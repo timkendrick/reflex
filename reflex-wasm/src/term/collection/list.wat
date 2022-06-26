@@ -285,8 +285,9 @@
             (global.get $NULL))))))
 
   (func $Term::List::traits::to_json (param $self i32) (param $offset i32) (result i32 i32)
-    (local $index i32)
     (local $length i32)
+    (local $index i32)
+    (local $item i32)
     (if (result i32 i32)
       ;; If the list is empty, write an empty JSON array literal
       (i32.eqz (local.tee $length (call $Term::List::get::items::length (local.get $self))))
@@ -305,10 +306,18 @@
         (i32.store8 (local.get $offset) (@char "["))
         ;; Iterate through the list items
         (loop $LOOP
+          ;; If the value does not support JSON serialization, bail out
+          (if
+            (i32.eqz
+              (call $Term::implements::to_json
+                (local.tee $item (call $Term::List::get::items::value (local.get $self) (local.get $index)))))
+            (then
+              (return (global.get $FALSE) (local.get $offset)))
+            (else))
           ;; Write the current item to the output and store the updated offset
           (local.set $offset
             (call $Term::traits::to_json
-              (call $Term::List::get::items::value (local.get $self) (local.get $index))
+              (local.get $item)
               ;; The target offset is incremented to reflect the preceding 1-byte opening brace or character separator
               (i32.add (local.get $offset) (i32.const 1))))
           ;; If the value serialization failed, bail out

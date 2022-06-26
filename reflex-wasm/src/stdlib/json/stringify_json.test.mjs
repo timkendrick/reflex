@@ -488,6 +488,15 @@ export default (describe) => {
         assert.strictEqual(format(result), JSON.stringify(JSON.stringify([3, 4, 5])));
         assert.strictEqual(format(dependencies), 'NULL');
       })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.StringifyJson),
+          createUnitList(createTriple(createInt(3), createBuiltin(Stdlib.Identity), createInt(5))),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:StringifyJson([3, Identity, 5])> . NULL)}');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
     });
 
     test('(Record)', (assert, {
@@ -553,6 +562,20 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), JSON.stringify(JSON.stringify({ foo: 3, baz: 5 })));
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.StringifyJson),
+          createUnitList(
+            createRecord(
+              createTriple(createString('foo'), createString('bar'), createString('baz')),
+              createTriple(createInt(3), createBuiltin(Stdlib.Identity), createInt(5)),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:StringifyJson({ "foo": 3, "bar": Identity, "baz": 5 })> . NULL)}');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });
