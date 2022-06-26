@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 export default (describe) => {
-  describe('TermType::Int', (test) => {
+  describe('Term::Int', (test) => {
     test('format', (assert, { createInt, format }) => {
       assert.strictEqual(format(createInt(0)), '0');
       assert.strictEqual(format(createInt(3)), '3');

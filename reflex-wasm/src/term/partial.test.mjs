@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 export default (describe) => {
-  describe('TermType::Partial', (test) => {
+  describe('Term::Partial', (test) => {
     test.skip('format', (assert) => {
       throw new Error('Not yet implemented');
     });

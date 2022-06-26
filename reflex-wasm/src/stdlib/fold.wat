@@ -2,12 +2,12 @@
 ;; SPDX-License-Identifier: Apache-2.0
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 (module
-  (@method $Stdlib_Fold
+  (@builtin $Stdlib_Fold
     (@args (@strict $self) (@strict $iteratee) (@lazy $seed))
 
     (@impl
-      (call $TermType::implements::iterate)
-      (call $TermType::implements::apply)
+      (call $Term::implements::iterate)
+      (call $Term::implements::apply)
       (i32.or (i32.const 0xFFFFFFFF))
       (func $Stdlib_Fold::impl::<iterate>::<apply>::any (param $self i32) (param $iteratee i32) (param $seed i32) (param $state i32) (result i32 i32)
         (local $value i32)
@@ -25,7 +25,7 @@
             (else
               (call $Term::traits::apply
                 (local.get $iteratee)
-                (call $List::create_pair (local.get $seed) (local.get $value))
+                (call $Term::List::create_pair (local.get $seed) (local.get $value))
                 (local.get $state))
               (local.set $dependencies (call $Dependencies::traits::union (local.get $dependencies)))
               (call $Term::traits::evaluate (local.get $state))
@@ -37,8 +37,8 @@
 
     (@default
       (func $Stdlib_Fold::impl::default (param $self i32) (param $iteratee i32) (param $seed i32) (param $state i32) (result i32 i32)
-        (call $Signal::of
-          (call $Condition::invalid_builtin_function_args
+        (call $Term::Signal::of
+          (call $Term::Condition::invalid_builtin_function_args
             (global.get $Stdlib_Fold)
-            (call $List::create_triple (local.get $self) (local.get $iteratee) (local.get $seed))))
+            (call $Term::List::create_triple (local.get $self) (local.get $iteratee) (local.get $seed))))
         (global.get $NULL)))))

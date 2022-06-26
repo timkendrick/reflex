@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 export default (describe) => {
-  describe('TermType::Tree', (test) => {
+  describe('Term::Tree', (test) => {
     test('format', (assert, { createTree, createInt, format, NULL }) => {
       assert.strictEqual(format(createTree(NULL, NULL)), '(NULL . NULL)');
       assert.strictEqual(format(createTree(createInt(3), NULL)), '(3 . NULL)');

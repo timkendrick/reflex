@@ -33,7 +33,6 @@ export function createListDirective({ elements, location }) {
     instruction: LIST_DIRECTIVE,
     elements: [
       NodeType.Term({ source: LIST_DIRECTIVE, location }),
-      NodeType.Whitespace({ source: ' ', location }),
       ...elements,
     ],
     location,

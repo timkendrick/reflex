@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 export default (describe) => {
-  describe('TermType::Float', (test) => {
+  describe('Term::Float', (test) => {
     test('format', (assert, { createFloat, format }) => {
       assert.strictEqual(format(createFloat(0.0)), '0.0');
       assert.strictEqual(format(createFloat(-0.0)), '0.0');

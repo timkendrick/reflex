@@ -73,7 +73,7 @@ export default function builtinDirective(node, context) {
           location: node.location,
         }),
         $default_implementation: defaultImplementation.identifier,
-      }),
+      }).module,
     ),
     ...builtinImplementations.flatMap(({ implementation }) => [
       NodeType.Whitespace({ source: '\n\n', location: node.location }),

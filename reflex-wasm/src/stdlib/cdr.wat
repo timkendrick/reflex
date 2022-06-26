@@ -2,7 +2,7 @@
 ;; SPDX-License-Identifier: Apache-2.0
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 (module
-  (@method $Stdlib_Cdr
+  (@builtin $Stdlib_Cdr
     (@args (@strict $self))
 
     (@impl
@@ -10,9 +10,9 @@
       (func $Stdlib_Cdr::impl::Tree (param $self i32) (param $state i32) (result i32 i32)
         (local $value i32)
         (if (result i32 i32)
-          (i32.eq (global.get $NULL) (local.tee $value (call $Tree::get::right (local.get $self))))
+          (i32.eq (global.get $NULL) (local.tee $value (call $Term::Tree::get::right (local.get $self))))
           (then
-            (call $Nil::new)
+            (call $Term::Nil::new)
             (global.get $NULL))
           (else
             (local.get $value)
@@ -20,8 +20,8 @@
 
     (@default
       (func $Stdlib_Cdr::impl::default (param $self i32) (param $state i32) (result i32 i32)
-        (call $Signal::of
-          (call $Condition::invalid_builtin_function_args
+        (call $Term::Signal::of
+          (call $Term::Condition::invalid_builtin_function_args
             (global.get $Stdlib_Cdr)
-            (call $List::of (local.get $self))))
+            (call $Term::List::of (local.get $self))))
         (global.get $NULL)))))

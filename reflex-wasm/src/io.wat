@@ -11,19 +11,19 @@
 
   (func $Io::startup
     ;; Initialize the private use area that holds IO intermediate value scatter/gather vectors
-    (global.set $Io::IOVEC (call $Cell::new (i32.const 3))))
+    (global.set $Io::IOVEC (call $Term::Cell::allocate (i32.const 3))))
 
   (func $Io::write_bytes (param $fd i32) (param $offset i32) (param $length i32) (result i32)
     ;; Store the pointer and length in the IO private use area
-    (call $Cell::set_field (global.get $Io::IOVEC) (i32.const 0) (local.get $offset))
-    (call $Cell::set_field (global.get $Io::IOVEC) (i32.const 1) (local.get $length))
+    (call $Term::Cell::set_field (global.get $Io::IOVEC) (i32.const 0) (local.get $offset))
+    (call $Term::Cell::set_field (global.get $Io::IOVEC) (i32.const 1) (local.get $length))
     ;; Write to WASI stdout
     (call $WASI::fd_write
       ;; File descriptor ID
       (local.get $fd)
       ;;; Pointer to the array of IO vectors from which to retrieve data
-      (call $Cell::get_field_pointer (global.get $Io::IOVEC) (i32.const 0))
+      (call $Term::Cell::get_field_pointer (global.get $Io::IOVEC) (i32.const 0))
       ;; Number of IO vector entries to read
       (i32.const 1)
       ;;; The memory address at which to write the number of bytes written
-      (call $Cell::get_field_pointer (global.get $Io::IOVEC) (i32.const 2)))))
+      (call $Term::Cell::get_field_pointer (global.get $Io::IOVEC) (i32.const 2)))))

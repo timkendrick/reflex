@@ -2,60 +2,50 @@
 ;; SPDX-License-Identifier: Apache-2.0
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 (module
-  (func $Float::startup)
+  (@let $Float
+    (@struct $Float
+      (@field $value f64))
 
-  (func $Float::new (export "createFloat") (param $value f64) (result i32)
-    (local $self i32)
-    ;; Allocate a new struct of the required size and type
-    (local.tee $self (call $Term::new (global.get $TermType::Float) (i32.const 2)))
-    ;; Store the struct fields at the correct offsets
-    (call $Term::set_f64_field (local.get $self) (i32.const 0) (local.get $value))
-    ;; Instantiate the term
-    (call $Term::init))
+    (@derive $size (@get $Float))
+    (@derive $hash (@get $Float))
 
-  (func $Float::is (export "isFloat") (param $term i32) (result i32)
-    (i32.eq (global.get $TermType::Float) (call $Term::get_type (local.get $term))))
+    (@export $Float (@get $Float)))
 
-  (func $Float::get::value (export "getFloatValue") (param $self i32) (result f64)
-    ;; Retrieve the struct field value from the correct offset
-    (call $Term::get_f64_field (local.get $self) (i32.const 0)))
-
-  (func $Float::traits::is_static (param $self i32) (result i32)
-    (global.get $TRUE))
-
-  (func $Float::traits::is_atomic (param $self i32) (result i32)
-    (call $Float::traits::is_static (local.get $self)))
-
-  (func $Float::traits::is_truthy (param $self i32) (result i32)
-    (global.get $TRUE))
-
-  (func $Float::traits::hash (param $self i32) (param $state i32) (result i32)
-    (local.get $state)
-    ;; Hash the struct field values
-    (call $Float::get::value (local.get $self))
-    (call $Hash::write_f64))
+  (export "isFloat" (func $Term::Float::is))
+  (export "getFloatValue" (func $Term::Float::get::value))
 
   (func $Float::traits::equals (param $self i32) (param $other i32) (result i32)
     (local $self_value f64)
     (local $other_value f64)
     (i32.or
-      ;; Return true if either the two values are identical
+      ;; Return true either if the two values are identical...
       (f64.eq
         (local.tee $self_value (call $Float::get::value (local.get $self)))
         (local.tee $other_value (call $Float::get::value (local.get $other))))
-      ;; Or both are NaN
+      ;; ...or both are NaN
       (i32.and
         (call $Utils::f64::is_nan (local.get $self_value))
         (call $Utils::f64::is_nan (local.get $other_value)))))
 
-  (func $Float::traits::write_json (param $self i32) (param $offset i32) (result i32)
+  (func $Term::Float::startup)
+
+  (func $Term::Float::new (export "createFloat") (param $value f64) (result i32)
+    (call $Term::TermType::Float::new (local.get $value)))
+
+  (func $Term::Float::traits::is_atomic (param $self i32) (result i32)
+    (global.get $TRUE))
+
+  (func $Term::Float::traits::is_truthy (param $self i32) (result i32)
+    (global.get $TRUE))
+
+  (func $Term::Float::traits::write_json (param $self i32) (param $offset i32) (result i32)
     (local $bytes_written i32)
     (if (result i32)
       (i32.eq
         (global.get $NULL)
         (local.tee $bytes_written
           (call $Utils::f64::write_string
-            (call $Float::get::value (local.get $self))
+            (call $Term::Float::get::value (local.get $self))
             (local.get $offset))))
       (then
         ;; If the write failed due to NaN or infinite float values, return a null JSON value
@@ -64,10 +54,10 @@
       (else
         (i32.add (local.get $offset) (local.get $bytes_written)))))
 
-  (func $Float::get_non_negative_integer_value (param $self i32) (result i32)
+  (func $Term::Float::get_non_negative_integer_value (param $self i32) (result i32)
     (local $value f64)
     (select
-      (i32.trunc_f64_s (local.tee $value (call $Float::get::value (local.get $self))))
+      (i32.trunc_f64_s (local.tee $value (call $Term::Float::get::value (local.get $self))))
       (global.get $NULL)
       (i32.and
         (call $Utils::f64::is_integer (local.get $value))

@@ -36,9 +36,13 @@ export default function includeDirective(node, context) {
   })(includePath.source);
   const importedModule = ((path) => {
     try {
-      return context.import(path, {});
+      return context.import(path, {}).module;
     } catch (err) {
-      throw new ParseError(node.location, context.sources.get(context.path), err.message);
+      if (err instanceof ParseError) {
+        throw new ParseError(node.location, context.sources.get(context.path), err.message);
+      } else {
+        throw err;
+      }
     }
   })(importedPath);
   const rootModules = getModules(importedModule);

@@ -2,63 +2,46 @@
 ;; SPDX-License-Identifier: Apache-2.0
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 (module
-  (func $FilterIterator::startup)
+  (@let $FilterIterator
+    (@struct $FilterIterator
+      (@field $source (@ref $Term))
+      (@field $predicate (@ref $Term)))
 
-  (func $FilterIterator::new (export "createFilterIterator") (param $source i32) (param $predicate i32) (result i32)
-    (local $self i32)
-    (local.tee $self (call $Term::new (global.get $TermType::FilterIterator) (i32.const 2)))
-    (call $Term::set_field (local.get $self) (i32.const 0) (local.get $source))
-    (call $Term::set_field (local.get $self) (i32.const 1) (local.get $predicate))
-    (call $Term::init))
+    (@derive $size (@get $FilterIterator))
+    (@derive $equals (@get $FilterIterator))
+    (@derive $hash (@get $FilterIterator))
 
-  (func $FilterIterator::is (export "isFilterIterator") (param $self i32) (result i32)
-    (i32.eq (global.get $TermType::FilterIterator) (call $Term::get_type (local.get $self))))
+    (@export $FilterIterator (@get $FilterIterator)))
 
-  (func $FilterIterator::get::source (export "getFilterIteratorSource") (param $self i32) (result i32)
-    (call $Term::get_field (local.get $self) (i32.const 0)))
+  (export "isFilterIterator" (func $Term::FilterIterator::is))
+  (export "createFilterIterator" (func $Term::TermType::FilterIterator::new))
+  (export "getFilterIteratorSource" (func $Term::FilterIterator::get::source))
+  (export "getFilterIteratorPredicate" (func $Term::FilterIterator::get::predicate))
 
-  (func $FilterIterator::get::predicate (export "getFilterIteratorPredicate") (param $self i32) (result i32)
-    (call $Term::get_field (local.get $self) (i32.const 1)))
+  (func $Term::FilterIterator::startup)
 
-  (func $FilterIterator::traits::is_static (param $self i32) (result i32)
+  (func $Term::FilterIterator::traits::is_atomic (param $self i32) (result i32)
+    (i32.eqz
+      (call $Term::traits::size_hint
+        (call $Term::FilterIterator::get::source (local.get $self)))))
+
+  (func $Term::FilterIterator::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
 
-  (func $FilterIterator::traits::is_atomic (param $self i32) (result i32)
-    (global.get $FALSE))
+  (func $Term::FilterIterator::traits::write_json (param $self i32) (param $offset i32) (result i32)
+    (call $Term::traits::write_json (call $Term::Record::empty) (local.get $offset)))
 
-  (func $FilterIterator::traits::is_truthy (param $self i32) (result i32)
-    (global.get $TRUE))
-
-  (func $FilterIterator::traits::hash (param $self i32) (param $state i32) (result i32)
-    (local.get $state)
-    (call $FilterIterator::get::source (local.get $self))
-    (call $Hash::write_term)
-    (call $FilterIterator::get::predicate (local.get $self))
-    (call $Hash::write_term))
-
-  (func $FilterIterator::traits::equals (param $self i32) (param $other i32) (result i32)
-    (i32.and
-      (call $Term::traits::equals
-        (call $FilterIterator::get::source (local.get $self))
-        (call $FilterIterator::get::source (local.get $other)))
-      (call $Term::traits::equals
-        (call $FilterIterator::get::predicate (local.get $self))
-        (call $FilterIterator::get::predicate (local.get $other)))))
-
-  (func $FilterIterator::traits::write_json (param $self i32) (param $offset i32) (result i32)
-    (call $Term::traits::write_json (call $Record::empty) (local.get $offset)))
-
-  (func $FilterIterator::traits::iterate (param $self i32) (result i32)
+  (func $Term::FilterIterator::traits::iterate (param $self i32) (result i32)
     (local.get $self))
 
-  (func $FilterIterator::traits::size_hint (param $self i32) (result i32)
-    (call $Term::traits::size_hint (call $FilterIterator::get::source (local.get $self))))
+  (func $Term::FilterIterator::traits::size_hint (param $self i32) (result i32)
+    (call $Term::traits::size_hint (call $Term::FilterIterator::get::source (local.get $self))))
 
-  (func $FilterIterator::traits::next (param $self i32) (param $iterator_state i32) (param $state i32) (result i32 i32 i32)
+  (func $Term::FilterIterator::traits::next (param $self i32) (param $iterator_state i32) (param $state i32) (result i32 i32 i32)
     (local $value i32)
     (local $dependencies i32)
     ;; Consume the next item from the source iterator
-    (call $Term::traits::next (call $FilterIterator::get::source (local.get $self)) (local.get $iterator_state) (local.get $state))
+    (call $Term::traits::next (call $Term::FilterIterator::get::source (local.get $self)) (local.get $iterator_state) (local.get $state))
     (local.set $dependencies)
     (local.set $iterator_state)
     (local.set $value)
@@ -73,10 +56,10 @@
         ;; Otherwise apply the predicate function to the given value and evaluate the result
         (call $Term::traits::evaluate
           ;; TODO: Avoid unnecessary heap allocations for intermediate values
-          (call $Application::new
-            (call $FilterIterator::get::predicate (local.get $self))
-            (call $List::of (local.get $value)))
-          (local.get $state))
+          (call $Term::Application::new
+            (call $Term::FilterIterator::get::predicate (local.get $self))
+            (call $Term::List::of (local.get $value)))
+            (local.get $state))
         (local.set $dependencies (call $Dependencies::traits::union (local.get $dependencies)))
         ;; If the predicate returned a truthy result, emit the iterator value
         (if (result i32 i32 i32)
@@ -87,5 +70,5 @@
             (local.get $dependencies))
           (else
             ;; Otherwise try the next item
-            (call $FilterIterator::traits::next (local.get $self) (local.get $iterator_state) (local.get $state))
+            (call $Term::FilterIterator::traits::next (local.get $self) (local.get $iterator_state) (local.get $state))
             (call $Dependencies::traits::union (local.get $dependencies))))))))

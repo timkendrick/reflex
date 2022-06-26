@@ -14,10 +14,13 @@
   (@include "./term.wat")
   (@include "./term/index.wat")
 
+  (@constructor
+    (@import $Term "./term.wat"))
+
   (func (export "_initialize")
     (call $Io::startup)
     ;; Invoke any startup hooks defined by the term type implementations
-    (call $TermType::startup))
+    (call $Term::startup))
 
   (func $Runtime::get_state_value (param $state_token i32) (param $state i32) (result i32 i32)
     (if (result i32)
@@ -25,11 +28,11 @@
       (then
         (global.get $NULL))
       (else
-        (call $Hashmap::traits::get (local.get $state) (local.get $state_token))))
+        (call $Term::Hashmap::traits::get (local.get $state) (local.get $state_token))))
     (call $Dependencies::of (local.get $state_token)))
 
   (func $Dependencies::of (param $state_token i32) (result i32)
-    (call $Tree::of (local.get $state_token)))
+    (call $Term::Tree::of (local.get $state_token)))
 
   (func $Dependencies::traits::union (param $self i32) (param $other i32) (result i32)
-    (call $Tree::traits::union (local.get $self) (local.get $other))))
+    (call $Term::Tree::traits::union (local.get $self) (local.get $other))))

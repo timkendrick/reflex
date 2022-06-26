@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 export default (describe) => {
-  describe('TermType::Symbol', (test) => {
+  describe('Term::Symbol', (test) => {
     test('format', (assert, { createSymbol, format }) => {
       assert.strictEqual(format(createSymbol(0)), 'Symbol(0)');
       assert.strictEqual(format(createSymbol(3)), 'Symbol(3)');

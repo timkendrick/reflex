@@ -143,7 +143,7 @@
               (i32.eq (@char "l") (i32.load8_u (local.tee $offset (i32.add (local.get $offset) (i32.const 1)))))
               (i32.eq (@char "l") (i32.load8_u (local.tee $offset (i32.add (local.get $offset) (i32.const 1)))))))))
       (then
-        (call $Nil::new)
+        (call $Term::Nil::new)
         (i32.add (local.get $offset) (i32.const 1)))
       (else
         (call $Json::parse_error (local.get $offset)))))
@@ -163,7 +163,7 @@
                 (i32.eq (@char "s") (i32.load8_u (local.tee $offset (i32.add (local.get $offset) (i32.const 1)))))
                 (i32.eq (@char "e") (i32.load8_u (local.tee $offset (i32.add (local.get $offset) (i32.const 1))))))))))
       (then
-        (call $Boolean::false)
+        (call $Term::Boolean::false)
         (i32.add (local.get $offset) (i32.const 1)))
       (else
         (call $Json::parse_error (local.get $offset)))))
@@ -181,7 +181,7 @@
               (i32.eq (@char "u") (i32.load8_u (local.tee $offset (i32.add (local.get $offset) (i32.const 1)))))
               (i32.eq (@char "e") (i32.load8_u (local.tee $offset (i32.add (local.get $offset) (i32.const 1)))))))))
       (then
-        (call $Boolean::true)
+        (call $Term::Boolean::true)
         (i32.add (local.get $offset) (i32.const 1)))
       (else
         (call $Json::parse_error (local.get $offset)))))
@@ -248,7 +248,7 @@
                     (return (call $Json::parse_error (local.get $offset))))
                   (else
                     (return
-                      (call $Float::new
+                      (call $Term::Float::new
                         (call $Json::parse_float
                           (local.get $is_negative)
                           (local.get $integer_value)
@@ -281,7 +281,7 @@
               (return (call $Json::parse_error (local.get $offset))))
             (else
               (return
-                (call $Float::new
+                (call $Term::Float::new
                   (call $Json::parse_float
                     (local.get $is_negative)
                     (local.get $integer_value)
@@ -290,7 +290,7 @@
                     (call $Json::set_negative (local.get $exponent_value) (local.get $is_negative_exponent))))
                   (local.get $offset)))))
         ;; Default implementation
-        (call $Int::new (call $Json::set_negative (local.get $integer_value) (local.get $is_negative)))
+        (call $Term::Int::new (call $Json::set_negative (local.get $integer_value) (local.get $is_negative)))
         (local.get $offset))))
 
   (func $Json::is_digit (param $char i32) (result i32)
@@ -341,7 +341,7 @@
                     (i32.add
                       (i32.mul (local.get $exponent_value) (i32.const 10))
                       (call $Json::parse_digit (local.get $char))))
-                  (br_if $LOOP (i32.le_u (local.tee $offset (i32.add (local.get $offset) (i32.const 1))) (local.get $end_offset))))
+                  (br_if $LOOP (i32.lt_u (local.tee $offset (i32.add (local.get $offset) (i32.const 1))) (local.get $end_offset))))
                 (else)))
             (local.get $is_negative)
             (local.get $exponent_value)
@@ -380,7 +380,7 @@
     (local $char i32)
     (local $bytes_written i32)
     (local $escape_sequence_length i32)
-    (local.set $result (call $String::allocate_unsized))
+    (local.set $result (call $Term::String::allocate_unsized))
     ;; Store the address of the first byte of the string contents (skipping over the opening quote)
     (local.set $chunk_offset (local.tee $offset (i32.add (local.get $offset) (i32.const 1))))
     (loop $LOOP (result i32 i32)
@@ -389,7 +389,7 @@
         (i32.eq (local.get $offset) (local.get $end_offset))
         (then
           ;; Terminate the output string
-          (call $String::init_unsized (local.get $result) (local.get $bytes_written))
+          (call $Term::String::init (local.get $result) (local.get $bytes_written))
           (drop)
           ;; Return an error result
           (call $Json::parse_error (local.get $offset)))
@@ -411,17 +411,22 @@
                     (i32.eq (local.get $char) (@char "\"")))))
               ;; If the character is a quote, terminate the string
               (return
-                (call $String::init_unsized
-                  (local.get $result)
+                ;; FIXME: refactor byte copying into string method (making sure to update string capacity)
+                (local.set $bytes_written
                   (i32.add
                     (local.get $bytes_written)
                     ;; Write the current chunk to the output string
                     (call $Json::copy_bytes
                       (local.get $chunk_offset)
                       (local.get $offset)
-                      (i32.add (call $String::get::offset (local.get $result)) (local.get $bytes_written)))))
+                      (i32.add (call $Term::String::get_offset (local.get $result)) (local.get $bytes_written)))))
+                (call $Term::String::set::data::capacity
+                  (local.get $result)
+                  (i32.div_u (call $Allocator::pad_to_4_byte_offset (local.get $bytes_written)) (i32.const 4)))
+                (call $Term::String::init (local.get $result) (local.get $bytes_written))
                 (i32.add (local.get $offset) (i32.const 1))))
             ;; If the character is a backslash, copy the chunk so far to the output string
+            ;; FIXME: refactor byte copying into string method (making sure to update string capacity)
             (local.set $bytes_written
               (i32.add
                 (local.get $bytes_written)
@@ -429,12 +434,15 @@
                 (call $Json::copy_bytes
                   (local.get $chunk_offset)
                   (local.get $offset)
-                  (i32.add (call $String::get::offset (local.get $result)) (local.get $bytes_written)))))
+                  (i32.add (call $Term::String::get_offset (local.get $result)) (local.get $bytes_written)))))
+            (call $Term::String::set::data::capacity
+              (local.get $result)
+              (i32.div_u (call $Allocator::pad_to_4_byte_offset (local.get $bytes_written)) (i32.const 4)))
             ;; Write the decoded escape sequence to the output string
-            (call $Json::parse_escape_sequence
+            (call $Json::write_escape_sequence
               ;; Skip over the backslash character
               (i32.add (local.get $offset) (i32.const 1))
-              (call $String::get_char_pointer (local.get $result) (local.get $bytes_written))
+              (call $Term::String::get_char_pointer (local.get $result) (local.get $bytes_written))
               (local.get $end_offset))
             (local.set $offset)
             (local.set $escape_sequence_length)
@@ -443,13 +451,17 @@
               (i32.eq (global.get $NULL) (local.get $escape_sequence_length))
               (then
                 ;; Terminate the output string
-                (call $String::init_unsized (local.get $result) (local.get $bytes_written))
+                (call $Term::String::init (local.get $result) (local.get $bytes_written))
                 (drop)
                 ;; Return an error result
                 (return (call $Json::parse_error (local.get $offset))))
               (else
                 ;; Otherwise update the record of how many bytes have been written to the output string
                 (local.set $bytes_written (i32.add (local.get $bytes_written) (local.get $escape_sequence_length)))
+                ;; FIXME: string capacity update should be handled internally when writing the character
+                (call $Term::String::set::data::capacity
+                  (local.get $result)
+                  (i32.div_u (call $Allocator::pad_to_4_byte_offset (local.get $bytes_written)) (i32.const 4)))
                 (local.set $chunk_offset (local.get $offset))
                 ;; Continue with the next character
                 (br $LOOP))))
@@ -468,7 +480,7 @@
     ;; Return the number of bytes written
     (local.get $length))
 
-  (func $Json::parse_escape_sequence (param $source_offset i32) (param $target_offset i32) (param $end_offset i32) (result i32 i32)
+  (func $Json::write_escape_sequence (param $source_offset i32) (param $target_offset i32) (param $end_offset i32) (result i32 i32)
     (local $char i32)
     (if (result i32 i32)
       ;; If this is the end of the source string, return an error result
@@ -553,6 +565,7 @@
         (call $Json::parse_error (local.get $source_offset)))))
 
   (func $Json::write_char (param $char i32) (param $target_offset i32)
+    ;; FIXME: refactor into string method (making sure to update string capacity)
     (call $Allocator::extend (local.get $target_offset) (i32.const 1))
     (i32.store8 (local.get $target_offset) (local.get $char)))
 
@@ -810,11 +823,11 @@
       ;; If an empty JSON array was provided, return the empty list
       (i32.eq (local.get $char) (@char "]"))
       (then
-        (call $List::empty)
+        (call $Term::List::empty)
         (i32.add (local.get $offset) (i32.const 1)))
       (else
         ;; Otherwise allocate a new list to hold the results
-        (local.set $results (call $List::allocate_unsized))
+        (local.set $results (call $Term::List::allocate_unsized))
         ;; Iterate through each of the JSON values in the array
         (loop $LOOP (result i32 i32)
           ;; Parse the next array item
@@ -825,12 +838,12 @@
             ;; If an invalid JSON value was encountered, terminate the results list and return an error result
             (i32.eq (global.get $NULL) (local.get $value))
             (then
-              (call $List::init_unsized (local.get $results))
+              (call $Term::List::init_unsized (local.get $results))
               (drop)
               (call $Json::parse_error (local.get $offset)))
             (else
               ;; Otherwise add the parsed item to the results list
-              (local.set $results (call $List::append_unsized (local.get $results) (local.get $value)))
+              (local.set $results (call $Term::List::append_unsized (local.get $results) (local.get $value)))
               ;; Skip any trailing whitespace and peek the next lookahead character
               (call $Json::skip_whitespace (local.get $offset) (local.get $end_offset))
               (local.set $char)
@@ -852,13 +865,13 @@
                         (i32.eq (@char "]") (local.get $char)))))
                   ;; If the lookahead character is the closing brace character, return the initialized list
                   (return
-                    (call $List::init_unsized (local.get $results))
+                    (call $Term::List::init_unsized (local.get $results))
                     (i32.add (local.get $offset) (i32.const 1))))
                 ;; If the lookahead character is a comma, continue with the next item
                 (local.set $offset (i32.add (local.get $offset) (i32.const 1)))
                 (br $LOOP))
               ;; Otherwise terminate the list and return an error result
-              (call $List::init_unsized (local.get $results))
+              (call $Term::List::init_unsized (local.get $results))
               (drop)
               (call $Json::parse_error (local.get $offset))))))))
 
@@ -875,12 +888,12 @@
       ;; If an empty JSON object was provided, return the empty record
       (i32.eq (local.get $char) (@char "}"))
       (then
-        (call $Record::empty)
+        (call $Term::Record::empty)
         (i32.add (local.get $offset) (i32.const 1)))
       (else
         ;; Otherwise allocate a new key and value lists to hold the results
-        (local.set $keys (call $List::allocate_unsized))
-        (local.set $values (call $List::allocate_unsized))
+        (local.set $keys (call $Term::List::allocate_unsized))
+        (local.set $values (call $Term::List::allocate_unsized))
         ;; Iterate through each of the JSON fields in the object
         (loop $LOOP (result i32 i32)
           ;; Parse the field key
@@ -891,16 +904,16 @@
             ;; If an invalid JSON key was encountered, terminate the key and value lists and return an error result
             (i32.or
               (i32.eq (global.get $NULL) (local.get $value))
-              (i32.eqz (call $String::is (local.get $value))))
+              (i32.eqz (call $Term::String::is (local.get $value))))
             (then
-              (call $List::init_unsized (local.get $keys))
+              (call $Term::List::init_unsized (local.get $keys))
               (drop)
-              (call $List::init_unsized (local.get $values))
+              (call $Term::List::init_unsized (local.get $values))
               (drop)
               (call $Json::parse_error (local.get $offset)))
             (else
               ;; Otherwise add the parsed key to the keys list
-              (local.set $keys (call $List::append_unsized (local.get $keys) (local.get $value)))
+              (local.set $keys (call $Term::List::append_unsized (local.get $keys) (local.get $value)))
               ;; Skip any trailing whitespace and peek the next lookahead character
               (call $Json::skip_whitespace (local.get $offset) (local.get $end_offset))
               (local.set $char)
@@ -909,9 +922,9 @@
                 ;; If the key is not followed by a colon separator, terminate the key and value lists and return an error result
                 (i32.ne (local.get $char) (@char ":"))
                 (then
-                  (call $List::init_unsized (local.get $keys))
+                  (call $Term::List::init_unsized (local.get $keys))
                   (drop)
-                  (call $List::init_unsized (local.get $values))
+                  (call $Term::List::init_unsized (local.get $values))
                   (drop)
                   (call $Json::parse_error (local.get $offset)))
                 (else
@@ -923,14 +936,14 @@
                     ;; If an invalid JSON value was encountered, terminate the key and value lists and return an error result
                     (i32.eq (global.get $NULL) (local.get $value))
                     (then
-                      (call $List::init_unsized (local.get $keys))
+                      (call $Term::List::init_unsized (local.get $keys))
                       (drop)
-                      (call $List::init_unsized (local.get $values))
+                      (call $Term::List::init_unsized (local.get $values))
                       (drop)
                       (call $Json::parse_error (local.get $offset)))
                     (else
                       ;; Otherwise add the parsed value to the values list
-                      (local.set $values (call $List::append_unsized (local.get $values) (local.get $value)))
+                      (local.set $values (call $Term::List::append_unsized (local.get $values) (local.get $value)))
                       ;; Skip any trailing whitespace and peek the next lookahead character
                       (call $Json::skip_whitespace (local.get $offset) (local.get $end_offset))
                       (local.set $char)
@@ -952,16 +965,16 @@
                                 (i32.eq (@char "}") (local.get $char)))))
                           ;; If the lookahead character is the closing brace character, return the initialized record
                           (return
-                            (call $Record::new
-                              (call $List::init_unsized (local.get $keys))
-                              (call $List::init_unsized (local.get $values)))
+                            (call $Term::Record::new
+                              (call $Term::List::init_unsized (local.get $keys))
+                              (call $Term::List::init_unsized (local.get $values)))
                             (i32.add (local.get $offset) (i32.const 1))))
                         ;; If the lookahead character is a comma, continue with the next field
                         (local.set $offset (i32.add (local.get $offset) (i32.const 1)))
                         (br $LOOP))
                       ;; Otherwise terminate the key and value lists and return an error result
-                      (call $List::init_unsized (local.get $keys))
+                      (call $Term::List::init_unsized (local.get $keys))
                       (drop)
-                      (call $List::init_unsized (local.get $values))
+                      (call $Term::List::init_unsized (local.get $values))
                       (drop)
                       (call $Json::parse_error (local.get $offset)))))))))))))

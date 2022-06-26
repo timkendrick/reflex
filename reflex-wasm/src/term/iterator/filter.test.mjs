@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 export default (describe) => {
-  describe('TermType::FilterIterator', (test) => {
+  describe('Term::FilterIterator', (test) => {
     test('iteration', (assert, {
       createApplication,
       createBoolean,

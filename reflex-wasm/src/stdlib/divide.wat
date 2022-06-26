@@ -2,7 +2,7 @@
 ;; SPDX-License-Identifier: Apache-2.0
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 (module
-  (@method $Stdlib_Divide
+  (@builtin $Stdlib_Divide
     (@args (@strict $self) (@strict $divisor))
 
     (@impl
@@ -11,15 +11,15 @@
       (func $Stdlib_Divide::impl::Int::Int (param $self i32) (param $divisor i32) (param $state i32) (result i32 i32)
         (local $divisor_value i32)
         (if (result i32 i32)
-          (i32.eqz (local.tee $divisor_value (call $Int::get::value (local.get $divisor))))
+          (i32.eqz (local.tee $divisor_value (call $Term::Int::get::value (local.get $divisor))))
           (then
-            (call $Signal::of
-              (call $Condition::invalid_builtin_function_args
+            (call $Term::Signal::of
+              (call $Term::Condition::invalid_builtin_function_args
                 (global.get $Stdlib_Divide)
-                (call $List::create_pair (local.get $self) (local.get $divisor))))
+                (call $Term::List::create_pair (local.get $self) (local.get $divisor))))
             (global.get $NULL))
           (else
-            (call $Int::new (i32.div_s (call $Int::get::value (local.get $self)) (local.get $divisor_value)))
+            (call $Term::Int::new (i32.div_s (call $Term::Int::get::value (local.get $self)) (local.get $divisor_value)))
             (global.get $NULL)))))
 
     (@impl
@@ -28,15 +28,15 @@
       (func $Stdlib_Divide::impl::Float::Float (param $self i32) (param $divisor i32) (param $state i32) (result i32 i32)
         (local $divisor_value f64)
         (if (result i32 i32)
-          (f64.eq (f64.const 0) (local.tee $divisor_value (call $Float::get::value (local.get $divisor))))
+          (f64.eq (f64.const 0) (local.tee $divisor_value (call $Term::Float::get::value (local.get $divisor))))
           (then
-            (call $Signal::of
-              (call $Condition::invalid_builtin_function_args
+            (call $Term::Signal::of
+              (call $Term::Condition::invalid_builtin_function_args
                 (global.get $Stdlib_Divide)
-                (call $List::create_pair (local.get $self) (local.get $divisor))))
+                (call $Term::List::create_pair (local.get $self) (local.get $divisor))))
             (global.get $NULL))
           (else
-            (call $Float::new (f64.div (call $Float::get::value (local.get $self)) (local.get $divisor_value)))
+            (call $Term::Float::new (f64.div (call $Term::Float::get::value (local.get $self)) (local.get $divisor_value)))
             (global.get $NULL)))))
 
     (@impl
@@ -45,15 +45,15 @@
       (func $Stdlib_Divide::impl::Int::Float (param $self i32) (param $divisor i32) (param $state i32) (result i32 i32)
         (local $divisor_value f64)
         (if (result i32 i32)
-          (f64.eq (f64.const 0) (local.tee $divisor_value (call $Float::get::value (local.get $divisor))))
+          (f64.eq (f64.const 0) (local.tee $divisor_value (call $Term::Float::get::value (local.get $divisor))))
           (then
-            (call $Signal::of
-              (call $Condition::invalid_builtin_function_args
+            (call $Term::Signal::of
+              (call $Term::Condition::invalid_builtin_function_args
                 (global.get $Stdlib_Divide)
-                (call $List::create_pair (local.get $self) (local.get $divisor))))
+                (call $Term::List::create_pair (local.get $self) (local.get $divisor))))
             (global.get $NULL))
           (else
-            (call $Float::new (f64.div (f64.convert_i32_s (call $Int::get::value (local.get $self))) (local.get $divisor_value)))
+            (call $Term::Float::new (f64.div (f64.convert_i32_s (call $Term::Int::get::value (local.get $self))) (local.get $divisor_value)))
             (global.get $NULL)))))
 
     (@impl
@@ -62,21 +62,21 @@
       (func $Stdlib_Divide::impl::Float::Int (param $self i32) (param $divisor i32) (param $state i32) (result i32 i32)
         (local $divisor_value i32)
         (if (result i32 i32)
-          (i32.eqz (local.tee $divisor_value (call $Int::get::value (local.get $divisor))))
+          (i32.eqz (local.tee $divisor_value (call $Term::Int::get::value (local.get $divisor))))
           (then
-            (call $Signal::of
-              (call $Condition::invalid_builtin_function_args
+            (call $Term::Signal::of
+              (call $Term::Condition::invalid_builtin_function_args
                 (global.get $Stdlib_Divide)
-                (call $List::create_pair (local.get $self) (local.get $divisor))))
+                (call $Term::List::create_pair (local.get $self) (local.get $divisor))))
             (global.get $NULL))
           (else
-            (call $Float::new (f64.div (call $Float::get::value (local.get $self)) (f64.convert_i32_s (local.get $divisor_value))))
+            (call $Term::Float::new (f64.div (call $Term::Float::get::value (local.get $self)) (f64.convert_i32_s (local.get $divisor_value))))
             (global.get $NULL)))))
 
     (@default
       (func $Stdlib_Divide::impl::default (param $self i32) (param $divisor i32) (param $state i32) (result i32 i32)
-        (call $Signal::of
-          (call $Condition::invalid_builtin_function_args
+        (call $Term::Signal::of
+          (call $Term::Condition::invalid_builtin_function_args
             (global.get $Stdlib_Divide)
-            (call $List::create_pair (local.get $self) (local.get $divisor))))
+            (call $Term::List::create_pair (local.get $self) (local.get $divisor))))
         (global.get $NULL)))))

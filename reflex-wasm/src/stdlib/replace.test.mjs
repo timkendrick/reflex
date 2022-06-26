@@ -61,6 +61,15 @@ export default (describe) => {
       (() => {
         const expression = createApplication(
           createBuiltin(Stdlib.Replace),
+          createTriple(createString('foofoofoo'), createString('foo'), createString('bar')),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '"barfoofoo"');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.Replace),
           createTriple(createString('foobarbaz'), createString('bar'), createString('qux')),
         );
         const [result, dependencies] = evaluate(expression, NULL);

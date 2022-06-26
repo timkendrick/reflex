@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 export default (describe) => {
-  describe('TermType::List', (test) => {
+  describe('Term::List', (test) => {
     test('format', (assert, {
       createEmptyList,
       createInt,

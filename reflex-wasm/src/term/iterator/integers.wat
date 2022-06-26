@@ -2,50 +2,44 @@
 ;; SPDX-License-Identifier: Apache-2.0
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 (module
+  (@let $IntegersIterator
+    (@struct $IntegersIterator)
+
+    (@derive $size (@get $IntegersIterator))
+    (@derive $equals (@get $IntegersIterator))
+    (@derive $hash (@get $IntegersIterator))
+
+    (@export $IntegersIterator (@get $IntegersIterator)))
+
+  (export "isIntegersIterator" (func $Term::IntegersIterator::is))
+
   ;; TODO: Compile singleton instances directly into linear memory data
-  (global $IntegersIterator::INSTANCE (mut i32) (i32.const -1))
+  (global $Term::IntegersIterator::INSTANCE (mut i32) (i32.const -1))
 
-  (func $IntegersIterator::startup
-    ;; Pre-allocate the singleton instance
-    (call $Term::new (global.get $TermType::IntegersIterator) (i32.const 0))
-    (call $Term::init)
-    ;; Update the global variable with a pointer to the singleton instance
-    (global.set $IntegersIterator::INSTANCE))
+  (func $Term::IntegersIterator::startup
+    ;; Pre-allocate the singleton instances
+    (global.set $Term::IntegersIterator::INSTANCE (call $Term::TermType::IntegersIterator::new)))
 
-  (func $IntegersIterator::is (export "isIntegersIterator") (param $self i32) (result i32)
-    (i32.eq (global.get $TermType::IntegersIterator) (call $Term::get_type (local.get $self))))
+  (func $Term::IntegersIterator::new (export "createIntegersIterator") (result i32)
+    (global.get $Term::IntegersIterator::INSTANCE))
 
-  (func $IntegersIterator::new (export "createIntegersIterator") (result i32)
-    (global.get $IntegersIterator::INSTANCE))
-
-  (func $IntegersIterator::traits::is_static (param $self i32) (result i32)
+  (func $Term::IntegersIterator::traits::is_atomic (param $self i32) (result i32)
     (global.get $TRUE))
 
-  (func $IntegersIterator::traits::is_atomic (param $self i32) (result i32)
+  (func $Term::IntegersIterator::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
 
-  (func $IntegersIterator::traits::is_truthy (param $self i32) (result i32)
-    (global.get $TRUE))
+  (func $Term::IntegersIterator::traits::write_json (param $self i32) (param $offset i32) (result i32)
+    (call $Term::traits::write_json (call $Term::Record::empty) (local.get $offset)))
 
-  (func $IntegersIterator::traits::hash (param $self i32) (param $state i32) (result i32)
-    ;; All integers iterators are interchangeable, so no need to add anything to the hash state
-    (local.get $state))
-
-  (func $IntegersIterator::traits::equals (param $self i32) (param $other i32) (result i32)
-    ;; All integers iterators are identical, so by definition any two integers iterators must be equal
-    (global.get $TRUE))
-
-  (func $IntegersIterator::traits::write_json (param $self i32) (param $offset i32) (result i32)
-    (call $Term::traits::write_json (call $Record::empty) (local.get $offset)))
-
-  (func $IntegersIterator::traits::iterate (param $self i32) (result i32)
+  (func $Term::IntegersIterator::traits::iterate (param $self i32) (result i32)
     (local.get $self))
 
-  (func $IntegersIterator::traits::size_hint (param $self i32) (result i32)
+  (func $Term::IntegersIterator::traits::size_hint (param $self i32) (result i32)
     (global.get $NULL))
 
-  (func $IntegersIterator::traits::next (param $self i32) (param $iterator_state i32) (param $state i32) (result i32 i32 i32)
-    (call $Int::new
+  (func $Term::IntegersIterator::traits::next (param $self i32) (param $iterator_state i32) (param $state i32) (result i32 i32 i32)
+    (call $Term::Int::new
       (local.tee $iterator_state
         (select
           (i32.const 0)

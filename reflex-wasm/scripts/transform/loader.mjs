@@ -7,7 +7,7 @@ import path from 'path';
 import { tokenize } from './lexer.mjs';
 import { parse } from './parser.mjs';
 
-export function createLoaderContext(entryPoint, { transform = null } = {}) {
+export function createLoaderContext(entryPoint, { transform = null, variables = {} } = {}) {
   return createContext(
     entryPoint,
     {
@@ -15,12 +15,18 @@ export function createLoaderContext(entryPoint, { transform = null } = {}) {
       modules: new Map(),
       transform,
     },
-    {},
+    variables,
+    new Map(),
   );
 }
 
 export function createChildScope(context, variables) {
-  return createContext(context.path, context, { ...context.variables, ...variables });
+  return createContext(
+    context.path,
+    context,
+    { ...context.variables, ...variables },
+    context.exports,
+  );
 }
 
 export function loadModule(path, context, variables) {
@@ -35,7 +41,7 @@ export function loadModule(path, context, variables) {
     context.sources.set(path, source);
     if (isStaticModule) context.modules.set(path, null);
     const ast = parseAst(source, path);
-    const childContext = createContext(path, context, variables);
+    const childContext = createContext(path, context, variables, new Map());
     const transformedNode = context.transform ? context.transform(ast, childContext) : [ast];
     if (!Array.isArray(transformedNode)) {
       throw new Error(`Invalid source transformation: expected Array, received ${transformedNode}`);
@@ -47,8 +53,12 @@ export function loadModule(path, context, variables) {
       );
     }
     const [transformedAst] = transformedNode;
-    if (isStaticModule) context.modules.set(path, transformedAst);
-    return transformedAst;
+    const module = {
+      module: transformedAst,
+      exports: new Map(childContext.exports),
+    };
+    if (isStaticModule) context.modules.set(path, module);
+    return module;
   }
 }
 
@@ -57,7 +67,7 @@ function parseAst(source, path) {
   return parse(tokens, source, path);
 }
 
-function createContext(modulePath, { sources, modules, transform }, variables) {
+function createContext(modulePath, { sources, modules, transform }, variables, exports) {
   const context = {
     path: modulePath,
     sources,
@@ -68,6 +78,7 @@ function createContext(modulePath, { sources, modules, transform }, variables) {
       return loadModule(resolvedPath, context, variables);
     },
     variables,
+    exports,
   };
   return context;
 }

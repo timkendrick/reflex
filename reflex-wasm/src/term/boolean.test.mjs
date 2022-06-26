@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 export default (describe) => {
-  describe('TermType::Boolean', (test) => {
+  describe('Term::Boolean', (test) => {
     test('format', (assert, { createBoolean, format }) => {
       assert.strictEqual(format(createBoolean(true)), 'true');
       assert.strictEqual(format(createBoolean(false)), 'false');

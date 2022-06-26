@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 export default (describe) => {
-  describe('TermType::String', (test) => {
+  describe('Term::String', (test) => {
     test('format', (assert, { createString, format }) => {
       assert.strictEqual(format(createString('')), '""');
       assert.strictEqual(format(createString('foo')), '"foo"');

@@ -62,7 +62,7 @@ function formatWhitespace(node, _sources) {
 function formatNodes(nodes, sources) {
   return nodes.reduce((results, node, index, array) => {
     const formatted = node.location && !node.modified ? null : formatNode(node, sources);
-    if (formatted) {
+    if (formatted !== null) {
       results =
         results || array.slice(0, index).map((element) => formatSource(element.location, sources));
       results.push(formatted);

@@ -2,7 +2,7 @@
 ;; SPDX-License-Identifier: Apache-2.0
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 (module
-  (@method $Stdlib_ResolveDeep
+  (@builtin $Stdlib_ResolveDeep
     (@args (@strict $self))
 
     (@impl
@@ -10,17 +10,17 @@
       (func $Stdlib_ResolveDeep::impl::List (param $self i32) (param $state i32) (result i32 i32)
         (if (result i32 i32)
           ;; If the list is already fully resolved, return it as-is
-          (call $List::traits::is_atomic (local.get $self))
+          (call $Term::List::traits::is_atomic (local.get $self))
           (then
             (local.get $self)
             (global.get $NULL))
           (else
             ;; Otherwise resolve all the items and collect them into a new list, short-circuiting any signals
-            (call $List::traits::collect_strict
+            (call $Term::List::traits::collect_strict
               ;; TODO: Avoid unnecessary heap allocations for intermediate values
-              (call $MapIterator::new
+              (call $Term::MapIterator::new
                 (local.get $self)
-                (call $Builtin::new (global.get $Stdlib_ResolveDeep)))
+                (call $Term::Builtin::new (global.get $Stdlib_ResolveDeep)))
               (local.get $state))))))
 
     (@impl
@@ -31,39 +31,39 @@
         (local $dependencies i32)
         (if (result i32 i32)
           ;; If the record is already fully resolved, return it as-is
-          (call $Record::traits::is_atomic (local.get $self))
+          (call $Term::Record::traits::is_atomic (local.get $self))
           (then
             (local.get $self)
             (global.get $NULL))
           (else
             ;; Otherwise resolve the keys and values and create a new record, short-circuiting any signals
             (call $Stdlib_ResolveDeep::impl::List
-              (call $Record::get::keys (local.get $self))
+              (call $Term::Record::get::keys (local.get $self))
               (local.get $state))
             (local.set $dependencies)
             (local.set $keys)
             (call $Stdlib_ResolveDeep::impl::List
-              (call $Record::get::values (local.get $self))
+              (call $Term::Record::get::values (local.get $self))
               (local.get $state))
             (local.set $dependencies (call $Dependencies::traits::union (local.get $dependencies)))
             (local.set $values)
             (if (result i32 i32)
               (i32.or
-                (call $Signal::is (local.get $values))
-                (call $Signal::is (local.get $keys)))
+                (call $Term::Signal::is (local.get $values))
+                (call $Term::Signal::is (local.get $keys)))
               (then
-                (call $Signal::traits::union
+                (call $Term::Signal::traits::union
                   (select
                     (local.get $keys)
                     (global.get $NULL)
-                    (call $Signal::is (local.get $keys)))
+                    (call $Term::Signal::is (local.get $keys)))
                   (select
                     (local.get $values)
                     (global.get $NULL)
-                    (call $Signal::is (local.get $values))))
+                    (call $Term::Signal::is (local.get $values))))
                 (local.get $dependencies))
               (else
-                (call $Record::new (local.get $keys) (local.get $values))
+                (call $Term::Record::new (local.get $keys) (local.get $values))
                 (local.get $dependencies)))))))
 
     (@impl
@@ -71,17 +71,17 @@
       (func $Stdlib_ResolveDeep::impl::Hashmap (param $self i32) (param $state i32) (result i32 i32)
         (if (result i32 i32)
           ;; If the hashmap is already fully resolved, return it as-is
-          (call $Hashmap::traits::is_atomic (local.get $self))
+          (call $Term::Hashmap::traits::is_atomic (local.get $self))
           (then
             (local.get $self)
             (global.get $NULL))
           (else
             ;; Otherwise resolve all the entries and collect them into a new hashmap, short-circuiting any signals
-            (call $Hashmap::traits::collect_strict
+            (call $Term::Hashmap::traits::collect_strict
               ;; TODO: Avoid unnecessary heap allocations for intermediate values
-              (call $MapIterator::new
+              (call $Term::MapIterator::new
                 (local.get $self)
-                (call $Builtin::new (global.get $Stdlib_ResolveDeep)))
+                (call $Term::Builtin::new (global.get $Stdlib_ResolveDeep)))
               (local.get $state))))))
 
     (@impl
@@ -92,14 +92,14 @@
         (local $dependencies i32)
         (if (result i32 i32)
           ;; If the tree is already fully resolved, return it as-is
-          (call $Tree::traits::is_atomic (local.get $self))
+          (call $Term::Tree::traits::is_atomic (local.get $self))
           (then
             (local.get $self)
             (global.get $NULL))
           (else
             ;; Otherwise resolve the child branches and create a new tree, short-circuiting any signals
             (if (result i32 i32)
-              (i32.eq (global.get $NULL) (local.tee $left (call $Tree::get::left (local.get $self))))
+              (i32.eq (global.get $NULL) (local.tee $left (call $Term::Tree::get::left (local.get $self))))
               (then
                 (global.get $NULL)
                 (global.get $NULL))
@@ -111,7 +111,7 @@
             (local.set $dependencies)
             (local.set $left)
             (if (result i32 i32)
-              (i32.eq (global.get $NULL) (local.tee $right (call $Tree::get::right (local.get $self))))
+              (i32.eq (global.get $NULL) (local.tee $right (call $Term::Tree::get::right (local.get $self))))
               (then
                 (global.get $NULL)
                 (global.get $NULL))
@@ -124,25 +124,25 @@
             (local.set $right)
             (if (result i32 i32)
               (i32.or
-                (call $Signal::is (local.get $right))
-                (call $Signal::is (local.get $left)))
+                (call $Term::Signal::is (local.get $right))
+                (call $Term::Signal::is (local.get $left)))
               (then
-                (call $Signal::traits::union
+                (call $Term::Signal::traits::union
                   (select
                     (local.get $left)
                     (global.get $NULL)
-                    (call $Signal::is (local.get $left)))
+                    (call $Term::Signal::is (local.get $left)))
                   (select
                     (local.get $right)
                     (global.get $NULL)
-                    (call $Signal::is (local.get $right))))
+                    (call $Term::Signal::is (local.get $right))))
                 (local.get $dependencies))
               (else
-                (call $Tree::new (local.get $left) (local.get $right))
+                (call $Term::Tree::new (local.get $left) (local.get $right))
                 (local.get $dependencies)))))))
 
     (@impl
-      (call $TermType::implements::iterate)
+      (call $Term::implements::iterate)
       (func $Stdlib_ResolveDeep::impl::<iterate> (param $self i32) (param $state i32) (result i32 i32)
         (local $items i32)
         (local $dependencies i32)
@@ -154,11 +154,11 @@
             (global.get $NULL))
           (else
             ;; Otherwise resolve all the items and collect them into a new list, short-circuiting any signals
-            (call $List::traits::collect_strict
+            (call $Term::List::traits::collect_strict
               ;; TODO: Avoid unnecessary heap allocations for intermediate values
-              (call $MapIterator::new
+              (call $Term::MapIterator::new
                 (local.get $self)
-                (call $Builtin::new (global.get $Stdlib_ResolveDeep)))
+                (call $Term::Builtin::new (global.get $Stdlib_ResolveDeep)))
               (local.get $state))))))
 
     (@default

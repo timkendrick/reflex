@@ -14,6 +14,8 @@ export default function concatDirective(node, context) {
   const values = items.map((node) => {
     if (isIdentifierNode(node)) {
       return node.source.slice('$'.length);
+    } else if (isTermNode(node)) {
+      return node.source;
     } else if (isStringNode(node)) {
       return JSON.parse(node.source);
     } else {
@@ -45,6 +47,10 @@ function isNonFunctionalNode(node) {
 
 function isNamedTermNode(source, node) {
   return node.type === NodeType.Term && node.source === source;
+}
+
+function isTermNode(node) {
+  return node.type === NodeType.Term;
 }
 
 function isIdentifierNode(node) {

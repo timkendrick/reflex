@@ -10,7 +10,15 @@ export const LET_DIRECTIVE = '@let';
 export default function letDirective(node, context) {
   const [instruction, identifier, value, ...instructions] = node.elements.reduce(
     (results, node) => {
-      if (results.length >= 3 || !isNonFunctionalNode(node)) results.push(node);
+      if (results.length < 3) {
+        results.push(
+          ...(context.transform ? context.transform(node, context) : [node]).filter(
+            (node) => !isNonFunctionalNode(node),
+          ),
+        );
+      } else if (!isNonFunctionalNode(node)) {
+        results.push(node);
+      }
       return results;
     },
     [],

@@ -7,18 +7,18 @@
     (local (@get $arg_name) i32))
   (if (result i32 i32)
     ;; If an insufficient number of arguments has been supplied, return an error signal
-    (i32.lt_u (call $List::traits::length (local.get $args)) (i32.const (@length (@get $arg_names))))
+    (i32.lt_u (call $Term::List::traits::length (local.get $args)) (i32.const (@length (@get $arg_names))))
     (then
-      (call $Signal::of
-        (call $Condition::invalid_builtin_function_args
-          (global.get (@get $method_name))
+      (call $Term::Signal::of
+        (call $Term::Condition::invalid_builtin_function_args
+          (global.get (@get $builtin_name))
           (local.get $args)))
       (global.get $NULL))
     (else
       ;; Extract the arguments from the argument list
       (@map $arg_name
         (@get $arg_names)
-        (local.set (@get $arg_name) (call $List::get_item (local.get $args) (i32.const (@get $_)))))
+        (local.set (@get $arg_name) (call $Term::List::get_item (local.get $args) (i32.const (@get $_)))))
       ;; Invoke the method implementation
       (call
         (@concat "$" (@get $builtin_name) "::call_static")
@@ -40,18 +40,18 @@
     (@fold $result $arg_name
       (@get $strict_arg_names)
       (i32.const 0x00000000)
-      (i32.or (@get $result) (call $Signal::is (local.get (@get $arg_name)))))
+      (i32.or (@get $result) (call $Term::Signal::is (local.get (@get $arg_name)))))
     (then
       (return
         (@fold $result $arg_name
           (@get $strict_arg_names)
           (global.get $NULL)
-          (call $Signal::traits::union
+          (call $Term::Signal::traits::union
             (@get $result)
             (select
               (local.get (@get $arg_name))
               (global.get $NULL)
-              (call $Signal::is (local.get (@get $arg_name))))))
+              (call $Term::Signal::is (local.get (@get $arg_name))))))
         (local.get $dependencies)))
     (else))
   ;; Otherwise apply the method to the evaluated arguments

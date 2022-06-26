@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 export default (describe) => {
-  describe('TermType::Effect', (test) => {
+  describe('Term::Effect', (test) => {
     test('format', (assert, {
       createCustomCondition,
       createEffect,

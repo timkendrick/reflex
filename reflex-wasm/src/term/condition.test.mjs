@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 export default (describe) => {
-  describe('TermType::Condition', (test) => {
+  describe('Term::Condition', (test) => {
     test('format', (assert, { createCustomCondition, createInt, createSymbol, format }) => {
       assert.strictEqual(
         format(createCustomCondition(createSymbol(123), createInt(3))),

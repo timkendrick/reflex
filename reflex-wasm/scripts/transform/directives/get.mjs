@@ -23,7 +23,7 @@ export default function getDirective(node, context) {
     );
   }
   const value = context.variables && context.variables[identifier.source];
-  if (!value) {
+  if (value === undefined) {
     const source = context.sources.get(context.path);
     throw new ParseError(
       node.location,
@@ -31,6 +31,7 @@ export default function getDirective(node, context) {
       `Undeclared variable: ${formatSourceRange(source, identifier.location)}`,
     );
   }
+  if (value === null) return [];
   return context.transform ? context.transform(value, context) : [value];
 }
 

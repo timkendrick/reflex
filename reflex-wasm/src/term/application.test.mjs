@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 export default (describe) => {
-  describe('TermType::Application', (test) => {
+  describe('Term::Application', (test) => {
     test.skip('format', (assert) => {
       // TODO: Test Application formatting
       throw new Error('Not yet implemented');

@@ -1,57 +1,61 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-const TermType = {
-  Application: 0,
-  Partial: 1,
-  Builtin: 2,
-  Effect: 3,
-  Signal: 4,
-  Condition: 5,
-  Nil: 6,
-  Boolean: 7,
-  Int: 8,
-  Float: 9,
-  Symbol: 10,
-  String: 11,
-  List: 12,
-  Record: 13,
-  Hashmap: 14,
-  Tree: 15,
-  EmptyIterator: 16,
-  OnceIterator: 17,
-  RepeatIterator: 18,
-  SkipIterator: 19,
-  TakeIterator: 20,
-  ChainIterator: 21,
-  ZipIterator: 22,
-  MapIterator: 23,
-  FilterIterator: 24,
-  FlattenIterator: 25,
-  EvaluateIterator: 26,
-  IntegersIterator: 27,
-  RangeIterator: 28,
-  HashmapKeysIterator: 29,
-  HashmapValuesIterator: 30,
-  Cell: 31,
-  Pointer: 32,
-};
-
-const ConditionType = {
-  Custom: 0,
-  Pending: 1,
-  Error: 2,
-  TypeError: 3,
-  InvalidFunctionTarget: 4,
-  InvalidFunctionArgs: 5,
-  InvalidAccessor: 6,
-  InvalidJson: 7,
-  InvalidPointer: 8,
-};
-
 const FALSE = 0;
 const TRUE = 1;
 const NULL = -1;
+
+function createTermTypes(runtime) {
+  return {
+    Application: runtime.TermType_Application.value,
+    Boolean: runtime.TermType_Boolean.value,
+    Builtin: runtime.TermType_Builtin.value,
+    Cell: runtime.TermType_Cell.value,
+    Hashmap: runtime.TermType_Hashmap.value,
+    List: runtime.TermType_List.value,
+    Record: runtime.TermType_Record.value,
+    Tree: runtime.TermType_Tree.value,
+    Condition: runtime.TermType_Condition.value,
+    Effect: runtime.TermType_Effect.value,
+    Float: runtime.TermType_Float.value,
+    Int: runtime.TermType_Int.value,
+    Nil: runtime.TermType_Nil.value,
+    Partial: runtime.TermType_Partial.value,
+    Pointer: runtime.TermType_Pointer.value,
+    Signal: runtime.TermType_Signal.value,
+    String: runtime.TermType_String.value,
+    Symbol: runtime.TermType_Symbol.value,
+    ChainIterator: runtime.TermType_ChainIterator.value,
+    EmptyIterator: runtime.TermType_EmptyIterator.value,
+    EvaluateIterator: runtime.TermType_EvaluateIterator.value,
+    FilterIterator: runtime.TermType_FilterIterator.value,
+    FlattenIterator: runtime.TermType_FlattenIterator.value,
+    HashmapKeysIterator: runtime.TermType_HashmapKeysIterator.value,
+    HashmapValuesIterator: runtime.TermType_HashmapValuesIterator.value,
+    IntegersIterator: runtime.TermType_IntegersIterator.value,
+    MapIterator: runtime.TermType_MapIterator.value,
+    OnceIterator: runtime.TermType_OnceIterator.value,
+    RangeIterator: runtime.TermType_RangeIterator.value,
+    RepeatIterator: runtime.TermType_RepeatIterator.value,
+    SkipIterator: runtime.TermType_SkipIterator.value,
+    TakeIterator: runtime.TermType_TakeIterator.value,
+    ZipIterator: runtime.TermType_ZipIterator.value,
+  };
+}
+
+function createConditionTypes(runtime) {
+  return {
+    Custom: runtime.ConditionType_CustomCondition.value,
+    Pending: runtime.ConditionType_PendingCondition.value,
+    Error: runtime.ConditionType_ErrorCondition.value,
+    TypeError: runtime.ConditionType_TypeErrorCondition.value,
+    InvalidFunctionTarget: runtime.ConditionType_InvalidFunctionTargetCondition.value,
+    InvalidFunctionArgs: runtime.ConditionType_InvalidFunctionArgsCondition.value,
+    InvalidAccessor: runtime.ConditionType_InvalidAccessorCondition.value,
+    InvalidJson: runtime.ConditionType_InvalidJsonCondition.value,
+    InvalidPointer: runtime.ConditionType_InvalidPointerCondition.value,
+  };
+}
 
 function createStdlib(runtime) {
   return {
@@ -117,12 +121,18 @@ function createStdlib(runtime) {
 }
 
 export function createRuntime(runtime) {
+  const constants = {
+    TermType: createTermTypes(runtime),
+    ConditionType: createConditionTypes(runtime),
+    Stdlib: createStdlib(runtime),
+  };
   return {
     FALSE,
     TRUE,
     NULL,
-    ConditionType,
-    Stdlib: createStdlib(runtime),
+    TermType: constants.TermType,
+    ConditionType: constants.ConditionType,
+    Stdlib: constants.Stdlib,
     exports: runtime,
     createNil() {
       return runtime.createNil();
@@ -218,9 +228,6 @@ export function createRuntime(runtime) {
     getSignalConditions(value) {
       return runtime.getSignalConditions(value);
     },
-    createTypeErrorCondition(type, payload) {
-      return runtime.createErrorCondition(payload);
-    },
     isCondition(value) {
       return runtime.isCondition(value);
     },
@@ -246,22 +253,31 @@ export function createRuntime(runtime) {
       return runtime.getErrorConditionPayload(value);
     },
     getTypeErrorConditionType(value) {
-      return runtime.getErrorConditionType(value);
+      return runtime.getTypeErrorConditionType(value);
     },
-    getTypeErrorConditionValue(value) {
-      return runtime.getErrorConditionValue(value);
+    getTypeErrorConditionReceived(value) {
+      return runtime.getTypeErrorConditionReceived(value);
     },
     createPendingCondition() {
       return runtime.createPendingCondition();
     },
+    createInvalidFunctionTargetCondition(target) {
+      return runtime.createInvalidFunctionTargetCondition(target);
+    },
     getInvalidFunctionTargetConditionTarget(value) {
       return runtime.getInvalidFunctionTargetConditionTarget(value);
+    },
+    createInvalidFunctionArgsCondition(target, args) {
+      return runtime.createInvalidFunctionArgsCondition(target, args);
     },
     getInvalidFunctionArgsConditionTarget(value) {
       return runtime.getInvalidFunctionArgsConditionTarget(value);
     },
     getInvalidFunctionArgsConditionArgs(value) {
       return runtime.getInvalidFunctionArgsConditionArgs(value);
+    },
+    createInvalidAccessorCondition(target, key) {
+      return runtime.createInvalidAccessorCondition(target, key);
     },
     getInvalidAccessorConditionTarget(value) {
       return runtime.getInvalidAccessorConditionTarget(value);
@@ -433,7 +449,7 @@ export function createRuntime(runtime) {
     createChainIterator(sources) {
       const instance = runtime.allocateChainIterator(sources.length);
       sources.forEach((source, index) => runtime.setChainIteratorSource(instance, index, source));
-      return runtime.initChainIterator(instance);
+      return runtime.initChainIterator(instance, sources.length);
     },
     createZipIterator(left, right) {
       return runtime.createZipIterator(left, right);
@@ -473,7 +489,7 @@ export function createRuntime(runtime) {
     },
     format(value) {
       if (value === NULL) return 'NULL';
-      return formatTerm(runtime, value);
+      return formatTerm(runtime, value, constants);
     },
     toJson(value) {
       return runtime.toJson(value);
@@ -489,65 +505,68 @@ function u32(value) {
   return value >= 0 ? value : 0xffffffff + 1 + value;
 }
 
-function formatTerm(runtime, value) {
+function formatTerm(runtime, value, constants) {
   switch (runtime.getTermType(value)) {
-    case TermType.Nil:
-      return formatNil(runtime, value);
-    case TermType.Boolean:
-      return formatBoolean(runtime, value);
-    case TermType.Int:
-      return formatInt(runtime, value);
-    case TermType.Float:
-      return formatFloat(runtime, value);
-    case TermType.String:
-      return formatString(runtime, value);
-    case TermType.Symbol:
-      return formatSymbol(runtime, value);
-    case TermType.Builtin:
-      return formatBuiltin(runtime, value);
-    case TermType.Partial:
-      return formatPartial(runtime, value);
-    case TermType.Application:
-      return formatApplication(runtime, value);
-    case TermType.List:
-      return formatList(runtime, value);
-    case TermType.Record:
-      return formatRecord(runtime, value);
-    case TermType.Hashmap:
-      return formatHashmap(runtime, value);
-    case TermType.Tree:
-      return formatTree(runtime, value);
-    case TermType.Iterator:
-      return formatIterator(runtime, value);
-    case TermType.Signal:
-      return formatSignal(runtime, value);
-    case TermType.Condition:
-      return formatCondition(runtime, value);
-    case TermType.Effect:
-      return formatEffect(runtime, value);
-    case TermType.Cell:
-      return formatCell(runtime, value);
-    case TermType.Pointer:
-      return formatPointer(runtime, value);
+    case constants.TermType.Nil:
+      return formatNil(runtime, value, constants);
+    case constants.TermType.Boolean:
+      return formatBoolean(runtime, value, constants);
+    case constants.TermType.Int:
+      return formatInt(runtime, value, constants);
+    case constants.TermType.Float:
+      return formatFloat(runtime, value, constants);
+    case constants.TermType.String:
+      return formatString(runtime, value, constants);
+    case constants.TermType.Symbol:
+      return formatSymbol(runtime, value, constants);
+    case constants.TermType.Builtin:
+      return formatBuiltin(runtime, value, constants);
+    case constants.TermType.Partial:
+      return formatPartial(runtime, value, constants);
+    case constants.TermType.Application:
+      return formatApplication(runtime, value, constants);
+    case constants.TermType.List:
+      return formatList(runtime, value, constants);
+    case constants.TermType.Record:
+      return formatRecord(runtime, value, constants);
+    case constants.TermType.Hashmap:
+      return formatHashmap(runtime, value, constants);
+    case constants.TermType.Tree:
+      return formatTree(runtime, value, constants);
+    case constants.TermType.Signal:
+      return formatSignal(runtime, value, constants);
+    case constants.TermType.Condition:
+      return formatCondition(runtime, value, constants);
+    case constants.TermType.Effect:
+      return formatEffect(runtime, value, constants);
+    case constants.TermType.Cell:
+      return formatCell(runtime, value, constants);
+    case constants.TermType.Pointer:
+      return formatPointer(runtime, value, constants);
     default: {
-      throw new Error(`Unexpected term type at offset ${value}: ${runtime.getTermType(value)}`);
+      const typeName = getEnumVariantName(constants.TermType, runtime.getTermType(value));
+      if (typeName) {
+        return typeName;
+      } else {
+        throw new Error(`Unexpected term type at offset ${value}: ${runtime.getTermType(value)}`);
+      }
     }
   }
 }
 
-function formatNil(_runtime, _value) {
+function formatNil(_runtime, _value, _constants) {
   return 'null';
 }
 
-function formatBoolean(runtime, value) {
+function formatBoolean(runtime, value, _constants) {
   return runtime.getBooleanValue(value) === 1 ? 'true' : 'false';
 }
 
-function formatInt(runtime, value) {
+function formatInt(runtime, value, _constants) {
   return runtime.getIntValue(value).toString(10);
 }
 
-function formatFloat(runtime, value) {
+function formatFloat(runtime, value, _constants) {
   const floatValue = runtime.getFloatValue(value);
   if (floatValue === Math.floor(floatValue)) {
     return floatValue.toFixed(1);
@@ -556,7 +575,7 @@ function formatFloat(runtime, value) {
   }
 }
 
-function formatString(runtime, value) {
+function formatString(runtime, value, _constants) {
   const offset = runtime.getStringOffset(value);
   const length = runtime.getStringLength(value);
   return JSON.stringify(
@@ -564,132 +583,132 @@ function formatString(runtime, value) {
   );
 }
 
-function formatSymbol(runtime, value) {
+function formatSymbol(runtime, value, _constants) {
   return `Symbol(${u32(runtime.getSymbolId(value))})`;
 }
 
-function formatSignal(runtime, value) {
-  return `{${formatTerm(runtime, runtime.getSignalConditions(value))}}`;
+function formatSignal(runtime, value, constants) {
+  return `{${formatTerm(runtime, runtime.getSignalConditions(value), constants)}}`;
 }
 
-function formatCondition(runtime, value) {
+function formatCondition(runtime, value, constants) {
   const type = u32(runtime.getConditionType(value));
-  const signalName = getEnumVariantName(ConditionType, type);
+  const signalName = getEnumVariantName(constants.ConditionType, type);
   if (!signalName) throw new Error(`Unexpected condition type: ${type}`);
-  const payload = formatConditionPayload(runtime, type, value);
+  const payload = formatConditionPayload(runtime, type, value, constants);
   return `<${signalName}${payload ? `:${payload}` : ''}>`;
 }
 
-function formatConditionPayload(runtime, type, value) {
+function formatConditionPayload(runtime, type, value, constants) {
   switch (type) {
-    case ConditionType.Custom:
-      return `${formatTerm(runtime, runtime.getCustomConditionEffectType(value))}:${formatTerm(
+    case constants.ConditionType.Custom:
+      return `${formatTerm(
         runtime,
-        runtime.getCustomConditionEffectPayload(value),
-      )}`;
-    case ConditionType.Error:
-      return formatTerm(runtime, runtime.getErrorConditionPayload(value));
-    case ConditionType.TypeError: {
-      const type = runtime.getTypeErrorConditionType(value);
-      return `${type === NULL ? '' : `${getEnumVariantName(TermType, type)}`}:${formatTerm(
+        runtime.getCustomConditionEffectType(value),
+        constants,
+      )}:${formatTerm(runtime, runtime.getCustomConditionPayload(value), constants)}`;
+    case constants.ConditionType.Error:
+      return formatTerm(runtime, runtime.getErrorConditionPayload(value), constants);
+    case constants.ConditionType.TypeError: {
+      const expected = runtime.getTypeErrorConditionExpected(value);
+      return `${expected === NULL ? '' : `${getEnumVariantName(constants.TermType, expected)}`}:${formatTerm(
         runtime,
-        runtime.getTypeErrorConditionValue(value),
+        runtime.getTypeErrorConditionReceived(value),
+        constants,
       )}`;
     }
-    case ConditionType.InvalidFunctionTarget:
-      return formatTerm(runtime, runtime.getInvalidFunctionTargetConditionTarget(value));
-    case ConditionType.InvalidFunctionArgs:
+    case constants.ConditionType.InvalidFunctionTarget:
+      return formatTerm(runtime, runtime.getInvalidFunctionTargetConditionTarget(value), constants);
+    case constants.ConditionType.InvalidFunctionArgs:
       return `${formatTerm(
         runtime,
         runtime.getInvalidFunctionArgsConditionTarget(value),
+        constants,
       )}(${getListItems(runtime, runtime.getInvalidFunctionArgsConditionArgs(value))
-        .map((arg) => formatTerm(runtime, arg))
+        .map((arg) => formatTerm(runtime, arg, constants))
         .join(', ')})`;
-    case ConditionType.InvalidAccessor:
-      return `${formatTerm(runtime, runtime.getInvalidAccessorConditionTarget(value))},${formatTerm(
+    case constants.ConditionType.InvalidAccessor:
+      return `${formatTerm(
         runtime,
-        runtime.getInvalidAccessorConditionKey(value),
-      )}`;
-    case ConditionType.InvalidJson:
+        runtime.getInvalidAccessorConditionTarget(value),
+        constants,
+      )},${formatTerm(runtime, runtime.getInvalidAccessorConditionKey(value), constants)}`;
+    case constants.ConditionType.InvalidJson:
       return `${formatTerm(
         runtime,
         runtime.getInvalidJsonConditionSource(value),
+        constants,
       )}:${runtime.getInvalidJsonConditionOffset(value)}`;
-    case ConditionType.Pending:
-    case ConditionType.InvalidPointer:
+    case constants.ConditionType.Pending:
+    case constants.ConditionType.InvalidPointer:
     default:
       return null;
   }
 }
 
-function formatEffect(runtime, value) {
-  return `(!${formatTerm(runtime, runtime.getEffectCondition(value))})`;
+function formatEffect(runtime, value, constants) {
+  return `(!${formatTerm(runtime, runtime.getEffectCondition(value), constants)})`;
 }
 
-function formatBuiltin(runtime, value) {
+function formatBuiltin(runtime, value, constants) {
   const target = u32(runtime.getBuiltinUid(value));
-  return getEnumVariantName(createStdlib(runtime), target);
+  return getEnumVariantName(constants.Stdlib, target);
 }
 
-function formatPartial(runtime, value) {
+function formatPartial(runtime, value, constants) {
   const target = runtime.getPartialTarget(value);
   const args = runtime.getPartialArgs(value);
-  return `${formatTerm(runtime, target)}.bind(${getListItems(runtime, args)
-    .map((arg) => formatTerm(runtime, arg))
+  return `${formatTerm(runtime, target, constants)}.bind(${getListItems(runtime, args)
+    .map((arg) => formatTerm(runtime, arg, constants))
     .join(', ')})`;
 }
 
-function formatApplication(runtime, value) {
+function formatApplication(runtime, value, constants) {
   const target = runtime.getApplicationTarget(value);
   const args = runtime.getApplicationArgs(value);
-  return `${formatTerm(runtime, target)}(${getListItems(runtime, args)
-    .map((arg) => formatTerm(runtime, arg))
+  return `${formatTerm(runtime, target, constants)}(${getListItems(runtime, args)
+    .map((arg) => formatTerm(runtime, arg, constants))
     .join(', ')})`;
 }
 
-function formatList(runtime, value) {
+function formatList(runtime, value, constants) {
   return `[${getListItems(runtime, value)
-    .map((item) => formatTerm(runtime, item))
+    .map((item) => formatTerm(runtime, item, constants))
     .join(', ')}]`;
 }
 
-function formatRecord(runtime, value) {
+function formatRecord(runtime, value, constants) {
   const keys = getListItems(runtime, runtime.getRecordKeys(value));
   const values = getListItems(runtime, runtime.getRecordValues(value));
   const entries = keys.map((key, index) => [key, values[index]]);
   if (entries.length == 0) return '{}';
   return `{ ${entries
-    .map(([key, value]) => `${formatTerm(runtime, key)}: ${formatTerm(runtime, value)}`)
+    .map(([key, value]) => `${formatTerm(runtime, key, constants)}: ${formatTerm(runtime, value, constants)}`)
     .join(', ')} }`;
 }
 
-function formatHashmap(runtime, value) {
+function formatHashmap(runtime, value, _constants) {
   return `Map({${runtime.getHashmapNumEntries(value)}})`;
 }
 
-function formatTree(runtime, value) {
+function formatTree(runtime, value, constants) {
   const left = runtime.getTreeLeft(value);
   const right = runtime.getTreeRight(value);
-  return `(${left === NULL ? 'NULL' : formatTerm(runtime, left)} . ${
-    right === NULL ? 'NULL' : formatTerm(runtime, right)
+  return `(${left === NULL ? 'NULL' : formatTerm(runtime, left, constants)} . ${
+    right === NULL ? 'NULL' : formatTerm(runtime, right, constants)
   })`;
 }
 
-function formatIterator(runtime, value) {
-  const length = u32(runtime.getIteratorSizeHint(value));
-  return `[...${length === 0xffffffff ? '' : `${length.toString(10)} items`}]`;
-}
-
-function formatCell(runtime, value) {
+function formatCell(runtime, value, _constants) {
   const numFields = runtime.getCellNumFields(value);
   return `Cell({${Array.from({ length: numFields }, (_, index) =>
     runtime.getCellField(value, index),
   ).join(', ')}})`;
 }
 
-function formatPointer(runtime, value) {
+function formatPointer(runtime, value, constants) {
   const target = runtime.getPointerTarget(value);
-  return `Pointer(${formatTerm(runtime, target)})`;
+  return `Pointer(${formatHex(value)}:${formatTerm(runtime, target, constants)})`;
 }
 
 function getListItems(runtime, value) {

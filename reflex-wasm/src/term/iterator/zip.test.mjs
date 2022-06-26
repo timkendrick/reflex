@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 export default (describe) => {
-  describe('TermType::ZipIterator', (test) => {
+  describe('Term::ZipIterator', (test) => {
     test('iteration', (assert, {
       createApplication,
       createEmptyIterator,

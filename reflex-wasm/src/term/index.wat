@@ -36,131 +36,76 @@
   (@include "./string.wat")
   (@include "./symbol.wat")
 
-  ;; Declare term types
-  (@let $typenames
-    (@list
-      "Application"
-      "Partial"
-      "Builtin"
-      "Effect"
-      "Signal"
-      "Condition"
-      "Nil"
-      "Boolean"
-      "Int"
-      "Float"
-      "Symbol"
-      "String"
-      "List"
-      "Record"
-      "Hashmap"
-      "Tree"
-      "EmptyIterator"
-      "OnceIterator"
-      "RepeatIterator"
-      "SkipIterator"
-      "TakeIterator"
-      "ChainIterator"
-      "ZipIterator"
-      "MapIterator"
-      "FilterIterator"
-      "FlattenIterator"
-      "EvaluateIterator"
-      "IntegersIterator"
-      "RangeIterator"
-      "HashmapKeysIterator"
-      "HashmapValuesIterator"
-      "Cell"
-      "Pointer")
+  (@let $TermType
+    (@union $TermType
+      (@import $Application "./application.wat")
+      (@import $Boolean "./boolean.wat")
+      (@import $Builtin "./builtin.wat")
+      (@import $Cell "./cell.wat")
+      (@import $Hashmap "./collection/hashmap.wat")
+      (@import $List "./collection/list.wat")
+      (@import $Record "./collection/record.wat")
+      (@import $Tree "./collection/tree.wat")
+      (@import $Condition "./condition.wat")
+      (@import $Effect "./effect.wat")
+      (@import $Float "./float.wat")
+      (@import $Int "./int.wat")
+      (@import $Nil "./nil.wat")
+      (@import $Partial "./partial.wat")
+      (@import $Pointer "./pointer.wat")
+      (@import $Signal "./signal.wat")
+      (@import $String "./string.wat")
+      (@import $Symbol "./symbol.wat")
+      (@import $ChainIterator "./iterator/chain.wat")
+      (@import $EmptyIterator "./iterator/empty.wat")
+      (@import $EvaluateIterator "./iterator/evaluate.wat")
+      (@import $FilterIterator "./iterator/filter.wat")
+      (@import $FlattenIterator "./iterator/flatten.wat")
+      (@import $HashmapKeysIterator "./iterator/hashmap_keys.wat")
+      (@import $HashmapValuesIterator "./iterator/hashmap_values.wat")
+      (@import $IntegersIterator "./iterator/integers.wat")
+      (@import $MapIterator "./iterator/map.wat")
+      (@import $OnceIterator "./iterator/once.wat")
+      (@import $RangeIterator "./iterator/range.wat")
+      (@import $RepeatIterator "./iterator/repeat.wat")
+      (@import $SkipIterator "./iterator/skip.wat")
+      (@import $TakeIterator "./iterator/take.wat")
+      (@import $ZipIterator "./iterator/zip.wat"))
 
-    ;; Declare term type constants
+    (@derive $equals (@get $TermType))
+    (@derive $hash (@get $TermType))
+
+    (@export $TermType (@get $TermType))
+
+    ;; Declare global term type constants
     (@map $typename
-      (@get $typenames)
-      (global (@concat "$TermType::" (@get $typename)) i32 (i32.const (@get $_))))
+      (@union_variants (@get $TermType))
+      (@block
+        (global (@concat "$TermType::" (@get $typename)) (export (@concat "\"" "TermType_" (@get $typename) "\"")) i32 (i32.const (@get $_)))))
 
-    (func $TermType::startup
-      ;; Allocate singleton instances
-      ;; TODO: Generate startup snapshot via compile-time macros
-      (@map $typename
-        (@get $typenames)
-        (call (@concat "$" (@get $typename) "::startup"))))
-
-    (func $TermType::traits::is_static (param $self i32) (result i32)
+    (func $TermType::traits::size (param $self i32) (result i32)
       (@branch
-        ;; Delegate method to underlying term type implementations
-        (call $Term::get_type (local.get $self))
+        ;; Determine term size according to the underlying term type implementation
+        (call $TermType::get::type (local.get $self))
         (@list
           (@map $typename
-            (@get $typenames)
-            (return (call (@concat "$" (@get $typename) "::traits::is_static") (local.get $self)))))
+            (@union_variants (@get $TermType))
+            (return
+              (i32.add
+                (i32.const 4)
+                (call (@concat "$" (@get $typename) "::traits::size") (call $TermType::get::value (local.get $self)))))))
         ;; Default implementation
-        (global.get $TRUE)))
-
-    (func $TermType::traits::is_atomic (param $self i32) (result i32)
-      (@branch
-        ;; Delegate method to underlying term type implementations
-        (call $Term::get_type (local.get $self))
-        (@list
-          (@map $typename
-            (@get $typenames)
-            (return (call (@concat "$" (@get $typename) "::traits::is_atomic") (local.get $self)))))
-        ;; Default implementation
-        (global.get $TRUE)))
-
-    (func $TermType::traits::is_truthy (param $self i32) (result i32)
-      (@branch
-        ;; Delegate method to underlying term type implementations
-        (call $Term::get_type (local.get $self))
-        (@list
-          (@map $typename
-            (@get $typenames)
-            (return (call (@concat "$" (@get $typename) "::traits::is_truthy") (local.get $self)))))
-        ;; Default implementation
-        (global.get $TRUE)))
-
-    (func $TermType::traits::hash (param $self i32) (param $state i32) (result i32)
-      (@branch
-        ;; Delegate method to underlying term type implementations
-        (call $Term::get_type (local.get $self))
-        (@list
-          (@map $typename
-            (@get $typenames)
-            (return (call (@concat "$" (@get $typename) "::traits::hash") (local.get $self) (local.get $state)))))
-        ;; Default implementation
-        (global.get $NULL)))
-
-    (func $TermType::traits::equals (param $self i32) (param $other i32) (result i32)
-      (@branch
-        ;; Delegate method to underlying term type implementations
-        (call $Term::get_type (local.get $self))
-        (@list
-          (@map $typename
-            (@get $typenames)
-            (return (call (@concat "$" (@get $typename) "::traits::equals") (local.get $self) (local.get $other)))))
-        ;; Default implementation
-        (global.get $FALSE)))
-
-    (func $TermType::traits::write_json (param $self i32) (param $offset i32) (result i32)
-      (@branch
-        ;; Delegate method to underlying term type implementations
-        (call $Term::get_type (local.get $self))
-        (@list
-          (@map $typename
-            (@get $typenames)
-            (return (call (@concat "$" (@get $typename) "::traits::write_json") (local.get $self) (local.get $offset)))))
-        ;; Default implementation
-        (call $Term::traits::write_json (call $Record::empty) (local.get $offset))))
+        (call $TermType::sizeof)))
 
     ;; Trait implementations
     ;; TODO: Refactor manual trait delegation implementations into macro
-
     (@let $trait_typenames
       (@list
-        "Application"
-        "Effect"
-        "Pointer")
+        $Application
+        $Effect
+        $Pointer)
 
-      (func $TermType::implements::evaluate (param $type i32) (result i32)
+      (func $Term::implements::evaluate (param $type i32) (result i32)
         (@fold $result $typename
           (@get $trait_typenames)
           (global.get $FALSE)
@@ -168,7 +113,7 @@
             (@get $result)
             (i32.eq (local.get $type) (global.get (@concat "$TermType::" (@get $typename)))))))
 
-      (func $TermType::traits::evaluate (param $self i32) (param $state i32) (result i32 i32)
+      (func $Term::traits::evaluate (param $self i32) (param $state i32) (result i32 i32)
         (local $self_type i32)
         (local.set $self_type (call $Term::get_type (local.get $self)))
         (@switch
@@ -178,18 +123,18 @@
               (@get $trait_typenames)
               (@list
                 (i32.eq (local.get $self_type) (global.get (@concat "$TermType::" (@get $typename))))
-                (return (call (@concat "$" (@get $typename) "::traits::evaluate") (local.get $self) (local.get $state))))))
+                (return (call (@concat "$Term::" (@get $typename) "::traits::evaluate") (local.get $self) (local.get $state))))))
           ;; Default implementation
           (local.get $self)
           (global.get $NULL))))
 
     (@let $trait_typenames
       (@list
-        "Builtin"
-        "Partial"
-        "Signal")
+        $Builtin
+        $Partial
+        $Signal)
 
-      (func $TermType::implements::apply (param $type i32) (result i32)
+      (func $Term::implements::apply (param $type i32) (result i32)
         (@fold $result $typename
           (@get $trait_typenames)
           (global.get $FALSE)
@@ -197,7 +142,7 @@
             (@get $result)
             (i32.eq (local.get $type) (global.get (@concat "$TermType::" (@get $typename)))))))
 
-      (func $TermType::traits::apply (param $self i32) (param $args i32) (param $state i32) (result i32 i32)
+      (func $Term::traits::apply (param $self i32) (param $args i32) (param $state i32) (result i32 i32)
         (local $self_type i32)
         (local.set $self_type (call $Term::get_type (local.get $self)))
         (@switch
@@ -207,34 +152,34 @@
               (@get $trait_typenames)
               (@list
                 (i32.eq (local.get $self_type) (global.get (@concat "$TermType::" (@get $typename))))
-                (return (call (@concat "$" (@get $typename) "::traits::apply") (local.get $self) (local.get $args) (local.get $state))))))
+                (return (call (@concat "$Term::" (@get $typename) "::traits::apply") (local.get $self) (local.get $args) (local.get $state))))))
           ;; Default implementation
-          (call $Signal::of (call $Condition::invalid_function_target (local.get $self)))
+          (call $Term::Signal::of (call $Term::Condition::invalid_function_target (local.get $self)))
           (global.get $NULL))))
 
     (@let $trait_typenames
       (@list
-        "List"
-        "Record"
-        "Hashmap"
-        "Tree"
-        "EmptyIterator"
-        "OnceIterator"
-        "RepeatIterator"
-        "SkipIterator"
-        "TakeIterator"
-        "ChainIterator"
-        "ZipIterator"
-        "MapIterator"
-        "FilterIterator"
-        "FlattenIterator"
-        "EvaluateIterator"
-        "IntegersIterator"
-        "RangeIterator"
-        "HashmapKeysIterator"
-        "HashmapValuesIterator")
+        $List
+        $Record
+        $Hashmap
+        $Tree
+        $EmptyIterator
+        $OnceIterator
+        $RepeatIterator
+        $SkipIterator
+        $TakeIterator
+        $ChainIterator
+        $ZipIterator
+        $MapIterator
+        $FilterIterator
+        $FlattenIterator
+        $EvaluateIterator
+        $IntegersIterator
+        $RangeIterator
+        $HashmapKeysIterator
+        $HashmapValuesIterator)
 
-      (func $TermType::implements::iterate (param $type i32) (result i32)
+      (func $Term::implements::iterate (param $type i32) (result i32)
         (@fold $result $typename
           (@get $trait_typenames)
           (global.get $FALSE)
@@ -242,7 +187,7 @@
             (@get $result)
             (i32.eq (local.get $type) (global.get (@concat "$TermType::" (@get $typename)))))))
 
-      (func $TermType::traits::iterate (param $self i32) (result i32)
+      (func $Term::traits::iterate (param $self i32) (result i32)
         (local $self_type i32)
         (local.set $self_type (call $Term::get_type (local.get $self)))
         (@switch
@@ -252,11 +197,11 @@
               (@get $trait_typenames)
               (@list
                 (i32.eq (local.get $self_type) (global.get (@concat "$TermType::" (@get $typename))))
-                (return (call (@concat "$" (@get $typename) "::traits::iterate") (local.get $self))))))
+                (return (call (@concat "$Term::" (@get $typename) "::traits::iterate") (local.get $self))))))
           ;; Default implementation
           (global.get $NULL)))
 
-      (func $TermType::implements::size_hint (param $type i32) (result i32)
+      (func $Term::implements::size_hint (param $type i32) (result i32)
         (@fold $result $typename
           (@get $trait_typenames)
           (global.get $FALSE)
@@ -264,7 +209,7 @@
             (@get $result)
             (i32.eq (local.get $type) (global.get (@concat "$TermType::" (@get $typename)))))))
 
-      (func $TermType::traits::size_hint (param $self i32) (result i32)
+      (func $Term::traits::size_hint (param $self i32) (result i32)
         (local $self_type i32)
         (local.set $self_type (call $Term::get_type (local.get $self)))
         (@switch
@@ -274,11 +219,11 @@
               (@get $trait_typenames)
               (@list
                 (i32.eq (local.get $self_type) (global.get (@concat "$TermType::" (@get $typename))))
-                (return (call (@concat "$" (@get $typename) "::traits::size_hint") (local.get $self))))))
+                (return (call (@concat "$Term::" (@get $typename) "::traits::size_hint") (local.get $self))))))
           ;; Default implementation
           (global.get $NULL)))
 
-      (func $TermType::implements::next (param $type i32) (result i32)
+      (func $Term::implements::next (param $type i32) (result i32)
         (@fold $result $typename
           (@get $trait_typenames)
           (global.get $FALSE)
@@ -286,7 +231,7 @@
             (@get $result)
             (i32.eq (local.get $type) (global.get (@concat "$TermType::" (@get $typename)))))))
 
-      (func $TermType::traits::next (param $self i32) (param $iterator_state i32) (param $state i32) (result i32 i32 i32)
+      (func $Term::traits::next (param $self i32) (param $iterator_state i32) (param $state i32) (result i32 i32 i32)
         (local $self_type i32)
         (local.set $self_type (call $Term::get_type (local.get $self)))
         (@switch
@@ -296,7 +241,7 @@
               (@get $trait_typenames)
               (@list
                 (i32.eq (local.get $self_type) (global.get (@concat "$TermType::" (@get $typename))))
-                (return (call (@concat "$" (@get $typename) "::traits::next") (local.get $self) (local.get $iterator_state) (local.get $state))))))
+                (return (call (@concat "$Term::" (@get $typename) "::traits::next") (local.get $self) (local.get $iterator_state) (local.get $state))))))
           ;; Default implementation
           (global.get $NULL)
           (global.get $NULL)

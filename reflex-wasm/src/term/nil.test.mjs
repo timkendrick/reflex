@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 export default (describe) => {
-  describe('TermType::Nil', (test) => {
+  describe('Term::Nil', (test) => {
     test('format', (assert, { createNil, format }) => {
       assert.strictEqual(format(createNil()), 'null');
     });
