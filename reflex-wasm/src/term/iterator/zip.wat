@@ -74,7 +74,7 @@
       (call $Utils::i32::min_u
         (local.tee $left_length (call $Term::traits::size_hint (call $Term::ZipIterator::get::left (local.get $self))))
         (local.tee $right_length (call $Term::traits::size_hint (call $Term::ZipIterator::get::right (local.get $self)))))
-      (i32.or
+      (i32.and
         (i32.eq (local.get $left_length) (global.get $NULL))
         (i32.eq (local.get $right_length) (global.get $NULL)))))
 

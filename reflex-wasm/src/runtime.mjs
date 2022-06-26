@@ -12,6 +12,7 @@ function createTermTypes(runtime) {
     Builtin: runtime.TermType_Builtin.value,
     Cell: runtime.TermType_Cell.value,
     Hashmap: runtime.TermType_Hashmap.value,
+    Hashset: runtime.TermType_Hashset.value,
     List: runtime.TermType_List.value,
     Condition: runtime.TermType_Condition.value,
     Constructor: runtime.TermType_Constructor.value,
@@ -71,6 +72,7 @@ function createStdlib(runtime) {
     Ceil: runtime.Stdlib_Ceil.value,
     Chain: runtime.Stdlib_Chain.value,
     CollectHashmap: runtime.Stdlib_CollectHashmap.value,
+    CollectHashset: runtime.Stdlib_CollectHashset.value,
     CollectList: runtime.Stdlib_CollectList.value,
     CollectString: runtime.Stdlib_CollectString.value,
     CollectTree: runtime.Stdlib_CollectTree.value,
@@ -473,6 +475,26 @@ export function createRuntime(runtime) {
     getHashmapValue(value, key) {
       return runtime.getHashmapValue(value, key);
     },
+    createHashset(values) {
+      const entries = runtime.allocateHashmap(runtime.defaultHashmapCapacity(values.length));
+      const nil = runtime.createNil();
+      values.forEach((value) => {
+        runtime.insertHashmapEntry(entries, value, nil);
+      });
+      return runtime.createHashset(runtime.initHashmap(entries, values.length));
+    },
+    isHashset(value) {
+      return runtime.isHashset(value);
+    },
+    asHashset(value) {
+      return runtime.isHashset(value) ? value : null;
+    },
+    getHashsetNumEntries(value) {
+      return runtime.getHashsetNumEntries(value);
+    },
+    hasHashsetValue(value, key) {
+      return Boolean(runtime.hasHashsetValue(value, key));
+    },
     createTree(left, right) {
       return runtime.createTree(left, right);
     },
@@ -591,6 +613,8 @@ function formatTerm(runtime, value, constants) {
       return formatRecord(runtime, value, constants);
     case constants.TermType.Hashmap:
       return formatHashmap(runtime, value, constants);
+    case constants.TermType.Hashset:
+      return formatHashset(runtime, value, constants);
     case constants.TermType.Tree:
       return formatTree(runtime, value, constants);
     case constants.TermType.Signal:
@@ -776,6 +800,10 @@ function formatRecord(runtime, value, constants) {
 
 function formatHashmap(runtime, value, _constants) {
   return `Map({${runtime.getHashmapNumEntries(value)}})`;
+}
+
+function formatHashset(runtime, value, _constants) {
+  return `Set({${runtime.getHashsetNumEntries(value)}})`;
 }
 
 function formatTree(runtime, value, constants) {

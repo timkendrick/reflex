@@ -10,6 +10,7 @@ import cdr from './cdr.test.mjs';
 import ceil from './ceil.test.mjs';
 import chain from './chain.test.mjs';
 import collectHashmap from './collect_hashmap.test.mjs';
+import collectHashset from './collect_hashset.test.mjs';
 import collectList from './collect_list.test.mjs';
 import collectString from './collect_string.test.mjs';
 import collectTree from './collect_tree.test.mjs';
@@ -73,6 +74,7 @@ export default (describe) => {
   ceil(describe);
   chain(describe);
   collectHashmap(describe);
+  collectHashset(describe);
   collectList(describe);
   collectString(describe);
   collectTree(describe);

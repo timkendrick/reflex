@@ -7,6 +7,7 @@
   (@include "./builtin.wat")
   (@include "./cell.wat")
   (@include "./collection/hashmap.wat")
+  (@include "./collection/hashset.wat")
   (@include "./collection/list.wat")
   (@include "./condition.wat")
   (@include "./constructor.wat")
@@ -46,6 +47,7 @@
       (@import $Builtin "./builtin.wat")
       (@import $Cell "./cell.wat")
       (@import $Hashmap "./collection/hashmap.wat")
+      (@import $Hashset "./collection/hashset.wat")
       (@import $Lambda "./lambda.wat")
       (@import $List "./collection/list.wat")
       (@import $Condition "./condition.wat")
@@ -176,6 +178,7 @@
         $List
         $Record
         $Hashmap
+        $Hashset
         $Tree
         $EmptyIterator
         $OnceIterator

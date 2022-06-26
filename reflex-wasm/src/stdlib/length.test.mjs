@@ -110,6 +110,37 @@ export default (describe) => {
       })();
     });
 
+    test('(Hashset)', (assert, {
+      createApplication,
+      createBuiltin,
+      createInt,
+      createHashset,
+      createUnitList,
+      evaluate,
+      format,
+      NULL,
+      Stdlib,
+    }) => {
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.Length),
+          createUnitList(createHashset([])),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '0');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.Length),
+          createUnitList(createHashset([createInt(3), createInt(4), createInt(5)])),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '3');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+    });
+
     test('(Tree)', (assert, {
       createApplication,
       createTree,
@@ -170,10 +201,7 @@ export default (describe) => {
         const expression = createApplication(
           createBuiltin(Stdlib.Length),
           createUnitList(
-            createTree(
-              createInt(3),
-              createTree(createInt(4), createTree(createInt(5), NULL)),
-            ),
+            createTree(createInt(3), createTree(createInt(4), createTree(createInt(5), NULL))),
           ),
         );
         const [result, dependencies] = evaluate(expression, NULL);

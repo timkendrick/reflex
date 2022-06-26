@@ -82,6 +82,9 @@
     ;; Pre-allocate the singleton instances
     (global.set $Term::Hashmap::EMPTY (call $Term::TermType::Hashmap::new (i32.const 0))))
 
+  (func $Term::Hashmap::empty (export "createEmptyHashmap") (result i32)
+    (global.get $Term::Hashmap::EMPTY))
+
   (func $Term::Hashmap::empty::sizeof (result i32)
     ;; Determine the size of the term wrapper by inspecting the buckets pointer for an imaginary hashmap term located
     ;; at memory address 0. The pointer offset tells us how many bytes are taken up by the preceding hashmap wrapper.
@@ -100,7 +103,7 @@
       (i32.eqz (local.get $capacity))
       (then
         ;; Return the pre-allocated singleton instance
-        (global.get $Term::Hashmap::EMPTY))
+        (call $Term::Hashmap::empty))
       (else
         ;; The standard constructor wrappers take care of allocating space for a standard term,
         ;; however they do not allocate space for extra elements as needed by the hashmap term.
@@ -125,11 +128,6 @@
     (call $Term::Hashmap::set::num_entries (local.get $self) (local.get $num_entries))
     ;; Instantiate the term
     (call $Term::init (local.get $self)))
-
-  (func $Term::Hashmap::empty (export "createEmptyHashmap") (result i32)
-    ;; Allocate a new hashmap of the required length
-    ;; (this will return the pre-allocated empty hashmap singleton)
-    (call $Term::Hashmap::allocate (i32.const 0)))
 
   (func $Term::Hashmap::traits::is_atomic (param $self i32) (result i32)
     (local $bucket_index i32)
@@ -367,17 +365,7 @@
             ;; Update the bucket value on the cloned hashmap
             (call $Term::Hashmap::update_bucket_value (local.get $instance) (local.get $existing_bucket_index) (local.get $value))
             ;; Instantiate the cloned hashmap
-            (call $Term::init)
-
-            ;; ;; FIXME: remove
-            ;; (local.tee $instance (call $Allocator::allocate (i32.const 52)))
-            ;; (memory.copy
-            ;;   (local.get $instance)
-            ;;   (local.get $self)
-            ;;   (i32.const 52))
-            ;; (call $Term::Hashmap::update_bucket_value (local.get $instance) (local.get $existing_bucket_index) (local.get $value))
-            ;; (call $Term::init)
-            )))))
+            (call $Term::init))))))
 
   (func $Term::Hashmap::traits::keys (param $self i32) (result i32)
     (call $Term::HashmapKeysIterator::new (local.get $self)))

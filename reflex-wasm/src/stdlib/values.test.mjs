@@ -136,5 +136,46 @@ export default (describe) => {
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });
+
+    test('(Hashset)', (assert, {
+      createApplication,
+      createBuiltin,
+      createInt,
+      createHashset,
+      createUnitList,
+      evaluate,
+      format,
+      getListItems,
+      isList,
+      NULL,
+      Stdlib,
+    }) => {
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.CollectList),
+          createUnitList(
+            createApplication(createBuiltin(Stdlib.Values), createUnitList(createHashset([]))),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '[]');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.CollectList),
+          createUnitList(
+            createApplication(
+              createBuiltin(Stdlib.Values),
+              createUnitList(createHashset([createInt(3), createInt(4), createInt(5)])),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.ok(isList(result));
+        assert.strictEqual(`[${getListItems(result).map(format).sort().join(', ')}]`, '[3, 4, 5]');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+    });
   });
 };

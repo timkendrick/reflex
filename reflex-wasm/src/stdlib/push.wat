@@ -13,6 +13,13 @@
         (global.get $NULL)))
 
     (@impl
+      (i32.eq (global.get $TermType::Hashset))
+      (i32.or (i32.const 0xFFFFFFFF))
+      (func $Stdlib_Push::impl::Hashset::any (param $self i32) (param $item i32) (param $state i32) (result i32 i32)
+        (call $Term::Hashset::push (local.get $self) (local.get $item))
+        (global.get $NULL)))
+
+    (@impl
       (call $TermType::implements::iterate)
       (i32.or (i32.const 0xFFFFFFFF))
       (func $Stdlib_Push::impl::<iterate>::any (param $self i32) (param $item i32) (param $state i32) (result i32 i32)

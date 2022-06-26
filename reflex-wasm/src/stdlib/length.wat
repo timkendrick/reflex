@@ -24,6 +24,12 @@
         (global.get $NULL)))
 
     (@impl
+      (i32.eq (global.get $TermType::Hashset))
+      (func $Stdlib_Length::impl::Hashset (param $self i32) (param $state i32) (result i32 i32)
+        (call $Term::Int::new (call $Term::Hashset::traits::length (local.get $self)))
+        (global.get $NULL)))
+
+    (@impl
       (i32.eq (global.get $TermType::Tree))
       (func $Stdlib_Length::impl::Tree (param $self i32) (param $state i32) (result i32 i32)
         (call $Term::Int::new (call $Term::Tree::traits::length (local.get $self)))

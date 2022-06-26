@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 export default (describe) => {
-  describe('Term::Hashmap', (test) => {
+  describe('Term::Hashset', (test) => {
     test.skip('format', (assert) => {
       throw new Error('Not yet implemented');
     });
@@ -15,11 +15,10 @@ export default (describe) => {
       throw new Error('Not yet implemented');
     });
 
-    test('basic property access', (assert, {
+    test('value lookups', (assert, {
       createApplication,
       createBuiltin,
-      createHashmap,
-      createInt,
+      createHashset,
       createPair,
       createString,
       evaluate,
@@ -27,45 +26,53 @@ export default (describe) => {
       NULL,
       Stdlib,
     }) => {
-      const hashmap = createHashmap([
-        [createString('foo'), createInt(3)],
-        [createString('bar'), createInt(4)],
-        [createString('baz'), createInt(5)],
+      const hashset = createHashset([
+        createString('foo'),
+        createString('bar'),
+        createString('baz'),
       ]);
       (function () {
         const expression = createApplication(
-          createBuiltin(Stdlib.Get),
-          createPair(hashmap, createString('foo')),
+          createBuiltin(Stdlib.Has),
+          createPair(hashset, createString('foo')),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '3');
+        assert.strictEqual(format(result), 'true');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (function () {
         const expression = createApplication(
-          createBuiltin(Stdlib.Get),
-          createPair(hashmap, createString('bar')),
+          createBuiltin(Stdlib.Has),
+          createPair(hashset, createString('bar')),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '4');
+        assert.strictEqual(format(result), 'true');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (function () {
         const expression = createApplication(
-          createBuiltin(Stdlib.Get),
-          createPair(hashmap, createString('baz')),
+          createBuiltin(Stdlib.Has),
+          createPair(hashset, createString('baz')),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '5');
+        assert.strictEqual(format(result), 'true');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (function () {
+        const expression = createApplication(
+          createBuiltin(Stdlib.Has),
+          createPair(hashset, createString('qux')),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), 'false');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });
 
-    test('missing keys', (assert, {
+    test('empty hashset lookups', (assert, {
       createApplication,
       createBuiltin,
-      createHashmap,
-      createInt,
+      createHashset,
       createPair,
       createString,
       evaluate,
@@ -73,46 +80,20 @@ export default (describe) => {
       NULL,
       Stdlib,
     }) => {
-      const hashmap = createHashmap([
-        [createString('foo'), createInt(3)],
-        [createString('bar'), createInt(4)],
-        [createString('baz'), createInt(5)],
-      ]);
+      const hashset = createHashset([]);
       const expression = createApplication(
-        createBuiltin(Stdlib.Get),
-        createPair(hashmap, createString('missing')),
+        createBuiltin(Stdlib.Has),
+        createPair(hashset, createString('foo')),
       );
       const [result, dependencies] = evaluate(expression, NULL);
-      assert.strictEqual(format(result), 'null');
-      assert.strictEqual(format(dependencies), 'NULL');
-    });
-
-    test('empty hashmap lookups', (assert, {
-      createApplication,
-      createBuiltin,
-      createHashmap,
-      createPair,
-      createString,
-      evaluate,
-      format,
-      NULL,
-      Stdlib,
-    }) => {
-      const hashmap = createHashmap([]);
-      const expression = createApplication(
-        createBuiltin(Stdlib.Get),
-        createPair(hashmap, createString('missing')),
-      );
-      const [result, dependencies] = evaluate(expression, NULL);
-      assert.strictEqual(format(result), 'null');
+      assert.strictEqual(format(result), 'false');
       assert.strictEqual(format(dependencies), 'NULL');
     });
 
     test('iteration', (assert, {
       createApplication,
       createBuiltin,
-      createInt,
-      createHashmap,
+      createHashset,
       createString,
       createUnitList,
       evaluate,
@@ -125,7 +106,7 @@ export default (describe) => {
       (() => {
         const expression = createApplication(
           createBuiltin(Stdlib.CollectList),
-          createUnitList(createHashmap([])),
+          createUnitList(createHashset([])),
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '[]');
@@ -135,18 +116,14 @@ export default (describe) => {
         const expression = createApplication(
           createBuiltin(Stdlib.CollectList),
           createUnitList(
-            createHashmap([
-              [createString('foo'), createInt(3)],
-              [createString('bar'), createInt(4)],
-              [createString('baz'), createInt(5)],
-            ]),
+            createHashset([createString('foo'), createString('bar'), createString('baz')]),
           ),
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.ok(isList(result));
         assert.strictEqual(
           `[${getListItems(result).map(format).sort().join(', ')}]`,
-          '[["bar", 4], ["baz", 5], ["foo", 3]]',
+          '["bar", "baz", "foo"]',
         );
         assert.strictEqual(format(dependencies), 'NULL');
       })();

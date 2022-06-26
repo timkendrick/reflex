@@ -8,6 +8,7 @@ export default (describe) => {
       createEmptyIterator,
       createBuiltin,
       createInt,
+      createIntegersIterator,
       createOnceIterator,
       createRangeIterator,
       createUnitList,
@@ -73,6 +74,15 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '[[3, 4]]');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.CollectList),
+          createUnitList(createZipIterator(createRangeIterator(3, 3), createIntegersIterator())),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '[[3, 0], [4, 1], [5, 2]]');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });

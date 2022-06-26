@@ -17,35 +17,50 @@ export default (describe) => {
     }) => {
       (() => {
         const list = createEmptyList();
-        const expression = createApplication(createBuiltin(Stdlib.Has), createPair(list, createInt(0)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Has),
+          createPair(list, createInt(0)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), 'false');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
         const list = createTriple(createInt(3), createInt(4), createInt(5));
-        const expression = createApplication(createBuiltin(Stdlib.Has), createPair(list, createInt(0)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Has),
+          createPair(list, createInt(0)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), 'true');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
         const list = createTriple(createInt(3), createInt(4), createInt(5));
-        const expression = createApplication(createBuiltin(Stdlib.Has), createPair(list, createInt(1)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Has),
+          createPair(list, createInt(1)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), 'true');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
         const list = createTriple(createInt(3), createInt(4), createInt(5));
-        const expression = createApplication(createBuiltin(Stdlib.Has), createPair(list, createInt(2)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Has),
+          createPair(list, createInt(2)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), 'true');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
         const list = createTriple(createInt(3), createInt(4), createInt(5));
-        const expression = createApplication(createBuiltin(Stdlib.Has), createPair(list, createInt(3)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Has),
+          createPair(list, createInt(3)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), 'false');
         assert.strictEqual(format(dependencies), 'NULL');
@@ -208,6 +223,81 @@ export default (describe) => {
           [createSymbol(456), createInt(4)],
           [createSymbol(789), createInt(5)],
         ]);
+        const expression = createApplication(
+          createBuiltin(Stdlib.Has),
+          createPair(hashmap, createSymbol(999)),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), 'false');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+    });
+
+    test('(Hashset, String)', (assert, {
+      createApplication,
+      createBuiltin,
+      createHashset,
+      createInt,
+      createPair,
+      createString,
+      evaluate,
+      format,
+      NULL,
+      Stdlib,
+    }) => {
+      (() => {
+        const hashset = createHashset([
+          createString('foo'),
+          createString('bar'),
+          createString('baz'),
+        ]);
+        const expression = createApplication(
+          createBuiltin(Stdlib.Has),
+          createPair(hashset, createString('foo')),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), 'true');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const hashmap = createHashset([
+          createString('foo'),
+          createString('bar'),
+          createString('baz'),
+        ]);
+        const expression = createApplication(
+          createBuiltin(Stdlib.Has),
+          createPair(hashmap, createString('qux')),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), 'false');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+    });
+
+    test('(Hashset, Symbol)', (assert, {
+      createApplication,
+      createBuiltin,
+      createHashset,
+      createPair,
+      createSymbol,
+      evaluate,
+      format,
+      NULL,
+      Stdlib,
+    }) => {
+      (() => {
+        const hashmap = createHashset([createSymbol(123), createSymbol(456), createSymbol(789)]);
+        const expression = createApplication(
+          createBuiltin(Stdlib.Has),
+          createPair(hashmap, createSymbol(123)),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), 'true');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const hashmap = createHashset([createSymbol(123), createSymbol(456), createSymbol(789)]);
         const expression = createApplication(
           createBuiltin(Stdlib.Has),
           createPair(hashmap, createSymbol(999)),

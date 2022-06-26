@@ -226,9 +226,18 @@ export default (describe) => {
           createUnitList(
             createRecord(
               createTriple(
-                createApplication(createBuiltin(Stdlib.Identity), createUnitList(createString('foo'))),
-                createApplication(createBuiltin(Stdlib.Identity), createUnitList(createString('bar'))),
-                createApplication(createBuiltin(Stdlib.Identity), createUnitList(createString('baz'))),
+                createApplication(
+                  createBuiltin(Stdlib.Identity),
+                  createUnitList(createString('foo')),
+                ),
+                createApplication(
+                  createBuiltin(Stdlib.Identity),
+                  createUnitList(createString('bar')),
+                ),
+                createApplication(
+                  createBuiltin(Stdlib.Identity),
+                  createUnitList(createString('baz')),
+                ),
               ),
               createTriple(
                 createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-3))),
@@ -248,9 +257,18 @@ export default (describe) => {
           createUnitList(
             createRecord(
               createTriple(
-                createApplication(createBuiltin(Stdlib.Identity), createUnitList(createString('foo'))),
-                createApplication(createBuiltin(Stdlib.Identity), createUnitList(createString('bar'))),
-                createApplication(createBuiltin(Stdlib.Identity), createUnitList(createString('baz'))),
+                createApplication(
+                  createBuiltin(Stdlib.Identity),
+                  createUnitList(createString('foo')),
+                ),
+                createApplication(
+                  createBuiltin(Stdlib.Identity),
+                  createUnitList(createString('bar')),
+                ),
+                createApplication(
+                  createBuiltin(Stdlib.Identity),
+                  createUnitList(createString('baz')),
+                ),
               ),
               createTriple(
                 createApplication(
@@ -339,6 +357,7 @@ export default (describe) => {
         assert.strictEqual(format(getHashmapValue(result, createString('foo'))), '3');
         assert.strictEqual(format(getHashmapValue(result, createString('bar'))), '4');
         assert.strictEqual(format(getHashmapValue(result, createString('baz'))), '5');
+        assert.strictEqual(format(getHashmapValue(result, createString('qux'))), 'NULL');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
@@ -347,15 +366,24 @@ export default (describe) => {
           createUnitList(
             createHashmap([
               [
-                createApplication(createBuiltin(Stdlib.Identity), createUnitList(createString('foo'))),
+                createApplication(
+                  createBuiltin(Stdlib.Identity),
+                  createUnitList(createString('foo')),
+                ),
                 createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-3))),
               ],
               [
-                createApplication(createBuiltin(Stdlib.Identity), createUnitList(createString('bar'))),
+                createApplication(
+                  createBuiltin(Stdlib.Identity),
+                  createUnitList(createString('bar')),
+                ),
                 createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-4))),
               ],
               [
-                createApplication(createBuiltin(Stdlib.Identity), createUnitList(createString('baz'))),
+                createApplication(
+                  createBuiltin(Stdlib.Identity),
+                  createUnitList(createString('baz')),
+                ),
                 createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-5))),
               ],
             ]),
@@ -367,6 +395,7 @@ export default (describe) => {
         assert.strictEqual(format(getHashmapValue(result, createString('foo'))), '3');
         assert.strictEqual(format(getHashmapValue(result, createString('bar'))), '4');
         assert.strictEqual(format(getHashmapValue(result, createString('baz'))), '5');
+        assert.strictEqual(format(getHashmapValue(result, createString('qux'))), 'NULL');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
@@ -375,7 +404,10 @@ export default (describe) => {
           createUnitList(
             createHashmap([
               [
-                createApplication(createBuiltin(Stdlib.Identity), createUnitList(createString('foo'))),
+                createApplication(
+                  createBuiltin(Stdlib.Identity),
+                  createUnitList(createString('foo')),
+                ),
                 createApplication(
                   createBuiltin(Stdlib.Identity),
                   createUnitList(
@@ -388,7 +420,10 @@ export default (describe) => {
                 ),
               ],
               [
-                createApplication(createBuiltin(Stdlib.Identity), createUnitList(createString('bar'))),
+                createApplication(
+                  createBuiltin(Stdlib.Identity),
+                  createUnitList(createString('bar')),
+                ),
                 createApplication(
                   createBuiltin(Stdlib.Identity),
                   createUnitList(
@@ -401,7 +436,10 @@ export default (describe) => {
                 ),
               ],
               [
-                createApplication(createBuiltin(Stdlib.Identity), createUnitList(createString('baz'))),
+                createApplication(
+                  createBuiltin(Stdlib.Identity),
+                  createUnitList(createString('baz')),
+                ),
                 createApplication(
                   createBuiltin(Stdlib.Identity),
                   createUnitList(
@@ -419,9 +457,170 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.ok(isHashmap(result));
         assert.strictEqual(getHashmapNumEntries(result), 3);
-        assert.strictEqual(format(getHashmapValue(result, createString('foo'))), '[Abs(-1), Abs(-2), Abs(-3)]');
-        assert.strictEqual(format(getHashmapValue(result, createString('bar'))), '[Abs(-4), Abs(-5), Abs(-6)]');
-        assert.strictEqual(format(getHashmapValue(result, createString('baz'))), '[Abs(-7), Abs(-8), Abs(-9)]');
+        assert.strictEqual(
+          format(getHashmapValue(result, createString('foo'))),
+          '[Abs(-1), Abs(-2), Abs(-3)]',
+        );
+        assert.strictEqual(
+          format(getHashmapValue(result, createString('bar'))),
+          '[Abs(-4), Abs(-5), Abs(-6)]',
+        );
+        assert.strictEqual(
+          format(getHashmapValue(result, createString('baz'))),
+          '[Abs(-7), Abs(-8), Abs(-9)]',
+        );
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+    });
+
+    test('(Hashset)', (assert, {
+      createApplication,
+      createBuiltin,
+      createInt,
+      createHashset,
+      createString,
+      createTriple,
+      createUnitList,
+      evaluate,
+      format,
+      getHashsetNumEntries,
+      hasHashsetValue,
+      isHashset,
+      NULL,
+      Stdlib,
+    }) => {
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.ResolveShallow),
+          createUnitList(createHashset([])),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.ok(isHashset(result));
+        assert.strictEqual(getHashsetNumEntries(result), 0);
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.ResolveShallow),
+          createUnitList(
+            createHashset([createString('foo'), createString('bar'), createString('baz')]),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.ok(isHashset(result));
+        assert.strictEqual(getHashsetNumEntries(result), 3);
+        assert.strictEqual(hasHashsetValue(result, createString('foo')), true);
+        assert.strictEqual(hasHashsetValue(result, createString('bar')), true);
+        assert.strictEqual(hasHashsetValue(result, createString('baz')), true);
+        assert.strictEqual(hasHashsetValue(result, createString('qux')), false);
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.ResolveShallow),
+          createUnitList(
+            createHashset([
+              createApplication(
+                createBuiltin(Stdlib.Identity),
+                createUnitList(createString('foo')),
+              ),
+              createApplication(
+                createBuiltin(Stdlib.Identity),
+                createUnitList(createString('bar')),
+              ),
+              createApplication(
+                createBuiltin(Stdlib.Identity),
+                createUnitList(createString('baz')),
+              ),
+            ]),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.ok(isHashset(result));
+        assert.strictEqual(getHashsetNumEntries(result), 3);
+        assert.strictEqual(hasHashsetValue(result, createString('foo')), true);
+        assert.strictEqual(hasHashsetValue(result, createString('bar')), true);
+        assert.strictEqual(hasHashsetValue(result, createString('baz')), true);
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.ResolveShallow),
+          createUnitList(
+            createHashset([
+              createApplication(
+                createBuiltin(Stdlib.Identity),
+                createUnitList(
+                  createTriple(
+                    createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-1))),
+                    createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-2))),
+                    createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-3))),
+                  ),
+                ),
+              ),
+              createApplication(
+                createBuiltin(Stdlib.Identity),
+                createUnitList(
+                  createTriple(
+                    createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-4))),
+                    createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-5))),
+                    createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-6))),
+                  ),
+                ),
+              ),
+              createApplication(
+                createBuiltin(Stdlib.Identity),
+                createUnitList(
+                  createTriple(
+                    createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-7))),
+                    createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-8))),
+                    createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-9))),
+                  ),
+                ),
+              ),
+            ]),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.ok(isHashset(result));
+        assert.strictEqual(getHashsetNumEntries(result), 3);
+        assert.strictEqual(
+          hasHashsetValue(
+            result,
+            createTriple(
+              createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-1))),
+              createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-2))),
+              createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-3))),
+            ),
+          ),
+          true,
+        );
+        assert.strictEqual(
+          hasHashsetValue(
+            result,
+            createTriple(
+              createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-4))),
+              createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-5))),
+              createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-6))),
+            ),
+          ),
+          true,
+        );
+        assert.strictEqual(
+          hasHashsetValue(
+            result,
+            createTriple(
+              createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-7))),
+              createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-8))),
+              createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-9))),
+            ),
+          ),
+          true,
+        );
+        assert.strictEqual(
+          hasHashsetValue(result, createTriple(createInt(1), createInt(2), createInt(3))),
+          false,
+        );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });

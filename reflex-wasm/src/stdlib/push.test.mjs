@@ -35,6 +35,45 @@ export default (describe) => {
       })();
     });
 
+    test('(Hashset, Int)', (assert, {
+      createApplication,
+      createBuiltin,
+      createHashset,
+      createInt,
+      createPair,
+      hasHashsetValue,
+      evaluate,
+      format,
+      NULL,
+      Stdlib,
+    }) => {
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.Push),
+          createPair(createHashset([]), createInt(3)),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), 'Set({1})');
+        assert.strictEqual(hasHashsetValue(result, createInt(3)), true);
+        assert.strictEqual(hasHashsetValue(result, createInt(4)), false);
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.Push),
+          createPair(createHashset([createInt(3), createInt(4), createInt(5)]), createInt(6)),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), 'Set({4})');
+        assert.strictEqual(hasHashsetValue(result, createInt(3)), true);
+        assert.strictEqual(hasHashsetValue(result, createInt(4)), true);
+        assert.strictEqual(hasHashsetValue(result, createInt(5)), true);
+        assert.strictEqual(hasHashsetValue(result, createInt(6)), true);
+        assert.strictEqual(hasHashsetValue(result, createInt(7)), false);
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+    });
+
     test('(Iterator, Int)', (assert, {
       createApplication,
       createBuiltin,

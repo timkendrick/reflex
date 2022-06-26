@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 import hashmap from './hashmap.test.mjs';
+import hashset from './hashset.test.mjs';
 import list from './list.test.mjs';
 
 export default (describe) => {
   hashmap(describe);
+  hashset(describe);
   list(describe);
 };
