@@ -108,6 +108,8 @@ function createStdlib(runtime) {
     Remainder: runtime.Stdlib_Remainder.value,
     Replace: runtime.Stdlib_Replace.value,
     ResolveDeep: runtime.Stdlib_ResolveDeep.value,
+    ResolveQueryBranch: runtime.Stdlib_ResolveQueryBranch.value,
+    ResolveQueryLeaf: runtime.Stdlib_ResolveQueryLeaf.value,
     ResolveShallow: runtime.Stdlib_ResolveShallow.value,
     Round: runtime.Stdlib_Round.value,
     Sequence: runtime.Stdlib_Sequence.value,

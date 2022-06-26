@@ -19,6 +19,8 @@ import effect from './effect.test.mjs';
 import endsWith from './ends_with.test.mjs';
 import eq from './eq.test.mjs';
 import equal from './equal.test.mjs';
+import resolveQueryBranch from './graphql/resolve_query_branch.test.mjs';
+import resolveQueryLeaf from './graphql/resolve_query_leaf.test.mjs';
 import floor from './floor.test.mjs';
 import fold from './fold.test.mjs';
 import get from './get.test.mjs';
@@ -79,6 +81,8 @@ export default (describe) => {
   endsWith(describe);
   eq(describe);
   equal(describe);
+  resolveQueryBranch(describe);
+  resolveQueryLeaf(describe);
   floor(describe);
   fold(describe);
   get(describe);
