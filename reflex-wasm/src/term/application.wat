@@ -28,6 +28,36 @@
   (func $Term::Application::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
 
+  (func $Term::Application::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
+    (local $substituted_target i32)
+    (local $substituted_args i32)
+    (local.set $substituted_target
+      (call $Term::traits::substitute
+        (call $Term::Application::get::target (local.get $self))
+        (local.get $variables)
+        (local.get $scope_offset)))
+    (local.set $substituted_args
+      (call $Term::traits::substitute
+        (call $Term::Application::get::args (local.get $self))
+        (local.get $variables)
+        (local.get $scope_offset)))
+    (if (result i32)
+      (i32.and
+        (i32.eq (global.get $NULL) (local.get $substituted_target))
+        (i32.eq (global.get $NULL) (local.get $substituted_args)))
+      (then
+        (global.get $NULL))
+      (else
+        (call $Term::Application::new
+          (select
+            (call $Term::Application::get::target (local.get $self))
+            (local.get $substituted_target)
+            (i32.eq (global.get $NULL) (local.get $substituted_target)))
+          (select
+            (call $Term::Application::get::args (local.get $self))
+            (local.get $substituted_args)
+            (i32.eq (global.get $NULL) (local.get $substituted_args)))))))
+
   (func $Term::Application::traits::write_json (param $self i32) (param $offset i32) (result i32)
     (call $Term::traits::write_json (call $Term::Record::empty) (local.get $offset)))
 
@@ -43,7 +73,6 @@
     ;; Pop the result dependencies and combine them with the accumulated dependencies
     (local.set $dependencies (call $Dependencies::traits::union (local.get $dependencies)))
     ;; Evaluate the result
-    (local.get $state)
-    (call $Term::traits::evaluate)
+    (call $Term::traits::evaluate (local.get $state))
     ;; Pop the result dependencies and combine them with the accumulated dependencies
     (call $Dependencies::traits::union (local.get $dependencies))))

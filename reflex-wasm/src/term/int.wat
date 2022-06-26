@@ -26,6 +26,9 @@
   (func $Term::Int::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
 
+  (func $Term::Int::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
+    (global.get $NULL))
+
   (func $Term::Int::traits::write_json (param $self i32) (param $offset i32) (result i32)
     (i32.add
       (local.get $offset)

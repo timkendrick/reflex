@@ -29,6 +29,9 @@
   (func $Term::Effect::traits::write_json (param $self i32) (param $offset i32) (result i32)
     (call $Term::traits::write_json (call $Term::Record::empty) (local.get $offset)))
 
+  (func $Term::Effect::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
+    (global.get $NULL))
+
   (func $Term::Effect::traits::evaluate (param $self i32) (param $state i32) (result i32 i32)
     (local $condition i32)
     (local $value i32)

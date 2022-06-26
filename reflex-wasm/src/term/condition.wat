@@ -150,5 +150,8 @@
   (func $Term::Condition::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
 
+  (func $Term::Condition::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
+    (global.get $NULL))
+
   (func $Term::Condition::traits::write_json (param $self i32) (param $offset i32) (result i32)
     (call $Term::traits::write_json (call $Term::Record::empty) (local.get $offset))))

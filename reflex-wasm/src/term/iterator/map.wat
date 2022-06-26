@@ -30,6 +30,36 @@
   (func $Term::MapIterator::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
 
+  (func $Term::MapIterator::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
+    (local $substituted_source i32)
+    (local $substituted_iteratee i32)
+    (local.set $substituted_source
+      (call $Term::traits::substitute
+        (call $Term::MapIterator::get::source (local.get $self))
+        (local.get $variables)
+        (local.get $scope_offset)))
+    (local.set $substituted_iteratee
+      (call $Term::traits::substitute
+        (call $Term::MapIterator::get::iteratee (local.get $self))
+        (local.get $variables)
+        (local.get $scope_offset)))
+    (if (result i32)
+      (i32.and
+        (i32.eq (global.get $NULL) (local.get $substituted_source))
+        (i32.eq (global.get $NULL) (local.get $substituted_iteratee)))
+      (then
+        (global.get $NULL))
+      (else
+        (call $Term::MapIterator::new
+          (select
+            (call $Term::MapIterator::get::source (local.get $self))
+            (local.get $substituted_source)
+            (i32.eq (global.get $NULL) (local.get $substituted_source)))
+          (select
+            (call $Term::MapIterator::get::iteratee (local.get $self))
+            (local.get $substituted_iteratee)
+            (i32.eq (global.get $NULL) (local.get $substituted_iteratee)))))))
+
   (func $Term::MapIterator::traits::write_json (param $self i32) (param $offset i32) (result i32)
     (call $Term::traits::write_json (call $Term::Record::empty) (local.get $offset)))
 

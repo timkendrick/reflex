@@ -38,6 +38,9 @@
   (func $Term::Float::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
 
+  (func $Term::Float::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
+    (global.get $NULL))
+
   (func $Term::Float::traits::write_json (param $self i32) (param $offset i32) (result i32)
     (local $bytes_written i32)
     (if (result i32)

@@ -30,6 +30,36 @@
   (func $Term::Partial::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
 
+  (func $Term::Partial::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
+    (local $substituted_target i32)
+    (local $substituted_args i32)
+    (local.set $substituted_target
+      (call $Term::traits::substitute
+        (call $Term::Partial::get::target (local.get $self))
+        (local.get $variables)
+        (local.get $scope_offset)))
+    (local.set $substituted_args
+      (call $Term::traits::substitute
+        (call $Term::Partial::get::args (local.get $self))
+        (local.get $variables)
+        (local.get $scope_offset)))
+    (if (result i32)
+      (i32.and
+        (i32.eq (global.get $NULL) (local.get $substituted_target))
+        (i32.eq (global.get $NULL) (local.get $substituted_args)))
+      (then
+        (global.get $NULL))
+      (else
+        (call $Term::Partial::new
+          (select
+            (call $Term::Partial::get::target (local.get $self))
+            (local.get $substituted_target)
+            (i32.eq (global.get $NULL) (local.get $substituted_target)))
+          (select
+            (call $Term::Partial::get::args (local.get $self))
+            (local.get $substituted_args)
+            (i32.eq (global.get $NULL) (local.get $substituted_args)))))))
+
   (func $Term::Partial::traits::write_json (param $self i32) (param $offset i32) (result i32)
     (call $Term::traits::write_json (call $Term::Record::empty) (local.get $offset)))
 

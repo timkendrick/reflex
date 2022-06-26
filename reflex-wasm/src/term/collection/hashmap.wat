@@ -165,6 +165,101 @@
   (func $Term::Hashmap::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
 
+  (func $Term::Hashmap::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
+    (local $num_entries i32)
+    (local $capacity i32)
+    (local $index i32)
+    (local $key i32)
+    (local $value i32)
+    (local $substituted_key i32)
+    (local $substituted_value i32)
+    (local $results i32)
+    (if (result i32)
+      ;; If the hashmap is empty, return the unmodified marker
+      (i32.eqz (local.tee $num_entries (call $Term::Hashmap::get::num_entries (local.get $self))))
+      (then
+        (global.get $NULL))
+      (else
+        ;; Otherwise iterate through each hashmap bucket in turn
+        (local.set $capacity (call $Term::Hashmap::get_capacity (local.get $self)))
+        (local.set $results (global.get $NULL))
+        (loop $LOOP
+          ;; If this bucket is empty, continue with the next bucket
+          (br_if $LOOP (i32.eqz (local.tee $key (call $Term::Hashmap::get_bucket_key (local.get $self) (local.get $index)))))
+          ;; Get the substituted key and value
+          (local.set $substituted_key
+            (call $Term::traits::substitute
+              (local.get $key)
+              (local.get $variables)
+              (local.get $scope_offset)))
+          (local.set $substituted_value
+            (call $Term::traits::substitute
+              (local.tee $value (call $Term::Hashmap::get_bucket_value (local.get $self) (local.get $index)))
+              (local.get $variables)
+              (local.get $scope_offset)))
+          (if
+            ;; If the bucket was modified, and this is the first bucket to have been modified, create a new results hashmap
+            (i32.and
+              (i32.or
+                (i32.ne (global.get $NULL) (local.get $substituted_key))
+                (i32.ne (global.get $NULL) (local.get $substituted_value)))
+              (i32.eq (global.get $NULL) (local.get $results)))
+            (then
+              ;; Create a new result hashmap term with the correct capacity
+              (local.set $results (call $Term::Hashmap::allocate (local.get $capacity)))
+              ;; Copy any previous buckets into the results hashmap
+              (if
+                (i32.eqz (local.get $index))
+                (then)
+                (else
+                  (memory.copy
+                    (call $Term::Hashmap::get::buckets::pointer (local.get $results) (i32.const 0))
+                    (call $Term::Hashmap::get::buckets::pointer (local.get $self) (i32.const 0))
+                    (i32.mul (call $HashmapBucket::sizeof) (local.get $index)))))
+              ;; Insert the substituted entry into the results hashmap
+              (call $Term::Hashmap::insert
+                (local.get $results)
+                ;; Add the unmodified key or the substituted key as appropriate
+                (select
+                  (local.get $key)
+                  (local.get $substituted_key)
+                  (i32.eq (global.get $NULL) (local.get $substituted_key)))
+                ;; Add the unmodified value or the substituted value as appropriate
+                (select
+                  (local.get $value)
+                  (local.get $substituted_value)
+                  (i32.eq (global.get $NULL) (local.get $substituted_value)))))
+            (else
+              ;; Otherwise if there have been modifications to the preceding buckets,
+              ;; Insert the current result into the results hashmap
+              (if
+                (i32.ne (global.get $NULL) (local.get $results))
+                (then
+                  (call $Term::Hashmap::insert
+                    (local.get $results)
+                    ;; Add the unmodified key or the substituted key as appropriate
+                    (select
+                      (local.get $key)
+                      (local.get $substituted_key)
+                      (i32.eq (global.get $NULL) (local.get $substituted_key)))
+                    ;; Add the unmodified value or the substituted value as appropriate
+                    (select
+                      (local.get $value)
+                      (local.get $substituted_value)
+                      (i32.eq (global.get $NULL) (local.get $substituted_value)))))
+                ;; Otherwise nothing more needs to be done for this bucket
+                (else))))
+          ;; Continue with the next bucket
+          (br_if $LOOP (i32.lt_u (local.tee $index (i32.add (local.get $index) (i32.const 1))) (local.get $capacity))))
+        ;; If there were any substitutions, return the initialized results hashmap term
+        (if (result i32)
+          (i32.ne (global.get $NULL) (local.get $results))
+          (then
+            (call $Term::Hashmap::init (local.get $results) (local.get $num_entries)))
+          (else
+            ;; Otherwise return the unmodified marker
+            (global.get $NULL))))))
+
   (func $Term::Hashmap::traits::write_json (param $self i32) (param $offset i32) (result i32)
     (call $Term::traits::write_json (call $Term::Record::empty) (local.get $offset)))
 

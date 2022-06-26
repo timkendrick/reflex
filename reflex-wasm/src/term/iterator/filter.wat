@@ -14,11 +14,13 @@
     (@export $FilterIterator (@get $FilterIterator)))
 
   (export "isFilterIterator" (func $Term::FilterIterator::is))
-  (export "createFilterIterator" (func $Term::TermType::FilterIterator::new))
   (export "getFilterIteratorSource" (func $Term::FilterIterator::get::source))
   (export "getFilterIteratorPredicate" (func $Term::FilterIterator::get::predicate))
 
   (func $Term::FilterIterator::startup)
+
+  (func $Term::FilterIterator::new (export "createFilterIterator") (param $source i32) (param $predicate i32) (result i32)
+    (call $Term::TermType::FilterIterator::new (local.get $source) (local.get $predicate)))
 
   (func $Term::FilterIterator::traits::is_atomic (param $self i32) (result i32)
     (i32.eqz
@@ -27,6 +29,36 @@
 
   (func $Term::FilterIterator::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
+
+  (func $Term::FilterIterator::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
+    (local $substituted_source i32)
+    (local $substituted_predicate i32)
+    (local.set $substituted_source
+      (call $Term::traits::substitute
+        (call $Term::FilterIterator::get::source (local.get $self))
+        (local.get $variables)
+        (local.get $scope_offset)))
+    (local.set $substituted_predicate
+      (call $Term::traits::substitute
+        (call $Term::FilterIterator::get::predicate (local.get $self))
+        (local.get $variables)
+        (local.get $scope_offset)))
+    (if (result i32)
+      (i32.and
+        (i32.eq (global.get $NULL) (local.get $substituted_source))
+        (i32.eq (global.get $NULL) (local.get $substituted_predicate)))
+      (then
+        (global.get $NULL))
+      (else
+        (call $Term::FilterIterator::new
+          (select
+            (call $Term::FilterIterator::get::source (local.get $self))
+            (local.get $substituted_source)
+            (i32.eq (global.get $NULL) (local.get $substituted_source)))
+          (select
+            (call $Term::FilterIterator::get::predicate (local.get $self))
+            (local.get $substituted_predicate)
+            (i32.eq (global.get $NULL) (local.get $substituted_predicate)))))))
 
   (func $Term::FilterIterator::traits::write_json (param $self i32) (param $offset i32) (result i32)
     (call $Term::traits::write_json (call $Term::Record::empty) (local.get $offset)))

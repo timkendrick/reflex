@@ -65,6 +65,48 @@
   (func $Term::Tree::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
 
+  (func $Term::Tree::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
+    (local $left i32)
+    (local $right i32)
+    (local $substituted_left i32)
+    (local $substituted_right i32)
+    (local.set $substituted_left
+      (if (result i32)
+        (i32.ne (local.tee $left (call $Term::Tree::get::left (local.get $self))) (global.get $NULL))
+        (then
+          (call $Term::traits::substitute
+            (local.get $left)
+            (local.get $variables)
+            (local.get $scope_offset)))
+        (else
+          (global.get $NULL))))
+    (local.set $substituted_right
+      (if (result i32)
+        (i32.ne (local.tee $right (call $Term::Tree::get::right (local.get $self))) (global.get $NULL))
+        (then
+          (call $Term::traits::substitute
+            (local.get $right)
+            (local.get $variables)
+            (local.get $scope_offset)))
+        (else
+          (global.get $NULL))))
+    (if (result i32)
+      (i32.and
+        (i32.eq (global.get $NULL) (local.get $substituted_left))
+        (i32.eq (global.get $NULL) (local.get $substituted_right)))
+      (then
+        (global.get $NULL))
+      (else
+        (call $Term::Tree::new
+          (select
+            (call $Term::Tree::get::left (local.get $self))
+            (local.get $substituted_left)
+            (i32.eq (global.get $NULL) (local.get $substituted_left)))
+          (select
+            (call $Term::Tree::get::right (local.get $self))
+            (local.get $substituted_right)
+            (i32.eq (global.get $NULL) (local.get $substituted_right)))))))
+
   (func $Term::Tree::traits::write_json (param $self i32) (param $offset i32) (result i32)
     (call $Term::traits::write_json (call $Term::Record::empty) (local.get $offset)))
 

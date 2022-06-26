@@ -53,6 +53,21 @@
   (func $Term::HashmapKeysIterator::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
 
+  (func $Term::HashmapKeysIterator::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
+    (local $substituted_source i32)
+    (local.set $substituted_source
+      (call $Term::traits::substitute
+        ;; TODO: Avoid unnecessary hashmap values substitution
+        (call $Term::HashmapKeysIterator::get::source (local.get $self))
+        (local.get $variables)
+        (local.get $scope_offset)))
+    (if (result i32)
+      (i32.eq (global.get $NULL) (local.get $substituted_source))
+      (then
+        (global.get $NULL))
+      (else
+        (call $Term::HashmapKeysIterator::new (local.get $substituted_source)))))
+
   (func $Term::HashmapKeysIterator::traits::write_json (param $self i32) (param $offset i32) (result i32)
     (call $Term::traits::write_json (call $Term::Record::empty) (local.get $offset)))
 

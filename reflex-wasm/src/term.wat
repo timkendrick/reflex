@@ -67,6 +67,17 @@
         ;; Default implementation
         (global.get $TRUE)))
 
+    (func $Term::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
+      (@branch
+        ;; Delegate method to underlying term type implementations
+        (call $Term::get_type (local.get $self))
+        (@list
+          (@map $typename
+            (@union_variants (@get $TermType))
+            (return (call (@concat "$Term::" (@get $typename) "::traits::substitute") (local.get $self) (local.get $variables) (local.get $scope_offset)))))
+        ;; Default implementation
+        (global.get $NULL)))
+
     (func $Term::traits::write_json (param $self i32) (param $offset i32) (result i32)
       (@branch
         ;; Delegate method to underlying term type implementations

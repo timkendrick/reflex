@@ -28,12 +28,15 @@
   (@include "./iterator/skip.wat")
   (@include "./iterator/take.wat")
   (@include "./iterator/zip.wat")
+  (@include "./lambda.wat")
+  (@include "./let.wat")
   (@include "./nil.wat")
   (@include "./partial.wat")
   (@include "./pointer.wat")
   (@include "./signal.wat")
   (@include "./string.wat")
   (@include "./symbol.wat")
+  (@include "./variable.wat")
 
   (@let $TermType
     (@union $TermType
@@ -42,6 +45,7 @@
       (@import $Builtin "./builtin.wat")
       (@import $Cell "./cell.wat")
       (@import $Hashmap "./collection/hashmap.wat")
+      (@import $Lambda "./lambda.wat")
       (@import $List "./collection/list.wat")
       (@import $Record "./collection/record.wat")
       (@import $Tree "./collection/tree.wat")
@@ -55,6 +59,8 @@
       (@import $Signal "./signal.wat")
       (@import $String "./string.wat")
       (@import $Symbol "./symbol.wat")
+      (@import $Variable "./variable.wat")
+      (@import $Let "./let.wat")
       (@import $EmptyIterator "./iterator/empty.wat")
       (@import $EvaluateIterator "./iterator/evaluate.wat")
       (@import $FilterIterator "./iterator/filter.wat")
@@ -101,6 +107,7 @@
       (@list
         $Application
         $Effect
+        $Let
         $Pointer)
 
       (func $Term::implements::evaluate (param $type i32) (result i32)
@@ -130,6 +137,7 @@
       (@list
         $Builtin
         $Partial
+        $Lambda
         $Signal)
 
       (func $Term::implements::apply (param $type i32) (result i32)

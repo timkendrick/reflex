@@ -214,6 +214,76 @@
   (func $Term::List::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
 
+  (func $Term::List::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
+    (local $length i32)
+    (local $index i32)
+    (local $item i32)
+    (local $substituted_item i32)
+    (local $results i32)
+    (if (result i32)
+      ;; If the list is empty, return the unmodified marker
+      (i32.eqz (local.tee $length (call $Term::List::get::items::length (local.get $self))))
+      (then
+        (global.get $NULL))
+      (else
+        ;; Otherwise iterate through each list item in turn
+        (local.set $results (global.get $NULL))
+        (loop $LOOP
+          ;; Get the substituted item value
+          (local.set $substituted_item
+            (call $Term::traits::substitute
+              (local.tee $item (call $Term::List::get::items::value (local.get $self) (local.get $index)))
+              (local.get $variables)
+              (local.get $scope_offset)))
+          (if
+            ;; If the item was modified, and this is the first item to have been modified, create a new results list
+            (i32.and
+              (i32.ne (global.get $NULL) (local.get $substituted_item))
+              (i32.eq (global.get $NULL) (local.get $results)))
+            (then
+              ;; Create a new result list term with the correct size
+              (local.set $results (call $Term::List::allocate (local.get $length)))
+              ;; Copy any previous items into the results list
+              (if
+                (i32.eqz (local.get $index))
+                (then)
+                (else
+                  (memory.copy
+                    (call $Term::List::get::items::pointer (local.get $results) (i32.const 0))
+                    (call $Term::List::get::items::pointer (local.get $self) (i32.const 0))
+                    (i32.mul (i32.const 4) (local.get $index)))))
+              ;; Push the substituted item onto the results list
+              (call $Term::List::set::items::value
+                (local.get $results)
+                (local.get $index)
+                (local.get $substituted_item)))
+            (else
+              ;; Otherwise if there have been modifications to the preceding items,
+              ;; Push the current result onto the results list
+              (if
+                (i32.ne (global.get $NULL) (local.get $results))
+                (then
+                  (call $Term::List::set::items::value
+                    (local.get $results)
+                    (local.get $index)
+                    ;; Add the unmodified value or the substituted value as appropriate
+                    (select
+                      (local.get $item)
+                      (local.get $substituted_item)
+                      (i32.eq (global.get $NULL) (local.get $substituted_item)))))
+                ;; Otherwise nothing more needs to be done for this item
+                (else))))
+          ;; Continue with the next item
+          (br_if $LOOP (i32.lt_u (local.tee $index (i32.add (local.get $index) (i32.const 1))) (local.get $length))))
+        ;; If there were any substitutions, return the initialized results list term
+        (if (result i32)
+          (i32.ne (global.get $NULL) (local.get $results))
+          (then
+            (call $Term::List::init (local.get $results) (local.get $length)))
+          (else
+            ;; Otherwise return the unmodified marker
+            (global.get $NULL))))))
+
   (func $Term::List::traits::write_json (param $self i32) (param $offset i32) (result i32)
     (local $index i32)
     (local $length i32)

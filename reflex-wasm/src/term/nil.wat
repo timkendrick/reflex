@@ -30,6 +30,9 @@
   (func $Term::Nil::traits::is_truthy (param $self i32) (result i32)
     (global.get $FALSE))
 
+  (func $Term::Nil::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
+    (global.get $NULL))
+
   (func $Term::Nil::traits::write_json (param $self i32) (param $offset i32) (result i32)
     (@store_bytes (local.get $offset) "null")
     (i32.add (local.get $offset))))

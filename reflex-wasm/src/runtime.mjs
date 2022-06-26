@@ -25,6 +25,9 @@ function createTermTypes(runtime) {
     Signal: runtime.TermType_Signal.value,
     String: runtime.TermType_String.value,
     Symbol: runtime.TermType_Symbol.value,
+    Lambda: runtime.TermType_Lambda.value,
+    Variable: runtime.TermType_Variable.value,
+    Let: runtime.TermType_Let.value,
     EmptyIterator: runtime.TermType_EmptyIterator.value,
     EvaluateIterator: runtime.TermType_EvaluateIterator.value,
     FilterIterator: runtime.TermType_FilterIterator.value,
@@ -324,6 +327,48 @@ export function createRuntime(runtime) {
     getPartialArgs(value) {
       return runtime.getPartialArgs(value);
     },
+    createLambda(numArgs, body) {
+      return runtime.createLambda(numArgs, body);
+    },
+    isLambda(value) {
+      return runtime.isLambda(value);
+    },
+    asLambda(value) {
+      return runtime.isLambda(value) ? value : null;
+    },
+    getLambdaNumArgs(value) {
+      return u32(runtime.getLambdaNumArgs(value));
+    },
+    getLambdaBody(value) {
+      return runtime.getLambdaBody(value);
+    },
+    createVariable(stackOffset) {
+      return runtime.createVariable(stackOffset);
+    },
+    isVariable(value) {
+      return runtime.isVariable(value);
+    },
+    asVariable(value) {
+      return runtime.isVariable(value) ? value : null;
+    },
+    getVariableStackOffset(value) {
+      return u32(runtime.getVariableStatckOffset(value));
+    },
+    createLet(initializer, body) {
+      return runtime.createLet(initializer, body);
+    },
+    isLet(value) {
+      return runtime.isLet(value);
+    },
+    asLet(value) {
+      return runtime.isLet(value) ? value : null;
+    },
+    getLetInitializer(value) {
+      return u32(runtime.getLetInitializer(value));
+    },
+    getLetBody(value) {
+      return runtime.getLetBody(value);
+    },
     createApplication(target, args) {
       return runtime.createApplication(target, args);
     },
@@ -519,6 +564,12 @@ function formatTerm(runtime, value, constants) {
       return formatPartial(runtime, value, constants);
     case constants.TermType.Application:
       return formatApplication(runtime, value, constants);
+    case constants.TermType.Lambda:
+      return formatLambda(runtime, value, constants);
+    case constants.TermType.Variable:
+      return formatVariable(runtime, value, constants);
+    case constants.TermType.Let:
+      return formatLet(runtime, value, constants);
     case constants.TermType.List:
       return formatList(runtime, value, constants);
     case constants.TermType.Record:
@@ -605,13 +656,12 @@ function formatConditionPayload(runtime, type, value, constants) {
       return formatTerm(runtime, runtime.getErrorConditionPayload(value), constants);
     case constants.ConditionType.TypeError: {
       const expected = runtime.getTypeErrorConditionExpected(value);
-      return `${expected === NULL ? '' : `${getEnumVariantName(constants.TermType, expected)}`}:${formatTerm(
-        runtime,
-        runtime.getTypeErrorConditionReceived(value),
-        constants,
-      )}`;
+      return `${
+        expected === NULL ? '' : `${getEnumVariantName(constants.TermType, expected)}`
+      }:${formatTerm(runtime, runtime.getTypeErrorConditionReceived(value), constants)}`;
     }
     case constants.ConditionType.InvalidFunctionTarget:
+      console.error(`INVALID TARGET: ${runtime.getInvalidFunctionTargetConditionTarget(value)}`);
       return formatTerm(runtime, runtime.getInvalidFunctionTargetConditionTarget(value), constants);
     case constants.ConditionType.InvalidFunctionArgs:
       return `${formatTerm(
@@ -657,6 +707,26 @@ function formatPartial(runtime, value, constants) {
     .join(', ')})`;
 }
 
+function formatLambda(runtime, value, constants) {
+  const numArgs = u32(runtime.getLambdaNumArgs(value));
+  const body = runtime.getLetBody(value);
+  return `(${numArgs}) => ${formatTerm(runtime, body, constants)}`;
+}
+
+function formatVariable(runtime, value, _constants) {
+  return `Variable(${u32(runtime.getVariableStackOffset(value))})`;
+}
+
+function formatLet(runtime, value, constants) {
+  const initializer = runtime.getLetInitializer(value);
+  const body = runtime.getLetBody(value);
+  return `{let ${formatTerm(runtime, initializer, constants)}; ${formatTerm(
+    runtime,
+    body,
+    constants,
+  )}}`;
+}
+
 function formatApplication(runtime, value, constants) {
   const target = runtime.getApplicationTarget(value);
   const args = runtime.getApplicationArgs(value);
@@ -677,7 +747,10 @@ function formatRecord(runtime, value, constants) {
   const entries = keys.map((key, index) => [key, values[index]]);
   if (entries.length == 0) return '{}';
   return `{ ${entries
-    .map(([key, value]) => `${formatTerm(runtime, key, constants)}: ${formatTerm(runtime, value, constants)}`)
+    .map(
+      ([key, value]) =>
+        `${formatTerm(runtime, key, constants)}: ${formatTerm(runtime, value, constants)}`,
+    )
     .join(', ')} }`;
 }
 

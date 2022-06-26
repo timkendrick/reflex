@@ -76,6 +76,36 @@
   (func $Term::Record::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
 
+  (func $Term::Record::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
+    (local $substituted_keys i32)
+    (local $substituted_values i32)
+    (local.set $substituted_keys
+      (call $Term::traits::substitute
+        (call $Term::Record::get::keys (local.get $self))
+        (local.get $variables)
+        (local.get $scope_offset)))
+    (local.set $substituted_values
+      (call $Term::traits::substitute
+        (call $Term::Record::get::values (local.get $self))
+        (local.get $variables)
+        (local.get $scope_offset)))
+    (if (result i32)
+      (i32.and
+        (i32.eq (global.get $NULL) (local.get $substituted_keys))
+        (i32.eq (global.get $NULL) (local.get $substituted_values)))
+      (then
+        (global.get $NULL))
+      (else
+        (call $Term::Record::new
+          (select
+            (call $Term::Record::get::keys (local.get $self))
+            (local.get $substituted_keys)
+            (i32.eq (global.get $NULL) (local.get $substituted_keys)))
+          (select
+            (call $Term::Record::get::values (local.get $self))
+            (local.get $substituted_values)
+            (i32.eq (global.get $NULL) (local.get $substituted_values)))))))
+
   (func $Term::Record::traits::write_json (param $self i32) (param $offset i32) (result i32)
     (local $keys i32)
     (local $values i32)

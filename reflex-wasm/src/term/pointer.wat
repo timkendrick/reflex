@@ -32,6 +32,10 @@
     ;; Invoke the method on the target term
     (call $Term::traits::write_json (call $Term::Pointer::dereference (local.get $self)) (local.get $offset)))
 
+  (func $Term::Pointer::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
+    ;; Invoke the method on the target term
+    (call $Term::traits::substitute (call $Term::Pointer::dereference (local.get $self)) (local.get $variables) (local.get $scope_offset)))
+
   (func $Term::Pointer::traits::evaluate (param $self i32) (param $state i32) (result i32 i32)
     ;; Invoke the method on the target term
     (call $Term::traits::evaluate (call $Term::Pointer::dereference (local.get $self)) (local.get $state)))
