@@ -2,7 +2,7 @@
 ;; SPDX-License-Identifier: Apache-2.0
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 (module
-  (@builtin $Stdlib_Replace
+  (@builtin $Stdlib_Replace "Replace"
     (@args (@strict $self) (@strict $pattern) (@strict $replacement))
 
     (@impl

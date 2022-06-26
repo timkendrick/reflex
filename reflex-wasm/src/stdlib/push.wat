@@ -2,7 +2,7 @@
 ;; SPDX-License-Identifier: Apache-2.0
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 (module
-  (@builtin $Stdlib_Push
+  (@builtin $Stdlib_Push "Push"
     (@args (@strict $self) (@lazy $item))
 
     (@impl

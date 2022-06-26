@@ -10,6 +10,12 @@
   ;; Initialize the private use area that holds IO intermediate value scatter/gather vectors
   (@const $Io::IOVEC i32 (call $Term::Cell::allocate (i32.const 3)))
 
+  (func $Io::write_stdout (param $offset i32) (param $length i32) (result i32)
+    (call $Io::write_bytes (global.get $Io::STDOUT) (local.get $offset) (local.get $length)))
+
+  (func $Io::write_stderr (param $offset i32) (param $length i32) (result i32)
+    (call $Io::write_bytes (global.get $Io::STDERR) (local.get $offset) (local.get $length)))
+
   (func $Io::write_bytes (param $fd i32) (param $offset i32) (param $length i32) (result i32)
     ;; Store the pointer and length in the IO private use area
     (call $Term::Cell::set_field (global.get $Io::IOVEC) (i32.const 0) (local.get $offset))

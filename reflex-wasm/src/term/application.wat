@@ -26,6 +26,46 @@
   (func $Term::Application::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
 
+  (func $Term::Application::traits::display (param $self i32) (param $offset i32) (result i32)
+    (local $args i32)
+    (local $num_args i32)
+    (local $index i32)
+    ;; Write the function target to the output
+    (local.set $offset
+      (call $Term::traits::display
+        (call $Term::Application::get::target (local.get $self))
+        (local.get $offset)))
+    ;; Write the opening parenthesis to the output
+    (@store-bytes $offset "(")
+    (local.set $offset (i32.add (local.get $offset)))
+    ;; Write the argument list to the output
+    (local.set $args (call $Term::Application::get::args (local.get $self)))
+    (if
+      ;; If the argument list is empty, bail out
+      (i32.eqz (local.tee $num_args (call $Term::List::get_length (local.get $args))))
+      (then)
+      (else
+        ;; Otherwise iterate through each argument
+        (loop $LOOP
+          ;; If this is not the first argument, write a comma separator to the output
+          (if
+            (local.get $index)
+            (then
+              (@store-bytes $offset ", ")
+              (local.set $offset (i32.add (local.get $offset)))))
+          ;; Write the argument to the output
+          (local.set $offset
+            (call $Term::traits::display
+              (call $Term::List::get_item (local.get $args) (local.get $index))
+              (local.get $offset)))
+          ;; If this is not the final argument, continue with the next one
+          (br_if $LOOP (i32.lt_u (local.tee $index (i32.add (i32.const 1) (local.get $index))) (local.get $num_args))))))
+    ;; Write the closing parenthesis to the output
+    (@store-bytes $offset ")")
+    (local.set $offset (i32.add (local.get $offset)))
+    ;; Return the updated offset
+    (local.get $offset))
+
   (func $Term::Application::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (local $substituted_target i32)
     (local $substituted_args i32)

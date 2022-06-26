@@ -2,10 +2,6 @@
 ;; SPDX-License-Identifier: Apache-2.0
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 (module
-  ;; Length of a JSON-encoded ISO date string (used for determining how many bytes to allocate)
-  ;; Example: "1970-01-01T00:00:00.000Z"
-  (global $Term::Date::ISO_STRING_JSON_LENGTH i32 (i32.const 26))
-
   (@let $Date
     (@struct $Date
       (@field $timestamp i64))
@@ -28,40 +24,35 @@
   (func $Term::Date::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
 
+  (func $Term::Date::traits::display (param $self i32) (param $offset i32) (result i32)
+    (call $Utils::Date::to_iso_string
+      (call $Term::Date::get::timestamp (local.get $self))
+      (local.get $offset))
+    (i32.add (local.get $offset)))
+
   (func $Term::Date::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (global.get $NULL))
 
   (func $Term::Date::traits::to_json (param $self i32) (param $offset i32) (result i32 i32)
     (local $bytes_written i32)
-    (call $Allocator::extend (local.get $offset) (global.get $Term::Date::ISO_STRING_JSON_LENGTH))
+    ;; Write the opening quote to the output
+    (@store-bytes $offset "\"")
+    (local.set $offset (i32.add (local.get $offset)))
+    ;; Write the RFC-3339 encoded date to the output
+    (local.tee $bytes_written
+      (call $Utils::Date::to_iso_string
+        (call $Term::Date::get::timestamp (local.get $self))
+        (local.get $offset)))
+    (local.set $offset (i32.add (local.get $offset)))
     (if (result i32 i32)
-      (i32.eqz
-        (local.tee $bytes_written
-          (call $Utils::Date::to_json
-            (call $Term::Date::get::timestamp (local.get $self))
-            (local.get $offset))))
+      (i32.eqz (local.get $bytes_written))
       (then
         ;; Put the failure marker on the stack
         (global.get $FALSE)
-        ;; Return the updated offset
-        (i32.add (local.get $offset) (global.get $Term::Date::ISO_STRING_JSON_LENGTH)))
+        (local.get $offset))
       (else
         ;; Put the success marker on the stack
         (global.get $TRUE)
-        ;; If a different number of bytes was written than expected, grow or shrink the allocated space as appropriate
-        (if
-          (i32.eq (local.get $bytes_written) (global.get $Term::Date::ISO_STRING_JSON_LENGTH))
-          (then)
-          (else
-            (if
-              (i32.gt_u (local.get $bytes_written) (global.get $Term::Date::ISO_STRING_JSON_LENGTH))
-              (then
-                (call $Allocator::extend
-                  (i32.add (local.get $offset) (global.get $Term::Date::ISO_STRING_JSON_LENGTH))
-                  (i32.sub (local.get $bytes_written) (global.get $Term::Date::ISO_STRING_JSON_LENGTH))))
-              (else
-                (call $Allocator::shrink
-                  (i32.add (local.get $offset) (global.get $Term::Date::ISO_STRING_JSON_LENGTH))
-                  (i32.sub (global.get $Term::Date::ISO_STRING_JSON_LENGTH) (local.get $bytes_written)))))))
-        ;; Return the updated offset
-        (i32.add (local.get $offset) (local.get $bytes_written))))))
+        ;; Write the closing quote to the output and return the updated offset
+        (@store-bytes $offset "\"")
+        (i32.add (local.get $offset))))))

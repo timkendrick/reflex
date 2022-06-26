@@ -2,7 +2,7 @@
 ;; SPDX-License-Identifier: Apache-2.0
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 (module
-  (@builtin $Stdlib_Lt
+  (@builtin $Stdlib_Lt "Lt"
     (@args (@strict $self) (@strict $other))
 
     (@impl

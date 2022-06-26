@@ -1,6 +1,10 @@
 ;; SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 ;; SPDX-License-Identifier: Apache-2.0
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
+(func (@concat "$" (@get $builtin_name) "::display") (param $offset i32) (result i32)
+  (@store-bytes $offset (@get $name))
+  (i32.add (local.get $offset)))
+
 (func (@concat "$" (@get $builtin_name) "::apply") (param $args i32) (param $state i32) (result i32 i32)
   (@map $arg_name
     (@get $arg_names)

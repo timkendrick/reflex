@@ -37,7 +37,7 @@ export default (describe) => {
           createPair(createInt(0), createInt(-1)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:Pow(0, -1)> . NULL)}');
+        assert.strictEqual(format(result), '{<InvalidFunctionArgsCondition:Pow(0, -1)>}');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
@@ -55,7 +55,7 @@ export default (describe) => {
           createPair(createInt(0), createInt(-3)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:Pow(0, -3)> . NULL)}');
+        assert.strictEqual(format(result), '{<InvalidFunctionArgsCondition:Pow(0, -3)>}');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
@@ -240,7 +240,7 @@ export default (describe) => {
           createPair(createFloat(0), createFloat(-1)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:Pow(0.0, -1.0)> . NULL)}');
+        assert.strictEqual(format(result), '{<InvalidFunctionArgsCondition:Pow(0.0, -1.0)>}');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
@@ -258,7 +258,7 @@ export default (describe) => {
           createPair(createFloat(0), createFloat(-3)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:Pow(0.0, -3.0)> . NULL)}');
+        assert.strictEqual(format(result), '{<InvalidFunctionArgsCondition:Pow(0.0, -3.0)>}');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
@@ -276,7 +276,7 @@ export default (describe) => {
           createPair(createFloat(0), createFloat(-3.142)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:Pow(0.0, -3.142)> . NULL)}');
+        assert.strictEqual(format(result), '{<InvalidFunctionArgsCondition:Pow(0.0, -3.142)>}');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
@@ -393,7 +393,7 @@ export default (describe) => {
           createPair(createFloat(-1), createFloat(3.142)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:Pow(-1.0, 3.142)> . NULL)}');
+        assert.strictEqual(format(result), '{<InvalidFunctionArgsCondition:Pow(-1.0, 3.142)>}');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
@@ -402,7 +402,7 @@ export default (describe) => {
           createPair(createFloat(-1), createFloat(-3.142)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:Pow(-1.0, -3.142)> . NULL)}');
+        assert.strictEqual(format(result), '{<InvalidFunctionArgsCondition:Pow(-1.0, -3.142)>}');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
@@ -519,7 +519,7 @@ export default (describe) => {
           createPair(createFloat(-3), createFloat(3.142)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:Pow(-3.0, 3.142)> . NULL)}');
+        assert.strictEqual(format(result), '{<InvalidFunctionArgsCondition:Pow(-3.0, 3.142)>}');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
@@ -528,7 +528,7 @@ export default (describe) => {
           createPair(createFloat(-3), createFloat(-3.142)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:Pow(-3.0, -3.142)> . NULL)}');
+        assert.strictEqual(format(result), '{<InvalidFunctionArgsCondition:Pow(-3.0, -3.142)>}');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
@@ -645,7 +645,7 @@ export default (describe) => {
           createPair(createFloat(-3.142), createFloat(3.142)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:Pow(-3.142, 3.142)> . NULL)}');
+        assert.strictEqual(format(result), '{<InvalidFunctionArgsCondition:Pow(-3.142, 3.142)>}');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
@@ -654,7 +654,7 @@ export default (describe) => {
           createPair(createFloat(-3.142), createFloat(-3.142)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:Pow(-3.142, -3.142)> . NULL)}');
+        assert.strictEqual(format(result), '{<InvalidFunctionArgsCondition:Pow(-3.142, -3.142)>}');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
@@ -699,7 +699,7 @@ export default (describe) => {
           createPair(createFloat(-3.142), createFloat(2.718)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:Pow(-3.142, 2.718)> . NULL)}');
+        assert.strictEqual(format(result), '{<InvalidFunctionArgsCondition:Pow(-3.142, 2.718)>}');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
@@ -708,7 +708,7 @@ export default (describe) => {
           createPair(createFloat(-3.142), createFloat(-2.718)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:Pow(-3.142, -2.718)> . NULL)}');
+        assert.strictEqual(format(result), '{<InvalidFunctionArgsCondition:Pow(-3.142, -2.718)>}');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
@@ -717,7 +717,7 @@ export default (describe) => {
           createPair(createFloat(-2.718), createFloat(3.142)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:Pow(-2.718, 3.142)> . NULL)}');
+        assert.strictEqual(format(result), '{<InvalidFunctionArgsCondition:Pow(-2.718, 3.142)>}');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
@@ -726,7 +726,7 @@ export default (describe) => {
           createPair(createFloat(-2.718), createFloat(-3.142)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:Pow(-2.718, -3.142)> . NULL)}');
+        assert.strictEqual(format(result), '{<InvalidFunctionArgsCondition:Pow(-2.718, -3.142)>}');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });
@@ -766,7 +766,7 @@ export default (describe) => {
           createPair(createInt(0), createFloat(-1)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:Pow(0, -1.0)> . NULL)}');
+        assert.strictEqual(format(result), '{<InvalidFunctionArgsCondition:Pow(0, -1.0)>}');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
@@ -784,7 +784,7 @@ export default (describe) => {
           createPair(createInt(0), createFloat(-3)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:Pow(0, -3.0)> . NULL)}');
+        assert.strictEqual(format(result), '{<InvalidFunctionArgsCondition:Pow(0, -3.0)>}');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
@@ -802,7 +802,7 @@ export default (describe) => {
           createPair(createInt(0), createFloat(-3.142)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:Pow(0, -3.142)> . NULL)}');
+        assert.strictEqual(format(result), '{<InvalidFunctionArgsCondition:Pow(0, -3.142)>}');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
@@ -964,7 +964,7 @@ export default (describe) => {
           createPair(createInt(-3), createFloat(3.142)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:Pow(-3, 3.142)> . NULL)}');
+        assert.strictEqual(format(result), '{<InvalidFunctionArgsCondition:Pow(-3, 3.142)>}');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
@@ -973,7 +973,7 @@ export default (describe) => {
           createPair(createInt(-3), createFloat(-3.142)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:Pow(-3, -3.142)> . NULL)}');
+        assert.strictEqual(format(result), '{<InvalidFunctionArgsCondition:Pow(-3, -3.142)>}');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });
@@ -1013,7 +1013,7 @@ export default (describe) => {
           createPair(createFloat(0), createInt(-1)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:Pow(0.0, -1)> . NULL)}');
+        assert.strictEqual(format(result), '{<InvalidFunctionArgsCondition:Pow(0.0, -1)>}');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
@@ -1031,7 +1031,7 @@ export default (describe) => {
           createPair(createFloat(0), createInt(-3)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:Pow(0.0, -3)> . NULL)}');
+        assert.strictEqual(format(result), '{<InvalidFunctionArgsCondition:Pow(0.0, -3)>}');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {

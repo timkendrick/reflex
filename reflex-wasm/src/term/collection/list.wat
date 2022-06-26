@@ -209,6 +209,39 @@
   (func $Term::List::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
 
+  (func $Term::List::traits::display (param $self i32) (param $offset i32) (result i32)
+    (local $length i32)
+    (local $index i32)
+    ;; Write the opening brace to the output
+    (@store-bytes $offset "[")
+    (local.set $offset (i32.add (local.get $offset)))
+    ;; Write the list items to the output
+    (if
+      ;; If the list is empty, bail out
+      (i32.eqz (local.tee $length (call $Term::List::get_length (local.get $self))))
+      (then)
+      (else
+        ;; Otherwise iterate through each list item
+        (loop $LOOP
+          ;; If this is not the first list item, write a comma separator to the output
+          (if
+            (local.get $index)
+            (then
+              (@store-bytes $offset ", ")
+              (local.set $offset (i32.add (local.get $offset)))))
+          ;; Write the list item to the output
+          (local.set $offset
+            (call $Term::traits::display
+              (call $Term::List::get_item (local.get $self) (local.get $index))
+              (local.get $offset)))
+          ;; If this is not the final list item, continue with the next one
+          (br_if $LOOP (i32.lt_u (local.tee $index (i32.add (i32.const 1) (local.get $index))) (local.get $length))))))
+    ;; Write the closing brace to the output
+    (@store-bytes $offset "]")
+    (local.set $offset (i32.add (local.get $offset)))
+    ;; Return the updated offset
+    (local.get $offset))
+
   (func $Term::List::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (local $length i32)
     (local $index i32)
@@ -412,19 +445,27 @@
     (local $result i32)
     (local $length_self i32)
     (local $length_other i32)
-    (local.set $length_self (call $Term::List::get::items::length (local.get $self)))
-    (local.set $length_other (call $Term::List::get::items::length (local.get $other)))
-    (local.tee $result (call $Term::List::allocate (i32.add (local.get $length_self) (local.get $length_other))))
-    (memory.copy
-      (call $Term::List::get::items::pointer (local.get $result) (i32.const 0))
-      (call $Term::List::get::items::pointer (local.get $self) (i32.const 0))
-      (i32.mul (local.get $length_self) (i32.const 4)))
-    (memory.copy
-      (call $Term::List::get::items::pointer (local.get $result) (local.get $length_self))
-      (call $Term::List::get::items::pointer (local.get $other) (i32.const 0))
-      (i32.mul (local.get $length_other) (i32.const 4)))
-    ;; Instantiate the list term
-    (call $Term::List::init (i32.add (local.get $length_self) (local.get $length_other))))
+    (if (result i32)
+      (i32.eqz (local.tee $length_self (call $Term::List::get_length (local.get $self))))
+      (then
+        (local.get $other))
+      (else
+        (if (result i32)
+          (i32.eqz (local.tee $length_other (call $Term::List::get_length (local.get $other))))
+          (then
+            (local.get $self))
+          (else
+            (local.tee $result (call $Term::List::allocate (i32.add (local.get $length_self) (local.get $length_other))))
+            (memory.copy
+              (call $Term::List::get::items::pointer (local.get $result) (i32.const 0))
+              (call $Term::List::get::items::pointer (local.get $self) (i32.const 0))
+              (i32.mul (local.get $length_self) (i32.const 4)))
+            (memory.copy
+              (call $Term::List::get::items::pointer (local.get $result) (local.get $length_self))
+              (call $Term::List::get::items::pointer (local.get $other) (i32.const 0))
+              (i32.mul (local.get $length_other) (i32.const 4)))
+            ;; Instantiate the list term
+            (call $Term::List::init (i32.add (local.get $length_self) (local.get $length_other))))))))
 
   (func $Term::List::get_length (param $self i32) (result i32)
     (call $Term::List::get::items::length (local.get $self)))
@@ -751,16 +792,15 @@
         (local.tee $instance (call $Term::List::allocate (local.get $capacity)))
         ;; If the source list contains any items, copy them across to the new list
         (if
-          (i32.eqz (call $Term::List::get::items::length (local.get $self)))
-          (then)
-          (else
+          (call $Term::List::get::items::length (local.get $self))
+          (then
             (memory.copy
               (call $Term::List::get::items::pointer (local.get $instance) (i32.const 0))
               (call $Term::List::get::items::pointer (local.get $self) (i32.const 0))
-              (i32.mul (call $Term::List::get::items::length (local.get $self)) (i32.const 4)))))
-        ;; Rewrite the source list as a redirect pointer term
-        ;; (this is to avoid breaking any existing pointers to the original list address)
-        (call $Term::redirect (local.get $self) (local.get $instance)))))
+              (i32.mul (call $Term::List::get::items::length (local.get $self)) (i32.const 4)))
+            ;; Rewrite the source list as a redirect pointer term
+            ;; (this is to avoid breaking any existing pointers to the original list address)
+            (call $Term::redirect (local.get $self) (local.get $instance)))))))
 
   (func $Term::List::has_dynamic_items (param $self i32) (result i32)
     (local $length i32)

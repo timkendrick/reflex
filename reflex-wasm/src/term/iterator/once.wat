@@ -24,6 +24,9 @@
   (func $Term::OnceIterator::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
 
+  (func $Term::OnceIterator::traits::display (param $self i32) (param $offset i32) (result i32)
+    (call $TermType::traits::display (global.get $TermType::OnceIterator) (local.get $offset)))
+
   (func $Term::OnceIterator::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (local $substituted_value i32)
     (local.set $substituted_value

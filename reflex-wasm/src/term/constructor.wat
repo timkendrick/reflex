@@ -38,6 +38,40 @@
   (func $Term::Constructor::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
 
+  (func $Term::Constructor::traits::display (param $self i32) (param $offset i32) (result i32)
+    (local $keys i32)
+    (local $num_keys i32)
+    (local $index i32)
+    (@store-bytes $offset "Constructor({")
+    (local.set $offset (i32.add (local.get $offset)))
+    (local.set $keys (call $Term::Constructor::get::keys (local.get $self)))
+    ;; Write the field names to the output
+    (if
+      ;; If the list of field names is empty, bail out
+      (i32.eqz (local.tee $num_keys (call $Term::List::get_length (local.get $keys))))
+      (then)
+      (else
+        ;; Otherwise iterate through each field name
+        (loop $LOOP
+          ;; If this is not the first field name, write a comma separator to the output
+          (if
+            (local.get $index)
+            (then
+              (@store-bytes $offset ", ")
+              (local.set $offset (i32.add (local.get $offset)))))
+          ;; Write the field name to the output
+          (local.set $offset
+            (call $Term::traits::display
+              (call $Term::List::get_item (local.get $keys) (local.get $index))
+              (local.get $offset)))
+          ;; If this is not the final field name, continue with the next one
+          (br_if $LOOP (i32.lt_u (local.tee $index (i32.add (i32.const 1) (local.get $index))) (local.get $num_keys))))))
+    ;; Write the closing parenthesis to the output
+    (@store-bytes $offset "})")
+    (local.set $offset (i32.add (local.get $offset)))
+    ;; Return the updated offset
+    (local.get $offset))
+
   (func $Term::Constructor::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (local $substituted_keys i32)
     (local.set $substituted_keys

@@ -26,7 +26,7 @@ export default (describe) => {
           createUnitList(createEmptyIterator()),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), 'Map({0})');
+        assert.strictEqual(format(result), 'Map(0)');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
@@ -40,7 +40,7 @@ export default (describe) => {
           ),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), 'Map({3})');
+        assert.strictEqual(format(result), 'Map(3)');
         assert.strictEqual(format(getHashmapValue(result, createString('foo'))), '3');
         assert.strictEqual(format(getHashmapValue(result, createString('bar'))), '4');
         assert.strictEqual(format(getHashmapValue(result, createString('baz'))), '5');
@@ -60,7 +60,7 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(
           format(result),
-          '{((<TypeError:List:"foo"> . NULL) . (<TypeError:List:"baz"> . NULL))}',
+          '{<TypeErrorCondition:List:"foo">,<TypeErrorCondition:List:"baz">}',
         );
         assert.strictEqual(format(dependencies), 'NULL');
       })();

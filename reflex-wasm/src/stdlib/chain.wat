@@ -2,7 +2,7 @@
 ;; SPDX-License-Identifier: Apache-2.0
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 (module
-  (@builtin $Stdlib_Chain
+  (@builtin $Stdlib_Chain "Chain"
     (@args (@strict $self) (@strict $other))
 
     (@impl

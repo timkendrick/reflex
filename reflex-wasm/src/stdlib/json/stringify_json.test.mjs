@@ -496,7 +496,7 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(
           format(result),
-          '{(<InvalidFunctionArgs:StringifyJson([3, Identity, 5])> . NULL)}',
+          '{<InvalidFunctionArgsCondition:StringifyJson([3, Identity, 5])>}',
         );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
@@ -558,7 +558,7 @@ export default (describe) => {
           createBuiltin(Stdlib.StringifyJson),
           createUnitList(
             createRecord(
-              createTriple(createString('foo'), createInt(0), createString('baz')),
+              createTriple(createString('foo'), createInt(3), createString('baz')),
               createTriple(createInt(3), createInt(4), createInt(5)),
             ),
           ),
@@ -580,7 +580,7 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(
           format(result),
-          '{(<InvalidFunctionArgs:StringifyJson({ "foo": 3, "bar": Identity, "baz": 5 })> . NULL)}',
+          '{<InvalidFunctionArgsCondition:StringifyJson({ "foo": 3, "bar": Identity, "baz": 5 })>}',
         );
         assert.strictEqual(format(dependencies), 'NULL');
       })();

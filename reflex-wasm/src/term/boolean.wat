@@ -39,6 +39,16 @@
   (func $Term::Boolean::traits::is_truthy (param $self i32) (result i32)
     (call $Term::Boolean::get::value (local.get $self)))
 
+  (func $Term::Boolean::traits::display (param $self i32) (param $offset i32) (result i32)
+    (if (result i32)
+      (call $Term::Boolean::get::value (local.get $self))
+      (then
+        (@store-bytes $offset "true")
+        (i32.add (local.get $offset)))
+      (else
+        (@store-bytes $offset "false")
+        (i32.add (local.get $offset)))))
+
   (func $Term::Boolean::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (global.get $NULL))
 

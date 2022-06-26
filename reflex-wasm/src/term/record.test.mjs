@@ -62,36 +62,6 @@ export default (describe) => {
       })();
     });
 
-    test('[simple] invalid keys', (assert, {
-      createApplication,
-      createBuiltin,
-      createInt,
-      createPair,
-      createRecord,
-      createString,
-      createTriple,
-      evaluate,
-      format,
-      NULL,
-      Stdlib,
-    }) => {
-      const prototype = createTriple(createString('foo'), createString('bar'), createString('baz'));
-      const record = createRecord(
-        prototype,
-        createTriple(createInt(3), createInt(4), createInt(5)),
-      );
-      const expression = createApplication(
-        createBuiltin(Stdlib.Get),
-        createPair(record, createString('invalid')),
-      );
-      const [result, dependencies] = evaluate(expression, NULL);
-      assert.strictEqual(
-        format(result),
-        '{(<InvalidAccessor:{ "foo": 3, "bar": 4, "baz": 5 },"invalid"> . NULL)}',
-      );
-      assert.strictEqual(format(dependencies), 'NULL');
-    });
-
     test('[hashmap] basic property access', (assert, {
       createApplication,
       createBuiltin,
@@ -113,57 +83,16 @@ export default (describe) => {
       const values = createList(entries.map(([_, value]) => value));
       const record = createRecord(keys, values);
       const expressions = entries.map((_, index) =>
-        createApplication(createBuiltin(Stdlib.Get), createPair(record, createString(`key:${index}`))),
+        createApplication(
+          createBuiltin(Stdlib.Get),
+          createPair(record, createString(`key:${index}`)),
+        ),
       );
       const results = expressions.map((expression) => evaluate(expression, NULL));
       results.forEach(([result, dependencies], index) => {
         assert.strictEqual(result, entries[index][1]);
         assert.strictEqual(format(dependencies), 'NULL');
       });
-    });
-
-    test('[hashmap] invalid keys', (assert, {
-      createApplication,
-      asSignal,
-      createBuiltin,
-      createInt,
-      createList,
-      createPair,
-      createRecord,
-      createString,
-      evaluate,
-      format,
-      getInvalidAccessorConditionTarget,
-      getInvalidAccessorConditionKey,
-      getConditionType,
-      getTreeLeft,
-      getTreeLength,
-      getSignalConditions,
-      NULL,
-      ConditionType,
-      Stdlib,
-    }) => {
-      const entries = Array.from({ length: 128 }).map((_, index) => [
-        createString(`key:${index}`),
-        createInt(index),
-      ]);
-      const keys = createList(entries.map(([key, _]) => key));
-      const values = createList(entries.map(([_, value]) => value));
-      const record = createRecord(keys, values);
-      const expression = createApplication(
-        createBuiltin(Stdlib.Get),
-        createPair(record, createString('foo')),
-      );
-      const [result, dependencies] = evaluate(expression, NULL);
-      const signal = asSignal(result);
-      assert.ok(signal);
-      const conditions = getSignalConditions(signal);
-      assert.strictEqual(getTreeLength(conditions), 1);
-      const error = getTreeLeft(conditions);
-      assert.strictEqual(getConditionType(error), ConditionType.InvalidAccessor);
-      assert.strictEqual(getInvalidAccessorConditionTarget(error), record);
-      assert.strictEqual(format(getInvalidAccessorConditionKey(error)), '"foo"');
-      assert.strictEqual(format(dependencies), 'NULL');
     });
 
     test('iteration', (assert, {

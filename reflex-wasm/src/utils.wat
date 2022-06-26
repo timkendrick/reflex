@@ -315,43 +315,47 @@
     (i32.store8 (local.get $offset) (i32.add (@char "0") (local.get $digit))))
 
   (func $Utils::i32::write_string (param $value i32) (param $offset i32) (result i32)
+    (local $abs_value i32)
     (local $is_negative i32)
+    ;; Find out how many bytes to allocate for the string representation
+    ;; Assign a temporary value to determine the number of digits of the positive integer
+    (local.set $abs_value (call $Utils::i32::abs (local.get $value)))
+    ;; If the number is negative, write a minus sign to the output
+    (if
+      (local.tee $is_negative (i32.ne (local.get $abs_value) (local.get $value)))
+      (then
+        (call $Allocator::extend (local.get $offset) (i32.const 1))
+        (i32.store8 (local.get $offset) (@char "-"))
+        (local.set $offset (i32.add (i32.const 1) (local.get $offset)))))
+    ;; Write the absolute integer value to the output
+    (call $Utils::u32::write_string (local.get $abs_value) (local.get $offset))
+    ;; Return the number of bytes written, taking into account the minus sign if one was written
+    (i32.add (local.get $is_negative)))
+
+  (func $Utils::u32::write_string (param $value i32) (param $offset i32) (result i32)
     (local $remaining_digits i32)
     (local $num_chars i32)
     (local $index i32)
     ;; Find out how many bytes to allocate for the string representation
     ;; Assign a temporary value to determine the number of digits of the positive integer
-    (local.set $remaining_digits (call $Utils::i32::abs (local.get $value)))
-    ;; Keep track of whether the number is negative
-    (local.set $is_negative (i32.ne (local.get $remaining_digits) (local.get $value)))
-    ;; Update the value the absolute value for use later
-    (local.set $value (local.get $remaining_digits))
+    (local.set $remaining_digits (local.get $value))
     (loop $LOOP
       ;; Increment the length
       (local.set $num_chars (i32.add (local.get $num_chars) (i32.const 1)))
       ;; If the temporary value is still greater than zero after being divided by 10, continue with the next digit
       (br_if $LOOP (local.tee $remaining_digits (i32.div_u (local.get $remaining_digits) (i32.const 10)))))
     ;; Allocate the required number of bytes to store the string representation,
-    ;; allowing an extra byte for the minus sign if the number is negative
-    (call $Allocator::extend (local.get $offset) (local.tee $num_chars (i32.add (local.get $num_chars) (local.get $is_negative))))
-    ;; Reset the temporary value to the absolute value
-    (local.set $remaining_digits (local.get $value))
-    ;; If the number is negative, add the minus sign
-    (if
-      (local.get $is_negative)
-      (then
-        (i32.store8 (local.get $offset) (@char "-")))
-      (else))
+    (call $Allocator::extend (local.get $offset) (local.get $num_chars))
     ;; Push the length onto the stack as the return value
     (local.get $num_chars)
     ;; Write the bytes in reverse order, starting from the least significant digit
     (loop $LOOP
       ;; Write the current least significant digit to the output and increment the offset
       (call $Utils::u8::write_decimal_digit
-        (i32.rem_u (local.get $remaining_digits) (i32.const 10))
+        (i32.rem_u (local.get $value) (i32.const 10))
         (i32.add (local.get $offset) (local.tee $num_chars (i32.sub (local.get $num_chars) (i32.const 1)))))
-      ;; If the temporary value is still greater than zero after being divided by 10, continue with the next digit
-      (br_if $LOOP (local.tee $remaining_digits (i32.div_u (local.get $remaining_digits) (i32.const 10))))))
+      ;; If the value is still greater than zero after being divided by 10, continue with the next digit
+      (br_if $LOOP (local.tee $value (i32.div_u (local.get $value) (i32.const 10))))))
 
   (func $Utils::f64::write_string (param $value f64) (param $offset i32) (result i32)
     (local $original_offset i32)

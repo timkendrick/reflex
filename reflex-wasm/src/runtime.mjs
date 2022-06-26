@@ -5,6 +5,11 @@ const FALSE = 0;
 const TRUE = 1;
 const NULL = -1;
 
+function u32(value) {
+  // Convert 32-bit two's complement signed integer to unsigned integer
+  return value >= 0 ? value : 0xffffffff + 1 + value;
+}
+
 function createTermTypes(runtime) {
   return {
     Application: runtime.TermType_Application.value,
@@ -65,6 +70,7 @@ function createConditionTypes(runtime) {
 function createStdlib(runtime) {
   return {
     Abs: runtime.Stdlib_Abs.value,
+    Accessor: runtime.Stdlib_Accessor.value,
     Add: runtime.Stdlib_Add.value,
     And: runtime.Stdlib_And.value,
     Apply: runtime.Stdlib_Apply.value,
@@ -97,9 +103,11 @@ function createStdlib(runtime) {
     If: runtime.Stdlib_If.value,
     IfError: runtime.Stdlib_IfError.value,
     IfPending: runtime.Stdlib_IfPending.value,
+    IsFinite: runtime.Stdlib_IsFinite.value,
     Iterate: runtime.Stdlib_Iterate.value,
     Keys: runtime.Stdlib_Keys.value,
     Length: runtime.Stdlib_Length.value,
+    Log: runtime.Stdlib_Log.value,
     Lt: runtime.Stdlib_Lt.value,
     Lte: runtime.Stdlib_Lte.value,
     Max: runtime.Stdlib_Max.value,
@@ -107,6 +115,9 @@ function createStdlib(runtime) {
     Multiply: runtime.Stdlib_Multiply.value,
     Not: runtime.Stdlib_Not.value,
     Or: runtime.Stdlib_Or.value,
+    ParseDate: runtime.Stdlib_ParseDate.value,
+    ParseFloat: runtime.Stdlib_ParseFloat.value,
+    ParseInt: runtime.Stdlib_ParseInt.value,
     ParseJson: runtime.Stdlib_ParseJson.value,
     Pow: runtime.Stdlib_Pow.value,
     Push: runtime.Stdlib_Push.value,
@@ -130,6 +141,8 @@ function createStdlib(runtime) {
     Subtract: runtime.Stdlib_Subtract.value,
     Take: runtime.Stdlib_Take.value,
     ToRequest: runtime.Stdlib_ToRequest.value,
+    ToString: runtime.Stdlib_ToString.value,
+    Urlencode: runtime.Stdlib_Urlencode.value,
     Values: runtime.Stdlib_Values.value,
     Variable: runtime.Stdlib_Variable.value,
     Zip: runtime.Stdlib_Zip.value,
@@ -156,17 +169,11 @@ export function createRuntime(runtime) {
     isNil(value) {
       return runtime.isNil(value);
     },
-    asNil(value) {
-      return runtime.isNil(value) ? value : null;
-    },
     createBoolean(value) {
       return runtime.createBoolean(value);
     },
     isBoolean(value) {
       return runtime.isBoolean(value);
-    },
-    asBoolean(value) {
-      return runtime.isBoolean(value) ? value : null;
     },
     getBooleanValue(value) {
       return runtime.getBooleanValue(value) === 1;
@@ -177,9 +184,6 @@ export function createRuntime(runtime) {
     isInt(value) {
       return runtime.isInt(value);
     },
-    asInt(value) {
-      return runtime.isInt(value) ? value : null;
-    },
     getIntValue(value) {
       return runtime.getIntValue(value);
     },
@@ -189,9 +193,6 @@ export function createRuntime(runtime) {
     isFloat(value) {
       return runtime.isFloat(value);
     },
-    asFloat(value) {
-      return runtime.isFloat(value) ? value : null;
-    },
     getFloatValue(value) {
       return runtime.getFloatValue(value);
     },
@@ -200,9 +201,6 @@ export function createRuntime(runtime) {
     },
     isSymbol(value) {
       return runtime.isSymbol(value);
-    },
-    asSymbol(value) {
-      return runtime.isSymbol(value) ? value : null;
     },
     getSymbolId(value) {
       return u32(runtime.getSymbolId(value));
@@ -217,9 +215,6 @@ export function createRuntime(runtime) {
     },
     isString(value) {
       return runtime.isString(value);
-    },
-    asString(value) {
-      return runtime.isString(value) ? value : null;
     },
     getStringOffset(value) {
       return runtime.getStringOffset(value);
@@ -238,9 +233,6 @@ export function createRuntime(runtime) {
     isDate(value) {
       return runtime.isDate(value);
     },
-    asDate(value) {
-      return runtime.isDate(value) ? value : null;
-    },
     getDateTimestamp(value) {
       return Number(runtime.getDateTimestamp(value));
     },
@@ -250,17 +242,11 @@ export function createRuntime(runtime) {
     isSignal(value) {
       return runtime.isSignal(value);
     },
-    asSignal(value) {
-      return runtime.isSignal(value) ? value : null;
-    },
     getSignalConditions(value) {
       return runtime.getSignalConditions(value);
     },
     isCondition(value) {
       return runtime.isCondition(value);
-    },
-    asCondition(value) {
-      return runtime.isCondition(value) ? value : null;
     },
     getConditionType(value) {
       return u32(runtime.getConditionType(value));
@@ -280,8 +266,11 @@ export function createRuntime(runtime) {
     getErrorConditionPayload(value) {
       return runtime.getErrorConditionPayload(value);
     },
-    getTypeErrorConditionType(value) {
-      return runtime.getTypeErrorConditionType(value);
+    createTypeErrorCondition(expected, received) {
+      return runtime.createTypeErrorCondition(expected, received);
+    },
+    getTypeErrorConditionExpected(value) {
+      return runtime.getTypeErrorConditionExpected(value);
     },
     getTypeErrorConditionReceived(value) {
       return runtime.getTypeErrorConditionReceived(value);
@@ -319,9 +308,6 @@ export function createRuntime(runtime) {
     isEffect(value) {
       return runtime.isEffect(value);
     },
-    asEffect(value) {
-      return runtime.isEffect(value) ? value : null;
-    },
     getEffectCondition(value) {
       return runtime.getEffectCondition(value);
     },
@@ -332,9 +318,6 @@ export function createRuntime(runtime) {
     isBuiltin(value) {
       return runtime.isBuiltin(value);
     },
-    asBuiltin(value) {
-      return runtime.isBuiltin(value) ? value : null;
-    },
     getBuiltinUid(value) {
       return u32(runtime.getBuiltinUid(value));
     },
@@ -343,9 +326,6 @@ export function createRuntime(runtime) {
     },
     isPartial(value) {
       return runtime.isPartial(value);
-    },
-    asPartial(value) {
-      return runtime.isPartial(value) ? value : null;
     },
     getPartialTarget(value) {
       return runtime.getPartialTarget(value);
@@ -359,9 +339,6 @@ export function createRuntime(runtime) {
     isLambda(value) {
       return runtime.isLambda(value);
     },
-    asLambda(value) {
-      return runtime.isLambda(value) ? value : null;
-    },
     getLambdaNumArgs(value) {
       return u32(runtime.getLambdaNumArgs(value));
     },
@@ -374,9 +351,6 @@ export function createRuntime(runtime) {
     isVariable(value) {
       return runtime.isVariable(value);
     },
-    asVariable(value) {
-      return runtime.isVariable(value) ? value : null;
-    },
     getVariableStackOffset(value) {
       return u32(runtime.getVariableStatckOffset(value));
     },
@@ -385,9 +359,6 @@ export function createRuntime(runtime) {
     },
     isLet(value) {
       return runtime.isLet(value);
-    },
-    asLet(value) {
-      return runtime.isLet(value) ? value : null;
     },
     getLetInitializer(value) {
       return u32(runtime.getLetInitializer(value));
@@ -400,9 +371,6 @@ export function createRuntime(runtime) {
     },
     isApplication(value) {
       return runtime.isApplication(value);
-    },
-    asApplication(value) {
-      return runtime.isApplication(value) ? value : null;
     },
     getApplicationTarget(value) {
       return runtime.getApplicationTarget(value);
@@ -419,9 +387,6 @@ export function createRuntime(runtime) {
     isList(value) {
       return runtime.isList(value);
     },
-    asList(value) {
-      return runtime.isList(value) ? value : null;
-    },
     getListLength(list, index) {
       return u32(runtime.getListLength(list, index));
     },
@@ -429,7 +394,8 @@ export function createRuntime(runtime) {
       return runtime.getListItem(list, index);
     },
     getListItems(list) {
-      return getListItems(runtime, list);
+      const numItems = runtime.getListLength(list);
+      return Array.from({ length: numItems }, (_, index) => runtime.getListItem(list, index));
     },
     createEmptyList() {
       return runtime.createEmptyList();
@@ -449,9 +415,6 @@ export function createRuntime(runtime) {
     isRecord(value) {
       return runtime.isRecord(value);
     },
-    asRecord(value) {
-      return runtime.isRecord(value) ? value : null;
-    },
     getRecordKeys(value) {
       return runtime.getRecordKeys(value);
     },
@@ -467,9 +430,6 @@ export function createRuntime(runtime) {
     isConstructor(value) {
       return runtime.isConstructor(value);
     },
-    asConstructor(value) {
-      return runtime.isConstructor(value) ? value : null;
-    },
     getConstructorKeys(value) {
       return runtime.getConstructorKeys(value);
     },
@@ -482,9 +442,6 @@ export function createRuntime(runtime) {
     },
     isHashmap(value) {
       return runtime.isHashmap(value);
-    },
-    asHashmap(value) {
-      return runtime.isHashmap(value) ? value : null;
     },
     getHashmapCapacity(value) {
       return runtime.getHashmapCapacity(value);
@@ -506,9 +463,6 @@ export function createRuntime(runtime) {
     isHashset(value) {
       return runtime.isHashset(value);
     },
-    asHashset(value) {
-      return runtime.isHashset(value) ? value : null;
-    },
     getHashsetNumEntries(value) {
       return runtime.getHashsetNumEntries(value);
     },
@@ -520,9 +474,6 @@ export function createRuntime(runtime) {
     },
     isTree(value) {
       return runtime.isTree(value);
-    },
-    asTree(value) {
-      return runtime.isTree(value) ? value : null;
     },
     getTreeLeft(value) {
       return runtime.getTreeLeft(value);
@@ -589,291 +540,15 @@ export function createRuntime(runtime) {
     },
     format(value) {
       if (value === NULL) return 'NULL';
-      return formatTerm(runtime, value, constants);
+      const offset = runtime.getAllocatorOffset();
+      const length = runtime.display(value, offset) - offset;
+      const bytes = new Uint8Array(runtime.memory.buffer, offset, length);
+      const stringValue = new TextDecoder('utf-8').decode(bytes);
+      runtime.deallocate(offset + length, length);
+      return stringValue;
     },
     inspectHeap(offset, length) {
       return new Uint32Array(runtime.memory.buffer, offset, length);
     },
   };
-}
-
-function u32(value) {
-  // Convert 32-bit two's complement signed integer to unsigned integer
-  return value >= 0 ? value : 0xffffffff + 1 + value;
-}
-
-function formatTerm(runtime, value, constants) {
-  switch (runtime.getTermType(value)) {
-    case constants.TermType.Nil:
-      return formatNil(runtime, value, constants);
-    case constants.TermType.Boolean:
-      return formatBoolean(runtime, value, constants);
-    case constants.TermType.Int:
-      return formatInt(runtime, value, constants);
-    case constants.TermType.Float:
-      return formatFloat(runtime, value, constants);
-    case constants.TermType.String:
-      return formatString(runtime, value, constants);
-    case constants.TermType.Date:
-      return formatDate(runtime, value, constants);
-    case constants.TermType.Symbol:
-      return formatSymbol(runtime, value, constants);
-    case constants.TermType.Builtin:
-      return formatBuiltin(runtime, value, constants);
-    case constants.TermType.Partial:
-      return formatPartial(runtime, value, constants);
-    case constants.TermType.Application:
-      return formatApplication(runtime, value, constants);
-    case constants.TermType.Constructor:
-      return formatConstructor(runtime, value, constants);
-    case constants.TermType.Lambda:
-      return formatLambda(runtime, value, constants);
-    case constants.TermType.Variable:
-      return formatVariable(runtime, value, constants);
-    case constants.TermType.Let:
-      return formatLet(runtime, value, constants);
-    case constants.TermType.List:
-      return formatList(runtime, value, constants);
-    case constants.TermType.Record:
-      return formatRecord(runtime, value, constants);
-    case constants.TermType.Hashmap:
-      return formatHashmap(runtime, value, constants);
-    case constants.TermType.Hashset:
-      return formatHashset(runtime, value, constants);
-    case constants.TermType.Tree:
-      return formatTree(runtime, value, constants);
-    case constants.TermType.Signal:
-      return formatSignal(runtime, value, constants);
-    case constants.TermType.Condition:
-      return formatCondition(runtime, value, constants);
-    case constants.TermType.Effect:
-      return formatEffect(runtime, value, constants);
-    case constants.TermType.Cell:
-      return formatCell(runtime, value, constants);
-    case constants.TermType.Pointer:
-      return formatPointer(runtime, value, constants);
-    default: {
-      const typeName = getEnumVariantName(constants.TermType, runtime.getTermType(value));
-      if (typeName) {
-        return typeName;
-      } else {
-        throw new Error(`Unexpected term type at offset ${value}: ${runtime.getTermType(value)}`);
-      }
-    }
-  }
-}
-
-function formatNil(_runtime, _value, _constants) {
-  return 'null';
-}
-
-function formatBoolean(runtime, value, _constants) {
-  return runtime.getBooleanValue(value) === 1 ? 'true' : 'false';
-}
-
-function formatInt(runtime, value, _constants) {
-  return runtime.getIntValue(value).toString(10);
-}
-
-function formatFloat(runtime, value, _constants) {
-  const floatValue = runtime.getFloatValue(value);
-  if (floatValue === Math.floor(floatValue)) {
-    return floatValue.toFixed(1);
-  } else {
-    return floatValue.toString(10);
-  }
-}
-
-function formatString(runtime, value, _constants) {
-  const offset = runtime.getStringOffset(value);
-  const length = runtime.getStringLength(value);
-  return JSON.stringify(
-    new TextDecoder('utf-8').decode(new Uint8Array(runtime.memory.buffer, offset, length)),
-  );
-}
-
-function formatDate(runtime, value, _constants) {
-  return `Date(${new Date(Number(runtime.getDateTimestamp(value))).toISOString()})`;
-}
-
-function formatSymbol(runtime, value, _constants) {
-  return `Symbol(${u32(runtime.getSymbolId(value))})`;
-}
-
-function formatSignal(runtime, value, constants) {
-  return `{${formatTerm(runtime, runtime.getSignalConditions(value), constants)}}`;
-}
-
-function formatCondition(runtime, value, constants) {
-  const type = u32(runtime.getConditionType(value));
-  const signalName = getEnumVariantName(constants.ConditionType, type);
-  if (!signalName) throw new Error(`Unexpected condition type: ${type}`);
-  const payload = formatConditionPayload(runtime, type, value, constants);
-  return `<${signalName}${payload ? `:${payload}` : ''}>`;
-}
-
-function formatConditionPayload(runtime, type, value, constants) {
-  switch (type) {
-    case constants.ConditionType.Custom:
-      return `${formatTerm(
-        runtime,
-        runtime.getCustomConditionEffectType(value),
-        constants,
-      )}:${formatTerm(runtime, runtime.getCustomConditionPayload(value), constants)}:${formatTerm(
-        runtime,
-        runtime.getCustomConditionToken(value),
-        constants,
-      )}`;
-    case constants.ConditionType.Error:
-      return formatTerm(runtime, runtime.getErrorConditionPayload(value), constants);
-    case constants.ConditionType.TypeError: {
-      const expected = runtime.getTypeErrorConditionExpected(value);
-      return `${
-        expected === NULL ? '' : `${getEnumVariantName(constants.TermType, expected)}`
-      }:${formatTerm(runtime, runtime.getTypeErrorConditionReceived(value), constants)}`;
-    }
-    case constants.ConditionType.InvalidFunctionTarget:
-      console.error(`INVALID TARGET: ${runtime.getInvalidFunctionTargetConditionTarget(value)}`);
-      return formatTerm(runtime, runtime.getInvalidFunctionTargetConditionTarget(value), constants);
-    case constants.ConditionType.InvalidFunctionArgs:
-      return `${formatTerm(
-        runtime,
-        runtime.getInvalidFunctionArgsConditionTarget(value),
-        constants,
-      )}(${getListItems(runtime, runtime.getInvalidFunctionArgsConditionArgs(value))
-        .map((arg) => formatTerm(runtime, arg, constants))
-        .join(', ')})`;
-    case constants.ConditionType.InvalidAccessor:
-      return `${formatTerm(
-        runtime,
-        runtime.getInvalidAccessorConditionTarget(value),
-        constants,
-      )},${formatTerm(runtime, runtime.getInvalidAccessorConditionKey(value), constants)}`;
-    case constants.ConditionType.InvalidJson:
-      return `${formatTerm(
-        runtime,
-        runtime.getInvalidJsonConditionSource(value),
-        constants,
-      )}:${runtime.getInvalidJsonConditionOffset(value)}`;
-    case constants.ConditionType.Pending:
-    case constants.ConditionType.InvalidPointer:
-    default:
-      return null;
-  }
-}
-
-function formatEffect(runtime, value, constants) {
-  return `(!${formatTerm(runtime, runtime.getEffectCondition(value), constants)})`;
-}
-
-function formatBuiltin(runtime, value, constants) {
-  const target = u32(runtime.getBuiltinUid(value));
-  return getEnumVariantName(constants.Stdlib, target);
-}
-
-function formatPartial(runtime, value, constants) {
-  const target = runtime.getPartialTarget(value);
-  const args = runtime.getPartialArgs(value);
-  return `${formatTerm(runtime, target, constants)}.bind(${getListItems(runtime, args)
-    .map((arg) => formatTerm(runtime, arg, constants))
-    .join(', ')})`;
-}
-
-function formatLambda(runtime, value, constants) {
-  const numArgs = u32(runtime.getLambdaNumArgs(value));
-  const body = runtime.getLetBody(value);
-  return `(${numArgs}) => ${formatTerm(runtime, body, constants)}`;
-}
-
-function formatVariable(runtime, value, _constants) {
-  return `Variable(${u32(runtime.getVariableStackOffset(value))})`;
-}
-
-function formatLet(runtime, value, constants) {
-  const initializer = runtime.getLetInitializer(value);
-  const body = runtime.getLetBody(value);
-  return `{let ${formatTerm(runtime, initializer, constants)}; ${formatTerm(
-    runtime,
-    body,
-    constants,
-  )}}`;
-}
-
-function formatApplication(runtime, value, constants) {
-  const target = runtime.getApplicationTarget(value);
-  const args = runtime.getApplicationArgs(value);
-  return `${formatTerm(runtime, target, constants)}(${getListItems(runtime, args)
-    .map((arg) => formatTerm(runtime, arg, constants))
-    .join(', ')})`;
-}
-
-function formatList(runtime, value, constants) {
-  return `[${getListItems(runtime, value)
-    .map((item) => formatTerm(runtime, item, constants))
-    .join(', ')}]`;
-}
-
-function formatConstructor(runtime, value, constants) {
-  const keys = getListItems(runtime, runtime.getConstructorKeys(value));
-  return `Constructor({${keys.map((key) => formatTerm(runtime, key, constants)).join(', ')}})`;
-}
-
-function formatRecord(runtime, value, constants) {
-  const keys = getListItems(runtime, runtime.getRecordKeys(value));
-  const values = getListItems(runtime, runtime.getRecordValues(value));
-  const entries = keys.map((key, index) => [key, values[index]]);
-  if (entries.length == 0) return '{}';
-  return `{ ${entries
-    .map(
-      ([key, value]) =>
-        `${formatTerm(runtime, key, constants)}: ${formatTerm(runtime, value, constants)}`,
-    )
-    .join(', ')} }`;
-}
-
-function formatHashmap(runtime, value, _constants) {
-  return `Map({${runtime.getHashmapNumEntries(value)}})`;
-}
-
-function formatHashset(runtime, value, _constants) {
-  return `Set({${runtime.getHashsetNumEntries(value)}})`;
-}
-
-function formatTree(runtime, value, constants) {
-  const left = runtime.getTreeLeft(value);
-  const right = runtime.getTreeRight(value);
-  return `(${left === NULL ? 'NULL' : formatTerm(runtime, left, constants)} . ${
-    right === NULL ? 'NULL' : formatTerm(runtime, right, constants)
-  })`;
-}
-
-function formatCell(runtime, value, _constants) {
-  const numFields = runtime.getCellNumFields(value);
-  return `Cell({${Array.from({ length: numFields }, (_, index) =>
-    runtime.getCellField(value, index),
-  ).join(', ')}})`;
-}
-
-function formatPointer(runtime, value, constants) {
-  const target = runtime.getPointerTarget(value);
-  return `Pointer(${formatHex(value)}:${formatTerm(runtime, target, constants)})`;
-}
-
-function getListItems(runtime, value) {
-  const numItems = runtime.getListLength(value);
-  return Array.from({ length: numItems }, (_, index) => runtime.getListItem(value, index));
-}
-
-function getEnumVariantName(values, variant) {
-  return Object.entries(values)
-    .filter(([_key, index]) => index == variant)
-    .map(([key, _index]) => key)[0];
-}
-
-function formatHex(value) {
-  return `0x${leftPad(value.toString(16), 8)}`;
-}
-
-function leftPad(value, length) {
-  return `${Array.from({ length: length - value.toString().length }, () => '0').join('')}${value}`;
 }

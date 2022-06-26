@@ -3,6 +3,36 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 export default (describe) => {
   describe('Stdlib_Length', (test) => {
+    test('(String)', (assert, {
+      createApplication,
+      createBuiltin,
+      createString,
+      createUnitList,
+      evaluate,
+      format,
+      NULL,
+      Stdlib,
+    }) => {
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.Length),
+          createUnitList(createString('')),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '0');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.Length),
+          createUnitList(createString('foo')),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '3');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+    });
+
     test('(List)', (assert, {
       createApplication,
       createEmptyList,
@@ -137,6 +167,68 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '3');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+    });
+
+    test('(Iterator)', (assert, {
+      createApplication,
+      createEmptyIterator,
+      createBuiltin,
+      createFilterIterator,
+      createInt,
+      createLambda,
+      createPair,
+      createRangeIterator,
+      createUnitList,
+      createVariable,
+      evaluate,
+      format,
+      NULL,
+      Stdlib,
+    }) => {
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.Length),
+          createUnitList(createEmptyIterator()),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '0');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.Length),
+          createUnitList(createRangeIterator(3, 3)),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '3');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.Length),
+          createUnitList(
+            createFilterIterator(
+              createRangeIterator(3, 3),
+              createLambda(
+                1,
+                createApplication(
+                  createBuiltin(Stdlib.Equal),
+                  createPair(
+                    createApplication(
+                      createBuiltin(Stdlib.Remainder),
+                      createPair(createVariable(0), createInt(2)),
+                    ),
+                    createInt(1),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '2');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });

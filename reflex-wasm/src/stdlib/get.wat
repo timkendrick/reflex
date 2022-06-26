@@ -2,7 +2,7 @@
 ;; SPDX-License-Identifier: Apache-2.0
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 (module
-  (@builtin $Stdlib_Get
+  (@builtin $Stdlib_Get "Get"
     (@args (@strict $self) (@strict $key))
 
     (@impl
@@ -13,8 +13,7 @@
         (if (result i32 i32)
           (i32.eq (global.get $NULL) (local.tee $value (call $Term::List::traits::get (local.get $self) (local.get $key))))
           (then
-            (call $Term::Signal::of (call $Term::Condition::invalid_accessor (local.get $self) (local.get $key)))
-            (global.get $NULL))
+            (call $Stdlib_Get::impl::default (local.get $self) (local.get $key) (local.get $state)))
           (else
             (local.get $value)
             (global.get $NULL)))))
@@ -27,8 +26,7 @@
         (if (result i32 i32)
           (i32.eq (global.get $NULL) (local.tee $value (call $Term::Record::traits::get (local.get $self) (local.get $key))))
           (then
-            (call $Term::Signal::of (call $Term::Condition::invalid_accessor (local.get $self) (local.get $key)))
-            (global.get $NULL))
+            (call $Stdlib_Get::impl::default (local.get $self) (local.get $key) (local.get $state)))
           (else
             (local.get $value)
             (global.get $NULL)))))

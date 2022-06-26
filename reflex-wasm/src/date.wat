@@ -4,4 +4,4 @@
 (module
   ;; Imported Date functions
   (func $Utils::Date::parse (import "Date" "parse") (param i32 i32) (result i64))
-  (func $Utils::Date::to_json (import "Date" "toJson") (param i64 i32) (result i32)))
+  (func $Utils::Date::to_iso_string (import "Date" "toISOString") (param i64 i32) (result i32)))

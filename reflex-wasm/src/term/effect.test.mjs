@@ -11,8 +11,10 @@ export default (describe) => {
       format,
     }) => {
       assert.strictEqual(
-        format(createEffect(createCustomCondition(createSymbol(123), createInt(3), createSymbol(0)))),
-        '(!<Custom:Symbol(123):3:Symbol(0)>)',
+        format(
+          createEffect(createCustomCondition(createSymbol(123), createInt(3), createSymbol(0))),
+        ),
+        '<!<CustomCondition:Symbol(123):3:Symbol(0)>>',
       );
     });
 
@@ -89,19 +91,31 @@ export default (describe) => {
       NULL,
     }) => {
       (() => {
-        const expression = createEffect(createCustomCondition(createSymbol(123), createInt(3), createSymbol(0)));
+        const expression = createEffect(
+          createCustomCondition(createSymbol(123), createInt(3), createSymbol(0)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<Custom:Symbol(123):3:Symbol(0)> . NULL)}');
-        assert.strictEqual(format(dependencies), '(<Custom:Symbol(123):3:Symbol(0)> . NULL)');
+        assert.strictEqual(format(result), '{<CustomCondition:Symbol(123):3:Symbol(0)>}');
+        assert.strictEqual(
+          format(dependencies),
+          '(<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)',
+        );
       })();
       (() => {
-        const expression = createEffect(createCustomCondition(createSymbol(123), createInt(3), createSymbol(0)));
+        const expression = createEffect(
+          createCustomCondition(createSymbol(123), createInt(3), createSymbol(0)),
+        );
         const [result, dependencies] = evaluate(expression, createHashmap([]));
-        assert.strictEqual(format(result), '{(<Custom:Symbol(123):3:Symbol(0)> . NULL)}');
-        assert.strictEqual(format(dependencies), '(<Custom:Symbol(123):3:Symbol(0)> . NULL)');
+        assert.strictEqual(format(result), '{<CustomCondition:Symbol(123):3:Symbol(0)>}');
+        assert.strictEqual(
+          format(dependencies),
+          '(<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)',
+        );
       })();
       (() => {
-        const expression = createEffect(createCustomCondition(createSymbol(123), createInt(3), createSymbol(0)));
+        const expression = createEffect(
+          createCustomCondition(createSymbol(123), createInt(3), createSymbol(0)),
+        );
         const [result, dependencies] = evaluate(
           expression,
           createHashmap([
@@ -109,11 +123,16 @@ export default (describe) => {
             [createCustomCondition(createSymbol(456), createInt(3), createSymbol(0)), createInt(5)],
           ]),
         );
-        assert.strictEqual(format(result), '{(<Custom:Symbol(123):3:Symbol(0)> . NULL)}');
-        assert.strictEqual(format(dependencies), '(<Custom:Symbol(123):3:Symbol(0)> . NULL)');
+        assert.strictEqual(format(result), '{<CustomCondition:Symbol(123):3:Symbol(0)>}');
+        assert.strictEqual(
+          format(dependencies),
+          '(<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)',
+        );
       })();
       (() => {
-        const expression = createEffect(createCustomCondition(createSymbol(123), createInt(3), createSymbol(0)));
+        const expression = createEffect(
+          createCustomCondition(createSymbol(123), createInt(3), createSymbol(0)),
+        );
         const [result, dependencies] = evaluate(
           expression,
           createHashmap([
@@ -123,7 +142,10 @@ export default (describe) => {
           ]),
         );
         assert.strictEqual(format(result), '3');
-        assert.strictEqual(format(dependencies), '(<Custom:Symbol(123):3:Symbol(0)> . NULL)');
+        assert.strictEqual(
+          format(dependencies),
+          '(<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)',
+        );
       })();
     });
   });

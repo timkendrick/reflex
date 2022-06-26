@@ -71,6 +71,52 @@
   (func $Term::Record::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
 
+  (func $Term::Record::traits::display (param $self i32) (param $offset i32) (result i32)
+    (local $keys i32)
+    (local $values i32)
+    (local $num_fields i32)
+    (local $index i32)
+    (if (result i32)
+      ;; If the record is empty, write an empty object literal to the output
+      (i32.eqz
+        (local.tee $num_fields
+          (call $Utils::i32::min_u
+            (call $Term::List::get_length (local.tee $keys (call $Term::Record::get::keys (local.get $self))))
+            (call $Term::List::get_length (local.tee $values (call $Term::Record::get::values (local.get $self)))))))
+      (then
+        (@store-bytes $offset "{}")
+        (i32.add (local.get $offset)))
+      (else
+        ;; Write the opening parenthesis to the output
+        (@store-bytes $offset "{ ")
+        (local.set $offset (i32.add (local.get $offset)))
+        ;; Iterate through each field
+        (loop $LOOP
+          ;; If this is not the first field, write a comma separator to the output
+          (if
+            (local.get $index)
+            (then
+              (@store-bytes $offset ", ")
+              (local.set $offset (i32.add (local.get $offset)))))
+          ;; Write the key to the output
+          (local.set $offset
+            (call $Term::traits::display
+              (call $Term::List::get_item (local.get $keys) (local.get $index))
+              (local.get $offset)))
+          ;; Write the separator to the output
+          (@store-bytes $offset ": ")
+          (local.set $offset (i32.add (local.get $offset)))
+          ;; Write the value to the output
+          (local.set $offset
+            (call $Term::traits::display
+              (call $Term::List::get_item (local.get $values) (local.get $index))
+              (local.get $offset)))
+          ;; If this is not the final field, continue with the next one
+          (br_if $LOOP (i32.lt_u (local.tee $index (i32.add (i32.const 1) (local.get $index))) (local.get $num_fields))))
+        ;; Write the closing brace to the output and return the updated offset
+        (@store-bytes $offset " }")
+        (i32.add (local.get $offset)))))
+
   (func $Term::Record::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (local $substituted_keys i32)
     (local $substituted_values i32)

@@ -25,11 +25,11 @@ export default (describe) => {
       const [result, dependencies] = evaluate(expression, NULL);
       assert.strictEqual(
         format(result),
-        '{(<Custom:"reflex::scan":[Add(3, 4), 5, Add]:null> . NULL)}',
+        '{<CustomCondition:"reflex::scan":[Add(3, 4), 5, Add]:null>}',
       );
       assert.strictEqual(
         format(dependencies),
-        '(<Custom:"reflex::scan":[Add(3, 4), 5, Add]:null> . NULL)',
+        '(<CustomCondition:"reflex::scan":[Add(3, 4), 5, Add]:null> . NULL)',
       );
     });
   });

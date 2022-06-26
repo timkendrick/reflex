@@ -209,7 +209,7 @@ export default (describe) => {
           createTriple(hashmap, createString('qux'), createInt(6)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), 'Map({4})');
+        assert.strictEqual(format(result), 'Map(4)');
         assert.strictEqual(format(getHashmapValue(result, createString('foo'))), '3');
         assert.strictEqual(format(getHashmapValue(result, createString('bar'))), '4');
         assert.strictEqual(format(getHashmapValue(result, createString('baz'))), '5');
@@ -227,7 +227,7 @@ export default (describe) => {
           createTriple(hashmap, createString('bar'), createInt(4)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), 'Map({3})');
+        assert.strictEqual(format(result), 'Map(3)');
         assert.strictEqual(format(getHashmapValue(result, createString('foo'))), '3');
         assert.strictEqual(format(getHashmapValue(result, createString('bar'))), '4');
         assert.strictEqual(format(getHashmapValue(result, createString('baz'))), '5');
@@ -244,7 +244,7 @@ export default (describe) => {
           createTriple(hashmap, createString('bar'), createInt(6)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), 'Map({3})');
+        assert.strictEqual(format(result), 'Map(3)');
         assert.strictEqual(format(getHashmapValue(result, createString('foo'))), '3');
         assert.strictEqual(format(getHashmapValue(result, createString('bar'))), '6');
         assert.strictEqual(format(getHashmapValue(result, createString('baz'))), '5');

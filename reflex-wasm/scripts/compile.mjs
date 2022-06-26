@@ -39,6 +39,7 @@ import storeBytesDirective, { STORE_BYTES_DIRECTIVE } from './transform/directiv
 import structDirective, { STRUCT_DIRECTIVE } from './transform/directives/struct.mjs';
 import stringLengthDirective, { STRING_LENGTH_DIRECTIVE } from './transform/directives/string_length.mjs';
 import switchDirective, { SWITCH_DIRECTIVE } from './transform/directives/switch.mjs';
+import toStringDirective, { TO_STRING_DIRECTIVE } from './transform/directives/to_string.mjs';
 import unionDirective, { UNION_DIRECTIVE } from './transform/directives/union.mjs';
 import unionVariantDirective, { UNION_VARIANT_DIRECTIVE } from './transform/directives/union_variant.mjs';
 import unionVariantsDirective, { UNION_VARIANTS_DIRECTIVE } from './transform/directives/union_variants.mjs';
@@ -85,6 +86,7 @@ try {
         [STRING_LENGTH_DIRECTIVE]: stringLengthDirective,
         [STRUCT_DIRECTIVE]: structDirective,
         [SWITCH_DIRECTIVE]: switchDirective,
+        [TO_STRING_DIRECTIVE]: toStringDirective,
         [UNION_DIRECTIVE]: unionDirective,
         [UNION_VARIANT_DIRECTIVE]: unionVariantDirective,
         [UNION_VARIANTS_DIRECTIVE]: unionVariantsDirective,

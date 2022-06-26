@@ -18,13 +18,13 @@
   ;; This also means that an allocated pointer will never be zero, allowing cheap pointer existence checks against unallocated memory.
   (data $Allocator::heap (i32.const 0) "\04\00\00\00")
 
-  (func $Allocator::get_offset (result i32)
+  (func $Allocator::get_offset (export "getAllocatorOffset") (result i32)
     (i32.load (i32.const 0)))
 
   (func $Allocator::set_offset (param $value i32)
     (i32.store (i32.const 0) (local.get $value)))
 
-  (func $Allocator::allocate (param $size i32) (result i32)
+  (func $Allocator::allocate (export "allocate") (param $size i32) (result i32)
     ;; Reserve the requested amount of heap space and return the allocated address
     (local $before_offset i32)
     (local $after_offset i32)
@@ -54,7 +54,7 @@
         (unreachable))
       (else)))
 
-  (func $Allocator::shrink (param $offset i32) (param $size i32)
+  (func $Allocator::shrink (export "deallocate") (param $offset i32) (param $size i32)
     ;; Shrink an existing allocation by the given number of bytes
     ;; The provided offset must be the end address of the most recent allocation, or this will panic
     ;; (this is to prevent accidentally overwriting prior allocations)

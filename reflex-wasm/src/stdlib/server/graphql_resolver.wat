@@ -6,7 +6,7 @@
   (@const-string $Stdlib_GraphQlResolver::MUTATION "mutation")
   (@const-string $Stdlib_GraphQlResolver::SUBSCRIPTION "subscription")
 
-  (@builtin $Stdlib_GraphQlResolver
+  (@builtin $Stdlib_GraphQlResolver "GraphQlResolver"
     (@args (@strict $self))
 
     (@impl

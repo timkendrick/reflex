@@ -15,7 +15,7 @@ const TEMPLATE = path.join(__dirname, '../templates/builtin.wat');
 export const BUILTIN_DIRECTIVE = '@builtin';
 
 export default function builtinDirective(node, context) {
-  const [instruction, builtinIdentifier, signature, ...implementations] = node.elements
+  const [instruction, builtinIdentifier, name, signature, ...implementations] = node.elements
     .filter((node) => !isNonFunctionalNode(node))
     .flatMap((node) => (context.transform ? context.transform(node, context) : [node]));
   const argDefinitions = signature && parseArgDefinitions(signature);
@@ -27,6 +27,8 @@ export default function builtinDirective(node, context) {
     !isNamedTermNode(BUILTIN_DIRECTIVE, instruction) ||
     !builtinIdentifier ||
     !isIdentifierNode(builtinIdentifier) ||
+    !name ||
+    !isStringNode(name) ||
     !argDefinitions ||
     !builtinImplementations ||
     !defaultImplementation
@@ -42,6 +44,7 @@ export default function builtinDirective(node, context) {
     ...getTemplateElements(
       context.import(TEMPLATE, {
         $builtin_name: builtinIdentifier,
+        $name: name,
         $arg_names: createListDirective({
           elements: argDefinitions.map(({ identifier }) => identifier),
           location: node.location,
@@ -205,4 +208,8 @@ function isInstructionNode(node) {
 
 function isIdentifierNode(node) {
   return node.type === NodeType.Term && node.source.startsWith('$');
+}
+
+function isStringNode(node) {
+  return node.type === NodeType.String;
 }

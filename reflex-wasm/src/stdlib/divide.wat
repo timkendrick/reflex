@@ -2,7 +2,7 @@
 ;; SPDX-License-Identifier: Apache-2.0
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 (module
-  (@builtin $Stdlib_Divide
+  (@builtin $Stdlib_Divide "Divide"
     (@args (@strict $self) (@strict $divisor))
 
     (@impl

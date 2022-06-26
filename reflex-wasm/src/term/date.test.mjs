@@ -5,10 +5,7 @@ export default (describe) => {
   describe('Term::Date', (test) => {
     test('format', (assert, { createDate, format }) => {
       const timestamp = Date.now();
-      assert.strictEqual(
-        format(createDate(timestamp)),
-        `Date(${new Date(timestamp).toISOString()})`,
-      );
+      assert.strictEqual(format(createDate(timestamp)), new Date(timestamp).toISOString());
     });
 
     test('hash', (assert, { createDate, hash }) => {

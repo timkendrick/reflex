@@ -28,6 +28,10 @@
   (func $Term::Nil::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (global.get $NULL))
 
+  (func $Term::Nil::traits::display (param $self i32) (param $offset i32) (result i32)
+    (@store-bytes $offset "null")
+    (i32.add (local.get $offset)))
+
   (func $Term::Nil::traits::to_json (param $self i32) (param $offset i32) (result i32 i32)
     ;; Put the success marker on the stack
     (global.get $TRUE)

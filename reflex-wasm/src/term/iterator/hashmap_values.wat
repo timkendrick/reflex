@@ -50,6 +50,9 @@
   (func $Term::HashmapValuesIterator::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
 
+  (func $Term::HashmapValuesIterator::traits::display (param $self i32) (param $offset i32) (result i32)
+    (call $TermType::traits::display (global.get $TermType::HashmapValuesIterator) (local.get $offset)))
+
   (func $Term::HashmapValuesIterator::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (local $substituted_source i32)
     (local.set $substituted_source

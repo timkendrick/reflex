@@ -21,7 +21,7 @@ export default (describe) => {
           createPair(createBuiltin(Stdlib.Add), createEmptyList()),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:Add()> . NULL)}');
+        assert.strictEqual(format(result), '{<InvalidFunctionArgsCondition:Add()>}');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
@@ -63,7 +63,7 @@ export default (describe) => {
           createPair(createBuiltin(Stdlib.Add), createEmptyIterator()),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:Add()> . NULL)}');
+        assert.strictEqual(format(result), '{<InvalidFunctionArgsCondition:Add()>}');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {

@@ -107,6 +107,30 @@
         ;; Default implementation
         (call $TermType::sizeof)))
 
+    (func $TermType::traits::display (param $self i32) (param $offset i32) (result i32)
+      (@branch
+        ;; Format term type according to the underlying term type implementation
+        (local.get $self)
+        (@list
+          (@map $typename
+            (@union_variants (@get $TermType))
+            (block
+              (@store-bytes $offset (@to-string (@get $typename)))
+              (return (i32.add (local.get $offset))))))
+        ;; Default implementation
+        (local.get $offset)))
+
+    (func $Term::traits::display (param $self i32) (param $offset i32) (result i32)
+      (@branch
+        ;; Format term according to the underlying term type implementation
+        (call $Term::TermType::get::type (local.get $self))
+        (@list
+          (@map $typename
+            (@union_variants (@get $TermType))
+            (return (call (@concat "$Term::" (@get $typename) "::traits::display") (local.get $self) (local.get $offset)))))
+        ;; Default implementation
+        (local.get $offset)))
+
     ;; Trait implementations
     ;; TODO: Refactor manual trait delegation implementations into macro
     (@let $trait_typenames

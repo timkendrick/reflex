@@ -14,9 +14,6 @@
     (@export $Tree (@get $Tree)))
 
   (export "isTree" (func $Term::Tree::is))
-  (export "getTreeLeft" (func $Term::Tree::get::left))
-  (export "getTreeRight" (func $Term::Tree::get::right))
-  (export "getTreeLength" (func $Term::Tree::get::length))
 
   (@const $Term::Tree::EMPTY i32
     (call $Term::TermType::Tree::new (global.get $NULL) (global.get $NULL) (i32.const 0)))
@@ -59,6 +56,40 @@
 
   (func $Term::Tree::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
+
+  (func $Term::Tree::traits::display (param $self i32) (param $offset i32) (result i32)
+    (local $branch i32)
+    ;; Write the opening parenthesis to the output
+    (@store-bytes $offset "(")
+    (local.set $offset (i32.add (local.get $offset)))
+    ;; Write the left branch to the output
+    (local.set $offset
+      (if (result i32)
+        (i32.eq
+          (local.tee $branch (call $Term::Tree::get::left (local.get $self)))
+          (global.get $NULL))
+        (then
+          (@store-bytes $offset "NULL")
+          (i32.add (local.get $offset)))
+        (else
+          (call $Term::traits::display (local.get $branch) (local.get $offset)))))
+    ;; Write the pair separator to the output
+    (@store-bytes $offset " . ")
+    (local.set $offset (i32.add (local.get $offset)))
+    ;; Write the right branch to the output
+    (local.set $offset
+      (if (result i32)
+        (i32.eq
+          (local.tee $branch (call $Term::Tree::get::right (local.get $self)))
+          (global.get $NULL))
+        (then
+          (@store-bytes $offset "NULL")
+          (i32.add (local.get $offset)))
+        (else
+          (call $Term::traits::display (local.get $branch) (local.get $offset)))))
+    ;; Write the closing parenthesis to the output and return the updated offset
+    (@store-bytes $offset ")")
+    (i32.add (local.get $offset)))
 
   (func $Term::Tree::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (local $left i32)
@@ -390,6 +421,15 @@
             ;; Otherwise return the tree
             (local.get $instance)
             (local.get $dependencies))))))
+
+  (func $Term::Tree::get_left (export "getTreeLeft") (param $self i32) (result i32)
+    (call $Term::Tree::get::left (local.get $self)))
+
+  (func $Term::Tree::get_right (export "getTreeRight") (param $self i32) (result i32)
+    (call $Term::Tree::get::right (local.get $self)))
+
+  (func $Term::Tree::get_length (export "getTreeLength") (param $self i32) (result i32)
+    (call $Term::Tree::get::length (local.get $self)))
 
   (func $Term::Tree::get_depth (param $self i32) (result i32)
     (call $Utils::i32::max_u

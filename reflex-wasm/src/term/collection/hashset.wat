@@ -35,6 +35,14 @@
   (func $Term::Hashset::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
 
+  (func $Term::Hashset::traits::display (param $self i32) (param $offset i32) (result i32)
+    (@store-bytes $offset "Set(")
+    (local.set $offset (i32.add (local.get $offset)))
+    (call $Utils::u32::write_string (call $Term::Hashset::get::num_entries (local.get $self)) (local.get $offset))
+    (local.set $offset (i32.add (local.get $offset)))
+    (@store-bytes $offset ")")
+    (i32.add (local.get $offset)))
+
   (func $Term::Hashset::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (local $substituted_entries i32)
     (if (result i32)

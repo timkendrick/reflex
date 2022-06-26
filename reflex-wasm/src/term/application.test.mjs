@@ -69,7 +69,7 @@ export default (describe) => {
     }) => {
       const expression = createApplication(createInt(3), createEmptyList());
       const [result, dependencies] = evaluate(expression, NULL);
-      assert.strictEqual(format(result), '{(<InvalidFunctionTarget:3> . NULL)}');
+      assert.strictEqual(format(result), '{<InvalidFunctionTargetCondition:3>}');
       assert.strictEqual(format(dependencies), 'NULL');
     });
 
@@ -85,7 +85,7 @@ export default (describe) => {
     }) => {
       const expression = createApplication(createBuiltin(Stdlib.Add), createUnitList(createInt(3)));
       const [result, dependencies] = evaluate(expression, NULL);
-      assert.strictEqual(format(result), '{(<InvalidFunctionArgs:Add(3)> . NULL)}');
+      assert.strictEqual(format(result), '{<InvalidFunctionArgsCondition:Add(3)>}');
       assert.strictEqual(format(dependencies), 'NULL');
     });
 
@@ -107,7 +107,7 @@ export default (describe) => {
         createEmptyList(),
       );
       const [result, dependencies] = evaluate(expression, NULL);
-      assert.strictEqual(format(result), '{(<Custom:Symbol(123):"foo":Symbol(0)> . NULL)}');
+      assert.strictEqual(format(result), '{<CustomCondition:Symbol(123):"foo":Symbol(0)>}');
       assert.strictEqual(format(dependencies), 'NULL');
     });
 
@@ -135,7 +135,7 @@ export default (describe) => {
         ),
       );
       const [result, dependencies] = evaluate(expression, NULL);
-      assert.strictEqual(format(result), '{(<Custom:Symbol(123):"foo":Symbol(0)> . NULL)}');
+      assert.strictEqual(format(result), '{<CustomCondition:Symbol(123):"foo":Symbol(0)>}');
       assert.strictEqual(format(dependencies), 'NULL');
     });
 
@@ -166,7 +166,7 @@ export default (describe) => {
       const [result, dependencies] = evaluate(expression, NULL);
       assert.strictEqual(
         format(result),
-        '{((<Custom:Symbol(123):"foo":Symbol(0)> . NULL) . (<Custom:Symbol(456):"bar":Symbol(0)> . NULL))}',
+        '{<CustomCondition:Symbol(123):"foo":Symbol(0)>,<CustomCondition:Symbol(456):"bar":Symbol(0)>}',
       );
       assert.strictEqual(format(dependencies), 'NULL');
     });
@@ -200,7 +200,10 @@ export default (describe) => {
           ]),
         );
         assert.strictEqual(format(result), `${3 + 4}`);
-        assert.strictEqual(format(dependencies), '(<Custom:Symbol(123):3:Symbol(0)> . NULL)');
+        assert.strictEqual(
+          format(dependencies),
+          '(<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)',
+        );
       })();
       (() => {
         const target = createBuiltin(Stdlib.Add);
@@ -216,7 +219,10 @@ export default (describe) => {
           ]),
         );
         assert.strictEqual(format(result), `${3 + 4}`);
-        assert.strictEqual(format(dependencies), '(<Custom:Symbol(123):3:Symbol(0)> . NULL)');
+        assert.strictEqual(
+          format(dependencies),
+          '(<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)',
+        );
       })();
       (() => {
         const target = createBuiltin(Stdlib.Add);
@@ -235,7 +241,7 @@ export default (describe) => {
         assert.strictEqual(format(result), `${3 + 4}`);
         assert.strictEqual(
           format(dependencies),
-          '((<Custom:Symbol(234):4:Symbol(0)> . NULL) . (<Custom:Symbol(123):3:Symbol(0)> . NULL))',
+          '((<CustomCondition:Symbol(234):4:Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):3:Symbol(0)> . NULL))',
         );
       })();
       (() => {
@@ -261,7 +267,7 @@ export default (describe) => {
         assert.strictEqual(format(result), `${3 + 4}`);
         assert.strictEqual(
           format(dependencies),
-          '(((<Custom:Symbol(345):5:Symbol(0)> . NULL) . (<Custom:Symbol(234):4:Symbol(0)> . NULL)) . (<Custom:Symbol(123):3:Symbol(0)> . NULL))',
+          '(((<CustomCondition:Symbol(345):5:Symbol(0)> . NULL) . (<CustomCondition:Symbol(234):4:Symbol(0)> . NULL)) . (<CustomCondition:Symbol(123):3:Symbol(0)> . NULL))',
         );
       })();
       (() => {
@@ -316,7 +322,7 @@ export default (describe) => {
         assert.strictEqual(format(result), `${3 + 4 + 5 + 6}`);
         assert.strictEqual(
           format(dependencies),
-          '(((((<Custom:Symbol(789):9:Symbol(0)> . NULL) . (<Custom:Symbol(678):8:Symbol(0)> . NULL)) . (<Custom:Symbol(567):7:Symbol(0)> . NULL)) . (((<Custom:Symbol(456):6:Symbol(0)> . NULL) . (<Custom:Symbol(345):5:Symbol(0)> . NULL)) . (<Custom:Symbol(234):4:Symbol(0)> . NULL))) . (<Custom:Symbol(123):3:Symbol(0)> . NULL))',
+          '(((((<CustomCondition:Symbol(789):9:Symbol(0)> . NULL) . (<CustomCondition:Symbol(678):8:Symbol(0)> . NULL)) . (<CustomCondition:Symbol(567):7:Symbol(0)> . NULL)) . (((<CustomCondition:Symbol(456):6:Symbol(0)> . NULL) . (<CustomCondition:Symbol(345):5:Symbol(0)> . NULL)) . (<CustomCondition:Symbol(234):4:Symbol(0)> . NULL))) . (<CustomCondition:Symbol(123):3:Symbol(0)> . NULL))',
         );
       })();
     });

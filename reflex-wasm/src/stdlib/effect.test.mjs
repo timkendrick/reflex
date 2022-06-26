@@ -20,8 +20,11 @@ export default (describe) => {
           createTriple(createSymbol(123), createInt(3), createSymbol(456)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<Custom:Symbol(123):3:Symbol(456)> . NULL)}');
-        assert.strictEqual(format(dependencies), '(<Custom:Symbol(123):3:Symbol(456)> . NULL)');
+        assert.strictEqual(format(result), '{<CustomCondition:Symbol(123):3:Symbol(456)>}');
+        assert.strictEqual(
+          format(dependencies),
+          '(<CustomCondition:Symbol(123):3:Symbol(456)> . NULL)',
+        );
       })();
     });
   });

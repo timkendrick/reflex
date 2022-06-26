@@ -27,7 +27,7 @@
     (@depends-on $Stdlib_ToRequest::FIELDS)
     (call $Term::Constructor::new (global.get $Stdlib_ToRequest::FIELDS)))
 
-  (@builtin $Stdlib_ToRequest
+  (@builtin $Stdlib_ToRequest "ToRequest"
     (@args (@strict $self))
 
     (@impl

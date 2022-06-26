@@ -22,6 +22,14 @@
     (local.get $self)
     (call $Hash::write_i32))
 
+  (func $Term::Cell::traits::display (param $self i32) (param $offset i32) (result i32)
+    (@store-bytes $offset "Cell(")
+    (local.set $offset (i32.add (local.get $offset)))
+    (call $Utils::u32::write_string (call $Term::Cell::get_num_fields (local.get $self)) (local.get $offset))
+    (local.set $offset (i32.add (local.get $offset)))
+    (@store-bytes $offset ")")
+    (i32.add (local.get $offset)))
+
   (func $Term::Cell::empty::sizeof (result i32)
     ;; Determine the size of the term wrapper by inspecting the cell fields pointer for an imaginary cell term located
     ;; at memory address 0. The pointer offset tells us how many bytes are taken up by the preceding cell wrapper.

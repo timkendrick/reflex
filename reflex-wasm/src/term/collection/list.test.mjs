@@ -146,33 +146,6 @@ export default (describe) => {
       })();
     });
 
-    test('out-of-bounds indices', (assert, {
-      createApplication,
-      createBuiltin,
-      createInt,
-      createPair,
-      createTriple,
-      evaluate,
-      format,
-      NULL,
-      Stdlib,
-    }) => {
-      (() => {
-        const list = createTriple(createInt(3), createInt(4), createInt(5));
-        const expression = createApplication(createBuiltin(Stdlib.Get), createPair(list, createInt(3)));
-        const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidAccessor:[3, 4, 5],3> . NULL)}');
-        assert.strictEqual(format(dependencies), 'NULL');
-      })();
-      (() => {
-        const list = createTriple(createInt(3), createInt(4), createInt(5));
-        const expression = createApplication(createBuiltin(Stdlib.Get), createPair(list, createInt(-1)));
-        const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidAccessor:[3, 4, 5],-1> . NULL)}');
-        assert.strictEqual(format(dependencies), 'NULL');
-      })();
-    });
-
     test('iteration', (assert, {
       createApplication,
       createEmptyList,

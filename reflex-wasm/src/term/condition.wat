@@ -52,7 +52,24 @@
       (@map $typename
         (@union_variants (@get $Condition))
         (@block
-          (global (@concat "$Condition::" (@get $typename)) (export (@concat "\"" "ConditionType_" (@get $typename) "\"")) i32 (i32.const (@get $_))))))
+          (global (@concat "$Condition::" (@get $typename)) (export (@concat "\"" "ConditionType_" (@get $typename) "\"")) i32 (i32.const (@get $_)))))
+
+      ;; Generate display formatters for condition types
+      (func $ConditionType::display (param $variant i32) (param $offset i32) (result i32)
+        (@branch
+          (local.get $variant)
+          (@list
+            (@map $typename
+              (@union_variants (@get $Condition))
+              (return (call (@concat "$ConditionType::" (@get $typename) "::display") (local.get $offset)))))
+          (local.get $offset)))
+
+      (@map $typename
+        (@union_variants (@get $Condition))
+        (@block
+          (func (@concat "$ConditionType::" (@get $typename) "::display") (param $offset i32) (result i32)
+            (@store-bytes $offset (@to-string (@get $typename)))
+            (i32.add (local.get $offset))))))
 
   (export "isCondition" (func $Term::Condition::is))
   (export "getConditionType" (func $Term::Condition::get::type))
@@ -148,6 +165,141 @@
 
   (func $Term::Condition::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
+
+  (func $Term::Condition::traits::display (param $self i32) (param $offset i32) (result i32)
+    (local $type i32)
+    (@store-bytes $offset "<")
+    (local.set $offset (i32.add (local.get $offset)))
+    (local.set $offset
+      (call $ConditionType::display
+        (local.tee $type (call $Term::Condition::get::type (local.get $self)))
+        (local.get $offset)))
+    (block $BLOCK
+      (@switch
+        (@list
+          (@list
+            (i32.eq (local.get $type) (global.get $Condition::CustomCondition))
+            (block
+              (@store-bytes $offset ":")
+              (local.set $offset (i32.add (local.get $offset)))
+              (local.set $offset (call $Term::Condition::CustomCondition::traits::display (local.get $self) (local.get $offset)))
+              (br $BLOCK)))
+          (@list
+            (i32.eq (local.get $type) (global.get $Condition::ErrorCondition))
+            (block
+              (@store-bytes $offset ":")
+              (local.set $offset (i32.add (local.get $offset)))
+              (local.set $offset (call $Term::Condition::ErrorCondition::traits::display (local.get $self) (local.get $offset)))
+              (br $BLOCK)))
+          (@list
+            (i32.eq (local.get $type) (global.get $Condition::TypeErrorCondition))
+            (block
+              (@store-bytes $offset ":")
+              (local.set $offset (i32.add (local.get $offset)))
+              (local.set $offset (call $Term::Condition::TypeErrorCondition::traits::display (local.get $self) (local.get $offset)))
+              (br $BLOCK)))
+          (@list
+            (i32.eq (local.get $type) (global.get $Condition::InvalidFunctionTargetCondition))
+            (block
+              (@store-bytes $offset ":")
+              (local.set $offset (i32.add (local.get $offset)))
+              (local.set $offset (call $Term::Condition::InvalidFunctionTargetCondition::traits::display (local.get $self) (local.get $offset)))
+              (br $BLOCK)))
+          (@list
+            (i32.eq (local.get $type) (global.get $Condition::InvalidFunctionArgsCondition))
+            (block
+              (@store-bytes $offset ":")
+              (local.set $offset (i32.add (local.get $offset)))
+              (local.set $offset (call $Term::Condition::InvalidFunctionArgsCondition::traits::display (local.get $self) (local.get $offset)))
+              (br $BLOCK))))))
+    (@store-bytes $offset ">")
+    (i32.add (local.get $offset)))
+
+  (func $Term::Condition::CustomCondition::traits::display (param $self i32) (param $offset i32) (result i32)
+    (local.set $offset
+      (call $Term::traits::display
+        (call $Term::Condition::CustomCondition::get::effect_type (local.get $self))
+        (local.get $offset)))
+    (@store-bytes $offset ":")
+    (local.set $offset (i32.add (local.get $offset)))
+    (local.set $offset
+      (call $Term::traits::display
+        (call $Term::Condition::CustomCondition::get::payload (local.get $self))
+        (local.get $offset)))
+    (@store-bytes $offset ":")
+    (local.set $offset (i32.add (local.get $offset)))
+    (call $Term::traits::display
+      (call $Term::Condition::CustomCondition::get::token (local.get $self))
+      (local.get $offset)))
+
+  (func $Term::Condition::ErrorCondition::traits::display (param $self i32) (param $offset i32) (result i32)
+    (call $Term::traits::display
+      (call $Term::Condition::ErrorCondition::get::payload (local.get $self))
+      (local.get $offset)))
+
+  (func $Term::Condition::TypeErrorCondition::traits::display (param $self i32) (param $offset i32) (result i32)
+    (local $expected i32)
+    (local.set $offset
+      (if (result i32)
+        (i32.ne
+          (local.tee $expected
+            (call $Term::Condition::TypeErrorCondition::get::expected (local.get $self)))
+          (global.get $NULL))
+        (then
+          (call $TermType::traits::display (local.get $expected) (local.get $offset)))
+        (else
+          (@store-bytes $offset "<unknown>")
+          (i32.add (local.get $offset)))))
+    (@store-bytes $offset ":")
+    (local.set $offset (i32.add (local.get $offset)))
+    (call $Term::traits::display
+      (call $Term::Condition::TypeErrorCondition::get::received (local.get $self))
+      (local.get $offset)))
+
+  (func $Term::Condition::InvalidFunctionTargetCondition::traits::display (param $self i32) (param $offset i32) (result i32)
+    (call $Term::traits::display
+      (call $Term::Condition::InvalidFunctionTargetCondition::get::target (local.get $self))
+      (local.get $offset)))
+
+  (func $Term::Condition::InvalidFunctionArgsCondition::traits::display (param $self i32) (param $offset i32) (result i32)
+    (local $args i32)
+    (local $num_args i32)
+    (local $index i32)
+    ;; Write the function target to the output
+    (local.set $offset
+      (call $Term::traits::display
+        (call $Term::Condition::InvalidFunctionArgsCondition::get::target (local.get $self))
+        (local.get $offset)))
+    ;; Write the opening parenthesis to the output
+    (@store-bytes $offset "(")
+    (local.set $offset (i32.add (local.get $offset)))
+    ;; Write the argument list to the output
+    (local.set $args (call $Term::Condition::InvalidFunctionArgsCondition::get::args (local.get $self)))
+    (if
+      ;; If the argument list is empty, bail out
+      (i32.eqz (local.tee $num_args (call $Term::List::get_length (local.get $args))))
+      (then)
+      (else
+        ;; Otherwise iterate through each argument
+        (loop $LOOP
+          ;; If this is not the first argument, write a comma separator to the output
+          (if
+            (local.get $index)
+            (then
+              (@store-bytes $offset ", ")
+              (local.set $offset (i32.add (local.get $offset)))))
+          ;; Write the argument to the output
+          (local.set $offset
+            (call $Term::traits::display
+              (call $Term::List::get_item (local.get $args) (local.get $index))
+              (local.get $offset)))
+          ;; If this is not the final argument, continue with the next one
+          (br_if $LOOP (i32.lt_u (local.tee $index (i32.add (i32.const 1) (local.get $index))) (local.get $num_args))))))
+    ;; Write the closing parenthesis to the output
+    (@store-bytes $offset ")")
+    (local.set $offset (i32.add (local.get $offset)))
+    ;; Return the updated offset
+    (local.get $offset))
 
   (func $Term::Condition::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (global.get $NULL)))

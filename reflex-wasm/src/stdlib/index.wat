@@ -38,6 +38,15 @@
   (@include "./if_error.wat")
   (@include "./if_pending.wat")
   (@include "./iterate.wat")
+  (@include "./js/accessor.wat")
+  (@include "./js/construct.wat")
+  (@include "./js/is_finite.wat")
+  (@include "./js/log.wat")
+  (@include "./js/parse_date.wat")
+  (@include "./js/parse_float.wat")
+  (@include "./js/parse_int.wat")
+  (@include "./js/to_string.wat")
+  (@include "./js/urlencode.wat")
   (@include "./json/parse_json.wat")
   (@include "./json/stringify_json.wat")
   (@include "./keys.wat")
@@ -72,6 +81,7 @@
   (@let $builtins
     (@list
       $Stdlib_Abs
+      $Stdlib_Accessor
       $Stdlib_Add
       $Stdlib_And
       $Stdlib_Apply
@@ -85,6 +95,7 @@
       $Stdlib_CollectString
       $Stdlib_CollectTree
       $Stdlib_Cons
+      $Stdlib_Construct
       $Stdlib_Divide
       $Stdlib_Effect
       $Stdlib_EndsWith
@@ -103,9 +114,11 @@
       $Stdlib_If
       $Stdlib_IfError
       $Stdlib_IfPending
+      $Stdlib_IsFinite
       $Stdlib_Iterate
       $Stdlib_Keys
       $Stdlib_Length
+      $Stdlib_Log
       $Stdlib_Lt
       $Stdlib_Lte
       $Stdlib_Max
@@ -113,6 +126,9 @@
       $Stdlib_Multiply
       $Stdlib_Not
       $Stdlib_Or
+      $Stdlib_ParseDate
+      $Stdlib_ParseFloat
+      $Stdlib_ParseInt
       $Stdlib_ParseJson
       $Stdlib_Pow
       $Stdlib_Push
@@ -136,6 +152,8 @@
       $Stdlib_Subtract
       $Stdlib_Take
       $Stdlib_ToRequest
+      $Stdlib_ToString
+      $Stdlib_Urlencode
       $Stdlib_Values
       $Stdlib_Variable
       $Stdlib_Zip)
@@ -154,6 +172,24 @@
             (@get $builtins)
             (return (call (@concat "$" (@get $builtin) "::arity")))))
         (i32.const 0)))
+
+    (func $Builtin::display (param $target i32) (param $offset i32) (result i32)
+      (@branch
+        (local.get $target)
+        (@list
+          (@map $builtin
+            (@get $builtins)
+            (return (call (@concat "$" (@get $builtin) "::display") (local.get $offset)))))
+        ;; Default implementation
+        (@store-bytes $offset "<function:")
+        (local.set $offset (i32.add (local.get $offset)))
+        ;; Write the number of arguments to the output
+        (call $Utils::u32::write_string
+          (call $Builtin::arity (local.get $target))
+          (local.get $offset))
+        (local.set $offset (i32.add (local.get $offset)))
+        (@store-bytes $offset ">")
+        (i32.add (local.get $offset))))
 
     (@block
       ;; Declare builtin function implementations

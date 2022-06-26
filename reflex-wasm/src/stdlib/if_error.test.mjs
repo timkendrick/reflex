@@ -50,8 +50,11 @@ export default (describe) => {
           ),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<Custom:Symbol(123):3:Symbol(0)> . NULL)}');
-        assert.strictEqual(format(dependencies), '(<Custom:Symbol(123):3:Symbol(0)> . NULL)');
+        assert.strictEqual(format(result), '{<CustomCondition:Symbol(123):3:Symbol(0)>}');
+        assert.strictEqual(
+          format(dependencies),
+          '(<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)',
+        );
       })();
       (() => {
         const expression = createApplication(
@@ -70,8 +73,11 @@ export default (describe) => {
             ],
           ]),
         );
-        assert.strictEqual(format(result), '[<Error:"foo">]');
-        assert.strictEqual(format(dependencies), '(<Custom:Symbol(123):3:Symbol(0)> . NULL)');
+        assert.strictEqual(format(result), '[<ErrorCondition:"foo">]');
+        assert.strictEqual(
+          format(dependencies),
+          '(<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)',
+        );
       })();
       (() => {
         const expression = createApplication(
@@ -91,7 +97,10 @@ export default (describe) => {
           ]),
         );
         assert.strictEqual(format(result), '1');
-        assert.strictEqual(format(dependencies), '(<Custom:Symbol(123):3:Symbol(0)> . NULL)');
+        assert.strictEqual(
+          format(dependencies),
+          '(<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)',
+        );
       })();
       (() => {
         const expression = createApplication(
@@ -130,11 +139,11 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(
           format(result),
-          '{(((<Custom:Symbol(123):3:Symbol(0)> . NULL) . (<Custom:Symbol(234):4:Symbol(0)> . NULL)) . ((<Custom:Symbol(345):5:Symbol(0)> . NULL) . (<Custom:Symbol(456):6:Symbol(0)> . NULL)))}',
+          '{<CustomCondition:Symbol(123):3:Symbol(0)>,<CustomCondition:Symbol(234):4:Symbol(0)>,<CustomCondition:Symbol(345):5:Symbol(0)>,<CustomCondition:Symbol(456):6:Symbol(0)>}',
         );
         assert.strictEqual(
           format(dependencies),
-          '(((<Custom:Symbol(456):6:Symbol(0)> . NULL) . (<Custom:Symbol(345):5:Symbol(0)> . NULL)) . ((<Custom:Symbol(234):4:Symbol(0)> . NULL) . (<Custom:Symbol(123):3:Symbol(0)> . NULL)))',
+          '(((<CustomCondition:Symbol(456):6:Symbol(0)> . NULL) . (<CustomCondition:Symbol(345):5:Symbol(0)> . NULL)) . ((<CustomCondition:Symbol(234):4:Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)))',
         );
       })();
       (() => {
@@ -183,7 +192,7 @@ export default (describe) => {
         assert.strictEqual(format(result), `${3 + 4 + 5 + 6}`);
         assert.strictEqual(
           format(dependencies),
-          '(((<Custom:Symbol(456):6:Symbol(0)> . NULL) . (<Custom:Symbol(345):5:Symbol(0)> . NULL)) . ((<Custom:Symbol(234):4:Symbol(0)> . NULL) . (<Custom:Symbol(123):3:Symbol(0)> . NULL)))',
+          '(((<CustomCondition:Symbol(456):6:Symbol(0)> . NULL) . (<CustomCondition:Symbol(345):5:Symbol(0)> . NULL)) . ((<CustomCondition:Symbol(234):4:Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)))',
         );
       })();
       (() => {
@@ -235,11 +244,11 @@ export default (describe) => {
         );
         assert.strictEqual(
           format(result),
-          '{(<Custom:Symbol(123):3:Symbol(0)> . (<Custom:Symbol(345):5:Symbol(0)> . NULL))}',
+          '{<CustomCondition:Symbol(123):3:Symbol(0)>,<CustomCondition:Symbol(345):5:Symbol(0)>}',
         );
         assert.strictEqual(
           format(dependencies),
-          '(((<Custom:Symbol(456):6:Symbol(0)> . NULL) . (<Custom:Symbol(345):5:Symbol(0)> . NULL)) . ((<Custom:Symbol(234):4:Symbol(0)> . NULL) . (<Custom:Symbol(123):3:Symbol(0)> . NULL)))',
+          '(((<CustomCondition:Symbol(456):6:Symbol(0)> . NULL) . (<CustomCondition:Symbol(345):5:Symbol(0)> . NULL)) . ((<CustomCondition:Symbol(234):4:Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)))',
         );
       })();
       (() => {
@@ -299,11 +308,11 @@ export default (describe) => {
         );
         assert.strictEqual(
           format(result),
-          '[<Error:"foo">, <Error:"bar">, <Error:"baz">, <Error:"qux">]',
+          '[<ErrorCondition:"foo">, <ErrorCondition:"bar">, <ErrorCondition:"baz">, <ErrorCondition:"qux">]',
         );
         assert.strictEqual(
           format(dependencies),
-          '(((<Custom:Symbol(456):6:Symbol(0)> . NULL) . (<Custom:Symbol(345):5:Symbol(0)> . NULL)) . ((<Custom:Symbol(234):4:Symbol(0)> . NULL) . (<Custom:Symbol(123):3:Symbol(0)> . NULL)))',
+          '(((<CustomCondition:Symbol(456):6:Symbol(0)> . NULL) . (<CustomCondition:Symbol(345):5:Symbol(0)> . NULL)) . ((<CustomCondition:Symbol(234):4:Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)))',
         );
       })();
     });

@@ -14,11 +14,26 @@ export default (describe) => {
       NULL,
       Stdlib,
     }) => {
-      const list = createTriple(createInt(3), createInt(4), createInt(5));
-      const expression = createApplication(createBuiltin(Stdlib.Get), createPair(list, createInt(0)));
-      const [result, dependencies] = evaluate(expression, NULL);
-      assert.strictEqual(format(result), '3');
-      assert.strictEqual(format(dependencies), 'NULL');
+      (() => {
+        const list = createTriple(createInt(3), createInt(4), createInt(5));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Get),
+          createPair(list, createInt(0)),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '3');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const list = createTriple(createInt(3), createInt(4), createInt(5));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Get),
+          createPair(list, createInt(3)),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '{<InvalidFunctionArgsCondition:Get([3, 4, 5], 3)>}');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
     });
 
     test('(Record, String)', (assert, {
@@ -34,17 +49,35 @@ export default (describe) => {
       NULL,
       Stdlib,
     }) => {
-      const record = createRecord(
-        createTriple(createString('foo'), createString('bar'), createString('baz')),
-        createTriple(createInt(3), createInt(4), createInt(5)),
-      );
-      const expression = createApplication(
-        createBuiltin(Stdlib.Get),
-        createPair(record, createString('foo')),
-      );
-      const [result, dependencies] = evaluate(expression, NULL);
-      assert.strictEqual(format(result), '3');
-      assert.strictEqual(format(dependencies), 'NULL');
+      (() => {
+        const record = createRecord(
+          createTriple(createString('foo'), createString('bar'), createString('baz')),
+          createTriple(createInt(3), createInt(4), createInt(5)),
+        );
+        const expression = createApplication(
+          createBuiltin(Stdlib.Get),
+          createPair(record, createString('foo')),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '3');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const record = createRecord(
+          createTriple(createString('foo'), createString('bar'), createString('baz')),
+          createTriple(createInt(3), createInt(4), createInt(5)),
+        );
+        const expression = createApplication(
+          createBuiltin(Stdlib.Get),
+          createPair(record, createString('invalid')),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(
+          format(result),
+          '{<InvalidFunctionArgsCondition:Get({ "foo": 3, "bar": 4, "baz": 5 }, "invalid")>}',
+        );
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
     });
 
     test('(Record, Symbol)', (assert, {

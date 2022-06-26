@@ -22,7 +22,7 @@ export default (describe) => {
           createUnitList(createEmptyIterator()),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), 'Set({0})');
+        assert.strictEqual(format(result), 'Set(0)');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
@@ -33,7 +33,7 @@ export default (describe) => {
           ),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), 'Set({3})');
+        assert.strictEqual(format(result), 'Set(3)');
         assert.strictEqual(hasHashsetValue(result, createString('foo')), true);
         assert.strictEqual(hasHashsetValue(result, createString('bar')), true);
         assert.strictEqual(hasHashsetValue(result, createString('baz')), true);

@@ -28,6 +28,9 @@
   (func $Term::FilterIterator::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
 
+  (func $Term::FilterIterator::traits::display (param $self i32) (param $offset i32) (result i32)
+    (call $TermType::traits::display (global.get $TermType::FilterIterator) (local.get $offset)))
+
   (func $Term::FilterIterator::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (local $substituted_source i32)
     (local $substituted_predicate i32)
@@ -62,7 +65,7 @@
     (local.get $self))
 
   (func $Term::FilterIterator::traits::size_hint (param $self i32) (result i32)
-    (call $Term::traits::size_hint (call $Term::FilterIterator::get::source (local.get $self))))
+    (global.get $NULL))
 
   (func $Term::FilterIterator::traits::next (param $self i32) (param $iterator_state i32) (param $state i32) (result i32 i32 i32)
     (local $value i32)
@@ -71,10 +74,9 @@
     (call $Term::traits::next (call $Term::FilterIterator::get::source (local.get $self)) (local.get $iterator_state) (local.get $state))
     (local.set $dependencies)
     (local.set $iterator_state)
-    (local.set $value)
     (if (result i32 i32 i32)
       ;; If the source iterator has been fully consumed, emit the complete marker
-      (i32.eq (global.get $NULL) (local.get $value))
+      (i32.eq (local.tee $value) (global.get $NULL))
       (then
         (global.get $NULL)
         (global.get $NULL)

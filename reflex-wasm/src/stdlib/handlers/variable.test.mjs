@@ -26,11 +26,11 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(
           format(result),
-          '{(<Custom:"reflex::variable::get":[Symbol(123), 3]:null> . NULL)}',
+          '{<CustomCondition:"reflex::variable::get":[Symbol(123), 3]:null>}',
         );
         assert.strictEqual(
           format(dependencies),
-          '(<Custom:"reflex::variable::get":[Symbol(123), 3]:null> . NULL)',
+          '(<CustomCondition:"reflex::variable::get":[Symbol(123), 3]:null> . NULL)',
         );
       })();
       (() => {
@@ -62,7 +62,7 @@ export default (describe) => {
         assert.strictEqual(format(result), '4');
         assert.strictEqual(
           format(dependencies),
-          '(<Custom:"reflex::variable::get":[Symbol(123), 3]:null> . NULL)',
+          '(<CustomCondition:"reflex::variable::get":[Symbol(123), 3]:null> . NULL)',
         );
       })();
     });
@@ -118,7 +118,7 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(
           format(result),
-          '[(!<Custom:"reflex::variable::get":[Symbol(123), 3]:null>), (2) => Effect("reflex::variable::set", [Symbol(123), Variable(1)], Variable(0))]',
+          '[<!<CustomCondition:"reflex::variable::get":[Symbol(123), 3]:null>>, (2) => Effect("reflex::variable::set", [Symbol(123), Variable(1)], Variable(0))]',
         );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
@@ -136,11 +136,11 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(
           format(result),
-          '{(<Custom:"reflex::variable::get":[Symbol(123), 3]:null> . NULL)}',
+          '{<CustomCondition:"reflex::variable::get":[Symbol(123), 3]:null>}',
         );
         assert.strictEqual(
           format(dependencies),
-          '(<Custom:"reflex::variable::get":[Symbol(123), 3]:null> . NULL)',
+          '(<CustomCondition:"reflex::variable::get":[Symbol(123), 3]:null> . NULL)',
         );
       })();
       (() => {
@@ -178,7 +178,7 @@ export default (describe) => {
         assert.strictEqual(format(result), '4');
         assert.strictEqual(
           format(dependencies),
-          '(<Custom:"reflex::variable::get":[Symbol(123), 3]:null> . NULL)',
+          '(<CustomCondition:"reflex::variable::get":[Symbol(123), 3]:null> . NULL)',
         );
       })();
       (() => {

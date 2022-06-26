@@ -24,6 +24,9 @@
   (func $Term::IntegersIterator::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
 
+  (func $Term::IntegersIterator::traits::display (param $self i32) (param $offset i32) (result i32)
+    (call $TermType::traits::display (global.get $TermType::IntegersIterator) (local.get $offset)))
+
   (func $Term::IntegersIterator::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (global.get $NULL))
 

@@ -49,8 +49,11 @@ export default (describe) => {
           ),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<Custom:Symbol(123):3:Symbol(0)> . NULL)}');
-        assert.strictEqual(format(dependencies), '(<Custom:Symbol(123):3:Symbol(0)> . NULL)');
+        assert.strictEqual(format(result), '{<CustomCondition:Symbol(123):3:Symbol(0)>}');
+        assert.strictEqual(
+          format(dependencies),
+          '(<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)',
+        );
       })();
       (() => {
         const expression = createApplication(
@@ -70,7 +73,10 @@ export default (describe) => {
           ]),
         );
         assert.strictEqual(format(result), '3');
-        assert.strictEqual(format(dependencies), '(<Custom:Symbol(123):3:Symbol(0)> . NULL)');
+        assert.strictEqual(
+          format(dependencies),
+          '(<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)',
+        );
       })();
       (() => {
         const expression = createApplication(
@@ -82,15 +88,23 @@ export default (describe) => {
                 createApplication(
                   createBuiltin(Stdlib.Add),
                   createPair(
-                    createEffect(createCustomCondition(createSymbol(123), createInt(3), createSymbol(0))),
-                    createEffect(createCustomCondition(createSymbol(234), createInt(4), createSymbol(0))),
+                    createEffect(
+                      createCustomCondition(createSymbol(123), createInt(3), createSymbol(0)),
+                    ),
+                    createEffect(
+                      createCustomCondition(createSymbol(234), createInt(4), createSymbol(0)),
+                    ),
                   ),
                 ),
                 createApplication(
                   createBuiltin(Stdlib.Add),
                   createPair(
-                    createEffect(createCustomCondition(createSymbol(345), createInt(5), createSymbol(0))),
-                    createEffect(createCustomCondition(createSymbol(456), createInt(6), createSymbol(0))),
+                    createEffect(
+                      createCustomCondition(createSymbol(345), createInt(5), createSymbol(0)),
+                    ),
+                    createEffect(
+                      createCustomCondition(createSymbol(456), createInt(6), createSymbol(0)),
+                    ),
                   ),
                 ),
               ),
@@ -101,11 +115,11 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(
           format(result),
-          '{(((<Custom:Symbol(123):3:Symbol(0)> . NULL) . (<Custom:Symbol(234):4:Symbol(0)> . NULL)) . ((<Custom:Symbol(345):5:Symbol(0)> . NULL) . (<Custom:Symbol(456):6:Symbol(0)> . NULL)))}',
+          '{<CustomCondition:Symbol(123):3:Symbol(0)>,<CustomCondition:Symbol(234):4:Symbol(0)>,<CustomCondition:Symbol(345):5:Symbol(0)>,<CustomCondition:Symbol(456):6:Symbol(0)>}',
         );
         assert.strictEqual(
           format(dependencies),
-          '(((<Custom:Symbol(456):6:Symbol(0)> . NULL) . (<Custom:Symbol(345):5:Symbol(0)> . NULL)) . ((<Custom:Symbol(234):4:Symbol(0)> . NULL) . (<Custom:Symbol(123):3:Symbol(0)> . NULL)))',
+          '(((<CustomCondition:Symbol(456):6:Symbol(0)> . NULL) . (<CustomCondition:Symbol(345):5:Symbol(0)> . NULL)) . ((<CustomCondition:Symbol(234):4:Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)))',
         );
       })();
       (() => {
@@ -118,15 +132,23 @@ export default (describe) => {
                 createApplication(
                   createBuiltin(Stdlib.Add),
                   createPair(
-                    createEffect(createCustomCondition(createSymbol(123), createInt(3), createSymbol(0))),
-                    createEffect(createCustomCondition(createSymbol(234), createInt(4), createSymbol(0))),
+                    createEffect(
+                      createCustomCondition(createSymbol(123), createInt(3), createSymbol(0)),
+                    ),
+                    createEffect(
+                      createCustomCondition(createSymbol(234), createInt(4), createSymbol(0)),
+                    ),
                   ),
                 ),
                 createApplication(
                   createBuiltin(Stdlib.Add),
                   createPair(
-                    createEffect(createCustomCondition(createSymbol(345), createInt(5), createSymbol(0))),
-                    createEffect(createCustomCondition(createSymbol(456), createInt(6), createSymbol(0))),
+                    createEffect(
+                      createCustomCondition(createSymbol(345), createInt(5), createSymbol(0)),
+                    ),
+                    createEffect(
+                      createCustomCondition(createSymbol(456), createInt(6), createSymbol(0)),
+                    ),
                   ),
                 ),
               ),
@@ -149,11 +171,11 @@ export default (describe) => {
         );
         assert.strictEqual(
           format(result),
-          '{(<Custom:Symbol(123):3:Symbol(0)> . (<Custom:Symbol(345):5:Symbol(0)> . NULL))}',
+          '{<CustomCondition:Symbol(123):3:Symbol(0)>,<CustomCondition:Symbol(345):5:Symbol(0)>}',
         );
         assert.strictEqual(
           format(dependencies),
-          '(((<Custom:Symbol(456):6:Symbol(0)> . NULL) . (<Custom:Symbol(345):5:Symbol(0)> . NULL)) . ((<Custom:Symbol(234):4:Symbol(0)> . NULL) . (<Custom:Symbol(123):3:Symbol(0)> . NULL)))',
+          '(((<CustomCondition:Symbol(456):6:Symbol(0)> . NULL) . (<CustomCondition:Symbol(345):5:Symbol(0)> . NULL)) . ((<CustomCondition:Symbol(234):4:Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)))',
         );
       })();
       (() => {
@@ -166,15 +188,23 @@ export default (describe) => {
                 createApplication(
                   createBuiltin(Stdlib.Add),
                   createPair(
-                    createEffect(createCustomCondition(createSymbol(123), createInt(3), createSymbol(0))),
-                    createEffect(createCustomCondition(createSymbol(234), createInt(4), createSymbol(0))),
+                    createEffect(
+                      createCustomCondition(createSymbol(123), createInt(3), createSymbol(0)),
+                    ),
+                    createEffect(
+                      createCustomCondition(createSymbol(234), createInt(4), createSymbol(0)),
+                    ),
                   ),
                 ),
                 createApplication(
                   createBuiltin(Stdlib.Add),
                   createPair(
-                    createEffect(createCustomCondition(createSymbol(345), createInt(5), createSymbol(0))),
-                    createEffect(createCustomCondition(createSymbol(456), createInt(6), createSymbol(0))),
+                    createEffect(
+                      createCustomCondition(createSymbol(345), createInt(5), createSymbol(0)),
+                    ),
+                    createEffect(
+                      createCustomCondition(createSymbol(456), createInt(6), createSymbol(0)),
+                    ),
                   ),
                 ),
               ),
@@ -206,7 +236,7 @@ export default (describe) => {
         assert.strictEqual(format(result), '3');
         assert.strictEqual(
           format(dependencies),
-          '(((<Custom:Symbol(456):6:Symbol(0)> . NULL) . (<Custom:Symbol(345):5:Symbol(0)> . NULL)) . ((<Custom:Symbol(234):4:Symbol(0)> . NULL) . (<Custom:Symbol(123):3:Symbol(0)> . NULL)))',
+          '(((<CustomCondition:Symbol(456):6:Symbol(0)> . NULL) . (<CustomCondition:Symbol(345):5:Symbol(0)> . NULL)) . ((<CustomCondition:Symbol(234):4:Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)))',
         );
       })();
     });

@@ -16,13 +16,13 @@ export default (describe) => {
       (() => {
         const expression = createApplication(createBuiltin(Stdlib.Remainder), createPair(createInt(0), createInt(0)));
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:Remainder(0, 0)> . NULL)}');
+        assert.strictEqual(format(result), '{<InvalidFunctionArgsCondition:Remainder(0, 0)>}');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
         const expression = createApplication(createBuiltin(Stdlib.Remainder), createPair(createInt(3), createInt(0)));
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:Remainder(3, 0)> . NULL)}');
+        assert.strictEqual(format(result), '{<InvalidFunctionArgsCondition:Remainder(3, 0)>}');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
@@ -82,13 +82,13 @@ export default (describe) => {
       (() => {
         const expression = createApplication(createBuiltin(Stdlib.Remainder), createPair(createFloat(0), createFloat(0)));
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:Remainder(0.0, 0.0)> . NULL)}');
+        assert.strictEqual(format(result), '{<InvalidFunctionArgsCondition:Remainder(0.0, 0.0)>}');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
         const expression = createApplication(createBuiltin(Stdlib.Remainder), createPair(createFloat(3), createFloat(0)));
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:Remainder(3.0, 0.0)> . NULL)}');
+        assert.strictEqual(format(result), '{<InvalidFunctionArgsCondition:Remainder(3.0, 0.0)>}');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {

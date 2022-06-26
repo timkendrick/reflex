@@ -2,7 +2,7 @@
 ;; SPDX-License-Identifier: Apache-2.0
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 (module
-  (@builtin $Stdlib_ResolveQueryBranch
+  (@builtin $Stdlib_ResolveQueryBranch "ResolveQueryBranch"
     (@args (@strict $self) (@strict $shape))
 
     (@impl

@@ -4,6 +4,7 @@
 (module
   (@include "./date.wat")
   (@include "./math.wat")
+  (@include "./number.wat")
   (@include "./wasi.wat")
   (@include "./io.wat")
   (@include "./json.wat")

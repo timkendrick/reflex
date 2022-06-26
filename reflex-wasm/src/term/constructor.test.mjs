@@ -227,7 +227,7 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(
           format(result),
-          '{(<InvalidFunctionArgs:Constructor({})(3, 4, 5)> . NULL)}',
+          '{<InvalidFunctionArgsCondition:Constructor({})(3, 4, 5)>}',
         );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
@@ -241,7 +241,7 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(
           format(result),
-          '{(<InvalidFunctionArgs:Constructor({"foo", "bar", "baz"})()> . NULL)}',
+          '{<InvalidFunctionArgsCondition:Constructor({"foo", "bar", "baz"})()>}',
         );
         assert.strictEqual(format(dependencies), 'NULL');
       })();

@@ -31,6 +31,9 @@
   (func $Term::ZipIterator::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
 
+  (func $Term::ZipIterator::traits::display (param $self i32) (param $offset i32) (result i32)
+    (call $TermType::traits::display (global.get $TermType::ZipIterator) (local.get $offset)))
+
   (func $Term::ZipIterator::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (local $substituted_left i32)
     (local $substituted_right i32)

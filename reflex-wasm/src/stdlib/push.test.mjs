@@ -53,7 +53,7 @@ export default (describe) => {
           createPair(createHashset([]), createInt(3)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), 'Set({1})');
+        assert.strictEqual(format(result), 'Set(1)');
         assert.strictEqual(hasHashsetValue(result, createInt(3)), true);
         assert.strictEqual(hasHashsetValue(result, createInt(4)), false);
         assert.strictEqual(format(dependencies), 'NULL');
@@ -64,7 +64,7 @@ export default (describe) => {
           createPair(createHashset([createInt(3), createInt(4), createInt(5)]), createInt(6)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), 'Set({4})');
+        assert.strictEqual(format(result), 'Set(4)');
         assert.strictEqual(hasHashsetValue(result, createInt(3)), true);
         assert.strictEqual(hasHashsetValue(result, createInt(4)), true);
         assert.strictEqual(hasHashsetValue(result, createInt(5)), true);

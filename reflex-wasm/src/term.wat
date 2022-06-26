@@ -71,6 +71,7 @@
         ;; Default implementation
         (global.get $NULL))))
 
+  (export "display" (func $Term::traits::display))
   (export "evaluate" (func $Term::traits::evaluate))
 
   (func $Term::traits::equals (export "equals") (param $self i32) (param $other i32) (result i32)

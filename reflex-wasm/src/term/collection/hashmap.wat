@@ -158,6 +158,14 @@
   (func $Term::Hashmap::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
 
+  (func $Term::Hashmap::traits::display (param $self i32) (param $offset i32) (result i32)
+    (@store-bytes $offset "Map(")
+    (local.set $offset (i32.add (local.get $offset)))
+    (call $Utils::u32::write_string (call $Term::Hashmap::get::num_entries (local.get $self)) (local.get $offset))
+    (local.set $offset (i32.add (local.get $offset)))
+    (@store-bytes $offset ")")
+    (i32.add (local.get $offset)))
+
   (func $Term::Hashmap::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (local $num_entries i32)
     (local $capacity i32)

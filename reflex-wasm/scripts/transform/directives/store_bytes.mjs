@@ -71,12 +71,14 @@ export default function storeBytesDirective(node, context) {
           );
           return [instructions, output.length + '?'];
         case NodeType.Program:
-        case NodeType.Term:
+        case NodeType.Term: {
+          const source = context.sources.get(context.path);
           throw new ParseError(
             arg.location,
             source,
             `Invalid ${STORE_BYTES_DIRECTIVE} argument: ${formatSourceRange(source, arg.location)}`,
           );
+        }
       }
     },
     [[], ''],

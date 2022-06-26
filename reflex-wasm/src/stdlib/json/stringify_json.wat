@@ -2,7 +2,7 @@
 ;; SPDX-License-Identifier: Apache-2.0
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 (module
-  (@builtin $Stdlib_StringifyJson
+  (@builtin $Stdlib_StringifyJson "StringifyJson"
     (@args (@strict $self))
 
     (@impl
@@ -10,7 +10,9 @@
       (func $Stdlib_StringifyJson::impl::<to_json> (param $self i32) (param $state i32) (result i32 i32)
         (local $output i32)
         (local $offset i32)
+        ;; Allocate a new dynamic string term
         (local.set $output (call $Term::String::allocate_unsized))
+        ;; Attempt to serialize the input term into the newly-allocated string contents
         (local.set $offset
           (call $Term::traits::to_json
             (local.get $self)

@@ -24,6 +24,16 @@
   (func $Term::Effect::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
 
+  (func $Term::Effect::traits::display (param $self i32) (param $offset i32) (result i32)
+    (@store-bytes $offset "<!")
+    (local.set $offset (i32.add (local.get $offset)))
+    (local.set $offset
+      (call $Term::traits::display
+        (call $Term::Effect::get::condition (local.get $self))
+        (local.get $offset)))
+    (@store-bytes $offset ">")
+    (i32.add (local.get $offset)))
+
   (func $Term::Effect::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (global.get $NULL))
 

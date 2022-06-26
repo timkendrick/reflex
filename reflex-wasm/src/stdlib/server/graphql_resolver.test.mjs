@@ -93,7 +93,7 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(
           format(result),
-          '{(<InvalidFunctionArgs:GraphQlResolver({ "query": "foo", "mutation": "bar" })> . NULL)}',
+          '{<InvalidFunctionArgsCondition:GraphQlResolver({ "query": "foo", "mutation": "bar" })>}',
         );
         assert.strictEqual(format(dependencies), 'NULL');
       })();

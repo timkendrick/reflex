@@ -79,6 +79,20 @@
     ;; Instantiate the term
     (call $Term::String::init (local.get $self) (local.get $length)))
 
+  (func $Term::String::empty (result i32)
+    ;; Allocate a new string of the required length
+    ;; (this will return the pre-allocated empty string singleton)
+    (call $Term::String::allocate (i32.const 0)))
+
+  (func $Term::String::from_char (param $char i32) (result i32)
+    (local $instance i32)
+    ;; Allocate a new String term with the correct capacity
+    (local.tee $instance (call $Term::String::allocate (i32.const 1)))
+    ;; Copy the character into the data array
+    (i32.store8 (call $Term::String::get_char_pointer (local.get $instance) (i32.const 0)) (local.get $char))
+    ;; Instantiate the term
+    (call $Term::String::init (i32.const 1)))
+
   (func $Term::String::from_slice (param $offset i32) (param $length i32) (result i32)
     (local $self i32)
     ;; Allocates a new String term whose contents is copied from the given slice of linear memory
@@ -98,20 +112,6 @@
         ;; Instantiate the term
         (call $Term::String::init (local.get $length)))))
 
-  (func $Term::String::empty (result i32)
-    ;; Allocate a new string of the required length
-    ;; (this will return the pre-allocated empty string singleton)
-    (call $Term::String::allocate (i32.const 0)))
-
-  (func $Term::String::from_char (param $char i32) (result i32)
-    (local $instance i32)
-    ;; Allocate a new String term with the correct capacity
-    (local.tee $instance (call $Term::String::allocate (i32.const 1)))
-    ;; Copy the character into the data array
-    (i32.store8 (call $Term::String::get_char_pointer (local.get $instance) (i32.const 0)) (local.get $char))
-    ;; Instantiate the term
-    (call $Term::String::init (i32.const 1)))
-
   (func $Term::String::get_offset (export "getStringOffset") (param $self i32) (result i32)
     (call $Term::String::get::data::pointer (local.get $self) (i32.const 0)))
 
@@ -128,6 +128,14 @@
 
   (func $Term::String::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
+
+  (func $Term::String::traits::display (param $self i32) (param $offset i32) (result i32)
+    (i32.add
+      (local.get $offset)
+      (call $Utils::bytes::write_json
+        (call $Term::String::get_offset (local.get $self))
+        (call $Term::String::get_length (local.get $self))
+        (local.get $offset))))
 
   (func $Term::String::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (global.get $NULL))
@@ -228,6 +236,9 @@
         (call $Term::get_value (local.get $self))
         (i32.const 0))
       (local.get $index)))
+
+  (func $Term::String::get_char (param $self i32) (param $index i32) (result i32)
+    (call $Term::String::from_char (i32.load8_u (call $Term::String::get_char_pointer (local.get $self) (local.get $index)))))
 
   (func $Term::String::slice (param $self i32) (param $offset i32) (param $length i32) (result i32)
     (local $instance i32)

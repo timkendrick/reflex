@@ -58,6 +58,56 @@
   (func $Term::Signal::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
 
+  (func $Term::Signal::traits::display (param $self i32) (param $offset i32) (result i32)
+    (local $conditions i32)
+    (local $condition i32)
+    (local $index i32)
+    ;; Write the opening brace to the output
+    (@store-bytes $offset "{")
+    (local.set $offset (i32.add (local.get $offset)))
+    ;; Write the signal conditions to the output
+    (local.set $offset
+      (call $Term::Signal::display_tree_items
+        (call $Term::Signal::get::conditions (local.get $self))
+        (local.get $offset)
+        (global.get $FALSE)))
+    ;; Write the closing brace to the output and return the updated offset
+    (@store-bytes $offset "}")
+    (i32.add (local.get $offset)))
+
+  (func $Term::Signal::display_tree_items (param $self i32) (param $offset i32) (param $separator i32) (result i32)
+    (local $updated_offset i32)
+    (if (result i32)
+      (i32.eq (global.get $NULL) (local.get $self))
+      (then
+        (local.get $offset))
+      (else
+        (if (result i32)
+          (call $Term::Tree::is (local.get $self))
+          (then
+            (if
+              (i32.ne
+                (local.tee $updated_offset
+                  (call $Term::Signal::display_tree_items
+                    (call $Term::Tree::get_left (local.get $self))
+                    (local.get $offset)
+                    (local.get $separator)))
+                (local.get $offset))
+              (then
+                (local.set $offset (local.get $updated_offset))
+                (local.set $separator (global.get $TRUE))))
+            (call $Term::Signal::display_tree_items
+              (call $Term::Tree::get_right (local.get $self))
+              (local.get $offset)
+              (local.get $separator)))
+          (else
+            (if
+              (local.get $separator)
+              (then
+                (@store-bytes $offset ",")
+                (local.set $offset (i32.add (local.get $offset)))))
+            (call $Term::traits::display (local.get $self) (local.get $offset)))))))
+
   (func $Term::Signal::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (global.get $NULL))
 
@@ -73,20 +123,21 @@
     (local $conditions i32)
     (local $num_conditions i32)
     (local $partition i32)
-    (local $iterator i32)
     (local $iterator_state i32)
     (local $item i32)
     (if (result i32 i32)
-      (i32.eqz (local.tee $num_conditions (call $Term::Tree::traits::length (local.tee $conditions (call $Term::Signal::get::conditions (local.get $self))))))
+      (i32.eqz
+        (local.tee $num_conditions
+          (call $Term::Tree::traits::length
+            (local.tee $conditions (call $Term::Signal::get::conditions (local.get $self))))))
       (then
         (call $Term::List::empty)
         (call $Term::List::empty))
       (else
         (local.tee $partition (call $Term::List::allocate_partition_list (local.get $num_conditions)))
-        (local.set $iterator (call $Term::Tree::traits::iterate (local.get $conditions)))
         (local.set $iterator_state (global.get $NULL))
         (loop $LOOP
-          (call $Term::traits::next (local.get $iterator) (local.get $iterator_state) (global.get $NULL))
+          (call $Term::traits::next (local.get $conditions) (local.get $iterator_state) (global.get $NULL))
           ;; Iterating a static Tree list should never produce dependencies, so it should be safe to drop them
           (drop)
           (local.set $iterator_state)

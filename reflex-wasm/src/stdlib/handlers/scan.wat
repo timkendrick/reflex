@@ -4,7 +4,7 @@
 (module
   (@const-string $Stdlib_Scan::EFFECT_NAME_SCAN "reflex::scan")
 
-  (@builtin $Stdlib_Scan
+  (@builtin $Stdlib_Scan "Scan"
     (@args (@lazy $self) (@strict $seed) (@strict $iteratee))
 
     (@impl

@@ -26,6 +26,15 @@
     ;; Invoke the method on the target term
     (call $Term::traits::is_truthy (call $Term::Pointer::dereference (local.get $self))))
 
+  (func $Term::Pointer::traits::display (param $self i32) (param $offset i32) (result i32)
+    (@store-bytes $offset "Pointer(")
+    (local.set $offset (i32.add (local.get $offset)))
+    (local.set $offset
+      (call $Term::traits::display
+        (call $Term::Pointer::get::target (local.get $self)) (local.get $offset)))
+    (@store-bytes $offset ")")
+    (i32.add (local.get $offset)))
+
   (func $Term::Pointer::traits::to_json (param $self i32) (param $offset i32) (result i32 i32)
     ;; Invoke the method on the target term
     (call $Term::traits::to_json (call $Term::Pointer::dereference (local.get $self)) (local.get $offset)))

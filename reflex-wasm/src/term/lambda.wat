@@ -26,6 +26,15 @@
   (func $Term::Lambda::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
 
+  (func $Term::Lambda::traits::display (param $self i32) (param $offset i32) (result i32)
+    (@store-bytes $offset "(")
+    (local.set $offset (i32.add (local.get $offset)))
+    (call $Utils::u32::write_string (call $Term::Lambda::get::num_args (local.get $self)) (local.get $offset))
+    (local.set $offset (i32.add (local.get $offset)))
+    (@store-bytes $offset ") => ")
+    (local.set $offset (i32.add (local.get $offset)))
+    (call $Term::traits::display (call $Term::Lambda::get::body (local.get $self)) (local.get $offset)))
+
   (func $Term::Lambda::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (local $num_args i32)
     (local $substituted_body i32)
@@ -52,10 +61,24 @@
     (if (result i32 i32)
       (i32.eq
         (local.tee $result
-          (call $Term::traits::substitute
-            (call $Term::Lambda::get::body (local.get $self))
-            (local.get $args)
-            (i32.const 0)))
+          (if (result i32)
+            ;; TODO: consider alternate substitution method for offseting variable scope rather than overloading
+            (i32.eq (global.get $NULL) (local.get $args))
+            (then
+              (call $Term::traits::substitute
+                (call $Term::Lambda::get::body (local.get $self))
+                (local.get $args)
+                (i32.const 0)))
+            (else
+              (if (result i32)
+                (call $Term::List::get_length (local.get $args))
+                (then
+                  (call $Term::traits::substitute
+                    (call $Term::Lambda::get::body (local.get $self))
+                    (local.get $args)
+                    (i32.const 0)))
+                (else
+                  (global.get $NULL))))))
         (global.get $NULL))
       (then
         (call $Term::Lambda::get::body (local.get $self))

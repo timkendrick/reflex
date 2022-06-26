@@ -2,7 +2,7 @@
 ;; SPDX-License-Identifier: Apache-2.0
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 (module
-  (@builtin $Stdlib_Values
+  (@builtin $Stdlib_Values "Values"
     (@args (@strict $self))
 
     (@impl
@@ -33,6 +33,12 @@
       (i32.eq (global.get $TermType::Tree))
       (func $Stdlib_Values::impl::Tree (param $self i32) (param $state i32) (result i32 i32)
         (call $Term::Tree::traits::values (local.get $self))
+        (global.get $NULL)))
+
+    (@impl
+      (call $TermType::implements::iterate)
+      (func $Stdlib_Values::impl::<iterate> (param $self i32) (param $state i32) (result i32 i32)
+        (local.get $self)
         (global.get $NULL)))
 
     (@default

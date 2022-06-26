@@ -12,7 +12,6 @@
     (@export $Float (@get $Float)))
 
   (export "isFloat" (func $Term::Float::is))
-  (export "getFloatValue" (func $Term::Float::get::value))
 
   (func $Float::traits::equals (param $self i32) (param $other i32) (result i32)
     (local $self_value f64)
@@ -35,6 +34,12 @@
 
   (func $Term::Float::traits::is_truthy (param $self i32) (result i32)
     (global.get $TRUE))
+
+  (func $Term::Float::traits::display (param $self i32) (param $offset i32) (result i32)
+    (call $Utils::Float::to_string
+      (call $Term::Float::get_value (local.get $self))
+      (local.get $offset))
+    (i32.add (local.get $offset)))
 
   (func $Term::Float::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (global.get $NULL))
@@ -61,6 +66,9 @@
         (global.get $TRUE)
         ;; Write the serialized value to the output string and return the updated offset
         (i32.add (local.get $offset) (local.get $bytes_written)))))
+
+  (func $Term::Float::get_value (export "getFloatValue") (param $self i32) (result f64)
+    (call $Term::Float::get::value (local.get $self)))
 
   (func $Term::Float::get_non_negative_integer_value (param $self i32) (result i32)
     (local $value f64)

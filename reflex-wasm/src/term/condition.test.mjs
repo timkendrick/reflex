@@ -3,10 +3,60 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 export default (describe) => {
   describe('Term::Condition', (test) => {
-    test('format', (assert, { createCustomCondition, createInt, createSymbol, format }) => {
+    test('format', (assert, {
+      createBuiltin,
+      createCustomCondition,
+      createErrorCondition,
+      createEmptyList,
+      createInt,
+      createInvalidFunctionArgsCondition,
+      createInvalidFunctionTargetCondition,
+      createSymbol,
+      createString,
+      createTriple,
+      createTypeErrorCondition,
+      createUnitList,
+      format,
+      NULL,
+      Stdlib,
+    }) => {
       assert.strictEqual(
         format(createCustomCondition(createSymbol(123), createInt(3), createSymbol(0))),
-        '<Custom:Symbol(123):3:Symbol(0)>',
+        '<CustomCondition:Symbol(123):3:Symbol(0)>',
+      );
+      assert.strictEqual(
+        format(createErrorCondition(createString('foo'))),
+        '<ErrorCondition:"foo">',
+      );
+      assert.strictEqual(
+        format(createTypeErrorCondition(NULL, createString('foo'))),
+        '<TypeErrorCondition:<unknown>:"foo">',
+      );
+      assert.strictEqual(
+        format(createInvalidFunctionTargetCondition(createString('foo'))),
+        '<InvalidFunctionTargetCondition:"foo">',
+      );
+      assert.strictEqual(
+        format(createInvalidFunctionArgsCondition(createBuiltin(Stdlib.Add), createEmptyList())),
+        '<InvalidFunctionArgsCondition:Add()>',
+      );
+      assert.strictEqual(
+        format(
+          createInvalidFunctionArgsCondition(
+            createBuiltin(Stdlib.Add),
+            createUnitList(createInt(3)),
+          ),
+        ),
+        '<InvalidFunctionArgsCondition:Add(3)>',
+      );
+      assert.strictEqual(
+        format(
+          createInvalidFunctionArgsCondition(
+            createBuiltin(Stdlib.Add),
+            createTriple(createInt(3), createInt(4), createInt(5)),
+          ),
+        ),
+        '<InvalidFunctionArgsCondition:Add(3, 4, 5)>',
       );
     });
 

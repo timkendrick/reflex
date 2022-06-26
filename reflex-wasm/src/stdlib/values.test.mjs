@@ -177,5 +177,43 @@ export default (describe) => {
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });
+
+    test('(Iterator)', (assert, {
+      createApplication,
+      createEmptyIterator,
+      createBuiltin,
+      createRangeIterator,
+      createUnitList,
+      evaluate,
+      format,
+      NULL,
+      Stdlib,
+    }) => {
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.CollectList),
+          createUnitList(
+            createApplication(createBuiltin(Stdlib.Values), createUnitList(createEmptyIterator())),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '[]');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.CollectList),
+          createUnitList(
+            createApplication(
+              createBuiltin(Stdlib.Values),
+              createUnitList(createRangeIterator(3, 3)),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '[3, 4, 5]');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+    });
   });
 };

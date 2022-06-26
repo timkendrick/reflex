@@ -130,7 +130,6 @@ export default (describe) => {
 
     test('(Hashmap)', (assert, {
       createApplication,
-      asList,
       createBuiltin,
       createInt,
       createHashmap,
@@ -138,6 +137,7 @@ export default (describe) => {
       evaluate,
       format,
       getListItems,
+      isList,
       NULL,
       Stdlib,
     }) => {
@@ -169,9 +169,8 @@ export default (describe) => {
           ),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        const results = asList(result);
-        assert.ok(results);
-        const items = getListItems(results).map(format);
+        assert.ok(isList(result));
+        const items = getListItems(result).map(format);
         assert.strictEqual(items.length, 3);
         assert.ok(items.includes('[3, 6]'));
         assert.ok(items.includes('[4, 7]'));

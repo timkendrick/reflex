@@ -5,7 +5,7 @@
   (@const-string $Stdlib_Variable::EFFECT_NAME_GET "reflex::variable::get")
   (@const-string $Stdlib_Variable::EFFECT_NAME_SET "reflex::variable::set")
 
-  (@builtin $Stdlib_Variable
+  (@builtin $Stdlib_Variable "Variable"
     (@args (@strict $self) (@lazy $initial_value))
 
     (@default
@@ -29,7 +29,7 @@
                 (call $Term::Variable::new (i32.const 0))))))
         (global.get $NULL))))
 
-  (@builtin $Stdlib_Getter
+  (@builtin $Stdlib_Getter "Getter"
     (@args (@strict $self) (@lazy $initial_value))
 
     (@default
@@ -42,7 +42,7 @@
             (call $Term::Nil::new)))
         (global.get $NULL))))
 
-  (@builtin $Stdlib_Setter
+  (@builtin $Stdlib_Setter "Setter"
     (@args (@strict $self))
 
     (@default
