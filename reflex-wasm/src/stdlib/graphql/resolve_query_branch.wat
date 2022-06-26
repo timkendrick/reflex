@@ -31,7 +31,7 @@
         (local.set $dependencies (global.get $NULL))
         ;; Recursively resolve each source iterator item
         (@iterate-map $self $length $result $item $index $iterator_state $state $dependencies
-          (call $Stdlib_ResolveQueryBranch::call_static (local.get $item) (local.get $shape) (local.get $state)))))
+          (call $Stdlib_ResolveQueryBranch (local.get $item) (local.get $shape) (local.get $state)))))
 
     (@default
       (func $Stdlib_ResolveQueryBranch::impl::default (param $self i32) (param $shape i32) (param $state i32) (result i32 i32)

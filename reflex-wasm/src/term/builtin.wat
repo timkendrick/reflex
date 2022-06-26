@@ -38,7 +38,7 @@
 
   (func $Term::Builtin::traits::apply (param $self i32) (param $args i32) (param $state i32) (result i32 i32)
     ;; Invoke the builtin function implementation
-    (call_indirect (type $Builtin)
+    (call $Builtin::apply
+      (call $Term::Builtin::get::uid (local.get $self))
       (local.get $args)
-      (local.get $state)
-      (call $Term::Builtin::get::uid (local.get $self)))))
+      (local.get $state))))

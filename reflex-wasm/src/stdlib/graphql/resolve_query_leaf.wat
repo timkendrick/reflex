@@ -22,7 +22,7 @@
         (local.set $dependencies (global.get $NULL))
         ;; Recursively flatten each source iterator item
         (@iterate-map $self $length $result $item $index $iterator_state $state $dependencies
-          (call $Stdlib_ResolveQueryLeaf::call_static (local.get $item) (local.get $state)))))
+          (call $Stdlib_ResolveQueryLeaf (local.get $item) (local.get $state)))))
 
     (@default
       (func $Stdlib_ResolveQueryLeaf::impl::default (param $self i32) (param $state i32) (result i32 i32)
