@@ -3,13 +3,13 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 export default (describe) => {
   describe('Stdlib_Take', (test) => {
-    test('(Iterator, Iterator)', (assert, {
+    test('(Iterator, Int)', (assert, {
       createApplication,
-      createEmptyList,
+      createEmptyIterator,
       createBuiltin,
       createInt,
       createPair,
-      createTriple,
+      createRangeIterator,
       createUnitList,
       evaluate,
       format,
@@ -22,13 +22,7 @@ export default (describe) => {
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Take),
-              createPair(
-                createApplication(
-                  createBuiltin(Stdlib.Iterate),
-                  createUnitList(createEmptyList()),
-                ),
-                createInt(0),
-              ),
+              createPair(createEmptyIterator(), createInt(0)),
             ),
           ),
         );
@@ -42,13 +36,7 @@ export default (describe) => {
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Take),
-              createPair(
-                createApplication(
-                  createBuiltin(Stdlib.Iterate),
-                  createUnitList(createEmptyList()),
-                ),
-                createInt(3),
-              ),
+              createPair(createEmptyIterator(), createInt(3)),
             ),
           ),
         );
@@ -62,13 +50,7 @@ export default (describe) => {
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Take),
-              createPair(
-                createApplication(
-                  createBuiltin(Stdlib.Iterate),
-                  createUnitList(createTriple(createInt(3), createInt(4), createInt(5))),
-                ),
-                createInt(0),
-              ),
+              createPair(createRangeIterator(3, 3), createInt(0)),
             ),
           ),
         );
@@ -82,13 +64,7 @@ export default (describe) => {
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Take),
-              createPair(
-                createApplication(
-                  createBuiltin(Stdlib.Iterate),
-                  createUnitList(createTriple(createInt(3), createInt(4), createInt(5))),
-                ),
-                createInt(1),
-              ),
+              createPair(createRangeIterator(3, 3), createInt(1)),
             ),
           ),
         );
@@ -102,13 +78,7 @@ export default (describe) => {
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Take),
-              createPair(
-                createApplication(
-                  createBuiltin(Stdlib.Iterate),
-                  createUnitList(createTriple(createInt(3), createInt(4), createInt(5))),
-                ),
-                createInt(2),
-              ),
+              createPair(createRangeIterator(3, 3), createInt(2)),
             ),
           ),
         );
@@ -122,13 +92,7 @@ export default (describe) => {
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Take),
-              createPair(
-                createApplication(
-                  createBuiltin(Stdlib.Iterate),
-                  createUnitList(createTriple(createInt(3), createInt(4), createInt(5))),
-                ),
-                createInt(3),
-              ),
+              createPair(createRangeIterator(3, 3), createInt(3)),
             ),
           ),
         );
@@ -142,13 +106,120 @@ export default (describe) => {
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Take),
-              createPair(
-                createApplication(
-                  createBuiltin(Stdlib.Iterate),
-                  createUnitList(createTriple(createInt(3), createInt(4), createInt(5))),
-                ),
-                createInt(4),
-              ),
+              createPair(createRangeIterator(3, 3), createInt(4)),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '[3, 4, 5]');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+    });
+
+    test('(Iterator, Float)', (assert, {
+      createApplication,
+      createBuiltin,
+      createEmptyIterator,
+      createFloat,
+      createPair,
+      createRangeIterator,
+      createUnitList,
+      evaluate,
+      format,
+      NULL,
+      Stdlib,
+    }) => {
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.CollectList),
+          createUnitList(
+            createApplication(
+              createBuiltin(Stdlib.Take),
+              createPair(createEmptyIterator(), createFloat(0.0)),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '[]');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.CollectList),
+          createUnitList(
+            createApplication(
+              createBuiltin(Stdlib.Take),
+              createPair(createEmptyIterator(), createFloat(3.0)),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '[]');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.CollectList),
+          createUnitList(
+            createApplication(
+              createBuiltin(Stdlib.Take),
+              createPair(createRangeIterator(3, 3), createFloat(0.0)),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '[]');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.CollectList),
+          createUnitList(
+            createApplication(
+              createBuiltin(Stdlib.Take),
+              createPair(createRangeIterator(3, 3), createFloat(1.0)),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '[3]');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.CollectList),
+          createUnitList(
+            createApplication(
+              createBuiltin(Stdlib.Take),
+              createPair(createRangeIterator(3, 3), createFloat(2.0)),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '[3, 4]');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.CollectList),
+          createUnitList(
+            createApplication(
+              createBuiltin(Stdlib.Take),
+              createPair(createRangeIterator(3, 3), createFloat(3.0)),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '[3, 4, 5]');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.CollectList),
+          createUnitList(
+            createApplication(
+              createBuiltin(Stdlib.Take),
+              createPair(createRangeIterator(3, 3), createFloat(4.0)),
             ),
           ),
         );

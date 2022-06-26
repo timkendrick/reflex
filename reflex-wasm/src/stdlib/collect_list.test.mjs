@@ -5,7 +5,7 @@ export default (describe) => {
   describe('Stdlib_CollectList', (test) => {
     test('(Iterator)', (assert, {
       createApplication,
-      createEmptyList,
+      createEmptyIterator,
       createBuiltin,
       createInt,
       createRangeIterator,
@@ -19,9 +19,7 @@ export default (describe) => {
       (() => {
         const expression = createApplication(
           createBuiltin(Stdlib.CollectList),
-          createUnitList(
-            createApplication(createBuiltin(Stdlib.Iterate), createUnitList(createEmptyList())),
-          ),
+          createUnitList(createEmptyIterator()),
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '[]');
@@ -39,15 +37,10 @@ export default (describe) => {
       (() => {
         const expression = createApplication(
           createBuiltin(Stdlib.CollectList),
-          createUnitList(
-            createApplication(
-              createBuiltin(Stdlib.Iterate),
-              createUnitList(createTriple(createInt(1), createInt(2), createInt(3))),
-            ),
-          ),
+          createUnitList(createTriple(createInt(3), createInt(4), createInt(5))),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '[1, 2, 3]');
+        assert.strictEqual(format(result), '[3, 4, 5]');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });

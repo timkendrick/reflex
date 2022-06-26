@@ -5,11 +5,11 @@ export default (describe) => {
   describe('Stdlib_Skip', (test) => {
     test('(Iterator, Int)', (assert, {
       createApplication,
-      createEmptyList,
+      createEmptyIterator,
       createBuiltin,
       createInt,
       createPair,
-      createTriple,
+      createRangeIterator,
       createUnitList,
       evaluate,
       format,
@@ -22,13 +22,7 @@ export default (describe) => {
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Skip),
-              createPair(
-                createApplication(
-                  createBuiltin(Stdlib.Iterate),
-                  createUnitList(createEmptyList()),
-                ),
-                createInt(0),
-              ),
+              createPair(createEmptyIterator(), createInt(0)),
             ),
           ),
         );
@@ -42,13 +36,7 @@ export default (describe) => {
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Skip),
-              createPair(
-                createApplication(
-                  createBuiltin(Stdlib.Iterate),
-                  createUnitList(createEmptyList()),
-                ),
-                createInt(3),
-              ),
+              createPair(createEmptyIterator(), createInt(3)),
             ),
           ),
         );
@@ -62,13 +50,7 @@ export default (describe) => {
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Skip),
-              createPair(
-                createApplication(
-                  createBuiltin(Stdlib.Iterate),
-                  createUnitList(createTriple(createInt(3), createInt(4), createInt(5))),
-                ),
-                createInt(0),
-              ),
+              createPair(createRangeIterator(3, 3), createInt(0)),
             ),
           ),
         );
@@ -82,13 +64,7 @@ export default (describe) => {
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Skip),
-              createPair(
-                createApplication(
-                  createBuiltin(Stdlib.Iterate),
-                  createUnitList(createTriple(createInt(3), createInt(4), createInt(5))),
-                ),
-                createInt(1),
-              ),
+              createPair(createRangeIterator(3, 3), createInt(1)),
             ),
           ),
         );
@@ -102,13 +78,7 @@ export default (describe) => {
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Skip),
-              createPair(
-                createApplication(
-                  createBuiltin(Stdlib.Iterate),
-                  createUnitList(createTriple(createInt(3), createInt(4), createInt(5))),
-                ),
-                createInt(2),
-              ),
+              createPair(createRangeIterator(3, 3), createInt(2)),
             ),
           ),
         );
@@ -122,13 +92,7 @@ export default (describe) => {
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Skip),
-              createPair(
-                createApplication(
-                  createBuiltin(Stdlib.Iterate),
-                  createUnitList(createTriple(createInt(3), createInt(4), createInt(5))),
-                ),
-                createInt(3),
-              ),
+              createPair(createRangeIterator(3, 3), createInt(3)),
             ),
           ),
         );
@@ -142,13 +106,7 @@ export default (describe) => {
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Skip),
-              createPair(
-                createApplication(
-                  createBuiltin(Stdlib.Iterate),
-                  createUnitList(createTriple(createInt(3), createInt(3), createInt(5))),
-                ),
-                createInt(4),
-              ),
+              createPair(createRangeIterator(3, 3), createInt(4)),
             ),
           ),
         );
@@ -160,12 +118,11 @@ export default (describe) => {
 
     test('(Iterator, Float)', (assert, {
       createApplication,
-      createEmptyList,
       createBuiltin,
+      createEmptyIterator,
       createFloat,
-      createInt,
       createPair,
-      createTriple,
+      createRangeIterator,
       createUnitList,
       evaluate,
       format,
@@ -178,13 +135,7 @@ export default (describe) => {
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Skip),
-              createPair(
-                createApplication(
-                  createBuiltin(Stdlib.Iterate),
-                  createUnitList(createEmptyList()),
-                ),
-                createFloat(0.0),
-              ),
+              createPair(createEmptyIterator(), createFloat(0.0)),
             ),
           ),
         );
@@ -198,13 +149,7 @@ export default (describe) => {
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Skip),
-              createPair(
-                createApplication(
-                  createBuiltin(Stdlib.Iterate),
-                  createUnitList(createEmptyList()),
-                ),
-                createFloat(0.0),
-              ),
+              createPair(createEmptyIterator(), createFloat(0.0)),
             ),
           ),
         );
@@ -218,13 +163,7 @@ export default (describe) => {
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Skip),
-              createPair(
-                createApplication(
-                  createBuiltin(Stdlib.Iterate),
-                  createUnitList(createTriple(createInt(3), createInt(4), createInt(5))),
-                ),
-                createFloat(0.0),
-              ),
+              createPair(createRangeIterator(3, 3), createFloat(0.0)),
             ),
           ),
         );
@@ -238,13 +177,7 @@ export default (describe) => {
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Skip),
-              createPair(
-                createApplication(
-                  createBuiltin(Stdlib.Iterate),
-                  createUnitList(createTriple(createInt(3), createInt(4), createInt(5))),
-                ),
-                createFloat(1.0),
-              ),
+              createPair(createRangeIterator(3, 3), createFloat(1.0)),
             ),
           ),
         );
@@ -258,13 +191,7 @@ export default (describe) => {
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Skip),
-              createPair(
-                createApplication(
-                  createBuiltin(Stdlib.Iterate),
-                  createUnitList(createTriple(createInt(3), createInt(4), createInt(5))),
-                ),
-                createFloat(2.0),
-              ),
+              createPair(createRangeIterator(3, 3), createFloat(2.0)),
             ),
           ),
         );
@@ -278,13 +205,7 @@ export default (describe) => {
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Skip),
-              createPair(
-                createApplication(
-                  createBuiltin(Stdlib.Iterate),
-                  createUnitList(createTriple(createInt(3), createInt(4), createInt(5))),
-                ),
-                createFloat(3.0),
-              ),
+              createPair(createRangeIterator(3, 3), createFloat(3.0)),
             ),
           ),
         );
@@ -298,13 +219,7 @@ export default (describe) => {
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Skip),
-              createPair(
-                createApplication(
-                  createBuiltin(Stdlib.Iterate),
-                  createUnitList(createTriple(createInt(3), createInt(3), createInt(5))),
-                ),
-                createFloat(4.0),
-              ),
+              createPair(createRangeIterator(3, 3), createFloat(4.0)),
             ),
           ),
         );

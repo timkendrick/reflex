@@ -5,10 +5,13 @@ export default (describe) => {
   describe('Stdlib_Zip', (test) => {
     test('(Iterator, Iterator)', (assert, {
       createApplication,
-      createEmptyList,
       createBuiltin,
+      createEmptyIterator,
       createInt,
       createPair,
+      createRangeIterator,
+      createOnceIterator,
+      createString,
       createTriple,
       createUnitList,
       evaluate,
@@ -22,10 +25,35 @@ export default (describe) => {
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Zip),
-              createPair(
-                createApplication(createBuiltin(Stdlib.Iterate), createUnitList(createEmptyList())),
-                createApplication(createBuiltin(Stdlib.Iterate), createUnitList(createEmptyList())),
-              ),
+              createPair(createEmptyIterator(), createEmptyIterator()),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '[]');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.CollectList),
+          createUnitList(
+            createApplication(
+              createBuiltin(Stdlib.Zip),
+              createPair(createEmptyIterator(), createRangeIterator(3, 3)),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '[]');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.CollectList),
+          createUnitList(
+            createApplication(
+              createBuiltin(Stdlib.Zip),
+              createPair(createRangeIterator(3, 3), createEmptyIterator()),
             ),
           ),
         );
@@ -40,17 +68,14 @@ export default (describe) => {
             createApplication(
               createBuiltin(Stdlib.Zip),
               createPair(
-                createApplication(createBuiltin(Stdlib.Iterate), createUnitList(createEmptyList())),
-                createApplication(
-                  createBuiltin(Stdlib.Iterate),
-                  createUnitList(createTriple(createInt(1), createInt(2), createInt(3))),
-                ),
+                createTriple(createString('foo'), createString('bar'), createString('baz')),
+                createRangeIterator(3, 3),
               ),
             ),
           ),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '[]');
+        assert.strictEqual(format(result), '[["foo", 3], ["bar", 4], ["baz", 5]]');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
@@ -60,17 +85,14 @@ export default (describe) => {
             createApplication(
               createBuiltin(Stdlib.Zip),
               createPair(
-                createApplication(
-                  createBuiltin(Stdlib.Iterate),
-                  createUnitList(createTriple(createInt(1), createInt(2), createInt(3))),
-                ),
-                createApplication(createBuiltin(Stdlib.Iterate), createUnitList(createEmptyList())),
+                createTriple(createString('foo'), createString('bar'), createString('baz')),
+                createOnceIterator(createInt(4)),
               ),
             ),
           ),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '[]');
+        assert.strictEqual(format(result), '[["foo", 4]]');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
@@ -79,67 +101,12 @@ export default (describe) => {
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Zip),
-              createPair(
-                createApplication(
-                  createBuiltin(Stdlib.Iterate),
-                  createUnitList(createTriple(createInt(1), createInt(2), createInt(3))),
-                ),
-                createApplication(
-                  createBuiltin(Stdlib.Iterate),
-                  createUnitList(createTriple(createInt(4), createInt(5), createInt(6))),
-                ),
-              ),
+              createPair(createOnceIterator(createString('foo')), createRangeIterator(3, 3)),
             ),
           ),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '[[1, 4], [2, 5], [3, 6]]');
-        assert.strictEqual(format(dependencies), 'NULL');
-      })();
-      (() => {
-        const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
-          createUnitList(
-            createApplication(
-              createBuiltin(Stdlib.Zip),
-              createPair(
-                createApplication(
-                  createBuiltin(Stdlib.Iterate),
-                  createUnitList(createTriple(createInt(1), createInt(2), createInt(3))),
-                ),
-                createApplication(
-                  createBuiltin(Stdlib.Iterate),
-                  createUnitList(createUnitList(createInt(4))),
-                ),
-              ),
-            ),
-          ),
-        );
-        const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '[[1, 4]]');
-        assert.strictEqual(format(dependencies), 'NULL');
-      })();
-      (() => {
-        const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
-          createUnitList(
-            createApplication(
-              createBuiltin(Stdlib.Zip),
-              createPair(
-                createApplication(
-                  createBuiltin(Stdlib.Iterate),
-                  createUnitList(createUnitList(createInt(1))),
-                ),
-                createApplication(
-                  createBuiltin(Stdlib.Iterate),
-                  createUnitList(createTriple(createInt(4), createInt(5), createInt(6))),
-                ),
-              ),
-            ),
-          ),
-        );
-        const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '[[1, 4]]');
+        assert.strictEqual(format(result), '[["foo", 3]]');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });

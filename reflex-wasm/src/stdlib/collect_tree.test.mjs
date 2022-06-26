@@ -5,10 +5,9 @@ export default (describe) => {
   describe('Stdlib_CollectTree', (test) => {
     test('(Iterator)', (assert, {
       createApplication,
-      createEmptyList,
+      createEmptyIterator,
       createBuiltin,
-      createInt,
-      createTriple,
+      createRangeIterator,
       createUnitList,
       evaluate,
       format,
@@ -18,12 +17,7 @@ export default (describe) => {
       (() => {
         const expression = createApplication(
           createBuiltin(Stdlib.CollectTree),
-          createUnitList(
-            createApplication(
-              createBuiltin(Stdlib.Iterate),
-              createUnitList(createEmptyList()),
-            ),
-          ),
+          createUnitList(createEmptyIterator()),
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '(NULL . NULL)');
@@ -32,15 +26,10 @@ export default (describe) => {
       (() => {
         const expression = createApplication(
           createBuiltin(Stdlib.CollectTree),
-          createUnitList(
-            createApplication(
-              createBuiltin(Stdlib.Iterate),
-              createUnitList(createTriple(createInt(1), createInt(2), createInt(3))),
-            ),
-          ),
+          createUnitList(createRangeIterator(3, 3)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '(3 . (2 . (1 . NULL)))');
+        assert.strictEqual(format(result), '(5 . (4 . (3 . NULL)))');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });

@@ -16,11 +16,11 @@
       (call $Term::implements::iterate)
       (i32.eq (global.get $TermType::Float))
       (func $Stdlib_Skip::impl::<iterate>::Float (param $self i32) (param $count i32) (param $state i32) (result i32 i32)
-        (local $index i32)
+        (local $count_value i32)
         (if (result i32 i32)
-          (i32.ne (local.tee $index (call $Term::Float::get_non_negative_integer_value (local.get $count))) (global.get $NULL))
+          (i32.ne (local.tee $count_value (call $Term::Float::get_non_negative_integer_value (local.get $count))) (global.get $NULL))
           (then
-            (call $Term::SkipIterator::new (local.get $self) (local.get $index))
+            (call $Term::SkipIterator::new (local.get $self) (local.get $count_value))
             (global.get $NULL))
           (else
             (call $Term::Signal::of

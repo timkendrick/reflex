@@ -5,13 +5,15 @@ export default (describe) => {
   describe('Stdlib_CollectHashmap', (test) => {
     test('(Iterator)', (assert, {
       createApplication,
-      createEmptyList,
+      createEmptyIterator,
       createBuiltin,
       createInt,
       createPair,
       createString,
+      createRangeIterator,
       createTriple,
       createUnitList,
+      createZipIterator,
       evaluate,
       format,
       getHashmapValue,
@@ -21,12 +23,7 @@ export default (describe) => {
       (() => {
         const expression = createApplication(
           createBuiltin(Stdlib.CollectHashmap),
-          createUnitList(
-            createApplication(
-              createBuiltin(Stdlib.Iterate),
-              createUnitList(createEmptyList()),
-            ),
-          ),
+          createUnitList(createEmptyIterator()),
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), 'Map({0})');
@@ -36,13 +33,9 @@ export default (describe) => {
         const expression = createApplication(
           createBuiltin(Stdlib.CollectHashmap),
           createUnitList(
-            createApplication(
-              createBuiltin(Stdlib.Iterate),
-              createUnitList(createTriple(
-                createPair(createString('foo'), createInt(3)),
-                createPair(createString('bar'), createInt(4)),
-                createPair(createString('baz'), createInt(5)),
-              )),
+            createZipIterator(
+              createTriple(createString('foo'), createString('bar'), createString('baz')),
+              createRangeIterator(3, 3),
             ),
           ),
         );
@@ -57,18 +50,18 @@ export default (describe) => {
         const expression = createApplication(
           createBuiltin(Stdlib.CollectHashmap),
           createUnitList(
-            createApplication(
-              createBuiltin(Stdlib.Iterate),
-              createUnitList(createTriple(
-                createString('foo'),
-                createPair(createString('bar'), createInt(4)),
-                createString('baz'),
-              )),
+            createTriple(
+              createString('foo'),
+              createPair(createString('bar'), createInt(4)),
+              createString('baz'),
             ),
           ),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{((<TypeError:List:"foo"> . NULL) . (<TypeError:List:"baz"> . NULL))}');
+        assert.strictEqual(
+          format(result),
+          '{((<TypeError:List:"foo"> . NULL) . (<TypeError:List:"baz"> . NULL))}',
+        );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });
