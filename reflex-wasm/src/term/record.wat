@@ -333,6 +333,12 @@
   (func $Term::Record::traits::values (param $self i32) (result i32)
     (call $Term::Record::get::values (local.get $self)))
 
+  (func $Term::Record::get_keys (param $self i32) (result i32)
+    (call $Term::Record::get::keys (local.get $self)))
+
+  (func $Term::Record::get_values (param $self i32) (result i32)
+    (call $Term::Record::get::values (local.get $self)))
+
   (func $Term::Record::find_value (param $self i32) (param $key i32) (result i32)
     (local $field_index i32)
     (if (result i32)

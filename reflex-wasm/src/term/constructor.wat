@@ -67,4 +67,54 @@
         (global.get $NULL))
       (else
         (call $Term::Record::new (local.get $keys) (local.get $args))
-        (global.get $NULL)))))
+        (global.get $NULL))))
+
+  (func $Term::Constructor::parse_record (param $self i32) (param $properties i32) (result i32)
+    (local $keys i32)
+    (local $values i32)
+    (local $num_keys i32)
+    (local $index i32)
+    (if (result i32)
+      ;; If the input record contains identical field layout to the constructor, return it as-is
+      (call $Term::traits::equals
+        (local.tee $keys (call $Term::Constructor::get::keys (local.get $self)))
+        (call $Term::Record::get_keys (local.get $properties)))
+      (then
+        (local.get $properties))
+      (else
+        ;; Otherwise determine whether the input record contains all the required fields
+        (local.set $num_keys (call $Term::List::get_length (local.get $keys)))
+        ;; Iterate through each of the constructor fields to determine whether they exist on the input record
+        (loop $LOOP
+          (if
+            ;; Determine whether the input record contains the current field
+            (call $Term::Record::traits::has
+              (local.get $properties)
+              (call $Term::List::get_item (local.get $keys) (local.get $index)))
+            (then
+              ;; If the input record contains the field, continue with the next field
+              (br_if $LOOP (i32.lt_u (local.tee $index (i32.add (i32.const 1) (local.get $index))) (local.get $num_keys))))
+            ;; Otherwise return the null sentinel value
+            (else
+              (return (global.get $NULL)))))
+        ;; Reset the iteration index
+        (local.set $index (i32.const 0))
+        ;; Push the constructor keys onto the stack (used to construct the record later)
+        (local.get $keys)
+        ;; Allocate a new list to hold the correctly-ordered values
+        (local.tee $values (call $Term::List::allocate (local.get $num_keys)))
+        ;; Iterate through each of the constructor fields and copy the corresponding value into the newly-allocated list
+        (loop $LOOP
+          ;; Store the corresponsing value for the current field in the output list
+          (call $Term::List::set_item
+            (local.get $values)
+            (local.get $index)
+            (call $Term::Record::traits::get
+              (local.get $properties)
+              (call $Term::List::get_item (local.get $keys) (local.get $index))))
+          ;; Continue with the next field
+          (br_if $LOOP (i32.lt_u (local.tee $index (i32.add (i32.const 1) (local.get $index))) (local.get $num_keys))))
+        ;; Instantiate the list of field values
+        (call $Term::List::init (local.get $num_keys))
+        ;; Create a record from the keys and values lists currently at the top of the stack
+        (call $Term::Record::new)))))
