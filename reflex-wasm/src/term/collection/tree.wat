@@ -1,0 +1,412 @@
+;; SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
+;; SPDX-License-Identifier: Apache-2.0
+;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
+(module
+  ;; TODO: Compile singleton instances directly into linear memory data
+  (global $Tree::EMPTY (mut i32) (i32.const -1))
+
+  (func $Tree::startup
+    ;; Pre-allocate the singleton instance
+    (call $Tree::new (global.get $NULL) (global.get $NULL))
+    ;; Update the global variable with a pointer to the singleton instance
+    (global.set $Tree::EMPTY))
+
+  (func $Tree::new (export "createTree") (param $left i32) (param $right i32) (result i32)
+    (local $self i32)
+    (local $right_length i32)
+    ;; Allocate a new struct of the required size and type
+    (local.tee $self (call $Term::new (global.get $TermType::Tree) (i32.const 3)))
+    ;; Store the struct fields at the correct offsets
+    (call $Term::set_field (local.get $self) (i32.const 0) (local.get $left))
+    (call $Term::set_field (local.get $self) (i32.const 1) (local.get $right))
+    (call $Term::set_field
+      (local.get $self)
+      (i32.const 2)
+      (i32.add
+        (call $Tree::get_branch_length (local.get $left))
+        (call $Tree::get_branch_length (local.get $right))))
+    ;; Instantiate the term
+    (call $Term::init))
+
+  (func $Tree::empty (result i32)
+    (global.get $Tree::EMPTY))
+
+  (func $Tree::of (param $value i32) (result i32)
+    (call $Tree::new (local.get $value) (global.get $NULL)))
+
+  (func $Tree::is (export "isTree") (param $term i32) (result i32)
+    (i32.eq (global.get $TermType::Tree) (call $Term::get_type (local.get $term))))
+
+  (func $Tree::get::left (export "getTreeLeft") (param $self i32) (result i32)
+    (call $Term::get_field (local.get $self) (i32.const 0)))
+
+  (func $Tree::get::right (export "getTreeRight") (param $self i32) (result i32)
+    (call $Term::get_field (local.get $self) (i32.const 1)))
+
+  (func $Tree::get::length (export "getTreeLength") (param $self i32) (result i32)
+    (call $Term::get_field (local.get $self) (i32.const 2)))
+
+  (func $Tree::traits::is_static (param $self i32) (result i32)
+    (global.get $TRUE))
+
+  (func $Tree::traits::is_atomic (param $self i32) (result i32)
+    (local $branch i32)
+    (i32.and
+      (if (result i32)
+        (i32.eq (global.get $NULL) (local.tee $branch (call $Tree::get::left (local.get $self))))
+        (then
+          (global.get $TRUE))
+        (else
+          (call $Term::traits::is_atomic (local.get $branch))))
+      (if (result i32)
+        (i32.eq (global.get $NULL) (local.tee $branch (call $Tree::get::right (local.get $self))))
+        (then
+          (global.get $TRUE))
+        (else
+          (call $Term::traits::is_atomic (local.get $branch))))))
+
+  (func $Tree::traits::is_truthy (param $self i32) (result i32)
+    (global.get $TRUE))
+
+  (func $Tree::traits::hash (param $self i32) (param $state i32) (result i32)
+    ;; Hash the struct field values
+    (local.get $state)
+    (call $Tree::get::left (local.get $self))
+    (call $Hash::write_term)
+    (call $Tree::get::right (local.get $self))
+    (call $Hash::write_term))
+
+  (func $Tree::traits::equals (param $self i32) (param $other i32) (result i32)
+    (if (result i32)
+      (call $Term::traits::equals
+        (call $Tree::get::left (local.get $self))
+        (call $Tree::get::left (local.get $other)))
+      (then
+        (call $Term::traits::equals
+          (call $Tree::get::right (local.get $self))
+          (call $Tree::get::right (local.get $other))))
+      (else
+        (global.get $FALSE))))
+
+  (func $Tree::traits::write_json (param $self i32) (param $offset i32) (result i32)
+    (call $Term::traits::write_json (call $Record::empty) (local.get $offset)))
+
+  (func $Tree::traits::union (param $self i32) (param $other i32) (result i32)
+    (if (result i32)
+      (i32.eq (global.get $NULL) (local.get $self))
+      (then
+        (local.get $other))
+      (else
+        (if (result i32)
+          (i32.eq (global.get $NULL) (local.get $other))
+          (then
+            (local.get $self))
+          (else
+            (call $Tree::new (local.get $self) (local.get $other)))))))
+
+  (func $Tree::traits::length (param $self i32) (result i32)
+    (call $Tree::get::length (local.get $self)))
+
+  (func $Tree::traits::iterate (param $self i32) (result i32)
+    (local.get $self))
+
+  (func $Tree::traits::size_hint (param $self i32) (result i32)
+    (call $Tree::traits::length (local.get $self)))
+
+  (func $Tree::traits::next (param $self i32) (param $iterator_state i32) (param $state i32) (result i32 i32 i32)
+    (call $Tree::next_branch
+      (if (result i32)
+        (i32.eq (global.get $NULL) (local.get $iterator_state))
+        (then
+          ;; If this is the first iteration, allocate a new cell to hold the iteration state
+          (call $Tree::allocate_iterator_state (local.get $self)))
+        (else
+          ;; Otherwise use the state that was passed in from the previous iteration result
+          (local.get $iterator_state))))
+    (global.get $NULL))
+
+  (func $Tree::next_branch (param $iterator_state i32) (result i32 i32)
+    (local $cursor i32)
+    (local $current i32)
+    (local $is_right i32)
+    (if (result i32 i32)
+      ;; If the stack has been fully emptied, dispose of the temporary iterator state and return the complete marker
+      (i32.eq
+        (i32.const -1)
+        (local.tee $cursor
+          (call $Tree::get_iterator_state_cursor (local.get $iterator_state))))
+      (then
+        (call $Term::drop (local.get $iterator_state))
+        (global.get $NULL)
+        (global.get $NULL))
+      (else
+        ;; Get the current stack entry, and whether we are processing the left or right branch
+        (call $Tree::get_pair_iterator_stack_entry (local.get $iterator_state) (local.get $cursor))
+        (local.set $is_right)
+        (local.set $current)
+        ;; Determine how to proceed depending on whether we are processing the left or right branch
+        (if (result i32 i32)
+          (local.get $is_right)
+          (then
+            (call $Tree::next_right (call $Tree::get::right (local.get $current)) (local.get $iterator_state)))
+          (else
+            (call $Tree::next_left (call $Tree::get::left (local.get $current)) (local.get $iterator_state)))))))
+
+  (func $Tree::next_left (param $left i32) (param $iterator_state i32) (result i32 i32)
+    (if (result i32 i32)
+      ;; If this is the null leaf marker, we need to shift from the left to the right branch
+      (i32.eq (global.get $NULL) (local.get $left))
+      (then
+        ;; Continue with the right branch
+        (call $Tree::next_branch
+          (call $Tree::iterator_state_left_next (local.get $iterator_state))))
+      (else
+        (if (result i32 i32)
+          ;; Determine whether the current item is itself a cell which needs to be traversed deeper
+          (call $Tree::is (local.get $left))
+          (then
+            ;; If so, push the cell to the stack and repeat the iteration with the updated stack
+            (call $Tree::next_branch
+              (call $Tree::iterator_state_push (local.get $iterator_state) (local.get $left))))
+          (else
+            ;; Otherwise emit the value
+            (local.get $left)
+            ;; Shift from the left to the right branch
+            (call $Tree::iterator_state_left_next (local.get $iterator_state)))))))
+
+  (func $Tree::next_right (param $right i32) (param $iterator_state i32) (result i32 i32)
+    (local $next_cursor i32)
+    (if (result i32 i32)
+      ;; If this is the null leaf marker, we are at the end of a list and need to pop the stack
+      (i32.eq (global.get $NULL) (local.get $right))
+      (then
+        (if (result i32 i32)
+          ;; Pop the current entry from the stack; if this was the final item, dispose of the temporary iterator state and return the complete marker
+          (i32.eq (i32.const -1) (local.tee $next_cursor (call $Tree::iterator_state_pop (local.get $iterator_state))))
+          (then
+            (call $Term::drop (local.get $iterator_state))
+            (global.get $NULL)
+            (global.get $NULL))
+          (else
+            ;; Otherwise repeat the iteration with the updated stack
+            (call $Tree::next_branch (local.get $iterator_state)))))
+      (else
+        (if (result i32 i32)
+          ;; Determine whether the current item is itself a cell which needs to be traversed deeper
+          (call $Tree::is (local.get $right))
+          (then
+            ;; Push the cell to the stack and repeat the iteration with the updated stack item
+            (call $Tree::next_branch
+              (call $Tree::iterator_state_push (local.get $iterator_state) (local.get $right))))
+          (else
+            ;; Pop the current entry from the stack
+            (call $Tree::iterator_state_pop (local.get $iterator_state))
+            (drop)
+            ;; Emit the value and state
+            (local.get $right)
+            (local.get $iterator_state))))))
+
+  (func $Tree::allocate_iterator_state (param $self i32) (result i32)
+    (local $iterator_state i32)
+    (local.tee $iterator_state (call $Cell::new (i32.add (i32.const 1) (call $Tree::get_depth (local.get $self)))))
+    (call $Cell::set_field (local.get $iterator_state) (i32.const 0) (call $Tree::create_iterator_state_cursor (i32.const 0) (i32.const 0)))
+    (call $Cell::set_field (local.get $iterator_state) (i32.const 1) (local.get $self)))
+
+  (func $Tree::get_iterator_state_cursor (param $iterator_state i32) (result i32)
+    (call $Cell::get_field (local.get $iterator_state) (i32.const 0)))
+
+  (func $Tree::set_iterator_state_cursor (param $iterator_state i32) (param $value i32)
+    (call $Cell::set_field (local.get $iterator_state) (i32.const 0) (local.get $value)))
+
+  (func $Tree::get_iterator_state_stack_item (param $iterator_state i32) (param $index i32) (result i32)
+    (call $Cell::get_field (local.get $iterator_state) (i32.add (i32.const 1) (local.get $index))))
+
+  (func $Tree::set_iterator_state_stack_item (param $iterator_state i32) (param $index i32) (param $value i32)
+    (call $Cell::set_field (local.get $iterator_state) (i32.add (i32.const 1) (local.get $index)) (local.get $value)))
+
+  (func $Tree::create_iterator_state_cursor (param $depth i32) (param $is_right i32) (result i32)
+    (i32.add (i32.mul (local.get $depth) (i32.const 2)) (local.get $is_right)))
+
+  (func $Tree::get_iterator_state_cursor_index (param $cursor i32) (result i32)
+    (i32.div_u (local.get $cursor) (i32.const 2)))
+
+  (func $Tree::get_iterator_state_cursor_is_right (param $cursor i32) (result i32)
+    (i32.rem_u (local.get $cursor) (i32.const 2)))
+
+  (func $Tree::get_pair_iterator_stack_entry (param $iterator_state i32) (param $cursor i32) (result i32 i32)
+    (call $Tree::get_iterator_state_stack_item
+      (local.get $iterator_state)
+      (call $Tree::get_iterator_state_cursor_index (local.get $cursor)))
+    (call $Tree::get_iterator_state_cursor_is_right (local.get $cursor)))
+
+  (func $Tree::iterator_state_left_next (param $iterator_state i32) (result i32)
+    (local $cursor i32)
+    ;; Shift the cursor from the left to the right branch
+    (call $Tree::set_iterator_state_cursor
+      (local.get $iterator_state)
+      (i32.add (local.tee $cursor (call $Tree::get_iterator_state_cursor (local.get $iterator_state))) (i32.const 1)))
+    (local.get $iterator_state))
+
+  (func $Tree::iterator_state_push (param $iterator_state i32) (param $item i32) (result i32)
+    (local $cursor i32)
+    ;; Determine the stack offset where we should store the cell
+    (call $Tree::set_iterator_state_cursor
+      (local.get $iterator_state)
+      (local.tee $cursor
+        ;; If we were processing the right branch, the cell is no longer needed so the current stack entry can be reused
+        ;; If we were processing the left branch, create a new stack entry so that we can return later to process the right branch
+        (i32.add
+          (local.tee $cursor (call $Tree::get_iterator_state_cursor (local.get $iterator_state)))
+          (select
+            (i32.const -1)
+            (i32.const 2)
+            (call $Tree::get_iterator_state_cursor_is_right (local.get $cursor))))))
+    ;; Store the cell at the given offset
+    (call $Tree::set_iterator_state_stack_item
+      (local.get $iterator_state)
+      (call $Tree::get_iterator_state_cursor_index (local.get $cursor))
+      (local.get $item))
+    (local.get $iterator_state))
+
+  (func $Tree::iterator_state_pop (param $iterator_state i32) (result i32)
+    (local $cursor i32)
+    (call $Tree::set_iterator_state_cursor
+      (local.get $iterator_state)
+      ;; The stack is only ever popped when processing the right branch; its parent's left branch must already have been processed
+      ;; so it's safe to assume that we always jump from processing a child's right branch to the parent's right branch.
+      ;; When popping the final entry from the stack this will result in the cursor being set to -1.
+      (local.tee $cursor
+        (i32.sub
+          (local.tee $cursor (call $Tree::get_iterator_state_cursor (local.get $iterator_state)))
+          (i32.const 2))))
+    (local.get $cursor))
+
+  (func $Tree::traits::values (param $self i32) (result i32)
+    (call $Tree::traits::iterate (local.get $self)))
+
+  (func $Tree::traits::collect (param $iterator i32) (param $state i32) (result i32 i32)
+    (local $instance i32)
+    (local $item i32)
+    (local $iterator_state i32)
+    (local $dependencies i32)
+    (if (result i32 i32)
+      ;; If the iterator is already a tree iterator, return the existing instance
+      (call $Tree::is (local.get $iterator))
+      (then
+        (local.get $iterator)
+        (global.get $NULL))
+      (else
+        ;; Otherwise collect the iterator items into a tree
+        (local.set $instance (global.get $NULL))
+        (local.set $iterator_state (global.get $NULL))
+        (local.set $dependencies (global.get $NULL))
+        (loop $LOOP
+          ;; Consume the next item from the source iterator
+          (call $Term::traits::next (local.get $iterator) (local.get $iterator_state) (local.get $state))
+          (local.set $dependencies (call $Dependencies::traits::union (local.get $dependencies)))
+          (local.set $iterator_state)
+          ;; If the iterator has been fully consumed, nothing more to do
+          (if
+            (i32.eq (local.tee $item) (global.get $NULL))
+            (then)
+            (else
+              ;; Otherwise update the tree result and continue with the next item
+              (local.set $instance (call $Tree::new (local.get $item) (local.get $instance)))
+              (br $LOOP))))
+        ;; If the iterator produced no items, return the empty tree
+        (if (result i32 i32)
+          (i32.eq (global.get $NULL) (local.get $instance))
+          (then
+            (call $Tree::empty)
+            (local.get $dependencies))
+          (else
+            ;; Otherwise return the tree
+            (local.get $instance)
+            (local.get $dependencies))))))
+
+  (func $Tree::traits::collect_strict (param $iterator i32) (param $state i32) (result i32 i32)
+    (local $instance i32)
+    (local $item i32)
+    (local $iterator_state i32)
+    (local $dependencies i32)
+    (local $signal i32)
+    ;; Collect the iterator items into a tree
+    (local.set $instance (global.get $NULL))
+    (local.set $iterator_state (global.get $NULL))
+    (local.set $dependencies (global.get $NULL))
+    (local.set $signal (global.get $NULL))
+    (loop $LOOP
+      ;; Consume the next item from the source iterator
+      (call $Term::traits::next (local.get $iterator) (local.get $iterator_state) (local.get $state))
+      (local.set $dependencies (call $Dependencies::traits::union (local.get $dependencies)))
+      (local.set $iterator_state)
+      ;; If the iterator has been fully consumed, nothing more to do
+      (if
+        (i32.eq (local.tee $item) (global.get $NULL))
+        (then)
+        (else
+          ;; Otherwise if a signal was encountered, update the combined signal result
+          (if
+            (i32.ne
+              (global.get $NULL)
+              (local.tee $signal
+                (call $Signal::traits::union
+                  (local.get $signal)
+                  (select
+                    (local.get $item)
+                    (global.get $NULL)
+                    (call $Signal::is (local.get $item))))))
+            (then)
+            (else
+              ;; Otherwise update the tree result
+              (local.set $instance (call $Tree::new (local.get $item) (local.get $instance)))))
+          ;; Continue with the next item
+          (br $LOOP))))
+    ;; If a signal was encountered during the iteration, return the signal
+    (if (result i32 i32)
+      (i32.ne (global.get $NULL) (local.get $signal))
+      (then
+        (local.get $signal)
+        (local.get $dependencies))
+      (else
+        ;; Otherwise if the iterator produced no items, return the empty tree
+        (if (result i32 i32)
+          (i32.eq (global.get $NULL) (local.get $instance))
+          (then
+            (call $Tree::empty)
+            (local.get $dependencies))
+          (else
+            ;; Otherwise return the tree
+            (local.get $instance)
+            (local.get $dependencies))))))
+
+  (func $Tree::get_depth (param $self i32) (result i32)
+    (call $Utils::i32::max_u
+      (call $Tree::get_branch_depth (call $Tree::get::left (local.get $self)))
+      (call $Tree::get_branch_depth (call $Tree::get::right (local.get $self)))))
+
+  (func $Tree::get_branch_length (param $branch i32) (result i32)
+    (if (result i32)
+      (i32.eq (global.get $NULL) (local.get $branch))
+      (then
+        (i32.const 0))
+      (else
+        (if (result i32)
+          (call $Tree::is (local.get $branch))
+          (then
+            (call $Tree::get::length (local.get $branch)))
+          (else
+            (i32.const 1))))))
+
+  (func $Tree::get_branch_depth (param $branch i32) (result i32)
+    (if (result i32)
+      (i32.eq (global.get $NULL) (local.get $branch))
+      (then
+        (i32.const 0))
+      (else
+        (if (result i32)
+          (call $Tree::is (local.get $branch))
+          (then
+            (i32.add (i32.const 1) (call $Tree::get_depth (local.get $branch))))
+          (else
+            (i32.const 1)))))))

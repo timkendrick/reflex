@@ -1,0 +1,8 @@
+#/usr/bin/env bash
+cd $(dirname $0)/..
+# Clear screen
+echo "\x1b[2J\x1b[3J\x1b[H"
+
+node --experimental-wasi-unstable-preview1 ./src/node.test.mjs
+fswatch --one-per-batch --exclude ".*" --include "\\.test.mjs$" --include "\\.wasm$" ./src ./build \
+  | xargs -n1 -I{} node --experimental-wasi-unstable-preview1 ./src/node.test.mjs

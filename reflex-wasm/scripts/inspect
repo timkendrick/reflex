@@ -1,0 +1,5 @@
+#/usr/bin/env bash
+cd $(dirname $0)/..
+set -e
+
+node --inspect-brk --experimental-wasi-unstable-preview1 ./src/node.test.mjs

@@ -1,0 +1,86 @@
+;; SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
+;; SPDX-License-Identifier: Apache-2.0
+;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
+(func (@concat "$" (@get $method_name)) (param $args i32) (param $state i32) (result i32 i32)
+  (@map $arg_name
+    (@get $arg_names)
+    (local (@get $arg_name) i32))
+  (if (result i32 i32)
+    ;; If an insufficient number of arguments has been supplied, return an error signal
+    (i32.lt_u (call $List::traits::length (local.get $args)) (i32.const (@length (@get $arg_names))))
+    (then
+      (call $Signal::of
+        (call $Condition::invalid_builtin_function_args
+          (global.get (@get $method_name))
+          (local.get $args)))
+      (global.get $NULL))
+    (else
+      ;; Extract the arguments from the argument list
+      (@map $arg_name
+        (@get $arg_names)
+        (local.set (@get $arg_name) (call $List::get_item (local.get $args) (i32.const (@get $_)))))
+      ;; Invoke the method implementation
+      (call
+        (@concat "$" (@get $method_name) "::call_static")
+        (@map $arg_name (@get $arg_names) (local.get (@get $arg_name)))
+        (local.get $state)))))
+
+(func (@concat "$" (@get $method_name) "::call_static") (@map $arg_name (@get $arg_names) (param (@get $arg_name) i32)) (param $state i32) (result i32 i32)
+  (local $dependencies i32)
+  (local.set $dependencies (global.get $NULL))
+  ;; Evaluate any eager arguments
+  (@map $arg_name
+    (@get $eager_arg_names)
+    (block
+      (call $Term::traits::evaluate (local.get (@get $arg_name)) (local.get $state))
+      (local.set $dependencies (call $Dependencies::traits::union (local.get $dependencies)))
+      (local.set (@get $arg_name))))
+  ;; If any of the strict arguments evaluated to a signal, return a combined short-circuited signal
+  (if
+    (@fold $result $arg_name
+      (@get $strict_arg_names)
+      (i32.const 0x00000000)
+      (i32.or (@get $result) (call $Signal::is (local.get (@get $arg_name)))))
+    (then
+      (return
+        (@fold $result $arg_name
+          (@get $strict_arg_names)
+          (global.get $NULL)
+          (call $Signal::traits::union
+            (@get $result)
+            (select
+              (local.get (@get $arg_name))
+              (global.get $NULL)
+              (call $Signal::is (local.get (@get $arg_name))))))
+        (local.get $dependencies)))
+    (else))
+  ;; Otherwise apply the method to the evaluated arguments
+  (call (@concat "$" (@get $method_name) "::dispatch") (@map $arg_name (@get $arg_names) (local.get (@get $arg_name))) (local.get $state))
+  (call $Dependencies::traits::union (local.get $dependencies)) )
+
+(func (@concat "$" (@get $method_name) "::dispatch") (@map $arg_name (@get $arg_names) (param (@get $arg_name) i32)) (param $state i32) (result i32 i32)
+  ;; Invoke the correct method implementation depending on the argument types
+  (@map $arg_name
+    (@get $arg_names)
+    (local (@concat "$" (@get $arg_name) "::type") i32))
+  (@map $arg_name
+    (@get $arg_names)
+    (local.set (@concat "$" (@get $arg_name) "::type") (call $Term::get_type (local.get (@get $arg_name)))))
+  (@switch
+    (@list
+      (@zip $implementation_name $implementation_signature
+        (@get $implementation_names) (@get $implementation_signatures)
+        (@list
+          (block (result i32)
+            (@zip $arg_name $arg_signature
+              (@get $arg_names) (@get $implementation_signature)
+              (block (result i32)
+                (local.get (@concat "$" (@get $arg_name) "::type"))
+                (@get $arg_signature)))
+            (@fold $result $_
+              (@get $arg_names)
+              (i32.const 0xFFFFFFFF)
+              (i32.and (@get $result))))
+          (return (call (@get $implementation_name) (@map $arg_name (@get $arg_names) (local.get (@get $arg_name))) (local.get $state))))))
+    ;; Default implementation
+    (call (@get $default_implementation) (@map $arg_name (@get $arg_names) (local.get (@get $arg_name))) (local.get $state))))

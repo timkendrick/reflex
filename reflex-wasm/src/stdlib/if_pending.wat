@@ -1,0 +1,40 @@
+;; SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
+;; SPDX-License-Identifier: Apache-2.0
+;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
+(module
+  (@method $Stdlib_IfPending
+    (@args (@eager $self) (@lazy $fallback))
+
+    (@impl
+      (i32.eq (global.get $TermType::Signal))
+      (i32.or (i32.const 0xFFFFFFFF))
+      (func $Stdlib_IfPending::impl::Signal::<apply> (param $self i32) (param $fallback i32) (param $state i32) (result i32 i32)
+        (local $pending_conditions i32)
+        (local $remaining_conditions i32)
+        ;; Partition the signal conditions into pending vs non-pending
+        (call $Signal::partition_conditions_by_type (local.get $self) (global.get $ConditionType::Pending))
+        (local.set $remaining_conditions)
+        (local.set $pending_conditions)
+        (if (result i32 i32)
+          ;; If the signal does not contain any pending conditions, return the signal as-is
+          (i32.eqz (call $List::get::length (local.get $pending_conditions)))
+          (then
+            (local.get $self)
+            (global.get $NULL))
+          (else
+            ;; Otherwise if all the conditions within the signal were pending conditions, return the fallback value
+            (if (result i32 i32)
+              (i32.eqz (call $List::get::length (local.get $remaining_conditions)))
+              (then
+                (local.get $fallback)
+                (global.get $NULL))
+              (else
+                ;; Otherwise return a signal containing just the non-pending conditions
+                (call $Signal::traits::collect
+                  (call $List::traits::iterate (local.get $remaining_conditions))
+                  (local.get $state))))))))
+
+    (@default
+      (func $Stdlib_IfPending::impl::default (param $self i32) (param $fallback i32) (param $state i32) (result i32 i32)
+        (local.get $self)
+        (global.get $NULL)))))
