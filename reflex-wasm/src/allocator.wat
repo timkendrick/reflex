@@ -47,12 +47,31 @@
   (func $Allocator::extend (param $offset i32) (param $size i32)
     ;; Extend an existing allocation by the given number of bytes
     ;; The provided offset must be the end address of the most recent allocation, or this will panic
-    ;; (this is to prevent extended allocations overwriting subsequent allocations)
+    ;; (this is to prevent accidentally overwriting subsequent allocations)
     (if
       (i32.ne (local.get $offset) (call $Allocator::allocate (local.get $size)))
       (then
         (unreachable))
       (else)))
+
+  (func $Allocator::shrink (param $offset i32) (param $size i32)
+    ;; Shrink an existing allocation by the given number of bytes
+    ;; The provided offset must be the end address of the most recent allocation, or this will panic
+    ;; (this is to prevent accidentally overwriting prior allocations)
+    (if
+      (i32.ne (local.get $offset) (call $Allocator::get_offset))
+      (then
+        (unreachable))
+      (else
+        ;; If the request is to decrement by zero bytes, nothing more to do
+        (if
+          (i32.eqz (local.get $size))
+          (then)
+          (else
+            ;; Otherwise decrement the current allocator offset by the given amount
+            (call $Allocator::set_offset (local.tee $offset (i32.sub (local.get $offset) (local.get $size))))
+            ;; Blank out the newly-deallocated space with zero bytes
+            (memory.fill (local.get $offset) (i32.const 0) (local.get $size)))))))
 
   (func $Allocator::increase_linear_memory_size (param $pages i32) (result i32)
     ;; Attempt to grow the memory by the requested number of pages
