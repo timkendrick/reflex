@@ -101,6 +101,7 @@
       $Stdlib_Cons
       $Stdlib_Construct
       $Stdlib_Debug
+      $Stdlib_DecrementVariable
       $Stdlib_Divide
       $Stdlib_Effect
       $Stdlib_EndsWith
@@ -110,7 +111,7 @@
       $Stdlib_Fold
       $Stdlib_FormatErrorMessage
       $Stdlib_Get
-      $Stdlib_Getter
+      $Stdlib_GetVariable
       $Stdlib_GraphQlResolver
       $Stdlib_Gt
       $Stdlib_Gte
@@ -120,6 +121,7 @@
       $Stdlib_If
       $Stdlib_IfError
       $Stdlib_IfPending
+      $Stdlib_IncrementVariable
       $Stdlib_IsFinite
       $Stdlib_Iterate
       $Stdlib_Keys
@@ -150,7 +152,7 @@
       $Stdlib_Scan
       $Stdlib_Sequence
       $Stdlib_Set
-      $Stdlib_Setter
+      $Stdlib_SetVariable
       $Stdlib_Skip
       $Stdlib_Slice
       $Stdlib_Split
@@ -163,7 +165,6 @@
       $Stdlib_ToString
       $Stdlib_Urlencode
       $Stdlib_Values
-      $Stdlib_Variable
       $Stdlib_Zip)
 
     (func $Builtin::apply (param $target i32) (param $args i32) (param $state i32) (result i32 i32)
