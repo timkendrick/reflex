@@ -7,7 +7,8 @@
 
       (@struct $CustomCondition
         (@field $effect_type (@ref $Term))
-        (@field $payload (@ref $Term)))
+        (@field $payload (@ref $Term))
+        (@field $token (@ref $Term)))
 
       (@struct $PendingCondition)
 
@@ -60,8 +61,8 @@
   (@const $Term::Condition::INVALID_POINTER i32 (call $Term::TermType::Condition::InvalidPointerCondition::new))
 
   ;; TODO: Codegen union variant constructors/accessors via macro
-  (func $Term::Condition::custom (export "createCustomCondition") (param $type i32) (param $payload i32) (result i32)
-    (call $Term::TermType::Condition::CustomCondition::new (local.get $type) (local.get $payload)))
+  (func $Term::Condition::custom (export "createCustomCondition") (param $type i32) (param $payload i32) (param $token i32) (result i32)
+    (call $Term::TermType::Condition::CustomCondition::new (local.get $type) (local.get $payload) (local.get $token)))
 
   (func $Term::Condition::pending (export "createPendingCondition") (result i32)
     (global.get $Term::Condition::PENDING))
@@ -94,6 +95,10 @@
   (func $Term::Condition::CustomCondition::get::payload (export "getCustomConditionPayload") (param $self i32) (result i32)
     (call $Term::Condition::get::value (local.get $self))
     (call $CustomCondition::get::payload))
+
+  (func $Term::Condition::CustomCondition::get::token (export "getCustomConditionToken") (param $self i32) (result i32)
+    (call $Term::Condition::get::value (local.get $self))
+    (call $CustomCondition::get::token))
 
   (func $Term::Condition::ErrorCondition::get::payload (export "getErrorConditionPayload") (param $self i32) (result i32)
     (call $Term::Condition::get::value (local.get $self))

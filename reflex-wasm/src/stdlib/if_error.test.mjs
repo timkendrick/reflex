@@ -45,19 +45,19 @@ export default (describe) => {
         const expression = createApplication(
           createBuiltin(Stdlib.IfError),
           createPair(
-            createEffect(createCustomCondition(createSymbol(123), createInt(3))),
+            createEffect(createCustomCondition(createSymbol(123), createInt(3), createSymbol(0))),
             createBuiltin(Stdlib.Identity),
           ),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<Custom:Symbol(123):3> . NULL)}');
-        assert.strictEqual(format(dependencies), '(<Custom:Symbol(123):3> . NULL)');
+        assert.strictEqual(format(result), '{(<Custom:Symbol(123):3:Symbol(0)> . NULL)}');
+        assert.strictEqual(format(dependencies), '(<Custom:Symbol(123):3:Symbol(0)> . NULL)');
       })();
       (() => {
         const expression = createApplication(
           createBuiltin(Stdlib.IfError),
           createPair(
-            createEffect(createCustomCondition(createSymbol(123), createInt(3))),
+            createEffect(createCustomCondition(createSymbol(123), createInt(3), createSymbol(0))),
             createBuiltin(Stdlib.Identity),
           ),
         );
@@ -65,19 +65,19 @@ export default (describe) => {
           expression,
           createHashmap([
             [
-              createCustomCondition(createSymbol(123), createInt(3)),
+              createCustomCondition(createSymbol(123), createInt(3), createSymbol(0)),
               createSignal(createErrorCondition(createString('foo'))),
             ],
           ]),
         );
         assert.strictEqual(format(result), '[<Error:"foo">]');
-        assert.strictEqual(format(dependencies), '(<Custom:Symbol(123):3> . NULL)');
+        assert.strictEqual(format(dependencies), '(<Custom:Symbol(123):3:Symbol(0)> . NULL)');
       })();
       (() => {
         const expression = createApplication(
           createBuiltin(Stdlib.IfError),
           createPair(
-            createEffect(createCustomCondition(createSymbol(123), createInt(3))),
+            createEffect(createCustomCondition(createSymbol(123), createInt(3), createSymbol(0))),
             createBuiltin(Stdlib.Length),
           ),
         );
@@ -85,13 +85,13 @@ export default (describe) => {
           expression,
           createHashmap([
             [
-              createCustomCondition(createSymbol(123), createInt(3)),
+              createCustomCondition(createSymbol(123), createInt(3), createSymbol(0)),
               createSignal(createErrorCondition(createString('foo'))),
             ],
           ]),
         );
         assert.strictEqual(format(result), '1');
-        assert.strictEqual(format(dependencies), '(<Custom:Symbol(123):3> . NULL)');
+        assert.strictEqual(format(dependencies), '(<Custom:Symbol(123):3:Symbol(0)> . NULL)');
       })();
       (() => {
         const expression = createApplication(
@@ -103,15 +103,23 @@ export default (describe) => {
                 createApplication(
                   createBuiltin(Stdlib.Add),
                   createPair(
-                    createEffect(createCustomCondition(createSymbol(123), createInt(3))),
-                    createEffect(createCustomCondition(createSymbol(234), createInt(4))),
+                    createEffect(
+                      createCustomCondition(createSymbol(123), createInt(3), createSymbol(0)),
+                    ),
+                    createEffect(
+                      createCustomCondition(createSymbol(234), createInt(4), createSymbol(0)),
+                    ),
                   ),
                 ),
                 createApplication(
                   createBuiltin(Stdlib.Add),
                   createPair(
-                    createEffect(createCustomCondition(createSymbol(345), createInt(5))),
-                    createEffect(createCustomCondition(createSymbol(456), createInt(6))),
+                    createEffect(
+                      createCustomCondition(createSymbol(345), createInt(5), createSymbol(0)),
+                    ),
+                    createEffect(
+                      createCustomCondition(createSymbol(456), createInt(6), createSymbol(0)),
+                    ),
                   ),
                 ),
               ),
@@ -122,11 +130,11 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(
           format(result),
-          '{(((<Custom:Symbol(123):3> . NULL) . (<Custom:Symbol(234):4> . NULL)) . ((<Custom:Symbol(345):5> . NULL) . (<Custom:Symbol(456):6> . NULL)))}',
+          '{(((<Custom:Symbol(123):3:Symbol(0)> . NULL) . (<Custom:Symbol(234):4:Symbol(0)> . NULL)) . ((<Custom:Symbol(345):5:Symbol(0)> . NULL) . (<Custom:Symbol(456):6:Symbol(0)> . NULL)))}',
         );
         assert.strictEqual(
           format(dependencies),
-          '(((<Custom:Symbol(456):6> . NULL) . (<Custom:Symbol(345):5> . NULL)) . ((<Custom:Symbol(234):4> . NULL) . (<Custom:Symbol(123):3> . NULL)))',
+          '(((<Custom:Symbol(456):6:Symbol(0)> . NULL) . (<Custom:Symbol(345):5:Symbol(0)> . NULL)) . ((<Custom:Symbol(234):4:Symbol(0)> . NULL) . (<Custom:Symbol(123):3:Symbol(0)> . NULL)))',
         );
       })();
       (() => {
@@ -139,15 +147,23 @@ export default (describe) => {
                 createApplication(
                   createBuiltin(Stdlib.Add),
                   createPair(
-                    createEffect(createCustomCondition(createSymbol(123), createInt(3))),
-                    createEffect(createCustomCondition(createSymbol(234), createInt(4))),
+                    createEffect(
+                      createCustomCondition(createSymbol(123), createInt(3), createSymbol(0)),
+                    ),
+                    createEffect(
+                      createCustomCondition(createSymbol(234), createInt(4), createSymbol(0)),
+                    ),
                   ),
                 ),
                 createApplication(
                   createBuiltin(Stdlib.Add),
                   createPair(
-                    createEffect(createCustomCondition(createSymbol(345), createInt(5))),
-                    createEffect(createCustomCondition(createSymbol(456), createInt(6))),
+                    createEffect(
+                      createCustomCondition(createSymbol(345), createInt(5), createSymbol(0)),
+                    ),
+                    createEffect(
+                      createCustomCondition(createSymbol(456), createInt(6), createSymbol(0)),
+                    ),
                   ),
                 ),
               ),
@@ -158,16 +174,16 @@ export default (describe) => {
         const [result, dependencies] = evaluate(
           expression,
           createHashmap([
-            [createCustomCondition(createSymbol(123), createInt(3)), createInt(3)],
-            [createCustomCondition(createSymbol(234), createInt(4)), createInt(4)],
-            [createCustomCondition(createSymbol(345), createInt(5)), createInt(5)],
-            [createCustomCondition(createSymbol(456), createInt(6)), createInt(6)],
+            [createCustomCondition(createSymbol(123), createInt(3), createSymbol(0)), createInt(3)],
+            [createCustomCondition(createSymbol(234), createInt(4), createSymbol(0)), createInt(4)],
+            [createCustomCondition(createSymbol(345), createInt(5), createSymbol(0)), createInt(5)],
+            [createCustomCondition(createSymbol(456), createInt(6), createSymbol(0)), createInt(6)],
           ]),
         );
         assert.strictEqual(format(result), `${3 + 4 + 5 + 6}`);
         assert.strictEqual(
           format(dependencies),
-          '(((<Custom:Symbol(456):6> . NULL) . (<Custom:Symbol(345):5> . NULL)) . ((<Custom:Symbol(234):4> . NULL) . (<Custom:Symbol(123):3> . NULL)))',
+          '(((<Custom:Symbol(456):6:Symbol(0)> . NULL) . (<Custom:Symbol(345):5:Symbol(0)> . NULL)) . ((<Custom:Symbol(234):4:Symbol(0)> . NULL) . (<Custom:Symbol(123):3:Symbol(0)> . NULL)))',
         );
       })();
       (() => {
@@ -180,15 +196,23 @@ export default (describe) => {
                 createApplication(
                   createBuiltin(Stdlib.Add),
                   createPair(
-                    createEffect(createCustomCondition(createSymbol(123), createInt(3))),
-                    createEffect(createCustomCondition(createSymbol(234), createInt(4))),
+                    createEffect(
+                      createCustomCondition(createSymbol(123), createInt(3), createSymbol(0)),
+                    ),
+                    createEffect(
+                      createCustomCondition(createSymbol(234), createInt(4), createSymbol(0)),
+                    ),
                   ),
                 ),
                 createApplication(
                   createBuiltin(Stdlib.Add),
                   createPair(
-                    createEffect(createCustomCondition(createSymbol(345), createInt(5))),
-                    createEffect(createCustomCondition(createSymbol(456), createInt(6))),
+                    createEffect(
+                      createCustomCondition(createSymbol(345), createInt(5), createSymbol(0)),
+                    ),
+                    createEffect(
+                      createCustomCondition(createSymbol(456), createInt(6), createSymbol(0)),
+                    ),
                   ),
                 ),
               ),
@@ -200,22 +224,22 @@ export default (describe) => {
           expression,
           createHashmap([
             [
-              createCustomCondition(createSymbol(234), createInt(4)),
+              createCustomCondition(createSymbol(234), createInt(4), createSymbol(0)),
               createSignal(createErrorCondition(createString('foo'))),
             ],
             [
-              createCustomCondition(createSymbol(456), createInt(6)),
+              createCustomCondition(createSymbol(456), createInt(6), createSymbol(0)),
               createSignal(createErrorCondition(createString('bar'))),
             ],
           ]),
         );
         assert.strictEqual(
           format(result),
-          '{(<Custom:Symbol(123):3> . (<Custom:Symbol(345):5> . NULL))}',
+          '{(<Custom:Symbol(123):3:Symbol(0)> . (<Custom:Symbol(345):5:Symbol(0)> . NULL))}',
         );
         assert.strictEqual(
           format(dependencies),
-          '(((<Custom:Symbol(456):6> . NULL) . (<Custom:Symbol(345):5> . NULL)) . ((<Custom:Symbol(234):4> . NULL) . (<Custom:Symbol(123):3> . NULL)))',
+          '(((<Custom:Symbol(456):6:Symbol(0)> . NULL) . (<Custom:Symbol(345):5:Symbol(0)> . NULL)) . ((<Custom:Symbol(234):4:Symbol(0)> . NULL) . (<Custom:Symbol(123):3:Symbol(0)> . NULL)))',
         );
       })();
       (() => {
@@ -228,15 +252,23 @@ export default (describe) => {
                 createApplication(
                   createBuiltin(Stdlib.Add),
                   createPair(
-                    createEffect(createCustomCondition(createSymbol(123), createInt(3))),
-                    createEffect(createCustomCondition(createSymbol(234), createInt(4))),
+                    createEffect(
+                      createCustomCondition(createSymbol(123), createInt(3), createSymbol(0)),
+                    ),
+                    createEffect(
+                      createCustomCondition(createSymbol(234), createInt(4), createSymbol(0)),
+                    ),
                   ),
                 ),
                 createApplication(
                   createBuiltin(Stdlib.Add),
                   createPair(
-                    createEffect(createCustomCondition(createSymbol(345), createInt(5))),
-                    createEffect(createCustomCondition(createSymbol(456), createInt(6))),
+                    createEffect(
+                      createCustomCondition(createSymbol(345), createInt(5), createSymbol(0)),
+                    ),
+                    createEffect(
+                      createCustomCondition(createSymbol(456), createInt(6), createSymbol(0)),
+                    ),
                   ),
                 ),
               ),
@@ -248,19 +280,19 @@ export default (describe) => {
           expression,
           createHashmap([
             [
-              createCustomCondition(createSymbol(123), createInt(3)),
+              createCustomCondition(createSymbol(123), createInt(3), createSymbol(0)),
               createSignal(createErrorCondition(createString('foo'))),
             ],
             [
-              createCustomCondition(createSymbol(234), createInt(4)),
+              createCustomCondition(createSymbol(234), createInt(4), createSymbol(0)),
               createSignal(createErrorCondition(createString('bar'))),
             ],
             [
-              createCustomCondition(createSymbol(345), createInt(5)),
+              createCustomCondition(createSymbol(345), createInt(5), createSymbol(0)),
               createSignal(createErrorCondition(createString('baz'))),
             ],
             [
-              createCustomCondition(createSymbol(456), createInt(6)),
+              createCustomCondition(createSymbol(456), createInt(6), createSymbol(0)),
               createSignal(createErrorCondition(createString('qux'))),
             ],
           ]),
@@ -271,7 +303,7 @@ export default (describe) => {
         );
         assert.strictEqual(
           format(dependencies),
-          '(((<Custom:Symbol(456):6> . NULL) . (<Custom:Symbol(345):5> . NULL)) . ((<Custom:Symbol(234):4> . NULL) . (<Custom:Symbol(123):3> . NULL)))',
+          '(((<Custom:Symbol(456):6:Symbol(0)> . NULL) . (<Custom:Symbol(345):5:Symbol(0)> . NULL)) . ((<Custom:Symbol(234):4:Symbol(0)> . NULL) . (<Custom:Symbol(123):3:Symbol(0)> . NULL)))',
         );
       })();
     });

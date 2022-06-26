@@ -5,8 +5,8 @@ export default (describe) => {
   describe('Term::Condition', (test) => {
     test('format', (assert, { createCustomCondition, createInt, createSymbol, format }) => {
       assert.strictEqual(
-        format(createCustomCondition(createSymbol(123), createInt(3))),
-        '<Custom:Symbol(123):3>',
+        format(createCustomCondition(createSymbol(123), createInt(3), createSymbol(0))),
+        '<Custom:Symbol(123):3:Symbol(0)>',
       );
     });
 
@@ -29,16 +29,20 @@ export default (describe) => {
         hash(createErrorCondition(createString('bar'))),
       );
       assert.strictEqual(
-        hash(createCustomCondition(createSymbol(123), createInt(3))),
-        hash(createCustomCondition(createSymbol(123), createInt(3))),
+        hash(createCustomCondition(createSymbol(123), createInt(3), createSymbol(0))),
+        hash(createCustomCondition(createSymbol(123), createInt(3), createSymbol(0))),
       );
       assert.notStrictEqual(
-        hash(createCustomCondition(createSymbol(123), createInt(3))),
-        hash(createCustomCondition(createSymbol(123), createInt(4))),
+        hash(createCustomCondition(createSymbol(123), createInt(3), createSymbol(0))),
+        hash(createCustomCondition(createSymbol(456), createInt(3), createSymbol(0))),
       );
       assert.notStrictEqual(
-        hash(createCustomCondition(createSymbol(123), createInt(3))),
-        hash(createCustomCondition(createSymbol(456), createInt(3))),
+        hash(createCustomCondition(createSymbol(123), createInt(3), createSymbol(0))),
+        hash(createCustomCondition(createSymbol(123), createInt(4), createSymbol(0))),
+      );
+      assert.notStrictEqual(
+        hash(createCustomCondition(createSymbol(123), createInt(3), createSymbol(0))),
+        hash(createCustomCondition(createSymbol(123), createInt(3), createSymbol(1))),
       );
     });
 
@@ -68,22 +72,29 @@ export default (describe) => {
       );
       assert.strictEqual(
         equals(
-          createCustomCondition(createSymbol(123), createInt(3)),
-          createCustomCondition(createSymbol(123), createInt(3)),
+          createCustomCondition(createSymbol(123), createInt(3), createSymbol(0)),
+          createCustomCondition(createSymbol(123), createInt(3), createSymbol(0)),
         ),
         true,
       );
       assert.strictEqual(
         equals(
-          createCustomCondition(createSymbol(123), createInt(3)),
-          createCustomCondition(createSymbol(123), createInt(4)),
+          createCustomCondition(createSymbol(123), createInt(3), createSymbol(0)),
+          createCustomCondition(createSymbol(456), createInt(3), createSymbol(0)),
         ),
         false,
       );
       assert.strictEqual(
         equals(
-          createCustomCondition(createSymbol(123), createInt(3)),
-          createCustomCondition(createSymbol(456), createInt(3)),
+          createCustomCondition(createSymbol(123), createInt(3), createSymbol(0)),
+          createCustomCondition(createSymbol(123), createInt(4), createSymbol(0)),
+        ),
+        false,
+      );
+      assert.strictEqual(
+        equals(
+          createCustomCondition(createSymbol(123), createInt(3), createSymbol(0)),
+          createCustomCondition(createSymbol(123), createInt(3), createSymbol(1)),
         ),
         false,
       );

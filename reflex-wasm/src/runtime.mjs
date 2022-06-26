@@ -246,8 +246,8 @@ export function createRuntime(runtime) {
     getConditionType(value) {
       return u32(runtime.getConditionType(value));
     },
-    createCustomCondition(type, payload) {
-      return runtime.createCustomCondition(type, payload);
+    createCustomCondition(type, payload, token) {
+      return runtime.createCustomCondition(type, payload, token);
     },
     getCustomConditionEffectType(value) {
       return runtime.getCustomConditionEffectType(value);
@@ -694,7 +694,11 @@ function formatConditionPayload(runtime, type, value, constants) {
         runtime,
         runtime.getCustomConditionEffectType(value),
         constants,
-      )}:${formatTerm(runtime, runtime.getCustomConditionPayload(value), constants)}`;
+      )}:${formatTerm(runtime, runtime.getCustomConditionPayload(value), constants)}:${formatTerm(
+        runtime,
+        runtime.getCustomConditionToken(value),
+        constants,
+      )}`;
     case constants.ConditionType.Error:
       return formatTerm(runtime, runtime.getErrorConditionPayload(value), constants);
     case constants.ConditionType.TypeError: {
