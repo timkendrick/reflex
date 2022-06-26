@@ -55,6 +55,7 @@
   (@include "./resolve_shallow.wat")
   (@include "./round.wat")
   (@include "./sequence.wat")
+  (@include "./server/graphql_resolver.wat")
   (@include "./set.wat")
   (@include "./skip.wat")
   (@include "./slice.wat")
@@ -121,6 +122,7 @@
       $Stdlib_Round
       $Stdlib_Set
       $Stdlib_Sequence
+      $Stdlib_GraphQlResolver
       $Stdlib_Skip
       $Stdlib_Slice
       $Stdlib_Split

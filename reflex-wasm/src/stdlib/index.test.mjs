@@ -59,6 +59,7 @@ import subtract from './subtract.test.mjs';
 import take from './take.test.mjs';
 import values from './values.test.mjs';
 import zip from './zip.test.mjs';
+import graphqlResolver from './server/graphql_resolver.test.mjs';
 import parseJson from './json/parse_json.test.mjs';
 import stringifyJson from './json/stringify_json.test.mjs';
 import resolveQueryBranch from './graphql/resolve_query_branch.test.mjs';
@@ -123,6 +124,7 @@ export default (describe) => {
   take(describe);
   values(describe);
   zip(describe);
+  graphqlResolver(describe);
   parseJson(describe);
   stringifyJson(describe);
   resolveQueryBranch(describe);
