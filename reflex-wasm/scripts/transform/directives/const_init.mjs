@@ -54,7 +54,7 @@ function sortInitializers(initializers) {
     }, 0);
     if (depth === null) {
       queue.push(entry);
-      break;
+      continue;
     }
     depths.set(name, depth);
   }
