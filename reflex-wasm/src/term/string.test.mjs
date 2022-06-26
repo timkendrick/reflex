@@ -32,20 +32,5 @@ export default (describe) => {
       assert.strictEqual(equals(createString('foo'), createString('fooo')), false);
       assert.strictEqual(equals(createString('foo'), createString('fo')), false);
     });
-
-    test('toJson', (assert, { createString, getStringValue, toJson }) => {
-      assert.strictEqual(getStringValue(toJson(createString(''))), '""');
-      assert.strictEqual(getStringValue(toJson(createString('foo'))), '"foo"');
-      assert.strictEqual(getStringValue(toJson(createString('\b'))), '"\\b"');
-      assert.strictEqual(getStringValue(toJson(createString('\f'))), '"\\f"');
-      assert.strictEqual(getStringValue(toJson(createString('\n'))), '"\\n"');
-      assert.strictEqual(getStringValue(toJson(createString('\r'))), '"\\r"');
-      assert.strictEqual(getStringValue(toJson(createString('\t'))), '"\\t"');
-      assert.strictEqual(getStringValue(toJson(createString('"'))), '"\\\""');
-      assert.strictEqual(getStringValue(toJson(createString('\\'))), '"\\\\"');
-      assert.strictEqual(getStringValue(toJson(createString('""'))), '"\\\"\\\""');
-      assert.strictEqual(getStringValue(toJson(createString('"foo"'))), '"\\\"foo\\\""');
-      assert.strictEqual(getStringValue(toJson(createString('foo "bar" baz'))), '"foo \\\"bar\\\" baz"');
-    });
   });
 };

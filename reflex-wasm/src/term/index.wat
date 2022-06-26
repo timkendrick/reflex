@@ -109,8 +109,7 @@
       (@list
         $Application
         $Effect
-        $Let
-        $Pointer)
+        $Let)
 
       (func $Term::implements::evaluate (param $type i32) (result i32)
         (@fold $result $typename
@@ -253,4 +252,37 @@
           ;; Default implementation
           (global.get $NULL)
           (global.get $NULL)
-          (global.get $NULL))))))
+          (global.get $NULL))))
+
+    (@let $trait_typenames
+      (@list
+        $Nil
+        $Boolean
+        $Int
+        $Float
+        $String
+        $List
+        $Record)
+
+      (func $Term::implements::to_json (param $type i32) (result i32)
+        (@fold $result $typename
+          (@get $trait_typenames)
+          (global.get $FALSE)
+          (i32.or
+            (@get $result)
+            (i32.eq (local.get $type) (global.get (@concat "$TermType::" (@get $typename)))))))
+
+      (func $Term::traits::to_json (param $self i32) (param $offset i32) (result i32 i32)
+        (local $self_type i32)
+        (local.set $self_type (call $Term::get_type (local.get $self)))
+        (@switch
+          ;; Delegate method to underlying term type implementations
+          (@list
+            (@map $typename
+              (@get $trait_typenames)
+              (@list
+                (i32.eq (local.get $self_type) (global.get (@concat "$TermType::" (@get $typename))))
+                (return (call (@concat "$Term::" (@get $typename) "::traits::to_json") (local.get $self) (local.get $offset))))))
+          ;; Default implementation
+          (global.get $FALSE)
+          (local.get $offset))))))

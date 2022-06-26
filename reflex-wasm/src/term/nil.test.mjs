@@ -14,9 +14,5 @@ export default (describe) => {
     test('equals', (assert, { createNil, equals }) => {
       assert.strictEqual(equals(createNil(), createNil()), true);
     });
-
-    test('toJson', (assert, { createNil, getStringValue, toJson }) => {
-      assert.strictEqual(getStringValue(toJson(createNil())), 'null');
-    });
   });
 };

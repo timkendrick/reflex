@@ -15,50 +15,6 @@ export default (describe) => {
       throw new Error('Not yet implemented');
     });
 
-    test('toJson', (assert, {
-      createEmptyList,
-      createUnitList,
-      createRecord,
-      createString,
-      createTriple,
-      createInt,
-      getStringValue,
-      toJson,
-    }) => {
-      assert.strictEqual(
-        getStringValue(toJson(createRecord(createEmptyList(), createEmptyList()))),
-        '{}',
-      );
-      assert.strictEqual(
-        getStringValue(
-          toJson(createRecord(createUnitList(createString('foo')), createUnitList(createInt(3)))),
-        ),
-        '{"foo":3}',
-      );
-      assert.strictEqual(
-        getStringValue(
-          toJson(
-            createRecord(
-              createTriple(createString('foo'), createString('bar'), createString('baz')),
-              createTriple(createInt(3), createInt(4), createInt(5)),
-            ),
-          ),
-        ),
-        '{"foo":3,"bar":4,"baz":5}',
-      );
-      assert.strictEqual(
-        getStringValue(
-          toJson(
-            createRecord(
-              createTriple(createString('foo'), createInt(0), createString('baz')),
-              createTriple(createInt(3), createInt(4), createInt(5)),
-            ),
-          ),
-        ),
-        '{"foo":3,"baz":5}',
-      );
-    });
-
     test('[simple] basic property access', (assert, {
       createApplication,
       createBuiltin,

@@ -19,10 +19,5 @@ export default (describe) => {
       assert.strictEqual(equals(createBoolean(false), createBoolean(false)), true);
       assert.strictEqual(equals(createBoolean(true), createBoolean(false)), false);
     });
-
-    test('toJson', (assert, { createBoolean, getStringValue, toJson }) => {
-      assert.strictEqual(getStringValue(toJson(createBoolean(false))), 'false');
-      assert.strictEqual(getStringValue(toJson(createBoolean(true))), 'true');
-    });
   });
 };

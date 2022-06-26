@@ -26,17 +26,5 @@ export default (describe) => {
       assert.strictEqual(equals(createInt(-3), createInt(-3)), true);
       assert.strictEqual(equals(createInt(-3), createInt(3)), false);
     });
-
-    test('toJson', (assert, { createInt, getStringValue, toJson }) => {
-      assert.strictEqual(getStringValue(toJson(createInt(0))), '0');
-      assert.strictEqual(getStringValue(toJson(createInt(1))), '1');
-      assert.strictEqual(getStringValue(toJson(createInt(-1))), '-1');
-      assert.strictEqual(getStringValue(toJson(createInt(3))), '3');
-      assert.strictEqual(getStringValue(toJson(createInt(-3))), '-3');
-      assert.strictEqual(getStringValue(toJson(createInt(123))), '123');
-      assert.strictEqual(getStringValue(toJson(createInt(-123))), '-123');
-      assert.strictEqual(getStringValue(toJson(createInt(0x7fffffff))), '2147483647');
-      assert.strictEqual(getStringValue(toJson(createInt(-0x7fffffff))), '-2147483647');
-    });
   });
 };

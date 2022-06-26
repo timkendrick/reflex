@@ -23,8 +23,6 @@
   (@include "./floor.wat")
   (@include "./fold.wat")
   (@include "./get.wat")
-  (@include "./graphql/resolve_query_branch.wat")
-  (@include "./graphql/resolve_query_leaf.wat")
   (@include "./gt.wat")
   (@include "./gte.wat")
   (@include "./has.wat")
@@ -34,7 +32,6 @@
   (@include "./if_error.wat")
   (@include "./if_pending.wat")
   (@include "./iterate.wat")
-  (@include "./json/parse_json.wat")
   (@include "./keys.wat")
   (@include "./length.wat")
   (@include "./lt.wat")
@@ -62,6 +59,12 @@
   (@include "./take.wat")
   (@include "./values.wat")
   (@include "./zip.wat")
+
+  (@include "./json/parse_json.wat")
+  (@include "./json/stringify_json.wat")
+
+  (@include "./graphql/resolve_query_branch.wat")
+  (@include "./graphql/resolve_query_leaf.wat")
 
   ;; TODO: Generate stdlib function lookup via macro
   (global $Stdlib_Abs (export "Stdlib_Abs") i32 (i32.const 0))
@@ -103,30 +106,34 @@
   (global $Stdlib_Multiply (export "Stdlib_Multiply") i32 (i32.const 36))
   (global $Stdlib_Not (export "Stdlib_Not") i32 (i32.const 37))
   (global $Stdlib_Or (export "Stdlib_Or") i32 (i32.const 38))
-  (global $Stdlib_ParseJson (export "Stdlib_ParseJson") i32 (i32.const 39))
-  (global $Stdlib_Pow (export "Stdlib_Pow") i32 (i32.const 40))
-  (global $Stdlib_Push (export "Stdlib_Push") i32 (i32.const 41))
-  (global $Stdlib_PushFront (export "Stdlib_PushFront") i32 (i32.const 42))
-  (global $Stdlib_Remainder (export "Stdlib_Remainder") i32 (i32.const 43))
-  (global $Stdlib_Replace (export "Stdlib_Replace") i32 (i32.const 44))
-  (global $Stdlib_ResolveDeep (export "Stdlib_ResolveDeep") i32 (i32.const 45))
-  (global $Stdlib_ResolveQueryBranch (export "Stdlib_ResolveQueryBranch") i32 (i32.const 46))
-  (global $Stdlib_ResolveQueryLeaf (export "Stdlib_ResolveQueryLeaf") i32 (i32.const 47))
-  (global $Stdlib_ResolveShallow (export "Stdlib_ResolveShallow") i32 (i32.const 48))
-  (global $Stdlib_Round (export "Stdlib_Round") i32 (i32.const 49))
-  (global $Stdlib_Set (export "Stdlib_Set") i32 (i32.const 50))
-  (global $Stdlib_Sequence (export "Stdlib_Sequence") i32 (i32.const 51))
-  (global $Stdlib_Skip (export "Stdlib_Skip") i32 (i32.const 52))
-  (global $Stdlib_Slice (export "Stdlib_Slice") i32 (i32.const 53))
-  (global $Stdlib_Split (export "Stdlib_Split") i32 (i32.const 54))
-  (global $Stdlib_StartsWith (export "Stdlib_StartsWith") i32 (i32.const 55))
-  (global $Stdlib_Subtract (export "Stdlib_Subtract") i32 (i32.const 56))
-  (global $Stdlib_Take (export "Stdlib_Take") i32 (i32.const 57))
-  (global $Stdlib_Values (export "Stdlib_Values") i32 (i32.const 58))
-  (global $Stdlib_Zip (export "Stdlib_Zip") i32 (i32.const 59))
+  (global $Stdlib_Pow (export "Stdlib_Pow") i32 (i32.const 39))
+  (global $Stdlib_Push (export "Stdlib_Push") i32 (i32.const 40))
+  (global $Stdlib_PushFront (export "Stdlib_PushFront") i32 (i32.const 41))
+  (global $Stdlib_Remainder (export "Stdlib_Remainder") i32 (i32.const 42))
+  (global $Stdlib_Replace (export "Stdlib_Replace") i32 (i32.const 43))
+  (global $Stdlib_ResolveDeep (export "Stdlib_ResolveDeep") i32 (i32.const 44))
+  (global $Stdlib_ResolveShallow (export "Stdlib_ResolveShallow") i32 (i32.const 45))
+  (global $Stdlib_Round (export "Stdlib_Round") i32 (i32.const 46))
+  (global $Stdlib_Set (export "Stdlib_Set") i32 (i32.const 47))
+  (global $Stdlib_Sequence (export "Stdlib_Sequence") i32 (i32.const 48))
+  (global $Stdlib_Skip (export "Stdlib_Skip") i32 (i32.const 49))
+  (global $Stdlib_Slice (export "Stdlib_Slice") i32 (i32.const 50))
+  (global $Stdlib_Split (export "Stdlib_Split") i32 (i32.const 51))
+  (global $Stdlib_StartsWith (export "Stdlib_StartsWith") i32 (i32.const 52))
+  (global $Stdlib_Subtract (export "Stdlib_Subtract") i32 (i32.const 53))
+  (global $Stdlib_Take (export "Stdlib_Take") i32 (i32.const 54))
+  (global $Stdlib_Values (export "Stdlib_Values") i32 (i32.const 55))
+  (global $Stdlib_Zip (export "Stdlib_Zip") i32 (i32.const 56))
+
+  (global $Stdlib_ParseJson (export "Stdlib_ParseJson") i32 (i32.const 57))
+  (global $Stdlib_StringifyJson (export "Stdlib_StringifyJson") i32 (i32.const 58))
+
+  (global $Stdlib_ResolveQueryBranch (export "Stdlib_ResolveQueryBranch") i32 (i32.const 59))
+  (global $Stdlib_ResolveQueryLeaf (export "Stdlib_ResolveQueryLeaf") i32 (i32.const 60))
+
 
   ;; Declare builtin function implementations
-  (table (export "__indirect_function_table") 60 funcref)
+  (table (export "__indirect_function_table") 61 funcref)
   (elem (i32.const 0)
     $Stdlib_Abs
     $Stdlib_Add
@@ -167,15 +174,12 @@
     $Stdlib_Multiply
     $Stdlib_Not
     $Stdlib_Or
-    $Stdlib_ParseJson
     $Stdlib_Pow
     $Stdlib_Push
     $Stdlib_PushFront
     $Stdlib_Remainder
     $Stdlib_Replace
     $Stdlib_ResolveDeep
-    $Stdlib_ResolveQueryBranch
-    $Stdlib_ResolveQueryLeaf
     $Stdlib_ResolveShallow
     $Stdlib_Round
     $Stdlib_Set
@@ -187,4 +191,8 @@
     $Stdlib_Subtract
     $Stdlib_Take
     $Stdlib_Values
-    $Stdlib_Zip))
+    $Stdlib_Zip
+    $Stdlib_ParseJson
+    $Stdlib_StringifyJson
+    $Stdlib_ResolveQueryBranch
+    $Stdlib_ResolveQueryLeaf))

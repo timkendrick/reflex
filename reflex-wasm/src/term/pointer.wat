@@ -28,9 +28,9 @@
     ;; Invoke the method on the target term
     (call $Term::traits::is_truthy (call $Term::Pointer::dereference (local.get $self))))
 
-  (func $Term::Pointer::traits::write_json (param $self i32) (param $offset i32) (result i32)
+  (func $Term::Pointer::traits::to_json (param $self i32) (param $offset i32) (result i32 i32)
     ;; Invoke the method on the target term
-    (call $Term::traits::write_json (call $Term::Pointer::dereference (local.get $self)) (local.get $offset)))
+    (call $Term::traits::to_json (call $Term::Pointer::dereference (local.get $self)) (local.get $offset)))
 
   (func $Term::Pointer::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     ;; Invoke the method on the target term

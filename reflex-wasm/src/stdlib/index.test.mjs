@@ -19,8 +19,6 @@ import effect from './effect.test.mjs';
 import endsWith from './ends_with.test.mjs';
 import eq from './eq.test.mjs';
 import equal from './equal.test.mjs';
-import resolveQueryBranch from './graphql/resolve_query_branch.test.mjs';
-import resolveQueryLeaf from './graphql/resolve_query_leaf.test.mjs';
 import floor from './floor.test.mjs';
 import fold from './fold.test.mjs';
 import get from './get.test.mjs';
@@ -42,7 +40,6 @@ import min from './min.test.mjs';
 import multiply from './multiply.test.mjs';
 import not from './not.test.mjs';
 import or from './or.test.mjs';
-import parseJson from './json/parse_json.test.mjs';
 import pow from './pow.test.mjs';
 import push from './push.test.mjs';
 import pushFront from './push_front.test.mjs';
@@ -61,6 +58,10 @@ import subtract from './subtract.test.mjs';
 import take from './take.test.mjs';
 import values from './values.test.mjs';
 import zip from './zip.test.mjs';
+import parseJson from './json/parse_json.test.mjs';
+import stringifyJson from './json/stringify_json.test.mjs';
+import resolveQueryBranch from './graphql/resolve_query_branch.test.mjs';
+import resolveQueryLeaf from './graphql/resolve_query_leaf.test.mjs';
 
 export default (describe) => {
   abs(describe);
@@ -81,8 +82,6 @@ export default (describe) => {
   endsWith(describe);
   eq(describe);
   equal(describe);
-  resolveQueryBranch(describe);
-  resolveQueryLeaf(describe);
   floor(describe);
   fold(describe);
   get(describe);
@@ -104,7 +103,6 @@ export default (describe) => {
   multiply(describe);
   not(describe);
   or(describe);
-  parseJson(describe);
   pow(describe);
   push(describe);
   pushFront(describe);
@@ -123,4 +121,8 @@ export default (describe) => {
   take(describe);
   values(describe);
   zip(describe);
+  parseJson(describe);
+  stringifyJson(describe);
+  resolveQueryBranch(describe);
+  resolveQueryLeaf(describe);
 };

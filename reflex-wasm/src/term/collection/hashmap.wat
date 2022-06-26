@@ -260,9 +260,6 @@
             ;; Otherwise return the unmodified marker
             (global.get $NULL))))))
 
-  (func $Term::Hashmap::traits::write_json (param $self i32) (param $offset i32) (result i32)
-    (call $Term::traits::write_json (call $Term::Record::empty) (local.get $offset)))
-
   (func $Term::Hashmap::traits::length (param $self i32) (result i32)
     (call $Term::Hashmap::get::num_entries (local.get $self)))
 

@@ -48,26 +48,5 @@ export default (describe) => {
       assert.strictEqual(equals(createFloat(-Infinity), createFloat(Infinity)), false);
       assert.strictEqual(equals(createFloat(-Infinity), createFloat(-Infinity)), true);
     });
-
-    test('toJson', (assert, { createFloat, getStringValue, toJson }) => {
-      assert.strictEqual(getStringValue(toJson(createFloat(0))), '0.0');
-      assert.strictEqual(getStringValue(toJson(createFloat(1))), '1.0');
-      assert.strictEqual(getStringValue(toJson(createFloat(-1))), '-1.0');
-      assert.strictEqual(getStringValue(toJson(createFloat(3))), '3.0');
-      assert.strictEqual(getStringValue(toJson(createFloat(-3))), '-3.0');
-      assert.strictEqual(getStringValue(toJson(createFloat(3.142))), '3.142');
-      assert.strictEqual(getStringValue(toJson(createFloat(-3.142))), '-3.142');
-      assert.strictEqual(getStringValue(toJson(createFloat(2.718))), '2.718');
-      assert.strictEqual(getStringValue(toJson(createFloat(-2.718))), '-2.718');
-      assert.strictEqual(getStringValue(toJson(createFloat(123))), '123.0');
-      assert.strictEqual(getStringValue(toJson(createFloat(-123))), '-123.0');
-      assert.strictEqual(getStringValue(toJson(createFloat(123.45))), '123.45');
-      assert.strictEqual(getStringValue(toJson(createFloat(-123.45))), '-123.45');
-      assert.strictEqual(getStringValue(toJson(createFloat(0x7fffffff))), '2147483647.0');
-      assert.strictEqual(getStringValue(toJson(createFloat(-0x7fffffff))), '-2147483647.0');
-      assert.strictEqual(getStringValue(toJson(createFloat(Infinity))), 'null');
-      assert.strictEqual(getStringValue(toJson(createFloat(-Infinity))), 'null');
-      assert.strictEqual(getStringValue(toJson(createFloat(NaN))), 'null');
-    });
   });
 };

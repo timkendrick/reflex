@@ -80,7 +80,4 @@
                 (select
                   (local.get $replacement)
                   (local.get $substituted_replacement)
-                  (i32.eq (global.get $NULL) (local.get $substituted_replacement))))))))))
-
-  (func $Term::Variable::traits::write_json (param $self i32) (param $offset i32) (result i32)
-    (call $Term::traits::write_json (call $Term::Record::empty) (local.get $offset))))
+                  (i32.eq (global.get $NULL) (local.get $substituted_replacement)))))))))))

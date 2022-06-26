@@ -106,13 +106,14 @@
             (local.get $substituted_values)
             (i32.eq (global.get $NULL) (local.get $substituted_values)))))))
 
-  (func $Term::Record::traits::write_json (param $self i32) (param $offset i32) (result i32)
+  (func $Term::Record::traits::to_json (param $self i32) (param $offset i32) (result i32 i32)
     (local $keys i32)
     (local $values i32)
     (local $num_keys i32)
     (local $num_invalid_keys i32)
     (local $index i32)
-    (local $key i32)
+    (local $item i32)
+    ;; TODO: Decide correct behavior when JSON-serializing objects with non-serializable keys
     ;; Determine the number of unserializable keys in order to subtract them from the total
     (if
       (local.tee $num_keys (call $Term::List::get_length (local.tee $keys (call $Term::Record::get::keys (local.get $self)))))
@@ -127,10 +128,12 @@
       (else))
     (local.set $index (i32.const 0))
     (local.set $values (call $Term::Record::get::values (local.get $self)))
-    (if (result i32)
+    (if (result i32 i32)
       ;; If the record is empty, write an empty JSON object literal
       (i32.eqz (i32.sub (local.get $num_keys) (local.get $num_invalid_keys)))
       (then
+        ;; Put the success marker on the stack
+        (global.get $TRUE)
         ;; Allocate two bytes for opening and closing braces and write the characters to the output
         (call $Allocator::extend (local.get $offset) (i32.const 2))
         (i32.store8 offset=0 (local.get $offset) (@char "{"))
@@ -145,7 +148,7 @@
         (loop $LOOP
           (if
             ;; If the current key is invalid, skip to the next one
-            (i32.eqz (call $Term::Record::is_valid_json_key (local.tee $key (call $Term::List::get_item (local.get $keys) (local.get $index)))))
+            (i32.eqz (call $Term::Record::is_valid_json_key (local.tee $item (call $Term::List::get_item (local.get $keys) (local.get $index)))))
             (then
               ;; Decrement the number of remaining invalid keys
               (local.set $num_invalid_keys (i32.sub (local.get $num_invalid_keys) (i32.const 1)))
@@ -153,20 +156,37 @@
               (local.set $index (i32.add (local.get $index) (i32.const 1)))
               (br $LOOP))
             (else
-              ;; Write the current item to the output and store the updated offset
+              ;; Write the current key to the output and store the updated offset
               (local.set $offset
-                (call $Term::traits::write_json
-                  (local.get $key)
+                (call $Term::traits::to_json
+                  (local.get $item)
                   ;; The target offset is incremented to reflect the preceding 1-byte opening brace or character separator
                   (i32.add (local.get $offset) (i32.const 1))))
+              ;; If the key serialization failed, or if the value does not support serialization, bail out
+              (if
+                (i32.or
+                  (i32.ne (global.get $TRUE))
+                  (i32.eqz
+                    (call $Term::implements::to_json
+                      (call $Term::get_type
+                        (local.tee $item (call $Term::List::get_item (local.get $values) (local.get $index)))))))
+                (then
+                  (return (global.get $FALSE) (local.get $offset)))
+                (else))
               ;; Allocate one byte for the colon separator and write the character to the output
               (call $Allocator::extend (local.get $offset) (i32.const 1))
               (i32.store8 (local.get $offset) (@char ":"))
               (local.set $offset
-                (call $Term::traits::write_json
-                  (call $Term::List::get_item (local.get $values) (local.get $index))
+                (call $Term::traits::to_json
+                  (local.get $item)
                   ;; The target offset is incremented to reflect the preceding 1-byte colon separator
                   (i32.add (local.get $offset) (i32.const 1))))
+              ;; If the value serialization failed, bail out
+              (if
+                (i32.ne (global.get $TRUE))
+                (then
+                  (return (global.get $FALSE) (local.get $offset)))
+                (else))
               ;; Allocate one byte for the comma separator or closing brace and write the character to the output
               (call $Allocator::extend (local.get $offset) (i32.const 1))
               (i32.store8
@@ -185,6 +205,8 @@
                 (i32.lt_u
                   (local.tee $index (i32.add (local.get $index) (i32.const 1)))
                   (i32.sub (local.get $num_keys) (local.get $num_invalid_keys)))))))
+        ;; Put the success marker on the stack
+        (global.get $TRUE)
         ;; Return the updated offset, taking into account the final closing brace
         (i32.add (local.get $offset) (i32.const 1)))))
 

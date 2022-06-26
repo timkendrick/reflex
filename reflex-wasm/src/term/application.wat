@@ -58,9 +58,6 @@
             (local.get $substituted_args)
             (i32.eq (global.get $NULL) (local.get $substituted_args)))))))
 
-  (func $Term::Application::traits::write_json (param $self i32) (param $offset i32) (result i32)
-    (call $Term::traits::write_json (call $Term::Record::empty) (local.get $offset)))
-
   (func $Term::Application::traits::evaluate (param $self i32) (param $state i32) (result i32 i32)
     (local $dependencies i32)
     ;; TODO: Cache thunk evaluation results

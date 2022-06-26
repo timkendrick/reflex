@@ -49,9 +49,6 @@
           (local.get $substituted_source)
           (call $Term::TakeIterator::get::count (local.get $self))))))
 
-  (func $Term::TakeIterator::traits::write_json (param $self i32) (param $offset i32) (result i32)
-    (call $Term::traits::write_json (call $Term::Record::empty) (local.get $offset)))
-
   (func $Term::TakeIterator::traits::iterate (param $self i32) (result i32)
     (local.get $self))
 

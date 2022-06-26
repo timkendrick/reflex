@@ -284,13 +284,15 @@
             ;; Otherwise return the unmodified marker
             (global.get $NULL))))))
 
-  (func $Term::List::traits::write_json (param $self i32) (param $offset i32) (result i32)
+  (func $Term::List::traits::to_json (param $self i32) (param $offset i32) (result i32 i32)
     (local $index i32)
     (local $length i32)
-    (if (result i32)
+    (if (result i32 i32)
       ;; If the list is empty, write an empty JSON array literal
       (i32.eqz (local.tee $length (call $Term::List::get::items::length (local.get $self))))
       (then
+        ;; Put the success marker on the stack
+        (global.get $TRUE)
         ;; Allocate two bytes for opening and closing braces and write the characters to the output
         (call $Allocator::extend (local.get $offset) (i32.const 2))
         (i32.store8 offset=0 (local.get $offset) (@char "["))
@@ -305,10 +307,16 @@
         (loop $LOOP
           ;; Write the current item to the output and store the updated offset
           (local.set $offset
-            (call $Term::traits::write_json
+            (call $Term::traits::to_json
               (call $Term::List::get::items::value (local.get $self) (local.get $index))
               ;; The target offset is incremented to reflect the preceding 1-byte opening brace or character separator
               (i32.add (local.get $offset) (i32.const 1))))
+          ;; If the value serialization failed, bail out
+          (if
+            (i32.ne (global.get $TRUE))
+            (then
+              (return (global.get $FALSE) (local.get $offset)))
+            (else))
           ;; Allocate one byte for the comma separator or closing brace and write the character to the output
           (call $Allocator::extend (local.get $offset) (i32.const 1))
           (i32.store8
@@ -321,6 +329,8 @@
           ;; If this was not the final item, continue with the next item
           (br_if $LOOP
             (i32.lt_u (local.tee $index (i32.add (local.get $index) (i32.const 1))) (local.get $length))))
+        ;; Put the success marker on the stack
+        (global.get $TRUE)
         ;; Return the updated offset, taking into account the final closing brace
         (i32.add (local.get $offset) (i32.const 1)))))
 

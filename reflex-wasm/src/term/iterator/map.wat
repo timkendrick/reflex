@@ -60,9 +60,6 @@
             (local.get $substituted_iteratee)
             (i32.eq (global.get $NULL) (local.get $substituted_iteratee)))))))
 
-  (func $Term::MapIterator::traits::write_json (param $self i32) (param $offset i32) (result i32)
-    (call $Term::traits::write_json (call $Term::Record::empty) (local.get $offset)))
-
   (func $Term::MapIterator::traits::iterate (param $self i32) (result i32)
     (local.get $self))
 

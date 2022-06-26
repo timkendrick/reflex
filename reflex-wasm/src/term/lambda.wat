@@ -46,9 +46,6 @@
           (call $Term::Lambda::get::num_args (local.get $self))
           (local.get $substituted_body)))))
 
-  (func $Term::Lambda::traits::write_json (param $self i32) (param $offset i32) (result i32)
-    (call $Term::traits::write_json (call $Term::Record::empty) (local.get $offset)))
-
   (func $Term::Lambda::traits::apply (param $self i32) (param $args i32) (param $state i32) (result i32 i32)
     (local $result i32)
     (if (result i32 i32)

@@ -59,9 +59,6 @@
         (call $Term::Constructor::new
           (local.get $substituted_keys)))))
 
-  (func $Term::Constructor::traits::write_json (param $self i32) (param $offset i32) (result i32)
-    (call $Term::traits::write_json (call $Term::Record::empty) (local.get $offset)))
-
   (func $Term::Constructor::traits::apply (param $self i32) (param $args i32) (param $state i32) (result i32 i32)
     (local $keys i32)
     (if (result i32 i32)

@@ -118,7 +118,10 @@
   (func $Term::String::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (global.get $NULL))
 
-  (func $Term::String::traits::write_json (param $self i32) (param $offset i32) (result i32)
+  (func $Term::String::traits::to_json (param $self i32) (param $offset i32) (result i32 i32)
+    ;; Put the success marker on the stack
+    (global.get $TRUE)
+    ;; Write the serialized value to the output string and return the updated offset
     (i32.add
       (local.get $offset)
       (call $Utils::bytes::write_json

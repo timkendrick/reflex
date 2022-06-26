@@ -101,15 +101,12 @@ function createStdlib(runtime) {
     Multiply: runtime.Stdlib_Multiply.value,
     Not: runtime.Stdlib_Not.value,
     Or: runtime.Stdlib_Or.value,
-    ParseJson: runtime.Stdlib_ParseJson.value,
     Pow: runtime.Stdlib_Pow.value,
     Push: runtime.Stdlib_Push.value,
     PushFront: runtime.Stdlib_PushFront.value,
     Remainder: runtime.Stdlib_Remainder.value,
     Replace: runtime.Stdlib_Replace.value,
     ResolveDeep: runtime.Stdlib_ResolveDeep.value,
-    ResolveQueryBranch: runtime.Stdlib_ResolveQueryBranch.value,
-    ResolveQueryLeaf: runtime.Stdlib_ResolveQueryLeaf.value,
     ResolveShallow: runtime.Stdlib_ResolveShallow.value,
     Round: runtime.Stdlib_Round.value,
     Sequence: runtime.Stdlib_Sequence.value,
@@ -122,6 +119,10 @@ function createStdlib(runtime) {
     Take: runtime.Stdlib_Take.value,
     Values: runtime.Stdlib_Values.value,
     Zip: runtime.Stdlib_Zip.value,
+    ParseJson: runtime.Stdlib_ParseJson.value,
+    StringifyJson: runtime.Stdlib_StringifyJson.value,
+    ResolveQueryBranch: runtime.Stdlib_ResolveQueryBranch.value,
+    ResolveQueryLeaf: runtime.Stdlib_ResolveQueryLeaf.value,
   };
 }
 
@@ -544,9 +545,6 @@ export function createRuntime(runtime) {
     format(value) {
       if (value === NULL) return 'NULL';
       return formatTerm(runtime, value, constants);
-    },
-    toJson(value) {
-      return runtime.toJson(value);
     },
     inspectHeap(offset, length) {
       return new Uint32Array(runtime.memory.buffer, offset, length);

@@ -58,9 +58,6 @@
             (local.get $substituted_body)
             (i32.eq (global.get $NULL) (local.get $substituted_body)))))))
 
-  (func $Term::Let::traits::write_json (param $self i32) (param $offset i32) (result i32)
-    (call $Term::traits::write_json (call $Term::Record::empty) (local.get $offset)))
-
   (func $Term::Let::traits::evaluate (param $self i32) (param $state i32) (result i32 i32)
     (local $result i32)
     ;; Substitute the variable initializer into the body, leaving the result on the stack

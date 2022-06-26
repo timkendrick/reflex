@@ -76,18 +76,7 @@
             (@union_variants (@get $TermType))
             (return (call (@concat "$Term::" (@get $typename) "::traits::substitute") (local.get $self) (local.get $variables) (local.get $scope_offset)))))
         ;; Default implementation
-        (global.get $NULL)))
-
-    (func $Term::traits::write_json (param $self i32) (param $offset i32) (result i32)
-      (@branch
-        ;; Delegate method to underlying term type implementations
-        (call $Term::get_type (local.get $self))
-        (@list
-          (@map $typename
-            (@union_variants (@get $TermType))
-            (return (call (@concat "$Term::" (@get $typename) "::traits::write_json") (local.get $self) (local.get $offset)))))
-        ;; Default implementation
-        (call $Term::traits::write_json (call $Term::Record::empty) (local.get $offset)))))
+        (global.get $NULL))))
 
   (export "evaluate" (func $Term::traits::evaluate))
 
@@ -153,14 +142,6 @@
     (call $Term::set::hash (local.get $self) (call $Term::get::hash (local.get $target)))
     ;; This assumes that the previous term had at least one field (singleton instances should be created for zero-field terms)
     (call $Term::Pointer::set::target (call $Term::pointer::value (local.get $self)) (local.get $target)))
-
-  (func $Term::to_json (export "toJson") (param $self i32) (result i32)
-    (local $output i32)
-    (call $Term::String::init
-      (local.tee $output (call $Term::String::allocate_unsized))
-      (i32.sub
-        (call $Term::traits::write_json (local.get $self) (call $Term::String::get_char_pointer (local.get $output) (i32.const 0)))
-        (call $Term::String::get_char_pointer (local.get $output) (i32.const 0)))))
 
   (func $Term::traits::clone (param $self i32) (result i32)
     (local $instance i32)

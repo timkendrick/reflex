@@ -41,9 +41,9 @@
   (func $Term::Float::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (global.get $NULL))
 
-  (func $Term::Float::traits::write_json (param $self i32) (param $offset i32) (result i32)
+  (func $Term::Float::traits::to_json (param $self i32) (param $offset i32) (result i32 i32)
     (local $bytes_written i32)
-    (if (result i32)
+    (if (result i32 i32)
       (i32.eq
         (global.get $NULL)
         (local.tee $bytes_written
@@ -51,10 +51,17 @@
             (call $Term::Float::get::value (local.get $self))
             (local.get $offset))))
       (then
+        ;; TODO: Decide correct behavior when JSON-serializing NaN or infinite float values
         ;; If the write failed due to NaN or infinite float values, return a null JSON value
+        ;; Put the success marker on the stack
+        (global.get $TRUE)
+        ;; Write the null value to the output string and return the updated offset
         (@store_bytes (local.get $offset) "null")
         (i32.add (local.get $offset)))
       (else
+        ;; Put the success marker on the stack
+        (global.get $TRUE)
+        ;; Write the serialized value to the output string and return the updated offset
         (i32.add (local.get $offset) (local.get $bytes_written)))))
 
   (func $Term::Float::get_non_negative_integer_value (param $self i32) (result i32)

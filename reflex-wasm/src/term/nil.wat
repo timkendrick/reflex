@@ -33,6 +33,9 @@
   (func $Term::Nil::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (global.get $NULL))
 
-  (func $Term::Nil::traits::write_json (param $self i32) (param $offset i32) (result i32)
+  (func $Term::Nil::traits::to_json (param $self i32) (param $offset i32) (result i32 i32)
+    ;; Put the success marker on the stack
+    (global.get $TRUE)
+    ;; Write the serialized value to the output string and return the updated offset
     (@store_bytes (local.get $offset) "null")
     (i32.add (local.get $offset))))

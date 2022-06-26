@@ -40,9 +40,6 @@
       (else
         (call $Term::OnceIterator::new (local.get $substituted_value)))))
 
-  (func $Term::OnceIterator::traits::write_json (param $self i32) (param $offset i32) (result i32)
-    (call $Term::traits::write_json (call $Term::Record::empty) (local.get $offset)))
-
   (func $Term::OnceIterator::traits::iterate (param $self i32) (result i32)
     (local.get $self))
 

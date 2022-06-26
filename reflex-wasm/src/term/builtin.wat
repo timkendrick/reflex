@@ -36,9 +36,6 @@
   (func $Term::Builtin::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (global.get $NULL))
 
-  (func $Term::Builtin::traits::write_json (param $self i32) (param $offset i32) (result i32)
-    (call $Term::traits::write_json (call $Term::Record::empty) (local.get $offset)))
-
   (func $Term::Builtin::traits::apply (param $self i32) (param $args i32) (param $state i32) (result i32 i32)
     ;; Invoke the builtin function implementation
     (call_indirect (type $Builtin)

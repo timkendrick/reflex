@@ -68,9 +68,6 @@
       (else
         (call $Term::HashmapKeysIterator::new (local.get $substituted_source)))))
 
-  (func $Term::HashmapKeysIterator::traits::write_json (param $self i32) (param $offset i32) (result i32)
-    (call $Term::traits::write_json (call $Term::Record::empty) (local.get $offset)))
-
   (func $Term::HashmapKeysIterator::traits::iterate (param $self i32) (result i32)
     (local.get $self))
 

@@ -114,21 +114,6 @@ export default (describe) => {
       );
     });
 
-    test('toJson', (assert, {
-      createEmptyList,
-      createUnitList,
-      createPair,
-      createTriple,
-      createInt,
-      getStringValue,
-      toJson,
-    }) => {
-      assert.strictEqual(getStringValue(toJson(createEmptyList())), '[]');
-      assert.strictEqual(getStringValue(toJson(createUnitList(createInt(3)))), '[3]');
-      assert.strictEqual(getStringValue(toJson(createPair(createInt(3), createInt(4)))), '[3,4]');
-      assert.strictEqual(getStringValue(toJson(createTriple(createInt(3), createInt(4), createInt(5)))), '[3,4,5]');
-    });
-
     test('basic item access', (assert, {
       createApplication,
       createBuiltin,

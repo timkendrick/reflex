@@ -42,9 +42,6 @@
       (else
         (call $Term::FlattenIterator::new (local.get $substituted_source)))))
 
-  (func $Term::FlattenIterator::traits::write_json (param $self i32) (param $offset i32) (result i32)
-    (call $Term::traits::write_json (call $Term::Record::empty) (local.get $offset)))
-
   (func $Term::FlattenIterator::traits::iterate (param $self i32) (result i32)
     (local.get $self))
 

@@ -60,9 +60,6 @@
             (local.get $substituted_args)
             (i32.eq (global.get $NULL) (local.get $substituted_args)))))))
 
-  (func $Term::Partial::traits::write_json (param $self i32) (param $offset i32) (result i32)
-    (call $Term::traits::write_json (call $Term::Record::empty) (local.get $offset)))
-
   (func $Term::Partial::traits::apply (param $self i32) (param $args i32) (param $state i32) (result i32 i32)
     (call $Term::traits::apply
       (call $Term::Partial::get::target (local.get $self))
