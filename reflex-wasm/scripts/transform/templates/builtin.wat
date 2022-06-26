@@ -1,7 +1,7 @@
 ;; SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 ;; SPDX-License-Identifier: Apache-2.0
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-(func (@concat "$" (@get $method_name)) (param $args i32) (param $state i32) (result i32 i32)
+(func (@concat "$" (@get $builtin_name)) (param $args i32) (param $state i32) (result i32 i32)
   (@map $arg_name
     (@get $arg_names)
     (local (@get $arg_name) i32))
@@ -21,11 +21,11 @@
         (local.set (@get $arg_name) (call $List::get_item (local.get $args) (i32.const (@get $_)))))
       ;; Invoke the method implementation
       (call
-        (@concat "$" (@get $method_name) "::call_static")
+        (@concat "$" (@get $builtin_name) "::call_static")
         (@map $arg_name (@get $arg_names) (local.get (@get $arg_name)))
         (local.get $state)))))
 
-(func (@concat "$" (@get $method_name) "::call_static") (@map $arg_name (@get $arg_names) (param (@get $arg_name) i32)) (param $state i32) (result i32 i32)
+(func (@concat "$" (@get $builtin_name) "::call_static") (@map $arg_name (@get $arg_names) (param (@get $arg_name) i32)) (param $state i32) (result i32 i32)
   (local $dependencies i32)
   (local.set $dependencies (global.get $NULL))
   ;; Evaluate any eager arguments
@@ -55,10 +55,10 @@
         (local.get $dependencies)))
     (else))
   ;; Otherwise apply the method to the evaluated arguments
-  (call (@concat "$" (@get $method_name) "::dispatch") (@map $arg_name (@get $arg_names) (local.get (@get $arg_name))) (local.get $state))
+  (call (@concat "$" (@get $builtin_name) "::dispatch") (@map $arg_name (@get $arg_names) (local.get (@get $arg_name))) (local.get $state))
   (call $Dependencies::traits::union (local.get $dependencies)) )
 
-(func (@concat "$" (@get $method_name) "::dispatch") (@map $arg_name (@get $arg_names) (param (@get $arg_name) i32)) (param $state i32) (result i32 i32)
+(func (@concat "$" (@get $builtin_name) "::dispatch") (@map $arg_name (@get $arg_names) (param (@get $arg_name) i32)) (param $state i32) (result i32 i32)
   ;; Invoke the correct method implementation depending on the argument types
   (@map $arg_name
     (@get $arg_names)

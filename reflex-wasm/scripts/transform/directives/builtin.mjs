@@ -10,38 +10,38 @@ import { createListDirective } from './list.mjs';
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 
-const TEMPLATE = path.join(__dirname, '../templates/method.wat');
+const TEMPLATE = path.join(__dirname, '../templates/builtin.wat');
 
-export const METHOD_DIRECTIVE = '@method';
+export const BUILTIN_DIRECTIVE = '@builtin';
 
-export default function methodDirective(node, context) {
-  const [instruction, methodIdentifier, signature, ...implementations] = node.elements
+export default function builtinDirective(node, context) {
+  const [instruction, builtinIdentifier, signature, ...implementations] = node.elements
     .filter((node) => !isNonFunctionalNode(node))
     .flatMap((node) => (context.transform ? context.transform(node, context) : [node]));
   const argDefinitions = signature && parseArgDefinitions(signature);
-  const methodImplementations =
+  const builtinImplementations =
     argDefinitions && parseMethodImplementations(implementations, argDefinitions, context);
   const defaultImplementation =
-    methodImplementations && methodImplementations.find(({ argTypes }) => !argTypes);
+    builtinImplementations && builtinImplementations.find(({ argTypes }) => !argTypes);
   if (
-    !isNamedTermNode(METHOD_DIRECTIVE, instruction) ||
-    !methodIdentifier ||
-    !isIdentifierNode(methodIdentifier) ||
+    !isNamedTermNode(BUILTIN_DIRECTIVE, instruction) ||
+    !builtinIdentifier ||
+    !isIdentifierNode(builtinIdentifier) ||
     !argDefinitions ||
-    !methodImplementations ||
+    !builtinImplementations ||
     !defaultImplementation
   ) {
     const source = context.sources.get(context.path);
     throw new ParseError(
       node.location,
       source,
-      `Invalid ${METHOD_DIRECTIVE} directive: ${formatSourceRange(source, node.location)}`,
+      `Invalid ${BUILTIN_DIRECTIVE} directive: ${formatSourceRange(source, node.location)}`,
     );
   }
   return [
     ...getTemplateElements(
       context.import(TEMPLATE, {
-        $method_name: methodIdentifier,
+        $builtin_name: builtinIdentifier,
         $arg_names: createListDirective({
           elements: argDefinitions.map(({ identifier }) => identifier),
           location: node.location,
@@ -61,13 +61,13 @@ export default function methodDirective(node, context) {
           location: node.location,
         }),
         $implementation_names: createListDirective({
-          elements: methodImplementations
+          elements: builtinImplementations
             .filter(({ argTypes }) => argTypes)
             .map(({ identifier }) => identifier),
           location: node.location,
         }),
         $implementation_signatures: createListDirective({
-          elements: methodImplementations
+          elements: builtinImplementations
             .filter(({ argTypes }) => argTypes)
             .map(({ argTypes, location }) => createListDirective({ elements: argTypes, location })),
           location: node.location,
@@ -75,7 +75,7 @@ export default function methodDirective(node, context) {
         $default_implementation: defaultImplementation.identifier,
       }),
     ),
-    ...methodImplementations.flatMap(({ implementation }) => [
+    ...builtinImplementations.flatMap(({ implementation }) => [
       NodeType.Whitespace({ source: '\n\n', location: node.location }),
       implementation,
     ]),
@@ -129,11 +129,11 @@ function parseMethodImplementations(nodes, signature, context) {
   const lastNode = nodes[nodes.length - 1];
   const defaultImplementation = lastNode && parseDefaultMethodImplementation(lastNode, context);
   if (!defaultImplementation) return null;
-  const methodOverloads = nodes
+  const builtinOverloads = nodes
     .slice(0, -1)
     .map((node) => parseMethodImplementation(node, signature, context));
-  if (!methodOverloads.every(Boolean)) return null;
-  return [...methodOverloads, defaultImplementation];
+  if (!builtinOverloads.every(Boolean)) return null;
+  return [...builtinOverloads, defaultImplementation];
 }
 
 function parseDefaultMethodImplementation(node, context) {
