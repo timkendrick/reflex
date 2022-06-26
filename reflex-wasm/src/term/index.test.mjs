@@ -8,6 +8,7 @@ import cell from './cell.test.mjs';
 import collection from './collection/index.test.mjs';
 import condition from './condition.test.mjs';
 import constructor from './constructor.test.mjs';
+import date from './date.test.mjs';
 import effect from './effect.test.mjs';
 import float from './float.test.mjs';
 import int from './int.test.mjs';
@@ -32,6 +33,7 @@ export default (describe) => {
   collection(describe);
   condition(describe);
   constructor(describe);
+  date(describe);
   effect(describe);
   float(describe);
   int(describe);

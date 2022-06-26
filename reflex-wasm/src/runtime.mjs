@@ -16,6 +16,7 @@ function createTermTypes(runtime) {
     List: runtime.TermType_List.value,
     Condition: runtime.TermType_Condition.value,
     Constructor: runtime.TermType_Constructor.value,
+    Date: runtime.TermType_Date.value,
     Effect: runtime.TermType_Effect.value,
     Float: runtime.TermType_Float.value,
     Int: runtime.TermType_Int.value,
@@ -77,6 +78,7 @@ function createStdlib(runtime) {
     CollectString: runtime.Stdlib_CollectString.value,
     CollectTree: runtime.Stdlib_CollectTree.value,
     Cons: runtime.Stdlib_Cons.value,
+    Construct: runtime.Stdlib_Construct.value,
     Divide: runtime.Stdlib_Divide.value,
     Effect: runtime.Stdlib_Effect.value,
     EndsWith: runtime.Stdlib_EndsWith.value,
@@ -228,7 +230,19 @@ export function createRuntime(runtime) {
     getStringValue(value) {
       const offset = runtime.getStringOffset(value);
       const length = runtime.getStringLength(value);
-      return new TextDecoder().decode(new Uint8Array(runtime.memory.buffer, offset, length));
+      return new TextDecoder('utf-8').decode(new Uint8Array(runtime.memory.buffer, offset, length));
+    },
+    createDate(timestamp) {
+      return runtime.createDate(BigInt(timestamp));
+    },
+    isDate(value) {
+      return runtime.isDate(value);
+    },
+    asDate(value) {
+      return runtime.isDate(value) ? value : null;
+    },
+    getDateTimestamp(value) {
+      return Number(runtime.getDateTimestamp(value));
     },
     createSignal(condition) {
       return runtime.createSignal(condition);
@@ -600,6 +614,8 @@ function formatTerm(runtime, value, constants) {
       return formatFloat(runtime, value, constants);
     case constants.TermType.String:
       return formatString(runtime, value, constants);
+    case constants.TermType.Date:
+      return formatDate(runtime, value, constants);
     case constants.TermType.Symbol:
       return formatSymbol(runtime, value, constants);
     case constants.TermType.Builtin:
@@ -674,6 +690,10 @@ function formatString(runtime, value, _constants) {
   return JSON.stringify(
     new TextDecoder('utf-8').decode(new Uint8Array(runtime.memory.buffer, offset, length)),
   );
+}
+
+function formatDate(runtime, value, _constants) {
+  return `Date(${new Date(Number(runtime.getDateTimestamp(value))).toISOString()})`;
 }
 
 function formatSymbol(runtime, value, _constants) {

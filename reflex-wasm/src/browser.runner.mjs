@@ -14,7 +14,10 @@ export default (modulePath) => {
   return createTestRunner(
     async () => {
       const wasi = new WASI();
-      const instance = await WebAssembly.instantiate(await module, imports(wasi));
+      const instance = await WebAssembly.instantiate(
+        await module,
+        imports(wasi, () => instance),
+      );
       wasi.initialize(instance);
       return createRuntime(instance.exports);
     },

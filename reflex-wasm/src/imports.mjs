@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-export default function imports(wasi) {
+export default function imports(wasi, getModule) {
+  const I64_MAX_VALUE = BigInt('0xFFFFFFFFFFFFFFFF');
   return {
     Math: {
       remainder: (x, y) => x % y,
@@ -28,6 +29,40 @@ export default function imports(wasi) {
       sqrt: Math.sqrt,
       tan: Math.tan,
       tanh: Math.tanh,
+    },
+    Date: {
+      parse: (offset, length) => {
+        const instance = getModule();
+        const dateString = (() => {
+          try {
+            new TextDecoder('utf-8', { fatal: true }).decode(
+              new Uint8Array(instance.exports.memory.buffer, offset, length),
+            )
+          } catch {
+            return null;
+          }
+        })();
+        if (dateString === null) return I64_MAX_VALUE;
+        const date = new Date(dateString);
+        const timestamp = date.getTime();
+        if (isNaN(timestamp)) return I64_MAX_VALUE;
+        return BigInt(timestamp);
+      },
+      toJson: (timestamp, offset) => {
+        const dateString = (() => {
+          try {
+            return JSON.stringify(new Date(Number(timestamp)).toISOString());
+          } catch {
+            return null;
+          }
+        })();
+        if (!dateString) return 0;
+        const instance = getModule();
+        const bytes = new TextEncoder().encode(dateString);
+        const length = bytes.length;
+        new Uint8Array(instance.exports.memory.buffer, offset, length).set(bytes);
+        return length;
+      },
     },
     wasi_snapshot_preview1: wasi.wasiImport,
   };

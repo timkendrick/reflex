@@ -11,6 +11,7 @@
   (@include "./collection/list.wat")
   (@include "./condition.wat")
   (@include "./constructor.wat")
+  (@include "./date.wat")
   (@include "./effect.wat")
   (@include "./float.wat")
   (@include "./int.wat")
@@ -52,6 +53,7 @@
       (@import $List "./collection/list.wat")
       (@import $Condition "./condition.wat")
       (@import $Constructor "./constructor.wat")
+      (@import $Date "./date.wat")
       (@import $Effect "./effect.wat")
       (@import $Float "./float.wat")
       (@import $Int "./int.wat")
@@ -294,7 +296,8 @@
         $Float
         $String
         $List
-        $Record)
+        $Record
+        $Date)
 
       (func $TermType::implements::to_json (param $type i32) (result i32)
         (@fold $result $typename

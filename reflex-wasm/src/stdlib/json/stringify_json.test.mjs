@@ -494,7 +494,10 @@ export default (describe) => {
           createUnitList(createTriple(createInt(3), createBuiltin(Stdlib.Identity), createInt(5))),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:StringifyJson([3, Identity, 5])> . NULL)}');
+        assert.strictEqual(
+          format(result),
+          '{(<InvalidFunctionArgs:StringifyJson([3, Identity, 5])> . NULL)}',
+        );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });
@@ -575,9 +578,35 @@ export default (describe) => {
           ),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:StringifyJson({ "foo": 3, "bar": Identity, "baz": 5 })> . NULL)}');
+        assert.strictEqual(
+          format(result),
+          '{(<InvalidFunctionArgs:StringifyJson({ "foo": 3, "bar": Identity, "baz": 5 })> . NULL)}',
+        );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
+    });
+
+    test('(Date)', (assert, {
+      createApplication,
+      createBuiltin,
+      createDate,
+      createUnitList,
+      evaluate,
+      format,
+      NULL,
+      Stdlib,
+    }) => {
+      const timestamp = Date.now();
+      const expression = createApplication(
+        createBuiltin(Stdlib.StringifyJson),
+        createUnitList(createDate(timestamp)),
+      );
+      const [result, dependencies] = evaluate(expression, NULL);
+      assert.strictEqual(
+        format(result),
+        JSON.stringify(JSON.stringify(new Date(timestamp).toISOString())),
+      );
+      assert.strictEqual(format(dependencies), 'NULL');
     });
   });
 };
