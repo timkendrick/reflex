@@ -30,6 +30,9 @@
   (@include "./gte.wat")
   (@include "./has.wat")
   (@include "./hash.wat")
+  (@include "./handlers/scan.wat")
+  (@include "./handlers/to_request.wat")
+  (@include "./handlers/variable.wat")
   (@include "./identity.wat")
   (@include "./if.wat")
   (@include "./if_error.wat")
@@ -90,8 +93,8 @@
       $Stdlib_Floor
       $Stdlib_Fold
       $Stdlib_Get
-      $Stdlib_ResolveQueryBranch
-      $Stdlib_ResolveQueryLeaf
+      $Stdlib_Getter
+      $Stdlib_GraphQlResolver
       $Stdlib_Gt
       $Stdlib_Gte
       $Stdlib_Has
@@ -101,8 +104,6 @@
       $Stdlib_IfError
       $Stdlib_IfPending
       $Stdlib_Iterate
-      $Stdlib_ParseJson
-      $Stdlib_StringifyJson
       $Stdlib_Keys
       $Stdlib_Length
       $Stdlib_Lt
@@ -112,24 +113,31 @@
       $Stdlib_Multiply
       $Stdlib_Not
       $Stdlib_Or
+      $Stdlib_ParseJson
       $Stdlib_Pow
       $Stdlib_Push
       $Stdlib_PushFront
       $Stdlib_Remainder
       $Stdlib_Replace
       $Stdlib_ResolveDeep
+      $Stdlib_ResolveQueryBranch
+      $Stdlib_ResolveQueryLeaf
       $Stdlib_ResolveShallow
       $Stdlib_Round
-      $Stdlib_Set
+      $Stdlib_Scan
       $Stdlib_Sequence
-      $Stdlib_GraphQlResolver
+      $Stdlib_Set
+      $Stdlib_Setter
       $Stdlib_Skip
       $Stdlib_Slice
       $Stdlib_Split
       $Stdlib_StartsWith
+      $Stdlib_StringifyJson
       $Stdlib_Subtract
       $Stdlib_Take
+      $Stdlib_ToRequest
       $Stdlib_Values
+      $Stdlib_Variable
       $Stdlib_Zip)
 
     (func $Builtin::apply (param $target i32) (param $args i32) (param $state i32) (result i32 i32)

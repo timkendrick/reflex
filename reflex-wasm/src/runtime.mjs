@@ -85,6 +85,7 @@ function createStdlib(runtime) {
     Floor: runtime.Stdlib_Floor.value,
     Fold: runtime.Stdlib_Fold.value,
     Get: runtime.Stdlib_Get.value,
+    Getter: runtime.Stdlib_Getter.value,
     Gt: runtime.Stdlib_Gt.value,
     Gte: runtime.Stdlib_Gte.value,
     GraphQlResolver: runtime.Stdlib_GraphQlResolver.value,
@@ -115,8 +116,10 @@ function createStdlib(runtime) {
     ResolveQueryLeaf: runtime.Stdlib_ResolveQueryLeaf.value,
     ResolveShallow: runtime.Stdlib_ResolveShallow.value,
     Round: runtime.Stdlib_Round.value,
+    Scan: runtime.Stdlib_Scan.value,
     Sequence: runtime.Stdlib_Sequence.value,
     Set: runtime.Stdlib_Set.value,
+    Setter: runtime.Stdlib_Setter.value,
     Skip: runtime.Stdlib_Skip.value,
     Slice: runtime.Stdlib_Slice.value,
     Split: runtime.Stdlib_Split.value,
@@ -124,7 +127,9 @@ function createStdlib(runtime) {
     StringifyJson: runtime.Stdlib_StringifyJson.value,
     Subtract: runtime.Stdlib_Subtract.value,
     Take: runtime.Stdlib_Take.value,
+    ToRequest: runtime.Stdlib_ToRequest.value,
     Values: runtime.Stdlib_Values.value,
+    Variable: runtime.Stdlib_Variable.value,
     Zip: runtime.Stdlib_Zip.value,
   };
 }
