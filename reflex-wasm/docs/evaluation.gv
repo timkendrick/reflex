@@ -1,0 +1,55 @@
+digraph {
+  subgraph expressions {
+    E0 [label="(eval (((lambda (x) (lambda (y) (if (< x y) (* (+ 2 x) y) (+ (+ 2 x) y)))) (+ 1 2)) {S1}))"]
+    E1 [label="(eval ((lambda (x) (lambda (y) (if (< x y) (* (+ 2 x) y) (+ (+ 2 x) y)))) (+ 1 2)))"]
+    E2 [label="(eval (+ 1 2))"]
+    E3 [label="3"]
+    E4 [label="(lambda (y) (if (< 3 y) (* (+ 2 3) y) (+ (+ 2 3) y)))"]
+    E5 [label="(eval {S1})"]
+    E6 [label="(eval (if (< 3 {S1}) (* (+ 2 3) {S1}) (+ (+ 2 3) {S1})))"]
+    E7 [label="(eval (< 3 {S1}))"]
+    E8 [label="4 : S1"]
+    E9 [label="true : S1"]
+    E10 [label="(eval (* (+ 2 3) {S1})) : S1"]
+    E11 [label="(eval (+ 2 3))"]
+    E12 [label="5"]
+    E13 [label="20 : S1"]
+  }
+
+  subgraph state {
+    node [shape="diamond"]
+    S1
+  }
+
+  subgraph staticDependencies {
+    E1 -> E0
+    E2 -> E1
+    E7 -> E6
+    E5 -> E7
+    S1 -> E5
+    E11 -> E10
+    E5 -> E10
+  }
+
+  subgraph dynamicDependencies {
+    edge [style=dashed]
+    E4 -> E0
+    E3 -> E1
+    E8 -> E7
+    E9 -> E6
+    E8 -> E10
+    E12 -> E10
+  }
+
+  subgraph evaluations {
+    edge [style=dashed]
+    E0 -> E6
+    E1 -> E4
+    E2 -> E3
+    E6 -> E10
+    E5 -> E8
+    E7 -> E9
+    E10 -> E13
+    E11 -> E12
+  }
+}
