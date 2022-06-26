@@ -46,6 +46,7 @@ import push from './push.test.mjs';
 import pushFront from './push_front.test.mjs';
 import remainder from './remainder.test.mjs';
 import replace from './replace.test.mjs';
+import resolveArgs from './resolve_args.test.mjs';
 import resolveDeep from './resolve_deep.test.mjs';
 import resolveShallow from './resolve_shallow.test.mjs';
 import round from './round.test.mjs';
@@ -137,6 +138,7 @@ export default (describe) => {
   pushFront(describe);
   remainder(describe);
   replace(describe);
+  resolveArgs(describe);
   resolveDeep(describe);
   resolveQueryBranch(describe);
   resolveQueryLeaf(describe);

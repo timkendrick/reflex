@@ -14,8 +14,6 @@
     (@export $Lambda (@get $Lambda)))
 
   (export "isLambda" (func $Term::Lambda::is))
-  (export "getLambdaNumArgs" (func $Term::Lambda::get::num_args))
-  (export "getLambdaBody" (func $Term::Lambda::get::body))
 
   (func $Term::Lambda::new (export "createLambda") (param $num_args i32) (param $body i32) (result i32)
     (call $Term::TermType::Lambda::new (local.get $num_args) (local.get $body)))
@@ -88,4 +86,10 @@
         (global.get $NULL))
       (else
         (local.get $result)
-        (global.get $NULL)))))
+        (global.get $NULL))))
+
+  (func $Term::Lambda::get_num_args (export "getLambdaNumArgs") (param $self i32) (result i32)
+    (call $Term::Lambda::get::num_args (local.get $self)))
+
+  (func $Term::Lambda::get_body (export "getLambdaBody") (param $self i32) (result i32)
+    (call $Term::Lambda::get::body (local.get $self))))

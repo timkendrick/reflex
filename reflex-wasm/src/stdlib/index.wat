@@ -66,6 +66,7 @@
   (@include "./push_front.wat")
   (@include "./remainder.wat")
   (@include "./replace.wat")
+  (@include "./resolve_args.wat")
   (@include "./resolve_deep.wat")
   (@include "./resolve_shallow.wat")
   (@include "./round.wat")
@@ -140,6 +141,7 @@
       $Stdlib_PushFront
       $Stdlib_Remainder
       $Stdlib_Replace
+      $Stdlib_ResolveArgs
       $Stdlib_ResolveDeep
       $Stdlib_ResolveQueryBranch
       $Stdlib_ResolveQueryLeaf

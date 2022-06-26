@@ -125,6 +125,7 @@ function createStdlib(runtime) {
     PushFront: runtime.Stdlib_PushFront.value,
     Remainder: runtime.Stdlib_Remainder.value,
     Replace: runtime.Stdlib_Replace.value,
+    ResolveArgs: runtime.Stdlib_ResolveArgs.value,
     ResolveDeep: runtime.Stdlib_ResolveDeep.value,
     ResolveQueryBranch: runtime.Stdlib_ResolveQueryBranch.value,
     ResolveQueryLeaf: runtime.Stdlib_ResolveQueryLeaf.value,
