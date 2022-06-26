@@ -3,12 +3,8 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 import hashmap from './hashmap.test.mjs';
 import list from './list.test.mjs';
-import record from './record.test.mjs';
-import tree from './tree.test.mjs';
 
 export default (describe) => {
   hashmap(describe);
   list(describe);
-  record(describe);
-  tree(describe);
 };

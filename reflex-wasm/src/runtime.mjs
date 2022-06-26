@@ -13,18 +13,19 @@ function createTermTypes(runtime) {
     Cell: runtime.TermType_Cell.value,
     Hashmap: runtime.TermType_Hashmap.value,
     List: runtime.TermType_List.value,
-    Record: runtime.TermType_Record.value,
-    Tree: runtime.TermType_Tree.value,
     Condition: runtime.TermType_Condition.value,
+    Constructor: runtime.TermType_Constructor.value,
     Effect: runtime.TermType_Effect.value,
     Float: runtime.TermType_Float.value,
     Int: runtime.TermType_Int.value,
     Nil: runtime.TermType_Nil.value,
     Partial: runtime.TermType_Partial.value,
     Pointer: runtime.TermType_Pointer.value,
+    Record: runtime.TermType_Record.value,
     Signal: runtime.TermType_Signal.value,
     String: runtime.TermType_String.value,
     Symbol: runtime.TermType_Symbol.value,
+    Tree: runtime.TermType_Tree.value,
     Lambda: runtime.TermType_Lambda.value,
     Variable: runtime.TermType_Variable.value,
     Let: runtime.TermType_Let.value,
@@ -435,6 +436,18 @@ export function createRuntime(runtime) {
     getRecordField(value, key) {
       return runtime.getRecordField(value, key);
     },
+    createConstructor(keys) {
+      return runtime.createConstructor(keys);
+    },
+    isConstructor(value) {
+      return runtime.isConstructor(value);
+    },
+    asConstructor(value) {
+      return runtime.isConstructor(value) ? value : null;
+    },
+    getConstructorKeys(value) {
+      return runtime.getConstructorKeys(value);
+    },
     createHashmap(entries) {
       const instance = runtime.allocateHashmap(runtime.defaultHashmapCapacity(entries.length));
       entries.forEach(([key, value]) => {
@@ -564,6 +577,8 @@ function formatTerm(runtime, value, constants) {
       return formatPartial(runtime, value, constants);
     case constants.TermType.Application:
       return formatApplication(runtime, value, constants);
+    case constants.TermType.Constructor:
+      return formatConstructor(runtime, value, constants);
     case constants.TermType.Lambda:
       return formatLambda(runtime, value, constants);
     case constants.TermType.Variable:
@@ -739,6 +754,11 @@ function formatList(runtime, value, constants) {
   return `[${getListItems(runtime, value)
     .map((item) => formatTerm(runtime, item, constants))
     .join(', ')}]`;
+}
+
+function formatConstructor(runtime, value, constants) {
+  const keys = getListItems(runtime, runtime.getConstructorKeys(value));
+  return `Constructor({${keys.map((key) => formatTerm(runtime, key, constants)).join(', ')}})`;
 }
 
 function formatRecord(runtime, value, constants) {

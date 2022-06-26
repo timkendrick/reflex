@@ -7,6 +7,7 @@ import builtin from './builtin.test.mjs';
 import cell from './cell.test.mjs';
 import collection from './collection/index.test.mjs';
 import condition from './condition.test.mjs';
+import constructor from './constructor.test.mjs';
 import effect from './effect.test.mjs';
 import float from './float.test.mjs';
 import int from './int.test.mjs';
@@ -16,9 +17,11 @@ import _let from './let.test.mjs';
 import nil from './nil.test.mjs';
 import partial from './partial.test.mjs';
 import pointer from './pointer.test.mjs';
+import record from './record.test.mjs';
 import signal from './signal.test.mjs';
 import string from './string.test.mjs';
 import symbol from './symbol.test.mjs';
+import tree from './tree.test.mjs';
 import variable from './variable.test.mjs';
 
 export default (describe) => {
@@ -28,6 +31,7 @@ export default (describe) => {
   cell(describe);
   collection(describe);
   condition(describe);
+  constructor(describe);
   effect(describe);
   float(describe);
   int(describe);
@@ -36,9 +40,11 @@ export default (describe) => {
   nil(describe);
   partial(describe);
   pointer(describe);
+  record(describe);
   signal(describe);
   string(describe);
   symbol(describe);
+  tree(describe);
   variable(describe);
   iterator(describe);
 };
