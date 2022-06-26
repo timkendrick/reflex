@@ -564,6 +564,9 @@ export function createRuntime(runtime) {
     evaluate(value, state) {
       return runtime.evaluate(value, state);
     },
+    arity(value) {
+      return runtime.arity(value);
+    },
     format(value) {
       if (value === NULL) return 'NULL';
       return formatTerm(runtime, value, constants);

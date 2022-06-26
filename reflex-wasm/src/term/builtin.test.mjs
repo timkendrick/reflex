@@ -13,10 +13,7 @@ export default (describe) => {
         hash(createBuiltin(Stdlib.Subtract)),
         hash(createBuiltin(Stdlib.Subtract)),
       );
-      assert.notStrictEqual(
-        hash(createBuiltin(Stdlib.Add)),
-        hash(createBuiltin(Stdlib.Subtract)),
-      );
+      assert.notStrictEqual(hash(createBuiltin(Stdlib.Add)), hash(createBuiltin(Stdlib.Subtract)));
     });
 
     test('equals', (assert, { createBuiltin, equals, Stdlib }) => {
@@ -25,10 +22,13 @@ export default (describe) => {
         equals(createBuiltin(Stdlib.Subtract), createBuiltin(Stdlib.Subtract)),
         true,
       );
-      assert.strictEqual(
-        equals(createBuiltin(Stdlib.Add), createBuiltin(Stdlib.Subtract)),
-        false,
-      );
+      assert.strictEqual(equals(createBuiltin(Stdlib.Add), createBuiltin(Stdlib.Subtract)), false);
+    });
+
+    test('arity', (assert, { createBuiltin, arity, Stdlib }) => {
+      assert.strictEqual(arity(createBuiltin(Stdlib.Abs)), 1);
+      assert.strictEqual(arity(createBuiltin(Stdlib.Add)), 2);
+      assert.strictEqual(arity(createBuiltin(Stdlib.Fold)), 3);
     });
 
     test('builtin function applications', (assert, {

@@ -150,6 +150,31 @@ export default (describe) => {
       );
     });
 
+    test('arity', (assert, {
+      createConstructor,
+      createEmptyList,
+      createPair,
+      createString,
+      createTriple,
+      createUnitList,
+      arity,
+    }) => {
+      assert.strictEqual(arity(createConstructor(createEmptyList())), 0);
+      assert.strictEqual(arity(createConstructor(createUnitList(createString('foo')))), 1);
+      assert.strictEqual(
+        arity(createConstructor(createPair(createString('foo'), createString('bar')))),
+        2,
+      );
+      assert.strictEqual(
+        arity(
+          createConstructor(
+            createTriple(createString('foo'), createString('bar'), createString('baz')),
+          ),
+        ),
+        3,
+      );
+    });
+
     test('constructor application', (assert, {
       createApplication,
       createConstructor,
@@ -200,7 +225,10 @@ export default (describe) => {
           createTriple(createInt(3), createInt(4), createInt(5)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:Constructor({})(3, 4, 5)> . NULL)}');
+        assert.strictEqual(
+          format(result),
+          '{(<InvalidFunctionArgs:Constructor({})(3, 4, 5)> . NULL)}',
+        );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (function () {
@@ -211,7 +239,10 @@ export default (describe) => {
           createEmptyList(),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{(<InvalidFunctionArgs:Constructor({"foo", "bar", "baz"})()> . NULL)}');
+        assert.strictEqual(
+          format(result),
+          '{(<InvalidFunctionArgs:Constructor({"foo", "bar", "baz"})()> . NULL)}',
+        );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });

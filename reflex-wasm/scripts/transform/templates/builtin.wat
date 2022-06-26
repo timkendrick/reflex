@@ -25,6 +25,9 @@
         (@map $arg_name (@get $arg_names) (local.get (@get $arg_name)))
         (local.get $state)))))
 
+(func (@concat "$" (@get $builtin_name) "::arity") (result i32)
+  (i32.const (@length (@get $arg_names))))
+
 (func (@concat "$" (@get $builtin_name)) (@map $arg_name (@get $arg_names) (param (@get $arg_name) i32)) (param $state i32) (result i32 i32)
   (local $dependencies i32)
   (local.set $dependencies (global.get $NULL))

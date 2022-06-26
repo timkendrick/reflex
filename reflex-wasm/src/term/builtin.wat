@@ -36,6 +36,9 @@
   (func $Term::Builtin::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (global.get $NULL))
 
+  (func $Term::Builtin::traits::arity (param $self i32) (result i32)
+    (call $Builtin::arity (call $Term::Builtin::get::uid (local.get $self))))
+
   (func $Term::Builtin::traits::apply (param $self i32) (param $args i32) (param $state i32) (result i32 i32)
     ;; Invoke the builtin function implementation
     (call $Builtin::apply

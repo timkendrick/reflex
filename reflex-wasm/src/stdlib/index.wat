@@ -136,6 +136,15 @@
         (local.get $state)
         (local.get $target)))
 
+    (func $Builtin::arity (param $target i32) (result i32)
+      (@branch
+        (local.get $target)
+        (@list
+          (@map $builtin
+            (@get $builtins)
+            (return (call (@concat "$" (@get $builtin) "::arity")))))
+        (i32.const 0)))
+
     (@block
       ;; Declare builtin function implementations
       (@map $builtin

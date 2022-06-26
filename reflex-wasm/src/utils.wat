@@ -31,6 +31,12 @@
       (local.get $other)
       (i32.gt_u (local.get $self) (local.get $other))))
 
+  (func $Utils::i32::saturating_sub_u (param $self i32) (param $other i32) (result i32)
+    (select
+      (i32.sub (local.get $self) (local.get $other))
+      (i32.const 0)
+      (i32.le_u (local.get $other) (local.get $self))))
+
   (func $Utils::i32::pow (param $self i32) (param $exponent i32) (result i32)
     ;; See https://rosettacode.org/wiki/Exponentiation_operator#C
     (local $result i32)

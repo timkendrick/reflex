@@ -59,6 +59,9 @@
         (call $Term::Constructor::new
           (local.get $substituted_keys)))))
 
+  (func $Term::Constructor::traits::arity (param $self i32) (result i32)
+    (call $Term::List::get_length (call $Term::Constructor::get::keys (local.get $self))))
+
   (func $Term::Constructor::traits::apply (param $self i32) (param $args i32) (param $state i32) (result i32 i32)
     (local $keys i32)
     (if (result i32 i32)

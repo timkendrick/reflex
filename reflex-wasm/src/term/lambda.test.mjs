@@ -46,6 +46,21 @@ export default (describe) => {
       );
     });
 
+    test('arity', (assert, { createBoolean, createLambda, arity }) => {
+      assert.strictEqual(
+        arity(createLambda(0, createBoolean(true))),
+        0,
+      );
+      assert.strictEqual(
+        arity(createLambda(1, createBoolean(true))),
+        1,
+      );
+      assert.strictEqual(
+        arity(createLambda(2, createBoolean(true))),
+        2,
+      );
+    });
+
     test('basic lambda application', (assert, {
       createApplication,
       createBuiltin,
