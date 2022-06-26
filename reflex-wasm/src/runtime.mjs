@@ -62,8 +62,6 @@ function createConditionTypes(runtime) {
     TypeError: runtime.ConditionType_TypeErrorCondition.value,
     InvalidFunctionTarget: runtime.ConditionType_InvalidFunctionTargetCondition.value,
     InvalidFunctionArgs: runtime.ConditionType_InvalidFunctionArgsCondition.value,
-    InvalidAccessor: runtime.ConditionType_InvalidAccessorCondition.value,
-    InvalidJson: runtime.ConditionType_InvalidJsonCondition.value,
     InvalidPointer: runtime.ConditionType_InvalidPointerCondition.value,
   };
 }
@@ -296,15 +294,6 @@ export function createRuntime(runtime) {
     },
     getInvalidFunctionArgsConditionArgs(value) {
       return runtime.getInvalidFunctionArgsConditionArgs(value);
-    },
-    createInvalidAccessorCondition(target, key) {
-      return runtime.createInvalidAccessorCondition(target, key);
-    },
-    getInvalidAccessorConditionTarget(value) {
-      return runtime.getInvalidAccessorConditionTarget(value);
-    },
-    getInvalidAccessorConditionKey(value) {
-      return runtime.getInvalidAccessorConditionKey(value);
     },
     createEffect(condition) {
       return runtime.createEffect(condition);

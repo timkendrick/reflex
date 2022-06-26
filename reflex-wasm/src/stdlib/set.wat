@@ -22,8 +22,7 @@
             (global.get $NULL))
           (else
             ;; Otherwise return an error
-            (call $Term::Signal::of (call $Term::Condition::invalid_accessor (local.get $self) (local.get $key)))
-            (global.get $NULL)))))
+            (call $Stdlib_Set::impl::default (local.get $self) (local.get $key) (local.get $value) (local.get $state))))))
 
     (@impl
       (i32.eq (global.get $TermType::List))
@@ -44,8 +43,7 @@
             (global.get $NULL))
           (else
             ;; Otherwise return an error
-            (call $Term::Signal::of (call $Term::Condition::invalid_accessor (local.get $self) (local.get $key)))
-            (global.get $NULL)))))
+            (call $Stdlib_Set::impl::default (local.get $self) (local.get $key) (local.get $value) (local.get $state))))))
 
 
     (@impl

@@ -16,11 +16,7 @@
         (if (result i32 i32)
           (i32.eq (global.get $NULL) (local.get $value))
           (then
-            (call $Term::Signal::of
-              (call $Term::Condition::invalid_json
-                (local.get $self)
-                (i32.sub (local.get $offset) (call $Term::String::get_offset (local.get $self)))))
-            (global.get $NULL))
+            (call $Stdlib_ParseJson::impl::default (local.get $self) (local.get $state)))
           (else
             (local.get $value)
             (global.get $NULL)))))

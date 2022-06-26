@@ -26,14 +26,6 @@
         (@field $target (@ref $Term))
         (@field $args (@ref $Term)))
 
-      (@struct $InvalidAccessorCondition
-        (@field $target (@ref $Term))
-        (@field $key (@ref $Term)))
-
-      (@struct $InvalidJsonCondition
-        (@field $source (@ref $Term))
-        (@field $offset i32))
-
       (@struct $InvalidPointerCondition))
 
       (@derive $size (@get $Condition))
@@ -96,12 +88,6 @@
   (func $Term::Condition::invalid_function_args (export "createInvalidFunctionArgsCondition") (param $target i32) (param $args i32) (result i32)
     (call $Term::TermType::Condition::InvalidFunctionArgsCondition::new (local.get $target) (local.get $args)))
 
-  (func $Term::Condition::invalid_accessor (export "createInvalidAccessorCondition") (param $target i32) (param $key i32) (result i32)
-    (call $Term::TermType::Condition::InvalidAccessorCondition::new (local.get $target) (local.get $key)))
-
-  (func $Term::Condition::invalid_json (export "createInvalidJsonCondition") (param $source i32) (param $offset i32) (result i32)
-    (call $Term::TermType::Condition::InvalidJsonCondition::new (local.get $source) (local.get $offset)))
-
   (func $Term::Condition::invalid_pointer (result i32)
     (global.get $Term::Condition::INVALID_POINTER))
 
@@ -140,22 +126,6 @@
   (func $Term::Condition::InvalidFunctionArgsCondition::get::args (export "getInvalidFunctionArgsConditionArgs") (param $self i32) (result i32)
     (call $Term::Condition::get::value (local.get $self))
     (call $InvalidFunctionArgsCondition::get::args))
-
-  (func $Term::Condition::InvalidAccessorCondition::get::target (export "getInvalidAccessorConditionTarget") (param $self i32) (result i32)
-    (call $Term::Condition::get::value (local.get $self))
-    (call $InvalidAccessorCondition::get::target))
-
-  (func $Term::Condition::InvalidAccessorCondition::get::key (export "getInvalidAccessorConditionKey") (param $self i32) (result i32)
-    (call $Term::Condition::get::value (local.get $self))
-    (call $InvalidAccessorCondition::get::key))
-
-  (func $Term::Condition::InvalidJsonCondition::get::target (export "getInvalidJsonConditionSource") (param $self i32) (result i32)
-    (call $Term::Condition::get::value (local.get $self))
-    (call $InvalidJsonCondition::get::source))
-
-  (func $Term::Condition::InvalidJsonCondition::get::key (export "getInvalidJsonConditionOffset") (param $self i32) (result i32)
-    (call $Term::Condition::get::value (local.get $self))
-    (call $InvalidJsonCondition::get::offset))
 
   (func $Term::Condition::invalid_builtin_function_args (param $target i32) (param $args i32) (result i32)
     (call $Term::Condition::invalid_function_args (call $Term::Builtin::new (local.get $target)) (local.get $args)))
