@@ -13,10 +13,12 @@
     (@export $FlattenIterator (@get $FlattenIterator)))
 
   (export "isFlattenIterator" (func $Term::FlattenIterator::is))
-  (export "createFlattenIterator" (func $Term::TermType::FlattenIterator::new))
   (export "getFlattenIteratorSource" (func $Term::FlattenIterator::get::source))
 
   (func $Term::FlattenIterator::startup)
+
+  (func $Term::FlattenIterator::new (export "createFlattenIterator") (param $source i32) (result i32)
+    (call $Term::TermType::FlattenIterator::new (local.get $source)))
 
   (func $Term::FlattenIterator::traits::is_atomic (param $self i32) (result i32)
     (i32.eqz

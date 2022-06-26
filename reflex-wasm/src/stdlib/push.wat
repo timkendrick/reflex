@@ -16,9 +16,10 @@
       (call $Term::implements::iterate)
       (i32.or (i32.const 0xFFFFFFFF))
       (func $Stdlib_Push::impl::<iterate>::any (param $self i32) (param $item i32) (param $state i32) (result i32 i32)
-        (call $Term::ChainIterator::create_pair
-          (local.get $self)
-          (call $Term::OnceIterator::new (local.get $item)))
+        (call $Term::FlattenIterator::new
+          (call $Term::List::create_pair
+            (local.get $self)
+            (call $Term::OnceIterator::new (local.get $item))))
         (global.get $NULL)))
 
     (@default

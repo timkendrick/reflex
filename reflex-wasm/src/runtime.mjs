@@ -25,7 +25,6 @@ function createTermTypes(runtime) {
     Signal: runtime.TermType_Signal.value,
     String: runtime.TermType_String.value,
     Symbol: runtime.TermType_Symbol.value,
-    ChainIterator: runtime.TermType_ChainIterator.value,
     EmptyIterator: runtime.TermType_EmptyIterator.value,
     EvaluateIterator: runtime.TermType_EvaluateIterator.value,
     FilterIterator: runtime.TermType_FilterIterator.value,
@@ -445,11 +444,6 @@ export function createRuntime(runtime) {
     },
     createTakeIterator(source, count) {
       return runtime.createTakeIterator(source, count);
-    },
-    createChainIterator(sources) {
-      const instance = runtime.allocateChainIterator(sources.length);
-      sources.forEach((source, index) => runtime.setChainIteratorSource(instance, index, source));
-      return runtime.initChainIterator(instance, sources.length);
     },
     createZipIterator(left, right) {
       return runtime.createZipIterator(left, right);

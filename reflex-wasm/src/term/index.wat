@@ -14,7 +14,6 @@
   (@include "./effect.wat")
   (@include "./float.wat")
   (@include "./int.wat")
-  (@include "./iterator/chain.wat")
   (@include "./iterator/empty.wat")
   (@include "./iterator/evaluate.wat")
   (@include "./iterator/filter.wat")
@@ -56,7 +55,6 @@
       (@import $Signal "./signal.wat")
       (@import $String "./string.wat")
       (@import $Symbol "./symbol.wat")
-      (@import $ChainIterator "./iterator/chain.wat")
       (@import $EmptyIterator "./iterator/empty.wat")
       (@import $EvaluateIterator "./iterator/evaluate.wat")
       (@import $FilterIterator "./iterator/filter.wat")
@@ -168,7 +166,6 @@
         $RepeatIterator
         $SkipIterator
         $TakeIterator
-        $ChainIterator
         $ZipIterator
         $MapIterator
         $FilterIterator

@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-import chain from './chain.test.mjs';
 import empty from './empty.test.mjs';
 import evaluate from './evaluate.test.mjs';
 import filter from './filter.test.mjs';
@@ -18,7 +17,6 @@ import take from './take.test.mjs';
 import zip from './zip.test.mjs';
 
 export default (describe) => {
-  chain(describe);
   empty(describe);
   evaluate(describe);
   filter(describe);
