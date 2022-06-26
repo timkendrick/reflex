@@ -29,6 +29,9 @@
   (func $Term::FlattenIterator::traits::display (param $self i32) (param $offset i32) (result i32)
     (call $TermType::traits::display (global.get $TermType::FlattenIterator) (local.get $offset)))
 
+  (func $Term::FlattenIterator::traits::debug (param $self i32) (param $offset i32) (result i32)
+    (call $Term::FlattenIterator::traits::display (local.get $self) (local.get $offset)))
+
   (func $Term::FlattenIterator::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (local $substituted_source i32)
     (local.set $substituted_source

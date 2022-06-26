@@ -182,62 +182,65 @@
             (block
               (@store-bytes $offset ":")
               (local.set $offset (i32.add (local.get $offset)))
-              (local.set $offset (call $Term::Condition::CustomCondition::traits::display (local.get $self) (local.get $offset)))
+              (local.set $offset (call $Term::Condition::CustomCondition::traits::debug (local.get $self) (local.get $offset)))
               (br $BLOCK)))
           (@list
             (i32.eq (local.get $type) (global.get $Condition::ErrorCondition))
             (block
               (@store-bytes $offset ":")
               (local.set $offset (i32.add (local.get $offset)))
-              (local.set $offset (call $Term::Condition::ErrorCondition::traits::display (local.get $self) (local.get $offset)))
+              (local.set $offset (call $Term::Condition::ErrorCondition::traits::debug (local.get $self) (local.get $offset)))
               (br $BLOCK)))
           (@list
             (i32.eq (local.get $type) (global.get $Condition::TypeErrorCondition))
             (block
               (@store-bytes $offset ":")
               (local.set $offset (i32.add (local.get $offset)))
-              (local.set $offset (call $Term::Condition::TypeErrorCondition::traits::display (local.get $self) (local.get $offset)))
+              (local.set $offset (call $Term::Condition::TypeErrorCondition::traits::debug (local.get $self) (local.get $offset)))
               (br $BLOCK)))
           (@list
             (i32.eq (local.get $type) (global.get $Condition::InvalidFunctionTargetCondition))
             (block
               (@store-bytes $offset ":")
               (local.set $offset (i32.add (local.get $offset)))
-              (local.set $offset (call $Term::Condition::InvalidFunctionTargetCondition::traits::display (local.get $self) (local.get $offset)))
+              (local.set $offset (call $Term::Condition::InvalidFunctionTargetCondition::traits::debug (local.get $self) (local.get $offset)))
               (br $BLOCK)))
           (@list
             (i32.eq (local.get $type) (global.get $Condition::InvalidFunctionArgsCondition))
             (block
               (@store-bytes $offset ":")
               (local.set $offset (i32.add (local.get $offset)))
-              (local.set $offset (call $Term::Condition::InvalidFunctionArgsCondition::traits::display (local.get $self) (local.get $offset)))
+              (local.set $offset (call $Term::Condition::InvalidFunctionArgsCondition::traits::debug (local.get $self) (local.get $offset)))
               (br $BLOCK))))))
     (@store-bytes $offset ">")
     (i32.add (local.get $offset)))
 
-  (func $Term::Condition::CustomCondition::traits::display (param $self i32) (param $offset i32) (result i32)
+  (func $Term::Condition::traits::debug (param $self i32) (param $offset i32) (result i32)
+    (call $Term::Condition::traits::display (local.get $self) (local.get $offset)))
+
+  (func $Term::Condition::CustomCondition::traits::debug (param $self i32) (param $offset i32) (result i32)
     (local.set $offset
-      (call $Term::traits::display
+      (call $Term::traits::debug
         (call $Term::Condition::CustomCondition::get::effect_type (local.get $self))
         (local.get $offset)))
     (@store-bytes $offset ":")
     (local.set $offset (i32.add (local.get $offset)))
     (local.set $offset
-      (call $Term::traits::display
+      (call $Term::traits::debug
         (call $Term::Condition::CustomCondition::get::payload (local.get $self))
         (local.get $offset)))
     (@store-bytes $offset ":")
     (local.set $offset (i32.add (local.get $offset)))
-    (call $Term::traits::display
+    (call $Term::traits::debug
       (call $Term::Condition::CustomCondition::get::token (local.get $self))
       (local.get $offset)))
 
-  (func $Term::Condition::ErrorCondition::traits::display (param $self i32) (param $offset i32) (result i32)
-    (call $Term::traits::display
+  (func $Term::Condition::ErrorCondition::traits::debug (param $self i32) (param $offset i32) (result i32)
+    (call $Term::traits::debug
       (call $Term::Condition::ErrorCondition::get::payload (local.get $self))
       (local.get $offset)))
 
-  (func $Term::Condition::TypeErrorCondition::traits::display (param $self i32) (param $offset i32) (result i32)
+  (func $Term::Condition::TypeErrorCondition::traits::debug (param $self i32) (param $offset i32) (result i32)
     (local $expected i32)
     (local.set $offset
       (if (result i32)
@@ -252,22 +255,22 @@
           (i32.add (local.get $offset)))))
     (@store-bytes $offset ":")
     (local.set $offset (i32.add (local.get $offset)))
-    (call $Term::traits::display
+    (call $Term::traits::debug
       (call $Term::Condition::TypeErrorCondition::get::received (local.get $self))
       (local.get $offset)))
 
-  (func $Term::Condition::InvalidFunctionTargetCondition::traits::display (param $self i32) (param $offset i32) (result i32)
-    (call $Term::traits::display
+  (func $Term::Condition::InvalidFunctionTargetCondition::traits::debug (param $self i32) (param $offset i32) (result i32)
+    (call $Term::traits::debug
       (call $Term::Condition::InvalidFunctionTargetCondition::get::target (local.get $self))
       (local.get $offset)))
 
-  (func $Term::Condition::InvalidFunctionArgsCondition::traits::display (param $self i32) (param $offset i32) (result i32)
+  (func $Term::Condition::InvalidFunctionArgsCondition::traits::debug (param $self i32) (param $offset i32) (result i32)
     (local $args i32)
     (local $num_args i32)
     (local $index i32)
     ;; Write the function target to the output
     (local.set $offset
-      (call $Term::traits::display
+      (call $Term::traits::debug
         (call $Term::Condition::InvalidFunctionArgsCondition::get::target (local.get $self))
         (local.get $offset)))
     ;; Write the opening parenthesis to the output
@@ -290,7 +293,7 @@
               (local.set $offset (i32.add (local.get $offset)))))
           ;; Write the argument to the output
           (local.set $offset
-            (call $Term::traits::display
+            (call $Term::traits::debug
               (call $Term::List::get_item (local.get $args) (local.get $index))
               (local.get $offset)))
           ;; If this is not the final argument, continue with the next one

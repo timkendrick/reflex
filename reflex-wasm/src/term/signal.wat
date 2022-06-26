@@ -23,6 +23,9 @@
   (func $Term::Signal::of (export "createSignal") (param $condition i32) (result i32)
     (call $Term::TermType::Signal::new (call $Term::Tree::of (local.get $condition))))
 
+  (func $Term::Signal::new (param $conditions i32) (result i32)
+    (call $Term::TermType::Signal::new (local.get $conditions)))
+
   (func $Term::Signal::pending (export "createPendingSignal") (result i32)
     (global.get $Term::Signal::PENDING))
 
@@ -75,6 +78,9 @@
     (@store-bytes $offset "}")
     (i32.add (local.get $offset)))
 
+  (func $Term::Signal::traits::debug (param $self i32) (param $offset i32) (result i32)
+    (call $Term::Signal::traits::display (local.get $self) (local.get $offset)))
+
   (func $Term::Signal::display_tree_items (param $self i32) (param $offset i32) (param $separator i32) (result i32)
     (local $updated_offset i32)
     (if (result i32)
@@ -106,7 +112,7 @@
               (then
                 (@store-bytes $offset ",")
                 (local.set $offset (i32.add (local.get $offset)))))
-            (call $Term::traits::display (local.get $self) (local.get $offset)))))))
+            (call $Term::traits::debug (local.get $self) (local.get $offset)))))))
 
   (func $Term::Signal::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (global.get $NULL))

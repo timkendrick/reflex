@@ -3,6 +3,12 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 export default (describe) => {
   describe('Term::Int', (test) => {
+    test('display', (assert, { createInt, display }) => {
+      assert.strictEqual(display(createInt(0)), '0');
+      assert.strictEqual(display(createInt(3)), '3');
+      assert.strictEqual(display(createInt(-3)), '-3');
+    });
+
     test('format', (assert, { createInt, format }) => {
       assert.strictEqual(format(createInt(0)), '0');
       assert.strictEqual(format(createInt(3)), '3');

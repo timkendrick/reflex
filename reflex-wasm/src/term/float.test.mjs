@@ -3,6 +3,15 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 export default (describe) => {
   describe('Term::Float', (test) => {
+    test('display', (assert, { createFloat, display }) => {
+      assert.strictEqual(display(createFloat(0.0)), '0.0');
+      assert.strictEqual(display(createFloat(-0.0)), '0.0');
+      assert.strictEqual(display(createFloat(3.0)), '3.0');
+      assert.strictEqual(display(createFloat(-3.0)), '-3.0');
+      assert.strictEqual(display(createFloat(3.142)), '3.142');
+      assert.strictEqual(display(createFloat(-3.142)), '-3.142');
+    });
+
     test('format', (assert, { createFloat, format }) => {
       assert.strictEqual(format(createFloat(0.0)), '0.0');
       assert.strictEqual(format(createFloat(-0.0)), '0.0');

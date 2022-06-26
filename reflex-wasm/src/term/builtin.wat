@@ -34,6 +34,9 @@
   (func $Term::Builtin::traits::display (param $self i32) (param $offset i32) (result i32)
     (call $Builtin::display (call $Term::Builtin::get::uid (local.get $self)) (local.get $offset)))
 
+  (func $Term::Builtin::traits::debug (param $self i32) (param $offset i32) (result i32)
+    (call $Term::Builtin::traits::display (local.get $self) (local.get $offset)))
+
   (func $Term::Builtin::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (global.get $NULL))
 

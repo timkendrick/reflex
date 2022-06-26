@@ -49,6 +49,9 @@
         (@store-bytes $offset "false")
         (i32.add (local.get $offset)))))
 
+  (func $Term::Boolean::traits::debug (param $self i32) (param $offset i32) (result i32)
+    (call $Term::Boolean::traits::display (local.get $self) (local.get $offset)))
+
   (func $Term::Boolean::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (global.get $NULL))
 

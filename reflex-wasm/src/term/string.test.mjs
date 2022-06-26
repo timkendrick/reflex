@@ -3,6 +3,12 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 export default (describe) => {
   describe('Term::String', (test) => {
+    test('display', (assert, { createString, display }) => {
+      assert.strictEqual(display(createString('')), '');
+      assert.strictEqual(display(createString('foo')), 'foo');
+      assert.strictEqual(display(createString('"')), '"');
+    });
+
     test('format', (assert, { createString, format }) => {
       assert.strictEqual(format(createString('')), '""');
       assert.strictEqual(format(createString('foo')), '"foo"');

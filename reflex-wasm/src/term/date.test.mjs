@@ -3,9 +3,17 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 export default (describe) => {
   describe('Term::Date', (test) => {
+    test('display', (assert, { createDate, display }) => {
+      const timestamp = Date.now();
+      assert.strictEqual(display(createDate(timestamp)), new Date(timestamp).toISOString());
+    });
+
     test('format', (assert, { createDate, format }) => {
       const timestamp = Date.now();
-      assert.strictEqual(format(createDate(timestamp)), new Date(timestamp).toISOString());
+      assert.strictEqual(
+        format(createDate(timestamp)),
+        `Date(${new Date(timestamp).toISOString()})`,
+      );
     });
 
     test('hash', (assert, { createDate, hash }) => {

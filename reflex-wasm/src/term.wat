@@ -72,6 +72,7 @@
         (global.get $NULL))))
 
   (export "display" (func $Term::traits::display))
+  (export "debug" (func $Term::traits::debug))
   (export "evaluate" (func $Term::traits::evaluate))
 
   (func $Term::traits::equals (export "equals") (param $self i32) (param $other i32) (result i32)
@@ -129,7 +130,25 @@
     (i32.eqz (call $Term::implements::evaluate (local.get $self))))
 
   (func $Term::drop (param $self i32)
-    (call $Term::redirect (local.get $self) (call $Term::Signal::invalid_pointer)))
+    (local $size i32)
+    (local $end_offset i32)
+    (local $foo i32)
+    ;; If this was the most recently allocated object, nothing can ever have referenced it, so it can be safely wiped.
+    ;; Otherwise there may theoretically still be dangling references to the disposed term, so we point it to an error.
+    (if
+      ;; Consult the current allocator offset to check whether this was the most recently allocated object
+      (i32.eq
+        (call $Allocator::get_offset)
+        (local.tee $end_offset
+          (i32.add
+            (local.get $self)
+            (local.tee $size (call $Term::traits::size (local.get $self))))))
+      (then
+        ;; If this was the most recently allocated object, wipe the memory
+        (call $Allocator::shrink (local.get $end_offset) (local.get $size)))
+      (else
+        ;; Otherwise create a redirect from the old address to an 'invalid pointer' error
+        (call $Term::redirect (local.get $self) (call $Term::Signal::invalid_pointer)))))
 
   (func $Term::redirect (param $self i32) (param $target i32)
     ;; TODO: When overwriting cell with redirect pointer, somehow mark truncated fields as elibible for GC

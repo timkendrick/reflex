@@ -30,6 +30,9 @@
     (@store-bytes $offset ")")
     (i32.add (local.get $offset)))
 
+  (func $Term::Cell::traits::debug (param $self i32) (param $offset i32) (result i32)
+    (call $Term::Cell::traits::display (local.get $self) (local.get $offset)))
+
   (func $Term::Cell::empty::sizeof (result i32)
     ;; Determine the size of the term wrapper by inspecting the cell fields pointer for an imaginary cell term located
     ;; at memory address 0. The pointer offset tells us how many bytes are taken up by the preceding cell wrapper.

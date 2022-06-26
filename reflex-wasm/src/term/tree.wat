@@ -72,7 +72,7 @@
           (@store-bytes $offset "NULL")
           (i32.add (local.get $offset)))
         (else
-          (call $Term::traits::display (local.get $branch) (local.get $offset)))))
+          (call $Term::traits::debug (local.get $branch) (local.get $offset)))))
     ;; Write the pair separator to the output
     (@store-bytes $offset " . ")
     (local.set $offset (i32.add (local.get $offset)))
@@ -86,10 +86,13 @@
           (@store-bytes $offset "NULL")
           (i32.add (local.get $offset)))
         (else
-          (call $Term::traits::display (local.get $branch) (local.get $offset)))))
+          (call $Term::traits::debug (local.get $branch) (local.get $offset)))))
     ;; Write the closing parenthesis to the output and return the updated offset
     (@store-bytes $offset ")")
     (i32.add (local.get $offset)))
+
+  (func $Term::Tree::traits::debug (param $self i32) (param $offset i32) (result i32)
+    (call $Term::Tree::traits::display (local.get $self) (local.get $offset)))
 
   (func $Term::Tree::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (local $left i32)

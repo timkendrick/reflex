@@ -41,6 +41,9 @@
       (local.get $offset))
     (i32.add (local.get $offset)))
 
+  (func $Term::Float::traits::debug (param $self i32) (param $offset i32) (result i32)
+    (call $Term::Float::traits::display (local.get $self) (local.get $offset)))
+
   (func $Term::Float::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (global.get $NULL))
 

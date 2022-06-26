@@ -100,7 +100,7 @@
               (local.set $offset (i32.add (local.get $offset)))))
           ;; Write the key to the output
           (local.set $offset
-            (call $Term::traits::display
+            (call $Term::traits::debug
               (call $Term::List::get_item (local.get $keys) (local.get $index))
               (local.get $offset)))
           ;; Write the separator to the output
@@ -108,7 +108,7 @@
           (local.set $offset (i32.add (local.get $offset)))
           ;; Write the value to the output
           (local.set $offset
-            (call $Term::traits::display
+            (call $Term::traits::debug
               (call $Term::List::get_item (local.get $values) (local.get $index))
               (local.get $offset)))
           ;; If this is not the final field, continue with the next one
@@ -116,6 +116,9 @@
         ;; Write the closing brace to the output and return the updated offset
         (@store-bytes $offset " }")
         (i32.add (local.get $offset)))))
+
+  (func $Term::Record::traits::debug (param $self i32) (param $offset i32) (result i32)
+    (call $Term::Record::traits::display (local.get $self) (local.get $offset)))
 
   (func $Term::Record::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (local $substituted_keys i32)

@@ -40,11 +40,14 @@
   (@include "./iterate.wat")
   (@include "./js/accessor.wat")
   (@include "./js/construct.wat")
+  (@include "./js/debug.wat")
+  (@include "./js/format_error_message.wat")
   (@include "./js/is_finite.wat")
   (@include "./js/log.wat")
   (@include "./js/parse_date.wat")
   (@include "./js/parse_float.wat")
   (@include "./js/parse_int.wat")
+  (@include "./js/throw.wat")
   (@include "./js/to_string.wat")
   (@include "./js/urlencode.wat")
   (@include "./json/parse_json.wat")
@@ -96,6 +99,7 @@
       $Stdlib_CollectTree
       $Stdlib_Cons
       $Stdlib_Construct
+      $Stdlib_Debug
       $Stdlib_Divide
       $Stdlib_Effect
       $Stdlib_EndsWith
@@ -103,6 +107,7 @@
       $Stdlib_Equal
       $Stdlib_Floor
       $Stdlib_Fold
+      $Stdlib_FormatErrorMessage
       $Stdlib_Get
       $Stdlib_Getter
       $Stdlib_GraphQlResolver
@@ -151,6 +156,7 @@
       $Stdlib_StringifyJson
       $Stdlib_Subtract
       $Stdlib_Take
+      $Stdlib_Throw
       $Stdlib_ToRequest
       $Stdlib_ToString
       $Stdlib_Urlencode

@@ -32,6 +32,9 @@
     (@store-bytes $offset "null")
     (i32.add (local.get $offset)))
 
+  (func $Term::Nil::traits::debug (param $self i32) (param $offset i32) (result i32)
+    (call $Term::Nil::traits::display (local.get $self) (local.get $offset)))
+
   (func $Term::Nil::traits::to_json (param $self i32) (param $offset i32) (result i32 i32)
     ;; Put the success marker on the stack
     (global.get $TRUE)

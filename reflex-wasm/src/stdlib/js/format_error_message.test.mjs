@@ -1,0 +1,328 @@
+// SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
+export default (describe) => {
+  describe('Stdlib_FormatErrorMessage', (test) => {
+    test('(String)', (assert, {
+      createApplication,
+      createBuiltin,
+      createString,
+      createUnitList,
+      evaluate,
+      format,
+      getStringValue,
+      isString,
+      NULL,
+      Stdlib,
+    }) => {
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.FormatErrorMessage),
+          createUnitList(createString('foo')),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.ok(isString(result));
+        assert.strictEqual(getStringValue(result), 'foo');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.FormatErrorMessage),
+          createUnitList(createString('"foo"')),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.ok(isString(result));
+        assert.strictEqual(getStringValue(result), '"foo"');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+    });
+
+    test('(Record)', (assert, {
+      createApplication,
+      createBuiltin,
+      createInt,
+      createPair,
+      createRecord,
+      createString,
+      createTriple,
+      createUnitList,
+      evaluate,
+      format,
+      getStringValue,
+      isString,
+      NULL,
+      Stdlib,
+    }) => {
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.FormatErrorMessage),
+          createUnitList(
+            createRecord(
+              createPair(createString('name'), createString('message')),
+              createPair(createString('Error'), createString('foo')),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.ok(isString(result));
+        assert.strictEqual(getStringValue(result), 'foo');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.FormatErrorMessage),
+          createUnitList(
+            createRecord(
+              createPair(createString('name'), createString('message')),
+              createPair(createString('Error'), createInt(3)),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.ok(isString(result));
+        assert.strictEqual(getStringValue(result), '3');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.FormatErrorMessage),
+          createUnitList(
+            createRecord(
+              createTriple(createString('foo'), createString('bar'), createString('baz')),
+              createTriple(createInt(3), createInt(4), createInt(5)),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.ok(isString(result));
+        assert.strictEqual(getStringValue(result), '{ "foo": 3, "bar": 4, "baz": 5 }');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+    });
+
+    test('(List)', (assert, {
+      createApplication,
+      createBuiltin,
+      createEmptyList,
+      createList,
+      createPair,
+      createRecord,
+      createString,
+      createUnitList,
+      evaluate,
+      format,
+      getStringValue,
+      isString,
+      NULL,
+      Stdlib,
+    }) => {
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.FormatErrorMessage),
+          createUnitList(createEmptyList()),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.ok(isString(result));
+        assert.strictEqual(getStringValue(result), '');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.FormatErrorMessage),
+          createUnitList(
+            createUnitList(
+              createRecord(
+                createPair(createString('name'), createString('message')),
+                createPair(createString('Error'), createString('foo')),
+              ),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.ok(isString(result));
+        assert.strictEqual(getStringValue(result), 'foo');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.FormatErrorMessage),
+          createUnitList(
+            createPair(
+              createRecord(
+                createPair(createString('name'), createString('message')),
+                createPair(createString('Error'), createString('foo')),
+              ),
+              createRecord(
+                createPair(createString('name'), createString('message')),
+                createPair(createString('Error'), createString('bar')),
+              ),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.ok(isString(result));
+        assert.strictEqual(getStringValue(result), 'foo\nbar');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.FormatErrorMessage),
+          createUnitList(
+            createList(
+              Array.from({ length: 9 }, (_, i) =>
+                createRecord(
+                  createPair(createString('name'), createString('message')),
+                  createPair(createString('Error'), createString(`Item ${i + 1}`)),
+                ),
+              ),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.ok(isString(result));
+        assert.strictEqual(
+          getStringValue(result),
+          'Item 1\nItem 2\nItem 3\nItem 4\nItem 5\nItem 6\nItem 7\nItem 8\nItem 9',
+        );
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.FormatErrorMessage),
+          createUnitList(
+            createList(
+              Array.from({ length: 10 }, (_, i) =>
+                createRecord(
+                  createPair(createString('name'), createString('message')),
+                  createPair(createString('Error'), createString(`Item ${i + 1}`)),
+                ),
+              ),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.ok(isString(result));
+        assert.strictEqual(
+          getStringValue(result),
+          'Item 1\nItem 2\nItem 3\nItem 4\nItem 5\nItem 6\nItem 7\nItem 8\nItem 9\nItem 10',
+        );
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.FormatErrorMessage),
+          createUnitList(
+            createList(
+              Array.from({ length: 11 }, (_, i) =>
+                createRecord(
+                  createPair(createString('name'), createString('message')),
+                  createPair(createString('Error'), createString(`Item ${i + 1}`)),
+                ),
+              ),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.ok(isString(result));
+        assert.strictEqual(
+          getStringValue(result),
+          'Item 1\nItem 2\nItem 3\nItem 4\nItem 5\nItem 6\nItem 7\nItem 8\nItem 9\n...2 more errors',
+        );
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.FormatErrorMessage),
+          createUnitList(
+            createList(
+              Array.from({ length: 12 }, (_, i) =>
+                createRecord(
+                  createPair(createString('name'), createString('message')),
+                  createPair(createString('Error'), createString(`Item ${i + 1}`)),
+                ),
+              ),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.ok(isString(result));
+        assert.strictEqual(
+          getStringValue(result),
+          'Item 1\nItem 2\nItem 3\nItem 4\nItem 5\nItem 6\nItem 7\nItem 8\nItem 9\n...3 more errors',
+        );
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+    });
+
+    test('(Iterator)', (assert, {
+      createApplication,
+      createBoolean,
+      createBuiltin,
+      createFilterIterator,
+      createLambda,
+      createMapIterator,
+      createList,
+      createPair,
+      createRecord,
+      createString,
+      createUnitList,
+      evaluate,
+      format,
+      getStringValue,
+      isString,
+      NULL,
+      Stdlib,
+    }) => {
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.FormatErrorMessage),
+          createUnitList(
+            createMapIterator(
+              createList(
+                Array.from({ length: 12 }, (_, i) =>
+                  createRecord(
+                    createPair(createString('name'), createString('message')),
+                    createPair(createString('Error'), createString(`Item ${i + 1}`)),
+                  ),
+                ),
+              ),
+              createBuiltin(Stdlib.Identity),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.ok(isString(result));
+        assert.strictEqual(
+          getStringValue(result),
+          'Item 1\nItem 2\nItem 3\nItem 4\nItem 5\nItem 6\nItem 7\nItem 8\nItem 9\n...3 more errors',
+        );
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.FormatErrorMessage),
+          createUnitList(
+            createFilterIterator(
+              createList(
+                Array.from({ length: 12 }, (_, i) =>
+                  createRecord(
+                    createPair(createString('name'), createString('message')),
+                    createPair(createString('Error'), createString(`Item ${i + 1}`)),
+                  ),
+                ),
+              ),
+              createLambda(1, createBoolean(true)),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.ok(isString(result));
+        assert.strictEqual(
+          getStringValue(result),
+          'Item 1\nItem 2\nItem 3\nItem 4\nItem 5\nItem 6\nItem 7\nItem 8\nItem 9\n...3 more errors',
+        );
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+    });
+  });
+};

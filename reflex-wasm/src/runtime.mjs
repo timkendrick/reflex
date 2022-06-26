@@ -43,6 +43,7 @@ function createTermTypes(runtime) {
     HashmapKeysIterator: runtime.TermType_HashmapKeysIterator.value,
     HashmapValuesIterator: runtime.TermType_HashmapValuesIterator.value,
     IntegersIterator: runtime.TermType_IntegersIterator.value,
+    IntersperseIterator: runtime.TermType_IntersperseIterator.value,
     MapIterator: runtime.TermType_MapIterator.value,
     OnceIterator: runtime.TermType_OnceIterator.value,
     RangeIterator: runtime.TermType_RangeIterator.value,
@@ -85,6 +86,7 @@ function createStdlib(runtime) {
     CollectTree: runtime.Stdlib_CollectTree.value,
     Cons: runtime.Stdlib_Cons.value,
     Construct: runtime.Stdlib_Construct.value,
+    Debug: runtime.Stdlib_Debug.value,
     Divide: runtime.Stdlib_Divide.value,
     Effect: runtime.Stdlib_Effect.value,
     EndsWith: runtime.Stdlib_EndsWith.value,
@@ -92,6 +94,7 @@ function createStdlib(runtime) {
     Equal: runtime.Stdlib_Equal.value,
     Floor: runtime.Stdlib_Floor.value,
     Fold: runtime.Stdlib_Fold.value,
+    FormatErrorMessage: runtime.Stdlib_FormatErrorMessage.value,
     Get: runtime.Stdlib_Get.value,
     Getter: runtime.Stdlib_Getter.value,
     Gt: runtime.Stdlib_Gt.value,
@@ -140,6 +143,7 @@ function createStdlib(runtime) {
     StringifyJson: runtime.Stdlib_StringifyJson.value,
     Subtract: runtime.Stdlib_Subtract.value,
     Take: runtime.Stdlib_Take.value,
+    Throw: runtime.Stdlib_Throw.value,
     ToRequest: runtime.Stdlib_ToRequest.value,
     ToString: runtime.Stdlib_ToString.value,
     Urlencode: runtime.Stdlib_Urlencode.value,
@@ -517,6 +521,9 @@ export function createRuntime(runtime) {
     createIntegersIterator() {
       return runtime.createIntegersIterator();
     },
+    createIntersperseIterator(source, separator) {
+      return runtime.createIntersperseIterator(source, separator);
+    },
     createRangeIterator(offset, length) {
       return runtime.createRangeIterator(offset, length);
     },
@@ -540,6 +547,14 @@ export function createRuntime(runtime) {
     },
     format(value) {
       if (value === NULL) return 'NULL';
+      const offset = runtime.getAllocatorOffset();
+      const length = runtime.debug(value, offset) - offset;
+      const bytes = new Uint8Array(runtime.memory.buffer, offset, length);
+      const stringValue = new TextDecoder('utf-8').decode(bytes);
+      runtime.deallocate(offset + length, length);
+      return stringValue;
+    },
+    display(value) {
       const offset = runtime.getAllocatorOffset();
       const length = runtime.display(value, offset) - offset;
       const bytes = new Uint8Array(runtime.memory.buffer, offset, length);

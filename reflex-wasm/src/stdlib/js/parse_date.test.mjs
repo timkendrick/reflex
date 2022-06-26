@@ -22,7 +22,7 @@ export default (describe) => {
       );
       const [result, dependencies] = evaluate(expression, NULL);
       assert.ok(isDate(result));
-      assert.strictEqual(format(result), new Date(timestamp).toISOString());
+      assert.strictEqual(format(result), `Date(${new Date(timestamp).toISOString()})`);
       assert.strictEqual(format(dependencies), 'NULL');
     });
 
@@ -44,7 +44,7 @@ export default (describe) => {
       );
       const [result, dependencies] = evaluate(expression, NULL);
       assert.ok(isDate(result));
-      assert.strictEqual(format(result), new Date(timestamp).toISOString());
+      assert.strictEqual(format(result), `Date(${new Date(timestamp).toISOString()})`);
       assert.strictEqual(format(dependencies), 'NULL');
     });
 
@@ -66,7 +66,7 @@ export default (describe) => {
       );
       const [result, dependencies] = evaluate(expression, NULL);
       assert.ok(isDate(result));
-      assert.strictEqual(format(result), new Date(timestamp).toISOString());
+      assert.strictEqual(format(result), `Date(${new Date(timestamp).toISOString()})`);
       assert.strictEqual(format(dependencies), 'NULL');
     });
   });

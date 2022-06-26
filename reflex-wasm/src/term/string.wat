@@ -62,7 +62,8 @@
     (call $Term::init (local.get $self)))
 
   (func $Term::String::allocate_unsized (result i32)
-    ;; TODO: Return empty string initially, reallocating when string is extended (see List implementation)
+    ;; Allocate a new zero-length string, ready for data to be written into its contents
+    ;; The string must be instantiated before it can be used.
     (call $Term::String::allocate_sized (i32.const 0)))
 
   (func $Term::String::init_unsized (param $self i32) (param $length i32) (result i32)
@@ -83,6 +84,29 @@
     ;; Allocate a new string of the required length
     ;; (this will return the pre-allocated empty string singleton)
     (call $Term::String::allocate (i32.const 0)))
+
+  (func $Term::String::from (param $value i32) (result i32)
+    (local $instance i32)
+    (local $end_offset i32)
+    (if (result i32)
+      ;; If the provided value is already a string, return it as-is
+      (call $Term::String::is (local.get $value))
+      (then
+        (local.get $value))
+      (else
+        ;; Allocate a new dynamic string term
+        (local.set $instance (call $Term::String::allocate_unsized))
+        ;; Serialize the input term into the newly-allocated string contents
+        (local.set $end_offset
+          (call $Term::traits::display
+            (local.get $value)
+            (call $Term::String::get_char_pointer (local.get $instance) (i32.const 0))))
+        ;; Initialize the dynamic string term
+        (call $Term::String::init_unsized
+          (local.get $instance)
+          (i32.sub
+            (local.get $end_offset)
+            (call $Term::String::get_char_pointer (local.get $instance) (i32.const 0)))))))
 
   (func $Term::String::from_char (param $char i32) (result i32)
     (local $instance i32)
@@ -130,6 +154,18 @@
     (global.get $TRUE))
 
   (func $Term::String::traits::display (param $self i32) (param $offset i32) (result i32)
+    (local $length i32)
+    (call $Allocator::extend
+      (local.get $offset)
+      (local.tee $length (call $Term::String::get_length (local.get $self))))
+    (memory.copy
+      (local.get $offset)
+      (call $Term::String::get_offset (local.get $self))
+      (local.get $length))
+    (i32.add (local.get $offset) (local.get $length)))
+
+  (func $Term::String::traits::debug (param $self i32) (param $offset i32) (result i32)
+    ;; Write the serialized value to the output string and return the updated offset
     (i32.add
       (local.get $offset)
       (call $Utils::bytes::write_json
@@ -154,8 +190,9 @@
   (func $Term::String::traits::length (param $self i32) (result i32)
     (call $Term::String::get_length (local.get $self)))
 
-  (func $Term::String::traits::collect (param $iterator i32) (param $num_sources i32) (param $state i32) (result i32 i32)
+  (func $Term::String::traits::collect (param $iterator i32) (param $state i32) (result i32 i32)
     (local $dependencies i32)
+    ;; TODO: Avoid unnecessary heap allocations for intermediate values
     (call $Term::List::traits::collect (local.get $iterator) (local.get $state))
     (local.set $dependencies)
     (call $Term::String::collect_string_list)
@@ -163,6 +200,7 @@
 
   (func $Term::String::traits::collect_strict (param $iterator i32) (param $state i32) (result i32 i32)
     (local $dependencies i32)
+    ;; TODO: Avoid unnecessary heap allocations for intermediate values
     (call $Term::List::traits::collect_strict (local.get $iterator) (local.get $state))
     (local.set $dependencies)
     (call $Term::String::collect_string_list)
@@ -198,7 +236,7 @@
                 (call $Term::Signal::traits::union
                   (local.get $type_error)
                   (call $Term::Signal::of
-                    (call $Term::Condition::type_error (global.get $TermType::String (local.get $source)))))))
+                    (call $Term::Condition::type_error (global.get $TermType::String) (local.get $source))))))
             (else
               ;; Otherwise increase the combined string length
               (local.set $length (i32.add (local.get $length) (call $Term::String::get_length (local.get $source))))))

@@ -43,6 +43,9 @@
     (@store-bytes $offset ")")
     (i32.add (local.get $offset)))
 
+  (func $Term::Hashset::traits::debug (param $self i32) (param $offset i32) (result i32)
+    (call $Term::Hashset::traits::display (local.get $self) (local.get $offset)))
+
   (func $Term::Hashset::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (local $substituted_entries i32)
     (if (result i32)

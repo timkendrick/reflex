@@ -39,6 +39,9 @@
   (func $Term::SkipIterator::traits::display (param $self i32) (param $offset i32) (result i32)
     (call $TermType::traits::display (global.get $TermType::SkipIterator) (local.get $offset)))
 
+  (func $Term::SkipIterator::traits::debug (param $self i32) (param $offset i32) (result i32)
+    (call $Term::SkipIterator::traits::display (local.get $self) (local.get $offset)))
+
   (func $Term::SkipIterator::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (local $substituted_source i32)
     (local.set $substituted_source

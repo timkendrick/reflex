@@ -34,6 +34,9 @@
   (func $Term::RangeIterator::traits::display (param $self i32) (param $offset i32) (result i32)
     (call $TermType::traits::display (global.get $TermType::RangeIterator) (local.get $offset)))
 
+  (func $Term::RangeIterator::traits::debug (param $self i32) (param $offset i32) (result i32)
+    (call $Term::RangeIterator::traits::display (local.get $self) (local.get $offset)))
+
   (func $Term::RangeIterator::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (global.get $NULL))
 

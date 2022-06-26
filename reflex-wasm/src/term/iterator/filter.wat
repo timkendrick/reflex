@@ -31,6 +31,9 @@
   (func $Term::FilterIterator::traits::display (param $self i32) (param $offset i32) (result i32)
     (call $TermType::traits::display (global.get $TermType::FilterIterator) (local.get $offset)))
 
+  (func $Term::FilterIterator::traits::debug (param $self i32) (param $offset i32) (result i32)
+    (call $Term::FilterIterator::traits::display (local.get $self) (local.get $offset)))
+
   (func $Term::FilterIterator::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (local $substituted_source i32)
     (local $substituted_predicate i32)

@@ -57,6 +57,9 @@
       (local.get $offset))
     (i32.add (local.get $offset)))
 
+  (func $Term::Int::traits::debug (param $self i32) (param $offset i32) (result i32)
+    (call $Term::Int::traits::display (local.get $self) (local.get $offset)))
+
   (func $Term::Int::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (global.get $NULL))
 

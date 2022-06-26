@@ -33,7 +33,7 @@
     (local.set $offset (i32.add (local.get $offset)))
     ;; Write the initializer to the output
     (local.set $offset
-      (call $Term::traits::display
+      (call $Term::traits::debug
         (call $Term::Let::get::initializer (local.get $self))
         (local.get $offset)))
     ;; Write the statement separator to the output
@@ -41,12 +41,15 @@
     (local.set $offset (i32.add (local.get $offset)))
     ;; Write the body to the output
     (local.set $offset
-      (call $Term::traits::display
+      (call $Term::traits::debug
         (call $Term::Let::get::body (local.get $self))
         (local.get $offset)))
     ;; Write the closing brace to the output and return the updated offset
     (@store-bytes $offset "}")
     (i32.add (local.get $offset)))
+
+  (func $Term::Let::traits::debug (param $self i32) (param $offset i32) (result i32)
+    (call $Term::Let::traits::display (local.get $self) (local.get $offset)))
 
   (func $Term::Let::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (local $substituted_initializer i32)

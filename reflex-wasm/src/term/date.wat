@@ -30,6 +30,13 @@
       (local.get $offset))
     (i32.add (local.get $offset)))
 
+  (func $Term::Date::traits::debug (param $self i32) (param $offset i32) (result i32)
+    (@store-bytes $offset "Date(")
+    (local.set $offset (i32.add (local.get $offset)))
+    (local.set $offset (call $Term::Date::traits::display (local.get $self) (local.get $offset)))
+    (@store-bytes $offset ")")
+    (i32.add (local.get $offset)))
+
   (func $Term::Date::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (global.get $NULL))
 

@@ -54,6 +54,9 @@
   (func $Term::HashmapKeysIterator::traits::display (param $self i32) (param $offset i32) (result i32)
     (call $TermType::traits::display (global.get $TermType::HashmapKeysIterator) (local.get $offset)))
 
+  (func $Term::HashmapKeysIterator::traits::debug (param $self i32) (param $offset i32) (result i32)
+    (call $Term::HashmapKeysIterator::traits::display (local.get $self) (local.get $offset)))
+
   (func $Term::HashmapKeysIterator::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (local $substituted_source i32)
     (local.set $substituted_source

@@ -22,6 +22,7 @@
   (@include "./iterator/hashmap_keys.wat")
   (@include "./iterator/hashmap_values.wat")
   (@include "./iterator/integers.wat")
+  (@include "./iterator/intersperse.wat")
   (@include "./iterator/map.wat")
   (@include "./iterator/once.wat")
   (@include "./iterator/range.wat")
@@ -74,6 +75,7 @@
       (@import $HashmapKeysIterator "./iterator/hashmap_keys.wat")
       (@import $HashmapValuesIterator "./iterator/hashmap_values.wat")
       (@import $IntegersIterator "./iterator/integers.wat")
+      (@import $IntersperseIterator "./iterator/intersperse.wat")
       (@import $MapIterator "./iterator/map.wat")
       (@import $OnceIterator "./iterator/once.wat")
       (@import $RangeIterator "./iterator/range.wat")
@@ -128,6 +130,17 @@
           (@map $typename
             (@union_variants (@get $TermType))
             (return (call (@concat "$Term::" (@get $typename) "::traits::display") (local.get $self) (local.get $offset)))))
+        ;; Default implementation
+        (local.get $offset)))
+
+    (func $Term::traits::debug (param $self i32) (param $offset i32) (result i32)
+      (@branch
+        ;; Format term according to the underlying term type implementation
+        (call $Term::TermType::get::type (local.get $self))
+        (@list
+          (@map $typename
+            (@union_variants (@get $TermType))
+            (return (call (@concat "$Term::" (@get $typename) "::traits::debug") (local.get $self) (local.get $offset)))))
         ;; Default implementation
         (local.get $offset)))
 
@@ -231,6 +244,7 @@
         $FlattenIterator
         $EvaluateIterator
         $IntegersIterator
+        $IntersperseIterator
         $RangeIterator
         $HashmapKeysIterator
         $HashmapValuesIterator)

@@ -29,6 +29,9 @@
   (func $Term::EvaluateIterator::traits::display (param $self i32) (param $offset i32) (result i32)
     (call $TermType::traits::display (global.get $TermType::EvaluateIterator) (local.get $offset)))
 
+  (func $Term::EvaluateIterator::traits::debug (param $self i32) (param $offset i32) (result i32)
+    (call $Term::EvaluateIterator::traits::display (local.get $self) (local.get $offset)))
+
   (func $Term::EvaluateIterator::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (local $substituted_source i32)
     (local.set $substituted_source

@@ -32,7 +32,7 @@
     (local $index i32)
     ;; Write the function target to the output
     (local.set $offset
-      (call $Term::traits::display
+      (call $Term::traits::debug
         (call $Term::Application::get::target (local.get $self))
         (local.get $offset)))
     ;; Write the opening parenthesis to the output
@@ -55,7 +55,7 @@
               (local.set $offset (i32.add (local.get $offset)))))
           ;; Write the argument to the output
           (local.set $offset
-            (call $Term::traits::display
+            (call $Term::traits::debug
               (call $Term::List::get_item (local.get $args) (local.get $index))
               (local.get $offset)))
           ;; If this is not the final argument, continue with the next one
@@ -65,6 +65,9 @@
     (local.set $offset (i32.add (local.get $offset)))
     ;; Return the updated offset
     (local.get $offset))
+
+  (func $Term::Application::traits::debug (param $self i32) (param $offset i32) (result i32)
+    (call $Term::Application::traits::display (local.get $self) (local.get $offset)))
 
   (func $Term::Application::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (local $substituted_target i32)

@@ -29,4 +29,27 @@
       ;; Number of IO vector entries to read
       (i32.const 1)
       ;;; The memory address at which to write the number of bytes written
-      (call $Term::Cell::get_field_pointer (global.get $Io::IOVEC) (i32.const 2)))))
+      (call $Term::Cell::get_field_pointer (global.get $Io::IOVEC) (i32.const 2))))
+
+  (func $Io::log_term (param $value i32) (result i32)
+    (local $serialized_value i32)
+    (local $bytes_written i32)
+    ;; Serialize the term to a temporary string term
+    (local.set $serialized_value (call $Term::String::from (local.get $value)))
+    ;; Write the serialized string contents to stdout
+    (call $Io::write_stdout
+      (call $Term::String::get_offset (local.get $serialized_value))
+      (call $Term::String::get_length (local.get $serialized_value)))
+    ;; Store the number of bytes written
+    (local.set $bytes_written)
+    ;; Dispose of the temporary string term
+    (if
+      (i32.ne (local.get $serialized_value) (local.get $value))
+      (then
+        (call $Term::drop (local.get $serialized_value))))
+    ;; Write a newline to stdout
+    (call $Io::write_stdout
+      (call $Term::String::get_offset (global.get $Stdlib_Log::NEWLINE))
+      (call $Term::String::get_length (global.get $Stdlib_Log::NEWLINE)))
+    ;; Return the total number of bytes written
+    (i32.add (local.get $bytes_written))))

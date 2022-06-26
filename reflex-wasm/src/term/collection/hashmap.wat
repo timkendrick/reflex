@@ -166,6 +166,9 @@
     (@store-bytes $offset ")")
     (i32.add (local.get $offset)))
 
+  (func $Term::Hashmap::traits::debug (param $self i32) (param $offset i32) (result i32)
+    (call $Term::Hashmap::traits::display (local.get $self) (local.get $offset)))
+
   (func $Term::Hashmap::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (local $num_entries i32)
     (local $capacity i32)

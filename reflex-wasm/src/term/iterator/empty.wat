@@ -27,6 +27,9 @@
   (func $Term::EmptyIterator::traits::display (param $self i32) (param $offset i32) (result i32)
     (call $TermType::traits::display (global.get $TermType::EmptyIterator) (local.get $offset)))
 
+  (func $Term::EmptyIterator::traits::debug (param $self i32) (param $offset i32) (result i32)
+    (call $Term::EmptyIterator::traits::display (local.get $self) (local.get $offset)))
+
   (func $Term::EmptyIterator::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (global.get $NULL))
 

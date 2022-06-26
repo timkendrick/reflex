@@ -33,7 +33,10 @@
     (local.set $offset (i32.add (local.get $offset)))
     (@store-bytes $offset ") => ")
     (local.set $offset (i32.add (local.get $offset)))
-    (call $Term::traits::display (call $Term::Lambda::get::body (local.get $self)) (local.get $offset)))
+    (call $Term::traits::debug (call $Term::Lambda::get::body (local.get $self)) (local.get $offset)))
+
+  (func $Term::Lambda::traits::debug (param $self i32) (param $offset i32) (result i32)
+    (call $Term::Lambda::traits::display (local.get $self) (local.get $offset)))
 
   (func $Term::Lambda::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (local $num_args i32)
