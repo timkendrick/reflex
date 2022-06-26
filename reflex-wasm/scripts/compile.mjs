@@ -23,6 +23,8 @@ import getDirective, { GET_DIRECTIVE } from './transform/directives/get.mjs';
 import importDirective, { IMPORT_DIRECTIVE } from './transform/directives/import.mjs';
 import includeDirective, { INCLUDE_DIRECTIVE } from './transform/directives/include.mjs';
 import instructionDirective, { INSTRUCTION_DIRECTIVE } from './transform/directives/instruction.mjs';
+import iterateDirective, { ITERATE_DIRECTIVE } from './transform/directives/iterate.mjs';
+import iterateMapDirective, { ITERATE_MAP_DIRECTIVE } from './transform/directives/iterate_map.mjs';
 import lengthDirective, { LENGTH_DIRECTIVE } from './transform/directives/length.mjs';
 import letDirective, { LET_DIRECTIVE } from './transform/directives/let.mjs';
 import listDirective, { LIST_DIRECTIVE } from './transform/directives/list.mjs';
@@ -63,6 +65,8 @@ try {
         [EXPORT_DIRECTIVE]: exportDirective,
         [INCLUDE_DIRECTIVE]: includeDirective,
         [INSTRUCTION_DIRECTIVE]: instructionDirective,
+        [ITERATE_DIRECTIVE]: iterateDirective,
+        [ITERATE_MAP_DIRECTIVE]: iterateMapDirective,
         [LENGTH_DIRECTIVE]: lengthDirective,
         [LET_DIRECTIVE]: letDirective,
         [LIST_DIRECTIVE]: listDirective,
