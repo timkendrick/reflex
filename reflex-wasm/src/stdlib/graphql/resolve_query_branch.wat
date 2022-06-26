@@ -19,7 +19,7 @@
         (call $Stdlib_ResolveQueryBranch::impl::default (local.get $self) (local.get $shape) (local.get $state))))
 
     (@impl
-      (call $Term::implements::iterate)
+      (call $TermType::implements::iterate)
       (i32.or (i32.const 0xFFFFFFFF))
       (func $Stdlib_ResolveQueryBranch::impl::<iterate>::any (param $self i32) (param $shape i32) (param $state i32) (result i32 i32)
         (local $dependencies i32)

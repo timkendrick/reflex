@@ -6,14 +6,14 @@
     (@args (@strict $self) (@strict $count))
 
     (@impl
-      (call $Term::implements::iterate)
+      (call $TermType::implements::iterate)
       (i32.eq (global.get $TermType::Int))
       (func $Stdlib_Take::impl::<iterate>::Int (param $self i32) (param $count i32) (param $state i32) (result i32 i32)
         (call $Term::TakeIterator::new (local.get $self) (call $Term::Int::get::value (local.get $count)))
         (global.get $NULL)))
 
     (@impl
-      (call $Term::implements::iterate)
+      (call $TermType::implements::iterate)
       (i32.eq (global.get $TermType::Float))
       (func $Stdlib_Take::impl::<iterate>::Float (param $self i32) (param $count i32) (param $state i32) (result i32 i32)
         (local $count_value i32)

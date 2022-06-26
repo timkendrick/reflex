@@ -168,8 +168,7 @@
                   (i32.ne (global.get $TRUE))
                   (i32.eqz
                     (call $Term::implements::to_json
-                      (call $Term::get_type
-                        (local.tee $item (call $Term::List::get_item (local.get $values) (local.get $index)))))))
+                      (local.tee $item (call $Term::List::get_item (local.get $values) (local.get $index))))))
                 (then
                   (return (global.get $FALSE) (local.get $offset)))
                 (else))

@@ -7,7 +7,7 @@
 
     (@impl
       (i32.or (i32.const 0xFFFFFFFF))
-      (call $Term::implements::apply)
+      (call $TermType::implements::apply)
       (func $Stdlib_Sequence::impl::any::<apply> (param $self i32) (param $callback i32) (param $state i32) (result i32 i32)
         (call $Term::traits::apply (local.get $callback) (call $Term::List::of (local.get $self)) (local.get $state))))
 

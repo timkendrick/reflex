@@ -11,7 +11,7 @@
         (call $Stdlib_ResolveQueryLeaf::impl::default (local.get $self) (local.get $state))))
 
     (@impl
-      (call $Term::implements::iterate)
+      (call $TermType::implements::iterate)
       (func $Stdlib_ResolveQueryLeaf::impl::<iterate> (param $self i32) (param $state i32) (result i32 i32)
         (local $dependencies i32)
         (local $length i32)

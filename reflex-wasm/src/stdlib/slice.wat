@@ -190,7 +190,7 @@
             (global.get $NULL)))))
 
     (@impl
-      (call $Term::implements::iterate)
+      (call $TermType::implements::iterate)
       (i32.eq (global.get $TermType::Int))
       (i32.eq (global.get $TermType::Int))
       (func $Stdlib_Slice::impl::<iterate>::Int::Int (param $self i32) (param $offset i32) (param $length i32) (param $state i32) (result i32 i32)
@@ -215,7 +215,7 @@
             (global.get $NULL)))))
 
     (@impl
-      (call $Term::implements::iterate)
+      (call $TermType::implements::iterate)
       (i32.eq (global.get $TermType::Float))
       (i32.eq (global.get $TermType::Float))
       (func $Stdlib_Slice::impl::<iterate>::Float::Float (param $self i32) (param $offset i32) (param $length i32) (param $state i32) (result i32 i32)
@@ -240,7 +240,7 @@
             (global.get $NULL)))))
 
     (@impl
-      (call $Term::implements::iterate)
+      (call $TermType::implements::iterate)
       (i32.eq (global.get $TermType::Int))
       (i32.eq (global.get $TermType::Float))
       (func $Stdlib_Slice::impl::<iterate>::Int::Float (param $self i32) (param $offset i32) (param $length i32) (param $state i32) (result i32 i32)
@@ -265,7 +265,7 @@
             (global.get $NULL)))))
 
     (@impl
-      (call $Term::implements::iterate)
+      (call $TermType::implements::iterate)
       (i32.eq (global.get $TermType::Float))
       (i32.eq (global.get $TermType::Int))
       (func $Stdlib_Slice::impl::<iterate>::Float::Int (param $self i32) (param $offset i32) (param $length i32) (param $state i32) (result i32 i32)

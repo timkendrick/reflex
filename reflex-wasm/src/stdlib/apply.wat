@@ -6,14 +6,14 @@
     (@args (@strict $self) (@strict $arg_list))
 
     (@impl
-      (call $Term::implements::apply)
+      (call $TermType::implements::apply)
       (i32.eq (global.get $TermType::List))
       (func $Stdlib_Apply::impl::<apply>::List (param $self i32) (param $arg_list i32) (param $state i32) (result i32 i32)
         (call $Term::traits::apply (local.get $self) (local.get $arg_list) (local.get $state))))
 
     (@impl
-      (call $Term::implements::apply)
-      (call $Term::implements::iterate)
+      (call $TermType::implements::apply)
+      (call $TermType::implements::iterate)
       (func $Stdlib_Apply::impl::<apply>::<iterate> (param $self i32) (param $arg_list i32) (param $state i32) (result i32 i32)
         (local $dependencies i32)
         (call $Term::List::traits::collect (local.get $arg_list) (local.get $state))

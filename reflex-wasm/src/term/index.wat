@@ -111,13 +111,16 @@
         $Effect
         $Let)
 
-      (func $Term::implements::evaluate (param $type i32) (result i32)
+      (func $TermType::implements::evaluate (param $type i32) (result i32)
         (@fold $result $typename
           (@get $trait_typenames)
           (global.get $FALSE)
           (i32.or
             (@get $result)
             (i32.eq (local.get $type) (global.get (@concat "$TermType::" (@get $typename)))))))
+
+      (func $Term::implements::evaluate (param $self i32) (result i32)
+        (call $TermType::implements::evaluate (call $Term::get_type (local.get $self))))
 
       (func $Term::traits::evaluate (param $self i32) (param $state i32) (result i32 i32)
         (local $self_type i32)
@@ -142,13 +145,16 @@
         $Lambda
         $Signal)
 
-      (func $Term::implements::apply (param $type i32) (result i32)
+      (func $TermType::implements::apply (param $type i32) (result i32)
         (@fold $result $typename
           (@get $trait_typenames)
           (global.get $FALSE)
           (i32.or
             (@get $result)
             (i32.eq (local.get $type) (global.get (@concat "$TermType::" (@get $typename)))))))
+
+      (func $Term::implements::apply (param $self i32) (result i32)
+        (call $TermType::implements::apply (call $Term::get_type (local.get $self))))
 
       (func $Term::traits::apply (param $self i32) (param $args i32) (param $state i32) (result i32 i32)
         (local $self_type i32)
@@ -186,13 +192,16 @@
         $HashmapKeysIterator
         $HashmapValuesIterator)
 
-      (func $Term::implements::iterate (param $type i32) (result i32)
+      (func $TermType::implements::iterate (param $type i32) (result i32)
         (@fold $result $typename
           (@get $trait_typenames)
           (global.get $FALSE)
           (i32.or
             (@get $result)
             (i32.eq (local.get $type) (global.get (@concat "$TermType::" (@get $typename)))))))
+
+      (func $Term::implements::iterate (param $self i32) (result i32)
+        (call $TermType::implements::iterate (call $Term::get_type (local.get $self))))
 
       (func $Term::traits::iterate (param $self i32) (result i32)
         (local $self_type i32)
@@ -208,13 +217,16 @@
           ;; Default implementation
           (global.get $NULL)))
 
-      (func $Term::implements::size_hint (param $type i32) (result i32)
+      (func $TermType::implements::size_hint (param $type i32) (result i32)
         (@fold $result $typename
           (@get $trait_typenames)
           (global.get $FALSE)
           (i32.or
             (@get $result)
             (i32.eq (local.get $type) (global.get (@concat "$TermType::" (@get $typename)))))))
+
+      (func $Term::implements::size_hint (param $self i32) (result i32)
+        (call $TermType::implements::size_hint (call $Term::get_type (local.get $self))))
 
       (func $Term::traits::size_hint (param $self i32) (result i32)
         (local $self_type i32)
@@ -230,13 +242,16 @@
           ;; Default implementation
           (global.get $NULL)))
 
-      (func $Term::implements::next (param $type i32) (result i32)
+      (func $TermType::implements::next (param $type i32) (result i32)
         (@fold $result $typename
           (@get $trait_typenames)
           (global.get $FALSE)
           (i32.or
             (@get $result)
             (i32.eq (local.get $type) (global.get (@concat "$TermType::" (@get $typename)))))))
+
+      (func $Term::implements::next (param $self i32) (result i32)
+        (call $TermType::implements::next (call $Term::get_type (local.get $self))))
 
       (func $Term::traits::next (param $self i32) (param $iterator_state i32) (param $state i32) (result i32 i32 i32)
         (local $self_type i32)
@@ -264,13 +279,16 @@
         $List
         $Record)
 
-      (func $Term::implements::to_json (param $type i32) (result i32)
+      (func $TermType::implements::to_json (param $type i32) (result i32)
         (@fold $result $typename
           (@get $trait_typenames)
           (global.get $FALSE)
           (i32.or
             (@get $result)
             (i32.eq (local.get $type) (global.get (@concat "$TermType::" (@get $typename)))))))
+
+      (func $Term::implements::to_json (param $self i32) (result i32)
+        (call $TermType::implements::to_json (call $Term::get_type (local.get $self))))
 
       (func $Term::traits::to_json (param $self i32) (param $offset i32) (result i32 i32)
         (local $self_type i32)

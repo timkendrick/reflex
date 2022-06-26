@@ -132,7 +132,7 @@
     (call $Term::TermType::get::value (local.get $self)))
 
   (func $Term::is_static (param $self i32) (result i32)
-    (i32.eqz (call $Term::implements::evaluate (call $Term::get_type (local.get $self)))))
+    (i32.eqz (call $Term::implements::evaluate (local.get $self))))
 
   (func $Term::drop (param $self i32)
     (call $Term::redirect (local.get $self) (call $Term::Signal::invalid_pointer)))

@@ -6,7 +6,7 @@
     (@args (@strict $self))
 
     (@impl
-      (call $Term::implements::iterate)
+      (call $TermType::implements::iterate)
       (func $Stdlib_CollectTree::impl::<iterate> (param $self i32) (param $state i32) (result i32 i32)
         (call $Term::Tree::traits::collect_strict (local.get $self) (local.get $state))))
 

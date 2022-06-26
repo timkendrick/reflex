@@ -41,8 +41,8 @@
             (global.get $NULL)))))
 
     (@impl
-      (call $Term::implements::iterate)
-      (call $Term::implements::iterate)
+      (call $TermType::implements::iterate)
+      (call $TermType::implements::iterate)
       (func $Stdlib_Chain::impl::<iterate>::<iterate> (param $self i32) (param $other i32) (param $state i32) (result i32 i32)
         (call $Term::FlattenIterator::new
           (call $Term::List::create_pair (local.get $self) (local.get $other)))

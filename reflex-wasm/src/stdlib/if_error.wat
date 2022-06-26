@@ -7,7 +7,7 @@
 
     (@impl
       (i32.eq (global.get $TermType::Signal))
-      (call $Term::implements::apply)
+      (call $TermType::implements::apply)
       (func $Stdlib_IfError::impl::Signal::<apply> (param $self i32) (param $handler i32) (param $state i32) (result i32 i32)
         (local $error_conditions i32)
         (local $remaining_conditions i32)

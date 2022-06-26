@@ -6,7 +6,7 @@
     (@args (@strict $self))
 
     (@impl
-      (call $Term::implements::to_json)
+      (call $TermType::implements::to_json)
       (func $Stdlib_StringifyJson::impl::<to_json> (param $self i32) (param $state i32) (result i32 i32)
         (local $output i32)
         (local $offset i32)

@@ -142,7 +142,7 @@
                 (local.get $dependencies)))))))
 
     (@impl
-      (call $Term::implements::iterate)
+      (call $TermType::implements::iterate)
       (func $Stdlib_ResolveDeep::impl::<iterate> (param $self i32) (param $state i32) (result i32 i32)
         (local $items i32)
         (local $dependencies i32)

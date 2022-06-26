@@ -6,7 +6,7 @@
     (@args (@strict $self))
 
     (@impl
-      (call $Term::implements::iterate)
+      (call $TermType::implements::iterate)
       (func $Stdlib_Iterate::impl::<iterate> (param $self i32) (param $state i32) (result i32 i32)
         (call $Term::traits::iterate (local.get $self))
         (global.get $NULL)))

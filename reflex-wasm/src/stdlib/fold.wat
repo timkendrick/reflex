@@ -6,8 +6,8 @@
     (@args (@strict $self) (@strict $iteratee) (@lazy $seed))
 
     (@impl
-      (call $Term::implements::iterate)
-      (call $Term::implements::apply)
+      (call $TermType::implements::iterate)
+      (call $TermType::implements::apply)
       (i32.or (i32.const 0xFFFFFFFF))
       (func $Stdlib_Fold::impl::<iterate>::<apply>::any (param $self i32) (param $iteratee i32) (param $seed i32) (param $state i32) (result i32 i32)
         (local $value i32)
