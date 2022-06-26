@@ -32,7 +32,7 @@
             (call $Stdlib_StringifyJson::impl::default (local.get $self) (local.get $state)))
           (else
             ;; Initialize the dynamic string term
-            (call $Term::String::init
+            (call $Term::String::init_unsized
               (local.get $output)
               (i32.sub
                 (local.get $offset)

@@ -18,7 +18,7 @@ export const CONST_DIRECTIVE = '@const';
 export const DEPENDS_ON_DIRECTIVE = '@depends-on';
 
 export default function constDirective(node, context) {
-  const [instruction, identifier, type, dependencies, ...initializer] = node.elements.reduce(
+  const [instruction, identifier, type, dependencies, ...instructions] = node.elements.reduce(
     (results, node) => {
       switch (results.length) {
         case 0:
@@ -54,8 +54,7 @@ export default function constDirective(node, context) {
     !type ||
     !isTermNode(type) ||
     !dependencyNames ||
-    !dependencyNames.every(Boolean) ||
-    !initializer
+    !dependencyNames.every(Boolean)
   ) {
     const source = context.sources.get(context.path);
     throw new ParseError(
@@ -64,20 +63,36 @@ export default function constDirective(node, context) {
       `Invalid ${CONST_DIRECTIVE} directive: ${formatSourceRange(source, node.location)}`,
     );
   }
+  const initializer = parseInitializer(identifier, instructions, node.location, context);
+  if (!initializer) {
+    const source = context.sources.get(context.path);
+    throw new ParseError(
+      node.location,
+      source,
+      `Invalid ${CONST_DIRECTIVE} directive initializer: ${formatSourceRange(
+        source,
+        node.location,
+      )}`,
+    );
+  }
   registerInitializer(identifier, dependencyNames, node.location, context);
   return getTemplateElements(
     context.import(TEMPLATE, {
       $identifier: identifier,
       $type: type,
-      $initializer: createBlockDirective({ elements: initializer, location: node.location }),
+      $initializer: initializer,
     }).module,
   );
 }
 
+function getInitializerName(identifier) {
+  return `${identifier.source}::initialize`;
+}
+
 function registerInitializer(identifier, dependencies, location, context) {
-  const name = identifier.source;
   const initializers = context.globals.get(CONST_INITIALIZERS_GLOBAL) || new Map();
-  if (initializers.has(name)) {
+  const initializerName = getInitializerName(identifier);
+  if (initializers.has(initializerName)) {
     const source = context.sources.get(context.path);
     throw new ParseError(
       location,
@@ -87,7 +102,10 @@ function registerInitializer(identifier, dependencies, location, context) {
   }
   context.globals.set(
     CONST_INITIALIZERS_GLOBAL,
-    initializers.set(name, { identifier, dependencies }),
+    initializers.set(initializerName, {
+      identifier: NodeType.Term({ source: initializerName, location: identifier.location }),
+      dependencies,
+    }),
   );
 }
 
@@ -112,7 +130,71 @@ function parseDependencyNode(node, context) {
       `Invalid ${DEPENDS_ON_DIRECTIVE} directive: ${formatSourceRange(source, node.location)}`,
     );
   }
-  return identifier.source;
+  return getInitializerName(identifier);
+}
+
+function parseInitializer(identifier, instructions, location, context) {
+  const initializerBody = (parseFunctionInitializer(instructions, context) || instructions).flatMap(
+    (node) => (context.transform ? context.transform(node, context) : [node]),
+  );
+  return NodeType.Instruction({
+    instruction: 'func',
+    elements: [
+      NodeType.Term({ source: 'func', location }),
+      NodeType.Whitespace({ source: ' ', location }),
+      NodeType.Term({ source: getInitializerName(identifier), location }),
+      NodeType.Whitespace({ source: '\n    ', location }),
+      ...initializerBody,
+      NodeType.Whitespace({ source: '\n    ', location }),
+      NodeType.Instruction({
+        instruction: 'global.set',
+        elements: [
+          NodeType.Term({ source: 'global.set', location }),
+          NodeType.Whitespace({ source: ' ', location }),
+          identifier,
+        ],
+        location,
+      }),
+    ],
+    location,
+  });
+}
+
+function parseFunctionInitializer(elements, context) {
+  const [initializer, ...varArgs] = elements.filter((node) => !isNonFunctionalNode(node));
+  if (!initializer || !isNamedInstructionNode('func', initializer) || varArgs.length > 0) {
+    return null;
+  }
+  const [identifier, signature, ...body] = initializer.elements.reduce((results, node) => {
+    results.push(...(results.length > 2 || !isNonFunctionalNode(node) ? [node] : []));
+    return results;
+  }, []);
+  if (
+    !identifier ||
+    !isNamedTermNode('func', identifier) ||
+    !signature ||
+    !isResultNode('i32', signature)
+  ) {
+    const source = context.sources.get(context.path);
+    throw new ParseError(
+      initializer.location,
+      source,
+      `Invalid ${CONST_DIRECTIVE} directive initializer: ${formatSourceRange(
+        source,
+        initializer.location,
+      )}`,
+    );
+  }
+  return body;
+}
+
+function isResultNode(resultType, node) {
+  if (!isNamedInstructionNode('result', node)) return false;
+  const [instruction, ...signature] = node.elements.filter((node) => !isNonFunctionalNode(node));
+  if (!isNamedTermNode('result', instruction)) return false;
+  const resultTypes = Array.isArray(resultType) ? resultType : [resultType];
+  if (signature.length !== resultTypes.length) return false;
+  return signature.every((node, index) => isTermNode(node) && node.source === resultTypes[index]);
 }
 
 function getTemplateElements(template) {

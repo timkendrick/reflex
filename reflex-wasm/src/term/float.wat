@@ -54,7 +54,7 @@
         ;; Put the success marker on the stack
         (global.get $TRUE)
         ;; Write the null value to the output string and return the updated offset
-        (@store_bytes (local.get $offset) "null")
+        (@store-bytes $offset "null")
         (i32.add (local.get $offset)))
       (else
         ;; Put the success marker on the stack

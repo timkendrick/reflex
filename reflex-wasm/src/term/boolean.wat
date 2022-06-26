@@ -49,8 +49,8 @@
     (if (result i32)
       (call $Term::Boolean::get::value (local.get $self))
       (then
-        (@store_bytes (local.get $offset) "true")
+        (@store-bytes $offset "true")
         (i32.add (local.get $offset)))
       (else
-        (@store_bytes (local.get $offset) "false")
+        (@store-bytes $offset "false")
         (i32.add (local.get $offset))))))

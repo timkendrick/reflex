@@ -15,6 +15,7 @@ import charDirective, { CHAR_DIRECTIVE } from './transform/directives/char.mjs';
 import concatDirective, { CONCAT_DIRECTIVE } from './transform/directives/concat.mjs';
 import constDirective, { CONST_DIRECTIVE } from './transform/directives/const.mjs';
 import constInitDirective, { CONST_INIT_DIRECTIVE } from './transform/directives/const_init.mjs';
+import constStringDirective, { CONST_STRING_DIRECTIVE } from './transform/directives/const_string.mjs';
 import constructorDirective, { CONSTRUCTOR_DIRECTIVE } from './transform/directives/constructor.mjs';
 import delegateDirective, { DELEGATE_DIRECTIVE } from './transform/directives/delegate.mjs';
 import deriveDirective, { DERIVE_DIRECTIVE } from './transform/directives/derive.mjs';
@@ -36,6 +37,7 @@ import reverseDirective, { REVERSE_DIRECTIVE } from './transform/directives/reve
 import signaturesDirective, { SIGNATURES_DIRECTIVE } from './transform/directives/signatures.mjs';
 import storeBytesDirective, { STORE_BYTES_DIRECTIVE } from './transform/directives/store_bytes.mjs';
 import structDirective, { STRUCT_DIRECTIVE } from './transform/directives/struct.mjs';
+import stringLengthDirective, { STRING_LENGTH_DIRECTIVE } from './transform/directives/string_length.mjs';
 import switchDirective, { SWITCH_DIRECTIVE } from './transform/directives/switch.mjs';
 import unionDirective, { UNION_DIRECTIVE } from './transform/directives/union.mjs';
 import unionVariantDirective, { UNION_VARIANT_DIRECTIVE } from './transform/directives/union_variant.mjs';
@@ -59,6 +61,7 @@ try {
         [CONCAT_DIRECTIVE]: concatDirective,
         [CONST_DIRECTIVE]: constDirective,
         [CONST_INIT_DIRECTIVE]: constInitDirective,
+        [CONST_STRING_DIRECTIVE]: constStringDirective,
         [CONSTRUCTOR_DIRECTIVE]: constructorDirective,
         [DELEGATE_DIRECTIVE]: delegateDirective,
         [DERIVE_DIRECTIVE]: deriveDirective,
@@ -79,6 +82,7 @@ try {
         [REVERSE_DIRECTIVE]: reverseDirective,
         [SIGNATURES_DIRECTIVE]: signaturesDirective,
         [STORE_BYTES_DIRECTIVE]: storeBytesDirective,
+        [STRING_LENGTH_DIRECTIVE]: stringLengthDirective,
         [STRUCT_DIRECTIVE]: structDirective,
         [SWITCH_DIRECTIVE]: switchDirective,
         [UNION_DIRECTIVE]: unionDirective,

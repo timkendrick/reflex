@@ -28,10 +28,6 @@
       (else
         (call $Term::String::allocate_sized (local.get $length)))))
 
-  (func $Term::String::allocate_unsized (result i32)
-    ;; TODO: Return empty string initially, reallocating when string is extended (see List implementation)
-    (call $Term::String::allocate_sized (i32.const 0)))
-
   (func $Term::String::empty::sizeof (result i32)
     ;; Determine the size of the term wrapper by inspecting the string data pointer for an imaginary string term located
     ;; at memory address 0. The pointer offset tells us how many bytes are taken up by the preceding string wrapper.
@@ -64,6 +60,24 @@
     (call $Term::String::set::data::length (local.get $self) (i32.div_u (call $Allocator::pad_to_4_byte_offset (local.get $length)) (i32.const 4)))
     ;; Instantiate the term
     (call $Term::init (local.get $self)))
+
+  (func $Term::String::allocate_unsized (result i32)
+    ;; TODO: Return empty string initially, reallocating when string is extended (see List implementation)
+    (call $Term::String::allocate_sized (i32.const 0)))
+
+  (func $Term::String::init_unsized (param $self i32) (param $length i32) (result i32)
+    (local $padded_length i32)
+    (local.set $padded_length (call $Allocator::pad_to_4_byte_offset (local.get $length)))
+    ;; Extend the allocated space to fill the enclosing 4-byte cell
+    (call $Allocator::extend
+      (call $Term::String::get_char_offset (local.get $self) (local.get $length))
+      (i32.sub (local.get $padded_length) (local.get $length)))
+    ;; Update the capacity of the data array, padded to 4-byte cell size
+    (call $Term::String::set::data::capacity
+      (local.get $self)
+      (i32.div_u (local.get $padded_length) (i32.const 4)))
+    ;; Instantiate the term
+    (call $Term::String::init (local.get $self) (local.get $length)))
 
   (func $Term::String::from_slice (param $offset i32) (param $length i32) (result i32)
     (local $self i32)
@@ -103,6 +117,11 @@
 
   (func $Term::String::get_length (param $self i32) (result i32)
     (call $Term::String::get::length (local.get $self)))
+
+  (func $Term::String::get_char_offset (param $self i32) (param $index i32) (result i32)
+    (i32.add
+      (call $Term::String::get_offset (local.get $self))
+      (local.get $index)))
 
   (func $Term::String::traits::is_atomic (param $self i32) (result i32)
     (global.get $TRUE))

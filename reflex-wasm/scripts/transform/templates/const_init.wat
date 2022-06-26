@@ -4,4 +4,4 @@
 (@map $initializer
   (@get $initializers)
   (@block
-    (call (@concat "$" (@get $initializer) "::initialize"))))
+    (call (@get $initializer))))

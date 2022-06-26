@@ -389,7 +389,7 @@
         (i32.eq (local.get $offset) (local.get $end_offset))
         (then
           ;; Terminate the output string
-          (call $Term::String::init (local.get $result) (local.get $bytes_written))
+          (call $Term::String::init_unsized (local.get $result) (local.get $bytes_written))
           (drop)
           ;; Return an error result
           (call $Json::parse_error (local.get $offset)))
@@ -423,7 +423,7 @@
                 (call $Term::String::set::data::capacity
                   (local.get $result)
                   (i32.div_u (call $Allocator::pad_to_4_byte_offset (local.get $bytes_written)) (i32.const 4)))
-                (call $Term::String::init (local.get $result) (local.get $bytes_written))
+                (call $Term::String::init_unsized (local.get $result) (local.get $bytes_written))
                 (i32.add (local.get $offset) (i32.const 1))))
             ;; If the character is a backslash, copy the chunk so far to the output string
             ;; FIXME: refactor byte copying into string method (making sure to update string capacity)
@@ -451,7 +451,7 @@
               (i32.eq (global.get $NULL) (local.get $escape_sequence_length))
               (then
                 ;; Terminate the output string
-                (call $Term::String::init (local.get $result) (local.get $bytes_written))
+                (call $Term::String::init_unsized (local.get $result) (local.get $bytes_written))
                 (drop)
                 ;; Return an error result
                 (return (call $Json::parse_error (local.get $offset))))
