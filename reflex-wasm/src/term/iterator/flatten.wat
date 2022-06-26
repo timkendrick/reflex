@@ -15,8 +15,6 @@
   (export "isFlattenIterator" (func $Term::FlattenIterator::is))
   (export "getFlattenIteratorSource" (func $Term::FlattenIterator::get::source))
 
-  (func $Term::FlattenIterator::startup)
-
   (func $Term::FlattenIterator::new (export "createFlattenIterator") (param $source i32) (result i32)
     (call $Term::TermType::FlattenIterator::new (local.get $source)))
 

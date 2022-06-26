@@ -16,12 +16,7 @@
   (export "isString" (func $Term::String::is))
   (export "getStringLength" (func $Term::String::get::length))
 
-  ;; TODO: Compile singleton instances directly into linear memory data
-  (global $Term::String::EMPTY (mut i32) (i32.const -1))
-
-  (func $Term::String::startup
-    ;; Pre-allocate the singleton instance
-    (global.set $Term::String::EMPTY (call $Term::TermType::String::new (i32.const 0))))
+  (@const $Term::String::EMPTY i32 (call $Term::TermType::String::new (i32.const 0)))
 
   (func $Term::String::allocate (export "allocateString") (param $length i32) (result i32)
     ;; TODO: Enforce unique interned strings

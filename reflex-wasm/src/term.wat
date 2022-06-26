@@ -38,13 +38,6 @@
             (call (@concat "$" (@get $typename) "::construct") (call $Term::pointer::value (local.get (@length (@get $args))))(@map $arg (@get $args) (@block (local.get (@list_item (@get $arg) 0)))))
             (call $Term::init))))))
 
-    (func $Term::startup
-      ;; Allocate singleton instances
-      ;; TODO: Generate startup snapshot via compile-time macros
-      (@map $typename
-        (@union_variants (@get $TermType))
-        (call (@concat "$Term::" (@get $typename) "::startup"))))
-
     (func $Term::traits::is_atomic (param $self i32) (result i32)
       (@branch
         ;; Delegate method to underlying term type implementations

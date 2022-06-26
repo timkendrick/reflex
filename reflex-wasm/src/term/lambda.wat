@@ -17,8 +17,6 @@
   (export "getLambdaNumArgs" (func $Term::Lambda::get::num_args))
   (export "getLambdaBody" (func $Term::Lambda::get::body))
 
-  (func $Term::Lambda::startup)
-
   (func $Term::Lambda::new (export "createLambda") (param $num_args i32) (param $body i32) (result i32)
     (call $Term::TermType::Lambda::new (local.get $num_args) (local.get $body)))
 

@@ -17,8 +17,6 @@
   (export "getLetInitializer" (func $Term::Let::get::initializer))
   (export "getLetBody" (func $Term::Let::get::body))
 
-  (func $Term::Let::startup)
-
   (func $Term::Let::new (export "createLet") (param $initializer i32) (param $body i32) (result i32)
     (call $Term::TermType::Let::new (local.get $initializer) (local.get $body)))
 

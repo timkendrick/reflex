@@ -15,8 +15,6 @@
   (export "isSymbol" (func $Term::Symbol::is))
   (export "getSymbolId" (func $Term::Symbol::get::id))
 
-  (func $Term::Symbol::startup)
-
   (func $Term::Symbol::new (export "createSymbol") (param $id i32) (result i32)
     (call $Term::TermType::Symbol::new (local.get $id)))
 

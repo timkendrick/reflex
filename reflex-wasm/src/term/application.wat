@@ -17,8 +17,6 @@
   (export "getApplicationTarget" (func $Term::Application::get::target))
   (export "getApplicationArgs" (func $Term::Application::get::args))
 
-  (func $Term::Application::startup)
-
   (func $Term::Application::new (export "createApplication") (param $target i32) (param $args i32) (result i32)
     (call $Term::TermType::Application::new (local.get $target) (local.get $args)))
 

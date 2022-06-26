@@ -15,8 +15,6 @@
   (export "isInt" (func $Term::Int::is))
   (export "getIntValue" (func $Term::Int::get::value))
 
-  (func $Term::Int::startup)
-
   (func $Term::Int::new (export "createInt") (param $value i32) (result i32)
     (call $Term::TermType::Int::new (local.get $value)))
 

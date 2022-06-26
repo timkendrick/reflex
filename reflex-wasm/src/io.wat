@@ -7,11 +7,8 @@
   (global $Io::STDOUT i32 (i32.const 1))
   (global $Io::STDERR i32 (i32.const 2))
 
-  (global $Io::IOVEC (mut i32) (i32.const -1))
-
-  (func $Io::startup
-    ;; Initialize the private use area that holds IO intermediate value scatter/gather vectors
-    (global.set $Io::IOVEC (call $Term::Cell::allocate (i32.const 3))))
+  ;; Initialize the private use area that holds IO intermediate value scatter/gather vectors
+  (@const $Io::IOVEC i32 (call $Term::Cell::allocate (i32.const 3)))
 
   (func $Io::write_bytes (param $fd i32) (param $offset i32) (param $length i32) (result i32)
     ;; Store the pointer and length in the IO private use area

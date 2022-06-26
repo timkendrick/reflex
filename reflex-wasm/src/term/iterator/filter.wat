@@ -17,8 +17,6 @@
   (export "getFilterIteratorSource" (func $Term::FilterIterator::get::source))
   (export "getFilterIteratorPredicate" (func $Term::FilterIterator::get::predicate))
 
-  (func $Term::FilterIterator::startup)
-
   (func $Term::FilterIterator::new (export "createFilterIterator") (param $source i32) (param $predicate i32) (result i32)
     (call $Term::TermType::FilterIterator::new (local.get $source) (local.get $predicate)))
 

@@ -17,8 +17,6 @@
   (export "getPartialTarget" (func $Term::Partial::get::target))
   (export "getPartialArgs" (func $Term::Partial::get::args))
 
-  (func $Term::Partial::startup)
-
   (func $Term::Partial::new (export "createPartial") (param $target i32) (param $args i32) (result i32)
     (call $Term::TermType::Partial::new (local.get $target) (local.get $args)))
 

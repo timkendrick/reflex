@@ -15,14 +15,8 @@
   (export "isBoolean" (func $Term::Boolean::is))
   (export "getBooleanValue" (func $Term::Boolean::get::value))
 
-  ;; TODO: Compile singleton instances directly into linear memory data
-  (global $Term::Boolean::TRUE (mut i32) (i32.const -1))
-  (global $Term::Boolean::FALSE (mut i32) (i32.const -1))
-
-  (func $Term::Boolean::startup
-    ;; Pre-allocate the singleton instances
-    (global.set $Term::Boolean::TRUE (call $Term::TermType::Boolean::new (i32.const 1)))
-    (global.set $Term::Boolean::FALSE (call $Term::TermType::Boolean::new (i32.const 0))))
+  (@const $Term::Boolean::TRUE i32 (call $Term::TermType::Boolean::new (i32.const 1)))
+  (@const $Term::Boolean::FALSE i32 (call $Term::TermType::Boolean::new (i32.const 0)))
 
   (func $Term::Boolean::new (export "createBoolean") (param $value i32) (result i32)
     ;; Return the pre-allocated singleton instance

@@ -18,9 +18,7 @@
     (@import $Term "./term.wat"))
 
   (func (export "_initialize")
-    (call $Io::startup)
-    ;; Invoke any startup hooks defined by the term type implementations
-    (call $Term::startup))
+    (@const-init))
 
   (func $Runtime::get_state_value (param $state_token i32) (param $state i32) (result i32 i32)
     (if (result i32)

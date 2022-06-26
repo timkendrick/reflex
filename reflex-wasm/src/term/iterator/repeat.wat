@@ -15,8 +15,6 @@
   (export "isRepeatIterator" (func $Term::RepeatIterator::is))
   (export "getRepeatIteratorValue" (func $Term::RepeatIterator::get::value))
 
-  (func $Term::RepeatIterator::startup)
-
   (func $Term::RepeatIterator::new (export "createRepeatIterator") (param $value i32) (result i32)
     (call $Term::TermType::RepeatIterator::new (local.get $value)))
 

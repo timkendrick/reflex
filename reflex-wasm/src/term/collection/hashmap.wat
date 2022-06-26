@@ -19,6 +19,8 @@
   (export "isHashmap" (func $Term::Hashmap::is))
   (export "getHashmapNumEntries" (func $Term::Hashmap::get::num_entries))
 
+  (@const $Term::Hashmap::EMPTY i32 (call $Term::TermType::Hashmap::new (i32.const 0)))
+
   (func $Hashmap::traits::equals (param $self i32) (param $other i32) (result i32)
     ;; This assumes that hashmaps with the same size and hash are almost certainly identical
     (i32.eq
@@ -74,13 +76,6 @@
 
   ;; Minimum hashmap capacity when allocating non-zero-length hashmaps of unknown size
   (global $Term::Hashmap::MIN_UNSIZED_HASHMAP_CAPACITY i32 (i32.const 8))
-
-  ;; TODO: Compile singleton instances directly into linear memory data
-  (global $Term::Hashmap::EMPTY (mut i32) (i32.const -1))
-
-  (func $Term::Hashmap::startup
-    ;; Pre-allocate the singleton instances
-    (global.set $Term::Hashmap::EMPTY (call $Term::TermType::Hashmap::new (i32.const 0))))
 
   (func $Term::Hashmap::empty (export "createEmptyHashmap") (result i32)
     (global.get $Term::Hashmap::EMPTY))

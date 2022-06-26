@@ -15,8 +15,6 @@
   (export "isEffect" (func $Term::Effect::is))
   (export "getEffectCondition" (func $Term::Effect::get::condition))
 
-  (func $Term::Effect::startup)
-
   (func $Term::Effect::new (export "createEffect") (param $condition i32) (result i32)
     (call $Term::TermType::Effect::new (local.get $condition)))
 

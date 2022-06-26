@@ -17,8 +17,6 @@
   (export "getZipIteratorLeft" (func $Term::ZipIterator::get::left))
   (export "getZipIteratorRight" (func $Term::ZipIterator::get::right))
 
-  (func $Term::ZipIterator::startup)
-
   (func $Term::ZipIterator::new (export "createZipIterator") (param $left i32) (param $right i32) (result i32)
     (call $Term::TermType::ZipIterator::new (local.get $left) (local.get $right)))
 

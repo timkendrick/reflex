@@ -15,14 +15,8 @@
   (export "isConstructor" (func $Term::Constructor::is))
   (export "getConstructorKeys" (func $Term::Constructor::get::keys))
 
-  ;; TODO: Compile singleton instances directly into linear memory data
-  (global $Term::Constructor::EMPTY (mut i32) (i32.const -1))
-
-  (func $Term::Constructor::startup
-    ;; Pre-allocate the singleton instances
-    (global.set $Term::Constructor::EMPTY
-      (call $Term::TermType::Constructor::new
-        (call $Term::List::empty))))
+  (@const $Term::Constructor::EMPTY i32 (@depends-on $Term::List::EMPTY)
+    (call $Term::TermType::Constructor::new (call $Term::List::empty)))
 
   (func $Term::Constructor::new (export "createConstructor") (param $keys i32) (result i32)
     (local $self i32)

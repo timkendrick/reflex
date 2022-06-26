@@ -13,12 +13,7 @@
 
   (export "isIntegersIterator" (func $Term::IntegersIterator::is))
 
-  ;; TODO: Compile singleton instances directly into linear memory data
-  (global $Term::IntegersIterator::INSTANCE (mut i32) (i32.const -1))
-
-  (func $Term::IntegersIterator::startup
-    ;; Pre-allocate the singleton instances
-    (global.set $Term::IntegersIterator::INSTANCE (call $Term::TermType::IntegersIterator::new)))
+  (@const $Term::IntegersIterator::INSTANCE i32 (call $Term::TermType::IntegersIterator::new))
 
   (func $Term::IntegersIterator::new (export "createIntegersIterator") (result i32)
     (global.get $Term::IntegersIterator::INSTANCE))

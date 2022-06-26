@@ -17,8 +17,6 @@
   (export "getTakeIteratorSource" (func $Term::TakeIterator::get::source))
   (export "getTakeIteratorCount" (func $Term::TakeIterator::get::count))
 
-  (func $Term::TakeIterator::startup)
-
   (func $Term::TakeIterator::new (export "createTakeIterator") (param $source i32) (param $count i32) (result i32)
     (if (result i32)
       (i32.eqz (local.get $count))

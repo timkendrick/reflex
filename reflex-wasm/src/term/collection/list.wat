@@ -14,21 +14,16 @@
   (export "isList" (func $Term::List::is))
   (export "getListLength" (func $Term::List::get::items::length))
 
+  (@const $Term::List::EMPTY i32 (call $Term::TermType::List::new))
+
+  ;; Minimum list capacity when allocating non-zero-length lists of unknown size
+  (global $Term::List::MIN_UNSIZED_LIST_CAPACITY i32 (i32.const 8))
+
   (func $List::traits::equals (param $self i32) (param $other i32) (result i32)
     ;; This assumes that lists with the same length and hash are almost certainly identical
     (i32.eq
       (call $List::get::items::length (local.get $self))
       (call $List::get::items::length (local.get $other))))
-
-  ;; Minimum list capacity when allocating non-zero-length lists of unknown size
-  (global $Term::List::MIN_UNSIZED_LIST_CAPACITY i32 (i32.const 8))
-
-  ;; TODO: Compile singleton instances directly into linear memory data
-  (global $Term::List::EMPTY (mut i32) (i32.const -1))
-
-  (func $Term::List::startup
-    ;; Pre-allocate the singleton instances
-    (global.set $Term::List::EMPTY (call $Term::TermType::List::new)))
 
   (func $Term::List::empty::sizeof (result i32)
     ;; Determine the size of the term wrapper by inspecting the list items pointer for an imaginary list term located at

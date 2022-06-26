@@ -56,14 +56,8 @@
   (export "isCondition" (func $Term::Condition::is))
   (export "getConditionType" (func $Term::Condition::get::type))
 
-  ;; TODO: Compile singleton instances directly into linear memory data
-  (global $Term::Condition::PENDING (mut i32) (i32.const -1))
-  (global $Term::Condition::INVALID_POINTER (mut i32) (i32.const -1))
-
-  (func $Term::Condition::startup
-    ;; Pre-allocate the singleton instances
-    (global.set $Term::Condition::PENDING (call $Term::TermType::Condition::PendingCondition::new))
-    (global.set $Term::Condition::INVALID_POINTER (call $Term::TermType::Condition::InvalidPointerCondition::new)))
+  (@const $Term::Condition::PENDING i32 (call $Term::TermType::Condition::PendingCondition::new))
+  (@const $Term::Condition::INVALID_POINTER i32 (call $Term::TermType::Condition::InvalidPointerCondition::new))
 
   ;; TODO: Codegen union variant constructors/accessors via macro
   (func $Term::Condition::custom (export "createCustomCondition") (param $type i32) (param $payload i32) (result i32)

@@ -13,12 +13,7 @@
 
   (export "isNil" (func $Term::Nil::is))
 
-  ;; TODO: Compile singleton instances directly into linear memory data
-  (global $Term::Nil::INSTANCE (mut i32) (i32.const -1))
-
-  (func $Term::Nil::startup
-    ;; Pre-allocate the singleton instances
-    (global.set $Term::Nil::INSTANCE (call $Term::TermType::Nil::new)))
+  (@const $Term::Nil::INSTANCE i32 (call $Term::TermType::Nil::new))
 
   (func $Term::Nil::new (export "createNil") (result i32)
     ;; Return the pre-allocated singleton instance

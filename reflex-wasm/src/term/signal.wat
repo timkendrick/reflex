@@ -15,16 +15,10 @@
   (export "isSignal" (func $Term::Signal::is))
   (export "getSignalConditions" (func $Term::Signal::get::conditions))
 
-  ;; TODO: Compile singleton instances directly into linear memory data
-  (global $Term::Signal::PENDING (mut i32) (i32.const -1))
-  (global $Term::Signal::INVALID_POINTER (mut i32) (i32.const -1))
-
-  (func $Term::Signal::startup
-    ;; Pre-allocate the singleton instances
-    (global.set $Term::Signal::PENDING
-      (call $Term::TermType::Signal::new (call $Term::Tree::of (call $Term::Condition::pending))))
-    (global.set $Term::Signal::INVALID_POINTER
-      (call $Term::TermType::Signal::new (call $Term::Tree::of (call $Term::Condition::invalid_pointer)))))
+  (@const $Term::Signal::PENDING i32 (@depends-on $Term::Condition::PENDING)
+    (call $Term::TermType::Signal::new (call $Term::Tree::of (call $Term::Condition::pending))))
+  (@const $Term::Signal::INVALID_POINTER i32 (@depends-on $Term::Condition::INVALID_POINTER)
+    (call $Term::TermType::Signal::new (call $Term::Tree::of (call $Term::Condition::invalid_pointer))))
 
   (func $Term::Signal::of (export "createSignal") (param $condition i32) (result i32)
     (call $Term::TermType::Signal::new (call $Term::Tree::of (local.get $condition))))

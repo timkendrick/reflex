@@ -13,6 +13,8 @@ import branchDirective, { BRANCH_DIRECTIVE } from './transform/directives/branch
 import builtinDirective, { BUILTIN_DIRECTIVE } from './transform/directives/builtin.mjs';
 import charDirective, { CHAR_DIRECTIVE } from './transform/directives/char.mjs';
 import concatDirective, { CONCAT_DIRECTIVE } from './transform/directives/concat.mjs';
+import constDirective, { CONST_DIRECTIVE } from './transform/directives/const.mjs';
+import constInitDirective, { CONST_INIT_DIRECTIVE } from './transform/directives/const_init.mjs';
 import constructorDirective, { CONSTRUCTOR_DIRECTIVE } from './transform/directives/constructor.mjs';
 import delegateDirective, { DELEGATE_DIRECTIVE } from './transform/directives/delegate.mjs';
 import deriveDirective, { DERIVE_DIRECTIVE } from './transform/directives/derive.mjs';
@@ -55,6 +57,8 @@ try {
         [BUILTIN_DIRECTIVE]: builtinDirective,
         [CHAR_DIRECTIVE]: charDirective,
         [CONCAT_DIRECTIVE]: concatDirective,
+        [CONST_DIRECTIVE]: constDirective,
+        [CONST_INIT_DIRECTIVE]: constInitDirective,
         [CONSTRUCTOR_DIRECTIVE]: constructorDirective,
         [DELEGATE_DIRECTIVE]: delegateDirective,
         [DERIVE_DIRECTIVE]: deriveDirective,

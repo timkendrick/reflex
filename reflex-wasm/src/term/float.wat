@@ -27,8 +27,6 @@
         (call $Utils::f64::is_nan (local.get $self_value))
         (call $Utils::f64::is_nan (local.get $other_value)))))
 
-  (func $Term::Float::startup)
-
   (func $Term::Float::new (export "createFloat") (param $value f64) (result i32)
     (call $Term::TermType::Float::new (local.get $value)))
 

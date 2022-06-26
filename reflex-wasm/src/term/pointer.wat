@@ -15,8 +15,6 @@
   (export "isPointer" (func $Term::Pointer::is))
   (export "getPointerTarget" (func $Term::Pointer::get::target))
 
-  (func $Term::Pointer::startup)
-
   (func $Term::Pointer::new (export "createPointer") (param $target i32) (result i32)
     (call $Term::TermType::Pointer::new (local.get $target)))
 

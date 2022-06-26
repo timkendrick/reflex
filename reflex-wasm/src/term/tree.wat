@@ -18,19 +18,14 @@
   (export "getTreeRight" (func $Term::Tree::get::right))
   (export "getTreeLength" (func $Term::Tree::get::length))
 
+  (@const $Term::Tree::EMPTY i32
+    (call $Term::TermType::Tree::new (global.get $NULL) (global.get $NULL) (i32.const 0)))
+
   (func $Tree::traits::equals (param $self i32) (param $other i32) (result i32)
     ;; This assumes that trees with the same length and hash are almost certainly identical
     (i32.eq
       (call $Tree::get::length (local.get $self))
       (call $Tree::get::length (local.get $other))))
-
-  ;; TODO: Compile singleton instances directly into linear memory data
-  (global $Term::Tree::EMPTY (mut i32) (i32.const -1))
-
-  (func $Term::Tree::startup
-    ;; Pre-allocate the singleton instances
-    (global.set $Term::Tree::EMPTY
-      (call $Term::TermType::Tree::new (global.get $NULL) (global.get $NULL) (i32.const 0))))
 
   (func $Term::Tree::new (export "createTree") (param $left i32) (param $right i32) (result i32)
     (call $Term::TermType::Tree::new

@@ -13,6 +13,7 @@ export function createLoaderContext(entryPoint, { transform = null, variables = 
     {
       sources: new Map(),
       modules: new Map(),
+      globals: new Map(),
       transform,
     },
     variables,
@@ -67,11 +68,12 @@ function parseAst(source, path) {
   return parse(tokens, source, path);
 }
 
-function createContext(modulePath, { sources, modules, transform }, variables, exports) {
+function createContext(modulePath, { sources, modules, globals, transform }, variables, exports) {
   const context = {
     path: modulePath,
     sources,
     modules,
+    globals,
     transform,
     import(path, variables) {
       const resolvedPath = path.startsWith('/') ? path : getRelativePath(modulePath, path);

@@ -15,8 +15,6 @@
   (export "isHashmapValuesIterator" (func $Term::HashmapValuesIterator::is))
   (export "getHashmapValuesIteratorSource" (func $Term::HashmapValuesIterator::get::source))
 
-  (func $Term::HashmapValuesIterator::startup)
-
   (func $Term::HashmapValuesIterator::new (export "createHashmapValuesIterator") (param $source i32) (result i32)
     (call $Term::TermType::HashmapValuesIterator::new (local.get $source)))
 

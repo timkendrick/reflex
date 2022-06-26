@@ -17,8 +17,6 @@
   (export "getSkipIteratorSource" (func $Term::SkipIterator::get::source))
   (export "getSkipIteratorCount" (func $Term::SkipIterator::get::count))
 
-  (func $Term::SkipIterator::startup)
-
   (func $Term::SkipIterator::new (export "createSkipIterator") (param $source i32) (param $count i32) (result i32)
     (if (result i32)
       (i32.eqz (local.get $count))

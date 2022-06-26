@@ -13,12 +13,7 @@
 
   (export "isEmptyIterator" (func $Term::EmptyIterator::is))
 
-  ;; TODO: Compile singleton instances directly into linear memory data
-  (global $Term::EmptyIterator::INSTANCE (mut i32) (i32.const -1))
-
-  (func $Term::EmptyIterator::startup
-    ;; Pre-allocate the singleton instances
-    (global.set $Term::EmptyIterator::INSTANCE (call $Term::TermType::EmptyIterator::new)))
+  (@const $Term::EmptyIterator::INSTANCE i32 (call $Term::TermType::EmptyIterator::new))
 
   (func $Term::EmptyIterator::new (export "createEmptyIterator") (result i32)
     (global.get $Term::EmptyIterator::INSTANCE))

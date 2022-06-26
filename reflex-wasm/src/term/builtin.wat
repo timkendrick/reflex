@@ -22,8 +22,6 @@
   (global $ArgType::Eager i32 (i32.const 1))
   (global $ArgType::Lazy i32 (i32.const 2))
 
-  (func $Term::Builtin::startup)
-
   (func $Term::Builtin::new (export "createBuiltin") (param $uid i32) (result i32)
     (call $Term::TermType::Builtin::new (local.get $uid)))
 

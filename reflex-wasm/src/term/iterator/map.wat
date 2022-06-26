@@ -17,8 +17,6 @@
   (export "getMapIteratorSource" (func $Term::MapIterator::get::source))
   (export "getMapIteratorIteratee" (func $Term::MapIterator::get::iteratee))
 
-  (func $Term::MapIterator::startup)
-
   (func $Term::MapIterator::new (export "createMapIterator") (param $source i32) (param $iteratee i32) (result i32)
     (call $Term::TermType::MapIterator::new (local.get $source) (local.get $iteratee)))
 

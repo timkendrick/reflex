@@ -15,8 +15,6 @@
   (export "isVariable" (func $Term::Variable::is))
   (export "getVariableStackOffset" (func $Term::Variable::get::stack_offset))
 
-  (func $Term::Variable::startup)
-
   (func $Term::Variable::new (export "createVariable") (param $stack_offset i32) (result i32)
     (call $Term::TermType::Variable::new (local.get $stack_offset)))
 

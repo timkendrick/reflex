@@ -15,8 +15,6 @@
   (export "isEvaluateIterator" (func $Term::EvaluateIterator::is))
   (export "getEvaluateIteratorSource" (func $Term::EvaluateIterator::get::source))
 
-  (func $Term::EvaluateIterator::startup)
-
   (func $Term::EvaluateIterator::new (export "createEvaluateIterator") (param $source i32) (result i32)
     (call $Term::TermType::EvaluateIterator::new (local.get $source)))
 

@@ -15,12 +15,8 @@
 
   (export "isHashset" (func $Term::Hashset::is))
 
-  ;; TODO: Compile singleton instances directly into linear memory data
-  (global $Term::Hashset::EMPTY (mut i32) (i32.const -1))
-
-  (func $Term::Hashset::startup
-    ;; Pre-allocate the singleton instances
-    (global.set $Term::Hashset::EMPTY (call $Term::TermType::Hashset::new (call $Term::Hashmap::empty))))
+  (@const $Term::Hashset::EMPTY i32 (@depends-on $Term::Hashmap::EMPTY)
+    (call $Term::TermType::Hashset::new (call $Term::Hashmap::empty)))
 
   (func $Term::Hashset::new (export "createHashset") (param $entries i32) (result i32)
     (if (result i32)

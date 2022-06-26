@@ -16,6 +16,15 @@
   (export "getRecordKeys" (func $Term::Record::get::keys))
   (export "getRecordValues" (func $Term::Record::get::values))
 
+  (@const $Term::Record::EMPTY i32 (@depends-on $Term::List::EMPTY)
+    (call $Term::TermType::Record::new
+      (call $Term::List::empty)
+      (call $Term::List::empty)
+      (global.get $NULL)))
+
+  ;; Define the minimum number of fields at which to allocate an internal hashmap lookup table
+  (global $Term::Record::LOOKUP_TABLE_MIN_SIZE i32 (i32.const 16))
+
   (func $Record::traits::equals (param $self i32) (param $other i32) (result i32)
     (i32.and
       (call $Term::traits::equals
@@ -31,20 +40,6 @@
     (local.get $state)
     (call $Term::traits::hash)
     (call $Term::traits::hash))
-
-  ;; Define the minimum number of fields at which to allocate an internal hashmap lookup table
-  (global $Term::Record::LOOKUP_TABLE_MIN_SIZE i32 (i32.const 16))
-
-  ;; TODO: Compile singleton instances directly into linear memory data
-  (global $Term::Record::EMPTY (mut i32) (i32.const -1))
-
-  (func $Term::Record::startup
-    ;; Pre-allocate the singleton instances
-    (global.set $Term::Record::EMPTY
-      (call $Term::TermType::Record::new
-        (call $Term::List::empty)
-        (call $Term::List::empty)
-        (global.get $NULL))))
 
   (func $Term::Record::new (export "createRecord") (param $keys i32) (param $values i32) (result i32)
     (local $self i32)

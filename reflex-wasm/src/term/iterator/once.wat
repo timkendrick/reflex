@@ -15,8 +15,6 @@
   (export "isOnceIterator" (func $Term::OnceIterator::is))
   (export "getOnceIteratorValue" (func $Term::OnceIterator::get::value))
 
-  (func $Term::OnceIterator::startup)
-
   (func $Term::OnceIterator::new (export "createOnceIterator") (param $value i32) (result i32)
     (call $Term::TermType::OnceIterator::new (local.get $value)))
 

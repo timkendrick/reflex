@@ -17,8 +17,6 @@
   (export "getRangeIteratorOffset" (func $Term::RangeIterator::get::offset))
   (export "getRangeIteratorLength" (func $Term::RangeIterator::get::length))
 
-  (func $Term::RangeIterator::startup)
-
   (func $Term::RangeIterator::new (export "createRangeIterator") (param $offset i32) (param $length i32) (result i32)
     (if (result i32)
       (i32.eqz (local.get $length))
