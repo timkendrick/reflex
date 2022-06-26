@@ -81,7 +81,6 @@ import resolveQueryBranch from './graphql/resolve_query_branch.test.mjs';
 import resolveQueryLeaf from './graphql/resolve_query_leaf.test.mjs';
 
 export default (describe) => {
-  _if(describe);
   abs(describe);
   accessor(describe);
   add(describe);
@@ -114,6 +113,7 @@ export default (describe) => {
   has(describe);
   hash(describe);
   identity(describe);
+  _if(describe);
   ifError(describe);
   ifPending(describe);
   isFinite(describe);
@@ -152,9 +152,9 @@ export default (describe) => {
   stringifyJson(describe);
   subtract(describe);
   take(describe);
+  _throw(describe);
   toRequest(describe);
   toString(describe);
-  _throw(describe);
   urlencode(describe);
   values(describe);
   variable(describe);
