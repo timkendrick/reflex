@@ -40,7 +40,7 @@ import min from './min.test.mjs';
 import multiply from './multiply.test.mjs';
 import not from './not.test.mjs';
 import or from './or.test.mjs';
-import parseJson from './parse_json.test.mjs';
+import parseJson from './json/parse_json.test.mjs';
 import pow from './pow.test.mjs';
 import push from './push.test.mjs';
 import pushFront from './push_front.test.mjs';
