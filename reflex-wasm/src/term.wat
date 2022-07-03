@@ -5,11 +5,11 @@
   (@export $Term
     (@struct $Term
       (@field $hash i32)
-      (@field $value (@import $TermType "./term/index.wat"))))
+      (@field $value (@import $TermType "./term_type/index.wat"))))
 
   ;; Declare term type wrapper methods
   (@let $TermType
-    (@import $TermType "./term/index.wat")
+    (@import $TermType "./term_type/index.wat")
 
     (@map $typename
       (@union_variants (@get $TermType))

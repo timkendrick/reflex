@@ -14,7 +14,7 @@
   (@include "./hash.wat")
   (@include "./stdlib/index.wat")
   (@include "./term.wat")
-  (@include "./term/index.wat")
+  (@include "./term_type/index.wat")
 
   (@constructor
     (@import $Term "./term.wat"))
