@@ -16,6 +16,7 @@ function createTermTypes(runtime) {
     Boolean: runtime.TermType_Boolean.value,
     Builtin: runtime.TermType_Builtin.value,
     Cell: runtime.TermType_Cell.value,
+    Compiled: runtime.TermType_Compiled.value,
     Hashmap: runtime.TermType_Hashmap.value,
     Hashset: runtime.TermType_Hashset.value,
     List: runtime.TermType_List.value,
@@ -315,6 +316,18 @@ export function createRuntime(runtime) {
     },
     getBuiltinUid(value) {
       return u32(runtime.getBuiltinUid(value));
+    },
+    createCompiled(target, num_args) {
+      return runtime.createCompiled(target, num_args);
+    },
+    isCompiled(value) {
+      return runtime.isCompiled(value);
+    },
+    getCompiledTarget(value) {
+      return u32(runtime.getCompiledTarget(value));
+    },
+    getCompiledNumArgs(value) {
+      return u32(runtime.getCompiledNumArgs(value));
     },
     createPartial(target, args) {
       return runtime.createPartial(target, args);
