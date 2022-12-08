@@ -9,3 +9,6 @@ edition = "2021"
 reflex = { path = "../reflex" }
 strum = "0.22"
 strum_macros = "0.22"
+swc_common = "0.29.16"
+swc_ecma_ast = "0.94.21"
+swc_ecma_parser = "0.122.31"
