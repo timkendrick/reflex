@@ -115,6 +115,7 @@ function createStdlib(runtime) {
     Lt: runtime.Stdlib_Lt.value,
     Lte: runtime.Stdlib_Lte.value,
     Max: runtime.Stdlib_Max.value,
+    Merge: runtime.Stdlib_Merge.value,
     Min: runtime.Stdlib_Min.value,
     Multiply: runtime.Stdlib_Multiply.value,
     Not: runtime.Stdlib_Not.value,

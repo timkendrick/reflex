@@ -55,6 +55,12 @@
         (call $TermType::List::construct (call $Term::pointer::value (local.get $self)))
         (call $Term::List::set::items::capacity (local.get $self) (local.get $capacity)))))
 
+  (func $Term::List::drop (param $self i32)
+    ;; Avoid dropping the global empty list instance
+    (if (i32.ne (local.get $self) (call $Term::List::empty))
+      (then
+        (call $Term::drop (local.get $self)))))
+
   (func $Term::List::init (export "initList") (param $self i32) (param $length i32) (result i32)
     ;; This assumes the given list has already been allocated and filled with items
     ;; Store the list length
@@ -795,8 +801,15 @@
         (local.tee $instance (call $Term::List::allocate (local.get $capacity)))
         ;; If the source list contains any items, copy them across to the new list
         (if
-          (call $Term::List::get::items::length (local.get $self))
+          (i32.eqz (call $Term::List::get::items::length (local.get $self)))
           (then
+            ;; If this is not the global empty list instance, rewrite the source list as a redirect pointer term
+            ;; (this is to avoid breaking any existing pointers to the original list address)
+            (if
+              (i32.ne (call $Term::List::empty) (local.get $self))
+              (then
+                (call $Term::redirect (local.get $self) (local.get $instance)))))
+          (else
             (memory.copy
               (call $Term::List::get::items::pointer (local.get $instance) (i32.const 0))
               (call $Term::List::get::items::pointer (local.get $self) (i32.const 0))
@@ -1091,7 +1104,7 @@
       ;; If the left-hand list has no items, dispose the partition list in favour of the empty list
       (i32.eqz (local.get $left_length))
       (then
-        (call $Term::drop (local.get $self))
+        (call $Term::List::drop (local.get $self))
         (call $Term::List::empty))
       (else
         ;; Otherwise initialize the left-hand list with its final length

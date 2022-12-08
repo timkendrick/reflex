@@ -60,7 +60,7 @@
             (else
               (global.get $NULL)))))))
 
-  (func $Term::Record::empty (result i32)
+  (func $Term::Record::empty (export "createEmptyRecord") (result i32)
     (global.get $Term::Record::EMPTY))
 
   (func $Term::Record::traits::is_atomic (param $self i32) (result i32)

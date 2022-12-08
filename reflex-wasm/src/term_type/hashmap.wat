@@ -114,6 +114,12 @@
         (call $TermType::Hashmap::construct (call $Term::pointer::value (local.get $self)) (i32.const 0))
         (call $Term::Hashmap::set::buckets::capacity (local.get $self) (local.get $capacity)))))
 
+  (func $Term::Hashmap::drop (param $self i32)
+    ;; Avoid dropping the global empty hashmap instance
+    (if (i32.ne (local.get $self) (call $Term::Hashmap::empty))
+      (then
+        (call $Term::drop (local.get $self)))))
+
   (func $Term::Hashmap::default_capacity (export "defaultHashmapCapacity") (param $num_entries i32) (result i32)
     ;; A typical 'load factor' is 0.75 (i.e. capacity = num_entries * 4/3)
     (i32.div_u (i32.mul (local.get $num_entries) (i32.const 4)) (i32.const 3)))
@@ -508,7 +514,7 @@
           (call $Term::Hashmap::insert
             (local.get $instance)
             (call $Term::List::get_item (local.get $item) (i32.const 0))
-            (call $Term::List::get_item (local.get $item) (i32.const 0)))
+            (call $Term::List::get_item (local.get $item) (i32.const 1)))
           ;; Keep track of how many entries have been added to the hashmap
           (local.set $num_entries (i32.add (local.get $num_entries) (i32.const 1)))
           ;; Continue with the next entry
@@ -837,7 +843,13 @@
         ;; If the source hashmap contains any entries, copy them across to the new hashmap
         (if
           (i32.eqz (call $Term::Hashmap::get::num_entries (local.get $self)))
-          (then)
+          (then
+            ;; If this is not the global empty hashmap instance, rewrite the source hashmap as a redirect pointer term
+            ;; (this is to avoid breaking any existing pointers to the original hashmap address)
+            (if
+              (i32.ne (call $Term::Hashmap::empty) (local.get $self))
+              (then
+                (call $Term::redirect (local.get $self) (local.get $instance)))))
           (else
             ;; Iterate through each bucket in turn, inserting the existing entries into the new hashmap
             (loop $LOOP
@@ -853,10 +865,10 @@
                   (local.set $num_entries (i32.add (local.get $num_entries) (i32.const 1))))
                 (else))
               ;; If this was not the last bucket, continue with the next bucket
-              (br_if $LOOP (i32.lt_u (local.tee $bucket_index (i32.add (local.get $bucket_index) (i32.const 1))) (local.get $source_capacity))))))
-        ;; Rewrite the source hashmap as a redirect pointer term
-        ;; (this is to avoid breaking any existing pointers to the original hashmap address)
-        (call $Term::redirect (local.get $self) (local.get $instance))
+              (br_if $LOOP (i32.lt_u (local.tee $bucket_index (i32.add (local.get $bucket_index) (i32.const 1))) (local.get $source_capacity))))
+              ;; Rewrite the source hashmap as a redirect pointer term
+              ;; (this is to avoid breaking any existing pointers to the original hashmap address)
+              (call $Term::redirect (local.get $self) (local.get $instance))))
         ;; Initialize the hashmap term
         ;; TODO: investigate whether reallocated hashmap initialization can be moved to the parent function
         (call $Term::Hashmap::init (local.get $num_entries)))))

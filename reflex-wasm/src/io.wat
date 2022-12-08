@@ -46,7 +46,7 @@
     (if
       (i32.ne (local.get $serialized_value) (local.get $value))
       (then
-        (call $Term::drop (local.get $serialized_value))))
+        (call $Term::String::drop (local.get $serialized_value))))
     ;; Write a newline to stdout
     (call $Io::write_stdout
       (call $Term::String::get_offset (global.get $Stdlib_Log::NEWLINE))

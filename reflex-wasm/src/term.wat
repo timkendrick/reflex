@@ -130,6 +130,7 @@
     (i32.eqz (call $Term::implements::evaluate (local.get $self))))
 
   (func $Term::drop (param $self i32)
+    ;; This function overwrites an existing term with new contents, so take care not to call it on shared global objects
     (local $size i32)
     (local $end_offset i32)
     (local $foo i32)
@@ -147,10 +148,12 @@
         ;; If this was the most recently allocated object, wipe the memory
         (call $Allocator::shrink (local.get $end_offset) (local.get $size)))
       (else
+        ;; TODO: Implement type-specific drop implementations
         ;; Otherwise create a redirect from the old address to an 'invalid pointer' error
         (call $Term::redirect (local.get $self) (call $Term::Signal::invalid_pointer)))))
 
   (func $Term::redirect (param $self i32) (param $target i32)
+    ;; This function overwrites an existing term with new contents, so take care not to call it on shared global objects
     ;; TODO: When overwriting cell with redirect pointer, somehow mark truncated fields as elibible for GC
     (call $Term::set::hash (local.get $self) (call $Term::get::hash (local.get $target)))
     ;; This assumes that the previous term had at least one field (singleton instances should be created for zero-field terms)

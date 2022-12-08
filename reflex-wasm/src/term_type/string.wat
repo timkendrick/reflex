@@ -28,6 +28,12 @@
       (else
         (call $Term::String::allocate_sized (local.get $length)))))
 
+  (func $Term::String::drop (param $self i32)
+    ;; Avoid dropping the global empty string instance
+    (if (i32.ne (local.get $self) (call $Term::String::empty))
+      (then
+        (call $Term::drop (local.get $self)))))
+
   (func $Term::String::empty::sizeof (result i32)
     ;; Determine the size of the term wrapper by inspecting the string data pointer for an imaginary string term located
     ;; at memory address 0. The pointer offset tells us how many bytes are taken up by the preceding string wrapper.

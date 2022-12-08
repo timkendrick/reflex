@@ -7,7 +7,9 @@ export default (describe) => {
       createApplication,
       createEmptyIterator,
       createBuiltin,
+      createFlattenIterator,
       createInt,
+      createOnceIterator,
       createPair,
       createString,
       createRangeIterator,
@@ -62,6 +64,27 @@ export default (describe) => {
           format(result),
           '{<TypeErrorCondition:List:"foo">,<TypeErrorCondition:List:"baz">}',
         );
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.CollectHashmap),
+          createUnitList(
+            createFlattenIterator(
+              createOnceIterator(
+                createZipIterator(
+                  createTriple(createString('foo'), createString('bar'), createString('baz')),
+                  createRangeIterator(3, 3),
+                ),
+              ),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), 'Map(3)');
+        assert.strictEqual(format(getHashmapValue(result, createString('foo'))), '3');
+        assert.strictEqual(format(getHashmapValue(result, createString('bar'))), '4');
+        assert.strictEqual(format(getHashmapValue(result, createString('baz'))), '5');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });

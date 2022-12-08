@@ -6,7 +6,11 @@ export default (describe) => {
     test('(Iterator)', (assert, {
       createApplication,
       createEmptyIterator,
+      createFlattenIterator,
       createBuiltin,
+      createInt,
+      createOnceIterator,
+      createRangeIterator,
       createString,
       createTriple,
       createUnitList,
@@ -38,6 +42,32 @@ export default (describe) => {
         assert.strictEqual(hasHashsetValue(result, createString('bar')), true);
         assert.strictEqual(hasHashsetValue(result, createString('baz')), true);
         assert.strictEqual(hasHashsetValue(result, createString('qux')), false);
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.CollectHashset),
+          createUnitList(createRangeIterator(3, 3)),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), 'Set(3)');
+        assert.strictEqual(hasHashsetValue(result, createInt(3)), true);
+        assert.strictEqual(hasHashsetValue(result, createInt(4)), true);
+        assert.strictEqual(hasHashsetValue(result, createInt(5)), true);
+        assert.strictEqual(hasHashsetValue(result, createInt(6)), false);
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.CollectHashset),
+          createUnitList(createFlattenIterator(createOnceIterator(createRangeIterator(3, 3)))),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), 'Set(3)');
+        assert.strictEqual(hasHashsetValue(result, createInt(3)), true);
+        assert.strictEqual(hasHashsetValue(result, createInt(4)), true);
+        assert.strictEqual(hasHashsetValue(result, createInt(5)), true);
+        assert.strictEqual(hasHashsetValue(result, createInt(6)), false);
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });

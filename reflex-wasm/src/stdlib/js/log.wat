@@ -31,7 +31,7 @@
         ;; Discard the number of bytes written
         (drop)
         ;; Discard the temporary string
-        (call $Term::drop (local.get $output))
+        (call $Term::String::drop (local.get $output))
         ;; For the overall method return value, consume the first item from the argument iterator
         (call $Term::traits::next (local.get $self) (global.get $NULL) (local.get $state))
         (local.set $dependencies)

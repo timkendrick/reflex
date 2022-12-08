@@ -37,6 +37,7 @@ import length from './length.test.mjs';
 import lt from './lt.test.mjs';
 import lte from './lte.test.mjs';
 import max from './max.test.mjs';
+import merge from './merge.test.mjs';
 import min from './min.test.mjs';
 import multiply from './multiply.test.mjs';
 import not from './not.test.mjs';
@@ -125,6 +126,7 @@ export default (describe) => {
   lt(describe);
   lte(describe);
   max(describe);
+  merge(describe);
   min(describe);
   multiply(describe);
   not(describe);

@@ -57,6 +57,7 @@
   (@include "./lt.wat")
   (@include "./lte.wat")
   (@include "./max.wat")
+  (@include "./merge.wat")
   (@include "./min.wat")
   (@include "./multiply.wat")
   (@include "./not.wat")
@@ -130,6 +131,7 @@
       $Stdlib_Lt
       $Stdlib_Lte
       $Stdlib_Max
+      $Stdlib_Merge
       $Stdlib_Min
       $Stdlib_Multiply
       $Stdlib_Not

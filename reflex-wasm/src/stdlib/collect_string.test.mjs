@@ -7,6 +7,8 @@ export default (describe) => {
       createApplication,
       createBuiltin,
       createEmptyIterator,
+      createEvaluateIterator,
+      createFlattenIterator,
       createOnceIterator,
       createPair,
       createString,
@@ -148,6 +150,34 @@ export default (describe) => {
           createBuiltin(Stdlib.CollectString),
           createUnitList(
             createTriple(createString('foo'), createString('bar'), createString('baz')),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '"foobarbaz"');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.CollectString),
+          createUnitList(
+            createEvaluateIterator(
+              createTriple(createString('foo'), createString('bar'), createString('baz')),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '"foobarbaz"');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.CollectString),
+          createUnitList(
+            createFlattenIterator(
+              createOnceIterator(
+                createTriple(createString('foo'), createString('bar'), createString('baz')),
+              ),
+            ),
           ),
         );
         const [result, dependencies] = evaluate(expression, NULL);

@@ -6,7 +6,9 @@ export default (describe) => {
     test('(Iterator)', (assert, {
       createApplication,
       createEmptyIterator,
+      createFlattenIterator,
       createBuiltin,
+      createOnceIterator,
       createRangeIterator,
       createUnitList,
       evaluate,
@@ -27,6 +29,15 @@ export default (describe) => {
         const expression = createApplication(
           createBuiltin(Stdlib.CollectTree),
           createUnitList(createRangeIterator(3, 3)),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '(5 . (4 . (3 . NULL)))');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.CollectTree),
+          createUnitList(createFlattenIterator(createOnceIterator(createRangeIterator(3, 3)))),
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '(5 . (4 . (3 . NULL)))');

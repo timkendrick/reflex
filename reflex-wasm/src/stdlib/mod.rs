@@ -48,6 +48,7 @@ pub enum Stdlib {
     Lt,
     Lte,
     Max,
+    Merge,
     Min,
     Multiply,
     Not,

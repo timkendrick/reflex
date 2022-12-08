@@ -6,8 +6,10 @@ export default (describe) => {
     test('(Iterator)', (assert, {
       createApplication,
       createEmptyIterator,
+      createFlattenIterator,
       createBuiltin,
       createInt,
+      createOnceIterator,
       createRangeIterator,
       createTriple,
       createUnitList,
@@ -38,6 +40,15 @@ export default (describe) => {
         const expression = createApplication(
           createBuiltin(Stdlib.CollectList),
           createUnitList(createTriple(createInt(3), createInt(4), createInt(5))),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '[3, 4, 5]');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.CollectList),
+          createUnitList(createFlattenIterator(createOnceIterator(createRangeIterator(3, 3)))),
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '[3, 4, 5]');
