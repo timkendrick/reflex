@@ -16,7 +16,7 @@ pub struct SymbolTerm {
     pub id: u32,
 }
 impl TermSize for SymbolTerm {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }

@@ -15,7 +15,7 @@ pub struct ZipIteratorTerm {
     pub right: TermPointer,
 }
 impl TermSize for ZipIteratorTerm {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }

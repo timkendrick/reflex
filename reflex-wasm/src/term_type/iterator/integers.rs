@@ -11,7 +11,7 @@ use crate::{
 #[repr(C)]
 pub struct IntegersIteratorTerm;
 impl TermSize for IntegersIteratorTerm {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }

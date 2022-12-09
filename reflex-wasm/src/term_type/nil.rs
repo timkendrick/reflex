@@ -14,7 +14,7 @@ use crate::{
 #[repr(C)]
 pub struct NilTerm;
 impl TermSize for NilTerm {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }

@@ -25,16 +25,16 @@ pub enum ConditionTerm {
     InvalidPointer(InvalidPointerCondition),
 }
 impl TermSize for ConditionTerm {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         let discriminant_size = std::mem::size_of::<u32>();
         let value_size = match self {
-            Self::Custom(condition) => condition.size(),
-            Self::Pending(condition) => condition.size(),
-            Self::Error(condition) => condition.size(),
-            Self::TypeError(condition) => condition.size(),
-            Self::InvalidFunctionTarget(condition) => condition.size(),
-            Self::InvalidFunctionArgs(condition) => condition.size(),
-            Self::InvalidPointer(condition) => condition.size(),
+            Self::Custom(condition) => condition.size_of(),
+            Self::Pending(condition) => condition.size_of(),
+            Self::Error(condition) => condition.size_of(),
+            Self::TypeError(condition) => condition.size_of(),
+            Self::InvalidFunctionTarget(condition) => condition.size_of(),
+            Self::InvalidFunctionArgs(condition) => condition.size_of(),
+            Self::InvalidPointer(condition) => condition.size_of(),
         };
         discriminant_size + value_size
     }
@@ -89,7 +89,7 @@ pub struct CustomCondition {
     pub token: TermPointer,
 }
 impl TermSize for CustomCondition {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }
@@ -106,7 +106,7 @@ impl TermHash for CustomCondition {
 #[repr(C)]
 pub struct PendingCondition;
 impl TermSize for PendingCondition {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }
@@ -122,7 +122,7 @@ pub struct ErrorCondition {
     pub payload: TermPointer,
 }
 impl TermSize for ErrorCondition {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }
@@ -139,7 +139,7 @@ pub struct TypeErrorCondition {
     pub payload: TermPointer,
 }
 impl TermSize for TypeErrorCondition {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }
@@ -157,7 +157,7 @@ pub struct InvalidFunctionTargetCondition {
     pub target: TermPointer,
 }
 impl TermSize for InvalidFunctionTargetCondition {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }
@@ -174,7 +174,7 @@ pub struct InvalidFunctionArgsCondition {
     pub args: TermPointer,
 }
 impl TermSize for InvalidFunctionArgsCondition {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }
@@ -188,7 +188,7 @@ impl TermHash for InvalidFunctionArgsCondition {
 #[repr(C)]
 pub struct InvalidPointerCondition;
 impl TermSize for InvalidPointerCondition {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }

@@ -19,7 +19,7 @@ pub struct PartialTerm {
     pub args: TermPointer,
 }
 impl TermSize for PartialTerm {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }

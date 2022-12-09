@@ -14,7 +14,7 @@ pub struct RepeatIteratorTerm {
     pub value: TermPointer,
 }
 impl TermSize for RepeatIteratorTerm {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }

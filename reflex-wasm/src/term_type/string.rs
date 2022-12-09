@@ -38,8 +38,8 @@ impl PartialEq for StringTerm {
     }
 }
 impl TermSize for StringTerm {
-    fn size(&self) -> usize {
-        std::mem::size_of::<u32>() + self.data.size()
+    fn size_of(&self) -> usize {
+        std::mem::size_of::<u32>() + self.data.size_of()
     }
 }
 impl TermHash for StringTerm {
@@ -56,7 +56,7 @@ impl StringTerm {
             }),
             arena,
         );
-        let term_size = term.size();
+        let term_size = term.size_of();
         let instance = arena.allocate(term);
         let list = instance.offset((term_size - std::mem::size_of::<Array<u32>>()) as u32);
         Array::<u32>::extend(list, get_string_chunks(value), arena);
@@ -139,7 +139,7 @@ impl<'heap> StringValue for StringTerm {
     }
     fn as_str(&self) -> &str {
         let start_pointer = self.data.items.as_ptr() as *const u8;
-        let num_bytes = self.data.size();
+        let num_bytes = self.data.size_of();
         // First, we build a &[u8]...
         let slice = unsafe { slice::from_raw_parts(start_pointer, num_bytes) };
         // ... and then convert that slice into a string slice

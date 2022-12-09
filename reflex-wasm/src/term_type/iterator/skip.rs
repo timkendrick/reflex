@@ -15,7 +15,7 @@ pub struct SkipIteratorTerm {
     pub count: u32,
 }
 impl TermSize for SkipIteratorTerm {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }

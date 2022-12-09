@@ -18,7 +18,7 @@ pub struct SignalTerm {
     pub conditions: TermPointer,
 }
 impl TermSize for SignalTerm {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }

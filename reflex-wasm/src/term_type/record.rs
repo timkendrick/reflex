@@ -19,7 +19,7 @@ pub struct RecordTerm {
     pub values: TermPointer,
 }
 impl TermSize for RecordTerm {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }

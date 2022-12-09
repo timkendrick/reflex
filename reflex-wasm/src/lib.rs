@@ -343,8 +343,8 @@ impl Term {
     }
 }
 impl TermSize for Term {
-    fn size(&self) -> usize {
-        std::mem::size_of::<TermHashState>() + self.value.size()
+    fn size_of(&self) -> usize {
+        std::mem::size_of::<TermHashState>() + self.value.size_of()
     }
 }
 impl TermHash for Term {
@@ -466,7 +466,7 @@ impl<T> TermSize for Array<T>
 where
     T: Sized,
 {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>() + ((self.capacity as usize) * std::mem::size_of::<T>())
     }
 }

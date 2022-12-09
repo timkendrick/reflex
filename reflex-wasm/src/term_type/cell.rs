@@ -15,8 +15,8 @@ pub struct CellTerm {
     pub fields: Array<u32>,
 }
 impl TermSize for CellTerm {
-    fn size(&self) -> usize {
-        std::mem::size_of::<Self>() - std::mem::size_of::<Array<u32>>() + self.fields.size()
+    fn size_of(&self) -> usize {
+        std::mem::size_of::<Self>() - std::mem::size_of::<Array<u32>>() + self.fields.size_of()
     }
 }
 impl TermHash for CellTerm {
@@ -36,7 +36,7 @@ impl CellTerm {
             }),
             arena,
         );
-        let term_size = term.size();
+        let term_size = term.size_of();
         let instance = arena.allocate(term);
         let list = instance.offset((term_size - std::mem::size_of::<Array<u32>>()) as u32);
         Array::<u32>::extend(list, values, arena);

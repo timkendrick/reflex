@@ -18,7 +18,7 @@ pub struct ConstructorTerm {
     pub keys: TermPointer,
 }
 impl TermSize for ConstructorTerm {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }

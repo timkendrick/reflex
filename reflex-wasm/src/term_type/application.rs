@@ -19,7 +19,7 @@ pub struct ApplicationTerm {
     pub args: TermPointer,
 }
 impl TermSize for ApplicationTerm {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }

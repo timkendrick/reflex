@@ -15,7 +15,7 @@ pub struct FilterIteratorTerm {
     pub predicate: TermPointer,
 }
 impl TermSize for FilterIteratorTerm {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }

@@ -16,7 +16,7 @@ pub struct VariableTerm {
     pub stack_offset: u32,
 }
 impl TermSize for VariableTerm {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }

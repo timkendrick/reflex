@@ -18,7 +18,7 @@ pub struct EffectTerm {
     pub condition: TermPointer,
 }
 impl TermSize for EffectTerm {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }

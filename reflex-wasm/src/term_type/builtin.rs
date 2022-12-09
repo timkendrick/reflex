@@ -15,7 +15,7 @@ use crate::{
 #[repr(C)]
 pub struct FunctionIndex(u32);
 impl TermSize for FunctionIndex {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }
@@ -37,7 +37,7 @@ pub struct BuiltinTerm {
     pub uid: FunctionIndex,
 }
 impl TermSize for BuiltinTerm {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }

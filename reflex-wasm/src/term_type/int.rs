@@ -16,7 +16,7 @@ pub struct IntTerm {
     value: i32,
 }
 impl TermSize for IntTerm {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }

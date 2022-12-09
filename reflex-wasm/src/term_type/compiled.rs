@@ -17,7 +17,7 @@ use crate::{
 #[repr(C)]
 pub struct CompiledFunctionIndex(u32);
 impl TermSize for CompiledFunctionIndex {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }
@@ -40,7 +40,7 @@ pub struct CompiledTerm {
     pub num_args: u32,
 }
 impl TermSize for CompiledTerm {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }

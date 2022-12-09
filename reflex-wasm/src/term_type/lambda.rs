@@ -17,7 +17,7 @@ pub struct LambdaTerm {
     pub body: TermPointer,
 }
 impl TermSize for LambdaTerm {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }

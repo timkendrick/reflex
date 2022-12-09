@@ -17,7 +17,7 @@ pub struct LetTerm {
     pub body: TermPointer,
 }
 impl TermSize for LetTerm {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }

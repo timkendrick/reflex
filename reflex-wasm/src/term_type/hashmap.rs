@@ -20,9 +20,9 @@ pub struct HashmapTerm {
     pub buckets: Array<HashmapBucket>,
 }
 impl TermSize for HashmapTerm {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>() - std::mem::size_of::<Array<HashmapBucket>>()
-            + self.buckets.size()
+            + self.buckets.size_of()
     }
 }
 impl TermHash for HashmapTerm {
@@ -53,7 +53,7 @@ impl HashmapTerm {
             }),
             arena,
         );
-        let term_size = term.size();
+        let term_size = term.size_of();
         let instance = arena.allocate(term);
         let list =
             instance.offset((term_size - std::mem::size_of::<Array<HashmapBucket>>()) as u32);
@@ -99,7 +99,7 @@ pub struct HashmapBucket {
     pub value: TermPointer,
 }
 impl TermSize for HashmapBucket {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }

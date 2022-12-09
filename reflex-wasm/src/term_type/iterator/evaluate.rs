@@ -14,7 +14,7 @@ pub struct EvaluateIteratorTerm {
     pub source: TermPointer,
 }
 impl TermSize for EvaluateIteratorTerm {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }

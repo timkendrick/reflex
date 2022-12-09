@@ -25,8 +25,9 @@ pub struct ListTerm {
     pub items: Array<TermPointer>,
 }
 impl TermSize for ListTerm {
-    fn size(&self) -> usize {
-        std::mem::size_of::<Self>() - std::mem::size_of::<Array<TermPointer>>() + self.items.size()
+    fn size_of(&self) -> usize {
+        std::mem::size_of::<Self>() - std::mem::size_of::<Array<TermPointer>>()
+            + self.items.size_of()
     }
 }
 impl TermHash for ListTerm {

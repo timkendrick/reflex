@@ -16,7 +16,7 @@ pub struct FloatTerm {
     value: [u32; 2],
 }
 impl TermSize for FloatTerm {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }

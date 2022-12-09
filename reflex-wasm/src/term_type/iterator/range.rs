@@ -14,7 +14,7 @@ pub struct RangeIteratorTerm {
     pub length: u32,
 }
 impl TermSize for RangeIteratorTerm {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }

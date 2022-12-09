@@ -15,7 +15,7 @@ pub struct MapIteratorTerm {
     pub iteratee: TermPointer,
 }
 impl TermSize for MapIteratorTerm {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }

@@ -13,7 +13,7 @@ pub struct DateTerm {
     pub timestamp: [u32; 2],
 }
 impl TermSize for DateTerm {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }

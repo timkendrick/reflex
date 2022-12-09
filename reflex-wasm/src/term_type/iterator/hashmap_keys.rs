@@ -14,7 +14,7 @@ pub struct HashmapKeysIteratorTerm {
     pub source: TermPointer,
 }
 impl TermSize for HashmapKeysIteratorTerm {
-    fn size(&self) -> usize {
+    fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()
     }
 }
