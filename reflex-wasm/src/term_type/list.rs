@@ -1,22 +1,28 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
-// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use std::iter::Copied;
+// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
+use std::{
+    collections::HashSet,
+    iter::{once, Copied},
+};
 
 use reflex::{
     core::{
-        Expression, ExpressionListType, FromRefTypeIterator, ListTermType, RefType,
-        StructPrototypeType,
+        DependencyList, Expression, ExpressionListType, GraphNode, ListTermType, RefType,
+        SerializeJson, StackOffset, StructPrototypeType,
     },
     hash::HashId,
 };
+use reflex_utils::{json::is_empty_json_object, MapIntoIterator};
+use serde_json::Value as JsonValue;
 
 use crate::{
     allocator::ArenaAllocator,
     hash::{TermHash, TermHasher, TermSize},
     term_type::TermType,
-    ArenaRef, Array, ArrayIter, IntoArenaRefIterator, Term, TermPointer, TypedTerm,
+    term_type::TypedTerm,
+    ArenaRef, Array, ArrayIter, IntoArenaRefIterator, Term, TermPointer,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -50,7 +56,7 @@ impl ListTerm {
             }),
             arena,
         );
-        let term_size = term.size();
+        let term_size = term.size_of();
         let instance = arena.allocate(term);
         let list = instance.offset((term_size - std::mem::size_of::<Array<TermPointer>>()) as u32);
         Array::<TermPointer>::extend(list, values, arena);
@@ -65,46 +71,103 @@ impl ListTerm {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, TypedTerm<ListTerm>, A> {
-    fn items(&self) -> ArenaRef<'heap, Array<TermPointer>, A> {
+impl<'heap, A: ArenaAllocator> ArenaRef<'heap, ListTerm, A> {
+    pub fn items(&self) -> ArenaRef<'heap, Array<TermPointer>, A> {
         ArenaRef::new(self.arena, &self.as_deref().items)
+    }
+    pub fn iter<'a>(
+        &'a self,
+    ) -> IntoArenaRefIterator<'a, Term, A, Copied<ArrayIter<'a, TermPointer>>> {
+        IntoArenaRefIterator::new(self.arena, self.items().iter().copied())
+    }
+    pub fn len(&self) -> usize {
+        self.items().len()
+    }
+}
+
+impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, ListTerm, A> {
+    fn size(&self) -> usize {
+        1 + self.iter().map(|term| term.size()).sum::<usize>()
+    }
+    fn capture_depth(&self) -> StackOffset {
+        self.iter()
+            .map(|term| term.capture_depth())
+            .max()
+            .unwrap_or(0)
+    }
+    fn free_variables(&self) -> HashSet<StackOffset> {
+        self.iter().flat_map(|term| term.free_variables()).collect()
+    }
+    fn count_variable_usages(&self, offset: StackOffset) -> usize {
+        self.iter()
+            .map(|term| term.count_variable_usages(offset))
+            .sum()
+    }
+    fn dynamic_dependencies(&self, deep: bool) -> DependencyList {
+        if deep {
+            self.iter()
+                .flat_map(|term| term.dynamic_dependencies(deep))
+                .collect()
+        } else {
+            DependencyList::empty()
+        }
+    }
+    fn has_dynamic_dependencies(&self, deep: bool) -> bool {
+        if deep {
+            self.iter().any(|term| term.has_dynamic_dependencies(deep))
+        } else {
+            false
+        }
+    }
+    fn is_static(&self) -> bool {
+        true
+    }
+    fn is_atomic(&self) -> bool {
+        self.iter().all(|term| term.is_atomic())
+    }
+    fn is_complex(&self) -> bool {
+        true
     }
 }
 
 impl<'heap, T: Expression, A: ArenaAllocator> ListTermType<T>
     for ArenaRef<'heap, TypedTerm<ListTerm>, A>
 where
-    for<'a> T::Ref<'a, T::ExpressionList<T>>: From<ArenaRef<'a, TypedTerm<ListTerm>, A>>,
+    for<'a> T::ExpressionListRef<'a, T>: From<ArenaRef<'a, TypedTerm<ListTerm>, A>>,
 {
-    fn items<'a>(&'a self) -> T::Ref<'a, T::ExpressionList<T>>
+    fn items<'a>(&'a self) -> T::ExpressionListRef<'a, T>
     where
         T::ExpressionList<T>: 'a,
         T: 'a,
     {
-        self.into()
+        (*self).into()
     }
 }
 
 impl<'heap, T: Expression, A: ArenaAllocator> StructPrototypeType<T>
     for ArenaRef<'heap, TypedTerm<ListTerm>, A>
 where
-    for<'a> T::Ref<'a, T::ExpressionList<T>>: From<ArenaRef<'a, TypedTerm<ListTerm>, A>>,
+    for<'a> T::ExpressionListRef<'a, T>: From<ArenaRef<'a, TypedTerm<ListTerm>, A>>,
 {
-    fn keys<'a>(&'a self) -> T::Ref<'a, T::ExpressionList<T>>
+    fn keys<'a>(&'a self) -> T::ExpressionListRef<'a, T>
     where
         T::ExpressionList<T>: 'a,
         T: 'a,
     {
-        self.into()
+        (*self).into()
     }
 }
 
 impl<'heap, T: Expression, A: ArenaAllocator> ExpressionListType<T>
     for ArenaRef<'heap, TypedTerm<ListTerm>, A>
 where
-    for<'a> T::Ref<'a, T>: From<ArenaRef<'a, Term, A>>,
+    for<'a> T::ExpressionRef<'a>: From<ArenaRef<'a, Term, A>>,
 {
-    type Iterator<'a> = FromRefTypeIterator<'a, T, T::Ref<'a, T>, IntoArenaRefIterator<'a, Term, A, Copied<ArrayIter<'a, TermPointer>>>>
+    type Iterator<'a> = MapIntoIterator<
+        IntoArenaRefIterator<'a, Term, A, Copied<ArrayIter<'a, TermPointer>>>,
+        ArenaRef<'a, Term, A>,
+        T::ExpressionRef<'a>,
+    >
     where
         T: 'a,
         Self: 'a;
@@ -112,22 +175,104 @@ where
         self.as_deref().id()
     }
     fn len(&self) -> usize {
-        self.items().len()
+        self.as_inner().items().len()
     }
-    fn get<'a>(&'a self, index: usize) -> Option<T::Ref<'a, T>>
+    fn get<'a>(&'a self, index: usize) -> Option<T::ExpressionRef<'a>>
     where
         T: 'a,
     {
-        self.items()
+        self.as_inner()
+            .items()
             .get(index)
             .copied()
             .map(|pointer| ArenaRef::new(self.arena, self.arena.get::<Term>(pointer)).into())
     }
-    fn iter<'a>(&'a self) -> Self::Iterator<'a> {
-        FromRefTypeIterator::new(IntoArenaRefIterator::new(
-            self.arena,
-            self.items().iter().copied(),
-        ))
+    fn iter<'a>(&'a self) -> Self::Iterator<'a>
+    where
+        T: 'a,
+    {
+        MapIntoIterator::new(self.as_inner().iter())
+    }
+}
+
+impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, ListTerm, A> {
+    fn to_json(&self) -> Result<JsonValue, String> {
+        self.iter()
+            .map(|key| key.to_json())
+            .collect::<Result<Vec<_>, String>>()
+            .map(|values| JsonValue::Array(values))
+    }
+    fn patch(&self, target: &Self) -> Result<Option<JsonValue>, String> {
+        let updates = target
+            .iter()
+            .zip(self.iter())
+            .map(|(current, previous)| previous.patch(&current))
+            .chain(
+                target
+                    .iter()
+                    .skip(self.len())
+                    .map(|item| item.to_json().map(Some)),
+            )
+            .collect::<Result<Vec<_>, _>>()?;
+        let updates = reflex_utils::json::json_object(
+            updates
+                .into_iter()
+                .enumerate()
+                .filter_map(|(index, item)| item.map(|value| (index.to_string(), value)))
+                .chain(if target.len() != self.len() {
+                    Some((String::from("length"), JsonValue::from(target.len())))
+                } else {
+                    None
+                }),
+        );
+        if is_empty_json_object(&updates) {
+            Ok(None)
+        } else {
+            Ok(Some(updates))
+        }
+    }
+}
+
+impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, ListTerm, A> {
+    fn eq(&self, other: &Self) -> bool {
+        // TODO: Clarify PartialEq implementations for container terms
+        // This assumes that lists with the same length and hash are almost certainly identical
+        self.len() == other.len()
+    }
+}
+impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, ListTerm, A> {}
+
+impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, ListTerm, A> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(self.as_deref(), f)
+    }
+}
+
+impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, ListTerm, A> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let max_displayed_items = 100;
+        let items = self.iter();
+        let num_items = items.len();
+        write!(
+            f,
+            "[{}]",
+            if num_items <= max_displayed_items {
+                items
+                    .map(|item| format!("{}", item))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            } else {
+                items
+                    .take(max_displayed_items - 1)
+                    .map(|item| format!("{}", item))
+                    .chain(once(format!(
+                        "...{} more items",
+                        num_items - (max_displayed_items - 1)
+                    )))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            }
+        )
     }
 }
 

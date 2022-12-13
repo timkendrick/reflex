@@ -1,12 +1,18 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
-// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use reflex::core::{StackOffset, VariableTermType};
+// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
+use std::{collections::HashSet, iter::once};
+
+use reflex::core::{
+    DependencyList, GraphNode, RefType, SerializeJson, StackOffset, VariableTermType,
+};
+use serde_json::Value as JsonValue;
 
 use crate::{
     allocator::ArenaAllocator,
     hash::{TermHash, TermHasher, TermSize},
+    term_type::TypedTerm,
     ArenaRef,
 };
 
@@ -27,7 +33,7 @@ impl TermHash for VariableTerm {
 }
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, VariableTerm, A> {
-    fn stack_offset(&self) -> u32 {
+    pub fn stack_offset(&self) -> u32 {
         self.as_deref().stack_offset
     }
 }
@@ -35,6 +41,77 @@ impl<'heap, A: ArenaAllocator> ArenaRef<'heap, VariableTerm, A> {
 impl<'heap, A: ArenaAllocator> VariableTermType for ArenaRef<'heap, VariableTerm, A> {
     fn offset(&self) -> StackOffset {
         self.stack_offset() as StackOffset
+    }
+}
+
+impl<'heap, A: ArenaAllocator> VariableTermType for ArenaRef<'heap, TypedTerm<VariableTerm>, A> {
+    fn offset(&self) -> StackOffset {
+        <ArenaRef<'heap, VariableTerm, A> as VariableTermType>::offset(&self.as_inner())
+    }
+}
+
+impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, VariableTerm, A> {
+    fn size(&self) -> usize {
+        1
+    }
+    fn capture_depth(&self) -> StackOffset {
+        (self.stack_offset() as StackOffset) + 1
+    }
+    fn free_variables(&self) -> HashSet<StackOffset> {
+        HashSet::from_iter(once(self.stack_offset() as StackOffset))
+    }
+    fn count_variable_usages(&self, offset: StackOffset) -> usize {
+        if offset == (self.stack_offset() as StackOffset) {
+            1
+        } else {
+            0
+        }
+    }
+    fn dynamic_dependencies(&self, _deep: bool) -> DependencyList {
+        DependencyList::empty()
+    }
+    fn has_dynamic_dependencies(&self, _deep: bool) -> bool {
+        false
+    }
+    fn is_static(&self) -> bool {
+        false
+    }
+    fn is_atomic(&self) -> bool {
+        false
+    }
+    fn is_complex(&self) -> bool {
+        false
+    }
+}
+
+impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, VariableTerm, A> {
+    fn to_json(&self) -> Result<JsonValue, String> {
+        Err(format!("Unable to serialize term: {}", self))
+    }
+    fn patch(&self, target: &Self) -> Result<Option<JsonValue>, String> {
+        Err(format!(
+            "Unable to create patch for terms: {}, {}",
+            self, target
+        ))
+    }
+}
+
+impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, VariableTerm, A> {
+    fn eq(&self, other: &Self) -> bool {
+        self.stack_offset() == other.stack_offset()
+    }
+}
+impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, VariableTerm, A> {}
+
+impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, VariableTerm, A> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(self.as_deref(), f)
+    }
+}
+
+impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, VariableTerm, A> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<variable:{}>", self.stack_offset())
     }
 }
 

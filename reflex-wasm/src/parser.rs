@@ -3,30 +3,32 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 use std::{collections::HashMap, iter::once, path::Path};
 
-use reflex::{
-    cache::NoopCache,
-    core::{
-        as_integer, create_record, Expression, ExpressionFactory, FloatTermType, HeapAllocator,
-        IntTermType, RefType, Rewritable, StringTermType, StringValue, Substitutions,
-    },
+use reflex::core::{
+    as_integer, create_record, Builtin, Expression, ExpressionFactory, FloatTermType,
+    HeapAllocator, IntTermType, RefType, StringTermType, StringValue,
 };
+use reflex_macros::blanket_trait;
 use swc_common::{source_map::Pos, sync::Lrc, FileName, SourceMap, Span, Spanned};
 use swc_ecma_ast::{
-    ArrayLit, ArrowExpr, BinExpr, BinaryOp, BlockStmt, BlockStmtOrExpr, Bool, CallExpr, Callee,
-    CondExpr, Decl, EsVersion, Expr, ExprStmt, Ident, ImportDecl, ImportSpecifier, Lit, MemberExpr,
-    MemberProp, Module, ModuleDecl, ModuleExportName, ModuleItem, NewExpr, Null, Number, ObjectLit,
-    ObjectPatProp, Pat, Prop, PropName, PropOrSpread, Stmt, Str, TaggedTpl, Tpl, TplElement,
-    UnaryExpr, UnaryOp, VarDeclKind, VarDeclarator,
+    ArrayLit, ArrowExpr, BinExpr, BinaryOp, BindingIdent, BlockStmt, BlockStmtOrExpr, Bool,
+    CallExpr, Callee, CondExpr, Decl, EsVersion, Expr, ExprStmt, Ident, ImportDecl,
+    ImportSpecifier, Lit, MemberExpr, MemberProp, Module, ModuleDecl, ModuleExportName, ModuleItem,
+    NewExpr, Null, Number, ObjectLit, ObjectPatProp, Pat, Prop, PropName, PropOrSpread, Stmt, Str,
+    TaggedTpl, Tpl, TplElement, UnaryExpr, UnaryOp, VarDeclKind, VarDeclarator,
 };
 use swc_ecma_parser::{lexer::Lexer, Parser, StringInput, Syntax};
 
-use crate::stdlib::Stdlib;
+use crate::stdlib::{
+    Accessor, Add, And, Apply, Chain, CollectList, CollectString, Construct, Divide, Eq,
+    FormatErrorMessage, Gt, Gte, Has, If, IfError, Lt, Lte, Merge, Multiply, Not, Or, Pow, Push,
+    PushFront, Remainder, ResolveDeep, Subtract, Throw, ToString,
+};
 
 #[derive(Clone)]
 pub struct Env<T: Expression> {
     globals: HashMap<&'static str, T>,
 }
-impl<T: Expression + Rewritable<T>> Env<T> {
+impl<T: Expression> Env<T> {
     pub fn new() -> Self {
         Self {
             globals: HashMap::new(),
@@ -47,6 +49,43 @@ impl<T: Expression + Rewritable<T>> Env<T> {
 
 pub type ParserResult<T> = Result<T, ParserError>;
 pub type ParserError = String;
+
+blanket_trait!(
+    pub trait WasmParserBuiltin:
+        Builtin
+        + From<Throw>
+        + From<ResolveDeep>
+        + From<ToString>
+        + From<CollectString>
+        + From<Merge>
+        + From<Push>
+        + From<PushFront>
+        + From<Chain>
+        + From<Subtract>
+        + From<Add>
+        + From<Not>
+        + From<Multiply>
+        + From<Divide>
+        + From<Remainder>
+        + From<Pow>
+        + From<Lt>
+        + From<Gt>
+        + From<Lte>
+        + From<Gte>
+        + From<Eq>
+        + From<And>
+        + From<Or>
+        + From<Has>
+        + From<If>
+        + From<IfError>
+        + From<FormatErrorMessage>
+        + From<CollectList>
+        + From<Accessor>
+        + From<Apply>
+        + From<Construct>
+    {
+    }
+);
 
 fn err<T: std::fmt::Debug>(message: &str, _node: T) -> ParserError {
     String::from(message)
@@ -98,20 +137,20 @@ impl LexicalScope {
     }
 }
 
-pub fn parse<T: Expression + Rewritable<T>>(
+pub fn parse<T: Expression>(
     input: &str,
     env: &Env<T>,
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let program = parse_ast(input, None)?;
     parse_script_contents(program.body.into_iter(), env, factory, allocator)
 }
 
-pub fn parse_module<T: Expression + Rewritable<T>>(
+pub fn parse_module<T: Expression>(
     input: &str,
     env: &Env<T>,
     path: &Path,
@@ -120,7 +159,7 @@ pub fn parse_module<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let program = parse_ast(input, Some(path))?;
     parse_module_contents(
@@ -195,14 +234,14 @@ fn parse_ast(input: &str, path: Option<&Path>) -> ParserResult<Module> {
         .map_err(|err| format_source_error(err.span(), &err.into_kind().msg(), &source_map))
 }
 
-fn parse_script_contents<T: Expression + Rewritable<T>>(
+fn parse_script_contents<T: Expression>(
     program: impl IntoIterator<Item = ModuleItem> + ExactSizeIterator,
     env: &Env<T>,
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let body = program
         .into_iter()
@@ -217,7 +256,7 @@ where
     }
 }
 
-fn parse_module_contents<T: Expression + Rewritable<T>>(
+fn parse_module_contents<T: Expression>(
     program: impl IntoIterator<Item = ModuleItem> + ExactSizeIterator,
     env: &Env<T>,
     path: &Path,
@@ -226,7 +265,7 @@ fn parse_module_contents<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let num_statements = program.len();
     let (body, import_bindings) = program.into_iter().fold(
@@ -273,7 +312,7 @@ where
     }
 }
 
-fn parse_module_import<T: Expression + Rewritable<T>>(
+fn parse_module_import<T: Expression>(
     node: &ImportDecl,
     path: &Path,
     loader: &impl Fn(&str, &Path) -> Option<Result<T, String>>,
@@ -281,7 +320,7 @@ fn parse_module_import<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<Vec<(String, T)>>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let module_path = parse_string(&node.src);
     let module = match loader(&module_path, path)
@@ -328,7 +367,7 @@ where
         .collect())
 }
 
-fn parse_block<'a, T: Expression + Rewritable<T>>(
+fn parse_block<'a, T: Expression>(
     body: impl IntoIterator<Item = &'a Stmt>,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -336,12 +375,12 @@ fn parse_block<'a, T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<Option<T>>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     parse_block_statements(body, None, scope, env, factory, allocator)
 }
 
-fn parse_block_statements<'a, T: Expression + Rewritable<T>>(
+fn parse_block_statements<'a, T: Expression>(
     remaining: impl IntoIterator<Item = &'a Stmt>,
     result: Option<T>,
     scope: &LexicalScope,
@@ -350,7 +389,7 @@ fn parse_block_statements<'a, T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<Option<T>>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let mut remaining = remaining.into_iter();
     let node = remaining.next();
@@ -433,35 +472,29 @@ where
                     }
                 }
                 Stmt::Try(node) => {
-                    let BlockStmt { stmts: body, .. } = &node.block;
-                    let body = parse_branch(&statement, body, scope, env, factory, allocator)?;
                     if let Some(node) = &node.finalizer {
                         Err(err_unimplemented(node))
                     } else if let Some(handler) = &node.handler {
-                        let identifier = match &handler.param {
+                        let error_identifier = match &handler.param {
                             Some(pattern) => match pattern {
-                                Pat::Ident(identifier) => {
-                                    Ok(Some(String::from(parse_identifier(&identifier.id))))
-                                }
+                                Pat::Ident(identifier) => Ok(Some(identifier)),
                                 // TODO: Support destructuring patterns in catch variable assignment
                                 _ => Err(err_unimplemented(pattern)),
                             },
                             None => Ok(None),
                         }?;
+                        let BlockStmt { stmts: body, .. } = &node.block;
                         let BlockStmt { stmts: handler, .. } = &handler.body;
-                        let handler = factory.create_lambda_term(
-                            1,
-                            parse_branch(
-                                &statement,
-                                handler,
-                                &scope.create_child(once(identifier)),
-                                env,
-                                factory,
-                                allocator,
-                            )?,
-                        );
-                        let expression =
-                            create_try_catch_expression(body, handler, factory, allocator);
+                        let expression = create_try_catch_expression(
+                            &statement,
+                            body,
+                            handler,
+                            error_identifier,
+                            scope,
+                            env,
+                            factory,
+                            allocator,
+                        )?;
                         let result = Some(expression);
                         parse_block_statements(remaining, result, scope, env, factory, allocator)
                     } else {
@@ -478,7 +511,7 @@ where
     }
 }
 
-fn create_declaration_block<T: Expression + Rewritable<T>>(
+fn create_declaration_block<T: Expression>(
     initializers: impl IntoIterator<Item = T, IntoIter = impl DoubleEndedIterator<Item = T>>,
     body: T,
     factory: &impl ExpressionFactory<T>,
@@ -491,7 +524,7 @@ fn create_declaration_block<T: Expression + Rewritable<T>>(
         })
 }
 
-fn parse_variable_declarators<T: Expression + Rewritable<T>>(
+fn parse_variable_declarators<T: Expression>(
     declarators: &[VarDeclarator],
     scope: &LexicalScope,
     env: &Env<T>,
@@ -502,7 +535,7 @@ fn parse_variable_declarators<T: Expression + Rewritable<T>>(
     Option<LexicalScope>,
 )>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     declarators
         .iter()
@@ -516,7 +549,7 @@ where
         })
 }
 
-fn parse_variable_declarator<T: Expression + Rewritable<T>>(
+fn parse_variable_declarator<T: Expression>(
     node: &VarDeclarator,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -524,7 +557,7 @@ fn parse_variable_declarator<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<(impl IntoIterator<Item = T>, Option<LexicalScope>)>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let init = node
         .init
@@ -567,7 +600,7 @@ where
     }
 }
 
-fn parse_object_destructuring_pattern_bindings<T: Expression + Rewritable<T>>(
+fn parse_object_destructuring_pattern_bindings<T: Expression>(
     target: T,
     properties: &[ObjectPatProp],
     scope: &LexicalScope,
@@ -576,7 +609,7 @@ fn parse_object_destructuring_pattern_bindings<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<(Vec<T>, Option<LexicalScope>)>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let properties = properties
         .iter()
@@ -648,7 +681,7 @@ where
     }
 }
 
-fn parse_array_destructuring_pattern_bindings<T: Expression + Rewritable<T>>(
+fn parse_array_destructuring_pattern_bindings<T: Expression>(
     target: T,
     accessors: &[Option<Pat>],
     scope: &LexicalScope,
@@ -657,7 +690,7 @@ fn parse_array_destructuring_pattern_bindings<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<(impl IntoIterator<Item = T>, Option<LexicalScope>)>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let accessors = accessors
         .iter()
@@ -716,7 +749,7 @@ fn parse_identifier(node: &Ident) -> &str {
     &node.sym
 }
 
-fn parse_prop_name<T: Expression + Rewritable<T>>(
+fn parse_prop_name<T: Expression>(
     node: &PropName,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -724,7 +757,7 @@ fn parse_prop_name<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<String>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     match node {
         PropName::Ident(key) => Ok(String::from(parse_identifier(key))),
@@ -760,7 +793,7 @@ where
     }
 }
 
-fn parse_throw_statement<T: Expression + Rewritable<T>>(
+fn parse_throw_statement<T: Expression>(
     value: &Expr,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -768,19 +801,19 @@ fn parse_throw_statement<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let error = parse_expression(value, scope, env, factory, allocator)?;
     Ok(factory.create_application_term(
-        factory.create_builtin_term(Stdlib::Throw),
+        factory.create_builtin_term(Throw),
         allocator.create_unit_list(factory.create_application_term(
-            factory.create_builtin_term(Stdlib::ResolveDeep),
+            factory.create_builtin_term(ResolveDeep),
             allocator.create_unit_list(error),
         )),
     ))
 }
 
-fn parse_if_branch<T: Expression + Rewritable<T>>(
+fn parse_if_branch<T: Expression>(
     node: &Stmt,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -788,7 +821,7 @@ fn parse_if_branch<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     match node {
         Stmt::Block(block) => {
@@ -799,7 +832,7 @@ where
     }
 }
 
-fn parse_branch<'a, T: Expression + Rewritable<T>>(
+fn parse_branch<'a, T: Expression>(
     node: &Stmt,
     body: impl IntoIterator<Item = &'a Stmt>,
     scope: &LexicalScope,
@@ -808,7 +841,7 @@ fn parse_branch<'a, T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let expression = parse_block(body, scope, env, factory, allocator)?;
     match expression {
@@ -817,7 +850,7 @@ where
     }
 }
 
-fn parse_expression<T: Expression + Rewritable<T>>(
+fn parse_expression<T: Expression>(
     node: &Expr,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -825,7 +858,7 @@ fn parse_expression<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     match node {
         Expr::Paren(node) => parse_expression(&node.expr, scope, env, factory, allocator),
@@ -846,7 +879,7 @@ where
     }
 }
 
-fn parse_expressions<'a, T: Expression + Rewritable<T>>(
+fn parse_expressions<'a, T: Expression>(
     expressions: impl IntoIterator<Item = &'a Expr>,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -854,7 +887,7 @@ fn parse_expressions<'a, T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<Vec<T>>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     expressions
         .into_iter()
@@ -862,7 +895,7 @@ where
         .collect::<Result<Vec<_>, _>>()
 }
 
-fn parse_variable_reference<T: Expression + Rewritable<T>>(
+fn parse_variable_reference<T: Expression>(
     node: &Ident,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -879,7 +912,7 @@ fn parse_variable_reference<T: Expression + Rewritable<T>>(
     }
 }
 
-fn parse_literal<T: Expression + Rewritable<T>>(
+fn parse_literal<T: Expression>(
     node: &Lit,
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
@@ -893,28 +926,28 @@ fn parse_literal<T: Expression + Rewritable<T>>(
     }
 }
 
-fn parse_null_literal<T: Expression + Rewritable<T>>(
+fn parse_null_literal<T: Expression>(
     _node: &Null,
     factory: &impl ExpressionFactory<T>,
 ) -> ParserResult<T> {
     Ok(factory.create_nil_term())
 }
 
-fn parse_boolean_literal<T: Expression + Rewritable<T>>(
+fn parse_boolean_literal<T: Expression>(
     node: &Bool,
     factory: &impl ExpressionFactory<T>,
 ) -> ParserResult<T> {
     Ok(factory.create_boolean_term(node.value))
 }
 
-fn parse_number_literal<T: Expression + Rewritable<T>>(
+fn parse_number_literal<T: Expression>(
     node: &Number,
     factory: &impl ExpressionFactory<T>,
 ) -> ParserResult<T> {
     Ok(factory.create_float_term(node.value))
 }
 
-fn parse_string_literal<T: Expression + Rewritable<T>>(
+fn parse_string_literal<T: Expression>(
     node: &Str,
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
@@ -944,7 +977,7 @@ fn parse_escaped_string(value: &str) -> String {
         .0
 }
 
-fn parse_template_literal<T: Expression + Rewritable<T>>(
+fn parse_template_literal<T: Expression>(
     node: &Tpl,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -952,7 +985,7 @@ fn parse_template_literal<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let args = node
         .quasis
@@ -971,7 +1004,7 @@ where
                 .map(|expression| {
                     let value = parse_expression(expression, scope, env, factory, allocator)?;
                     Ok(Some(factory.create_application_term(
-                        factory.create_builtin_term(Stdlib::ToString),
+                        factory.create_builtin_term(ToString),
                         allocator.create_unit_list(value),
                     )))
                 })
@@ -988,7 +1021,7 @@ where
         0 => factory.create_string_term(allocator.create_static_string("")),
         1 => args.into_iter().next().unwrap(),
         _ => factory.create_application_term(
-            factory.create_builtin_term(Stdlib::CollectString),
+            factory.create_builtin_term(CollectString),
             allocator.create_unit_list(factory.create_list_term(allocator.create_list(args))),
         ),
     })
@@ -1004,7 +1037,7 @@ fn parse_template_element(node: &TplElement) -> String {
         .unwrap_or_else(|| parse_escaped_string(&node.raw))
 }
 
-fn parse_tagged_template<T: Expression + Rewritable<T>>(
+fn parse_tagged_template<T: Expression>(
     node: &TaggedTpl,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -1012,12 +1045,12 @@ fn parse_tagged_template<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     parse_template_literal(&node.tpl, scope, env, factory, allocator)
 }
 
-fn parse_object_literal<T: Expression + Rewritable<T>>(
+fn parse_object_literal<T: Expression>(
     node: &ObjectLit,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -1025,7 +1058,7 @@ fn parse_object_literal<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     enum ObjectLiteralField<T> {
         Property(String, T),
@@ -1109,13 +1142,13 @@ where
         })
     } else {
         factory.create_application_term(
-            factory.create_builtin_term(Stdlib::Merge),
+            factory.create_builtin_term(Merge),
             allocator.create_unit_list(factory.create_list_term(allocator.create_list(field_sets))),
         )
     })
 }
 
-fn parse_array_literal<T: Expression + Rewritable<T>>(
+fn parse_array_literal<T: Expression>(
     node: &ArrayLit,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -1123,7 +1156,7 @@ fn parse_array_literal<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     enum ArrayLiteralFields<T> {
         Items(Vec<T>),
@@ -1169,7 +1202,7 @@ where
                 if items.len() == 1 =>
             {
                 return Ok(factory.create_application_term(
-                    factory.create_builtin_term(Stdlib::Push),
+                    factory.create_builtin_term(Push),
                     allocator
                         .create_pair(target.clone(), items.into_iter().next().cloned().unwrap()),
                 ))
@@ -1178,7 +1211,7 @@ where
                 if items.len() == 1 =>
             {
                 return Ok(factory.create_application_term(
-                    factory.create_builtin_term(Stdlib::PushFront),
+                    factory.create_builtin_term(PushFront),
                     allocator
                         .create_pair(target.clone(), items.into_iter().next().cloned().unwrap()),
                 ))
@@ -1193,7 +1226,7 @@ where
     });
     Ok(if item_sets.len() >= 2 {
         factory.create_application_term(
-            factory.create_builtin_term(Stdlib::Chain),
+            factory.create_builtin_term(Chain),
             allocator.create_list(item_sets),
         )
     } else {
@@ -1204,7 +1237,7 @@ where
     })
 }
 
-fn parse_unary_expression<T: Expression + Rewritable<T>>(
+fn parse_unary_expression<T: Expression>(
     node: &UnaryExpr,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -1212,7 +1245,7 @@ fn parse_unary_expression<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     match node.op {
         UnaryOp::Minus => parse_unary_minus_expression(node, scope, env, factory, allocator),
@@ -1222,7 +1255,7 @@ where
     }
 }
 
-fn parse_binary_expression<T: Expression + Rewritable<T>>(
+fn parse_binary_expression<T: Expression>(
     node: &BinExpr,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -1230,7 +1263,7 @@ fn parse_binary_expression<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     match node.op {
         BinaryOp::Add => parse_binary_add_expression(node, scope, env, factory, allocator),
@@ -1260,7 +1293,7 @@ where
     }
 }
 
-fn parse_unary_minus_expression<T: Expression + Rewritable<T>>(
+fn parse_unary_minus_expression<T: Expression>(
     node: &UnaryExpr,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -1268,7 +1301,7 @@ fn parse_unary_minus_expression<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let operand = parse_expression(&node.arg, scope, env, factory, allocator)?;
     Ok(if let Some(term) = factory.match_int_term(&operand) {
@@ -1277,13 +1310,13 @@ where
         factory.create_float_term(-term.value())
     } else {
         factory.create_application_term(
-            factory.create_builtin_term(Stdlib::Subtract),
+            factory.create_builtin_term(Subtract),
             allocator.create_pair(factory.create_float_term(0.0), operand),
         )
     })
 }
 
-fn parse_unary_plus_expression<T: Expression + Rewritable<T>>(
+fn parse_unary_plus_expression<T: Expression>(
     node: &UnaryExpr,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -1291,7 +1324,7 @@ fn parse_unary_plus_expression<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let operand = parse_expression(&node.arg, scope, env, factory, allocator)?;
     Ok(if let Some(_) = factory.match_int_term(&operand) {
@@ -1300,13 +1333,13 @@ where
         operand
     } else {
         factory.create_application_term(
-            factory.create_builtin_term(Stdlib::Add),
+            factory.create_builtin_term(Add),
             allocator.create_pair(factory.create_float_term(0.0), operand),
         )
     })
 }
 
-fn parse_unary_not_expression<T: Expression + Rewritable<T>>(
+fn parse_unary_not_expression<T: Expression>(
     node: &UnaryExpr,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -1314,16 +1347,16 @@ fn parse_unary_not_expression<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let operand = parse_expression(&node.arg, scope, env, factory, allocator)?;
     Ok(factory.create_application_term(
-        factory.create_builtin_term(Stdlib::Not),
+        factory.create_builtin_term(Not),
         allocator.create_unit_list(operand),
     ))
 }
 
-fn parse_binary_add_expression<T: Expression + Rewritable<T>>(
+fn parse_binary_add_expression<T: Expression>(
     node: &BinExpr,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -1331,17 +1364,17 @@ fn parse_binary_add_expression<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let left = parse_expression(&node.left, scope, env, factory, allocator)?;
     let right = parse_expression(&node.right, scope, env, factory, allocator)?;
     Ok(factory.create_application_term(
-        factory.create_builtin_term(Stdlib::Add),
+        factory.create_builtin_term(Add),
         allocator.create_pair(left, right),
     ))
 }
 
-fn parse_binary_subtract_expression<T: Expression + Rewritable<T>>(
+fn parse_binary_subtract_expression<T: Expression>(
     node: &BinExpr,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -1349,17 +1382,17 @@ fn parse_binary_subtract_expression<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let left = parse_expression(&node.left, scope, env, factory, allocator)?;
     let right = parse_expression(&node.right, scope, env, factory, allocator)?;
     Ok(factory.create_application_term(
-        factory.create_builtin_term(Stdlib::Subtract),
+        factory.create_builtin_term(Subtract),
         allocator.create_pair(left, right),
     ))
 }
 
-fn parse_binary_multiply_expression<T: Expression + Rewritable<T>>(
+fn parse_binary_multiply_expression<T: Expression>(
     node: &BinExpr,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -1367,17 +1400,17 @@ fn parse_binary_multiply_expression<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let left = parse_expression(&node.left, scope, env, factory, allocator)?;
     let right = parse_expression(&node.right, scope, env, factory, allocator)?;
     Ok(factory.create_application_term(
-        factory.create_builtin_term(Stdlib::Multiply),
+        factory.create_builtin_term(Multiply),
         allocator.create_pair(left, right),
     ))
 }
 
-fn parse_binary_divide_expression<T: Expression + Rewritable<T>>(
+fn parse_binary_divide_expression<T: Expression>(
     node: &BinExpr,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -1385,17 +1418,17 @@ fn parse_binary_divide_expression<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let left = parse_expression(&node.left, scope, env, factory, allocator)?;
     let right = parse_expression(&node.right, scope, env, factory, allocator)?;
     Ok(factory.create_application_term(
-        factory.create_builtin_term(Stdlib::Divide),
+        factory.create_builtin_term(Divide),
         allocator.create_pair(left, right),
     ))
 }
 
-fn parse_binary_remainder_expression<T: Expression + Rewritable<T>>(
+fn parse_binary_remainder_expression<T: Expression>(
     node: &BinExpr,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -1403,17 +1436,17 @@ fn parse_binary_remainder_expression<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let left = parse_expression(&node.left, scope, env, factory, allocator)?;
     let right = parse_expression(&node.right, scope, env, factory, allocator)?;
     Ok(factory.create_application_term(
-        factory.create_builtin_term(Stdlib::Remainder),
+        factory.create_builtin_term(Remainder),
         allocator.create_pair(left, right),
     ))
 }
 
-fn parse_binary_pow_expression<T: Expression + Rewritable<T>>(
+fn parse_binary_pow_expression<T: Expression>(
     node: &BinExpr,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -1421,17 +1454,17 @@ fn parse_binary_pow_expression<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let left = parse_expression(&node.left, scope, env, factory, allocator)?;
     let right = parse_expression(&node.right, scope, env, factory, allocator)?;
     Ok(factory.create_application_term(
-        factory.create_builtin_term(Stdlib::Pow),
+        factory.create_builtin_term(Pow),
         allocator.create_pair(left, right),
     ))
 }
 
-fn parse_binary_lt_expression<T: Expression + Rewritable<T>>(
+fn parse_binary_lt_expression<T: Expression>(
     node: &BinExpr,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -1439,17 +1472,17 @@ fn parse_binary_lt_expression<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let left = parse_expression(&node.left, scope, env, factory, allocator)?;
     let right = parse_expression(&node.right, scope, env, factory, allocator)?;
     Ok(factory.create_application_term(
-        factory.create_builtin_term(Stdlib::Lt),
+        factory.create_builtin_term(Lt),
         allocator.create_pair(left, right),
     ))
 }
 
-fn parse_binary_gt_expression<T: Expression + Rewritable<T>>(
+fn parse_binary_gt_expression<T: Expression>(
     node: &BinExpr,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -1457,17 +1490,17 @@ fn parse_binary_gt_expression<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let left = parse_expression(&node.left, scope, env, factory, allocator)?;
     let right = parse_expression(&node.right, scope, env, factory, allocator)?;
     Ok(factory.create_application_term(
-        factory.create_builtin_term(Stdlib::Gt),
+        factory.create_builtin_term(Gt),
         allocator.create_pair(left, right),
     ))
 }
 
-fn parse_binary_lte_expression<T: Expression + Rewritable<T>>(
+fn parse_binary_lte_expression<T: Expression>(
     node: &BinExpr,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -1475,17 +1508,17 @@ fn parse_binary_lte_expression<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let left = parse_expression(&node.left, scope, env, factory, allocator)?;
     let right = parse_expression(&node.right, scope, env, factory, allocator)?;
     Ok(factory.create_application_term(
-        factory.create_builtin_term(Stdlib::Lte),
+        factory.create_builtin_term(Lte),
         allocator.create_pair(left, right),
     ))
 }
 
-fn parse_binary_gte_expression<T: Expression + Rewritable<T>>(
+fn parse_binary_gte_expression<T: Expression>(
     node: &BinExpr,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -1493,17 +1526,17 @@ fn parse_binary_gte_expression<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let left = parse_expression(&node.left, scope, env, factory, allocator)?;
     let right = parse_expression(&node.right, scope, env, factory, allocator)?;
     Ok(factory.create_application_term(
-        factory.create_builtin_term(Stdlib::Gte),
+        factory.create_builtin_term(Gte),
         allocator.create_pair(left, right),
     ))
 }
 
-fn parse_binary_equal_expression<T: Expression + Rewritable<T>>(
+fn parse_binary_equal_expression<T: Expression>(
     node: &BinExpr,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -1511,17 +1544,17 @@ fn parse_binary_equal_expression<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let left = parse_expression(&node.left, scope, env, factory, allocator)?;
     let right = parse_expression(&node.right, scope, env, factory, allocator)?;
     Ok(factory.create_application_term(
-        factory.create_builtin_term(Stdlib::Eq),
+        factory.create_builtin_term(Eq),
         allocator.create_pair(left, right),
     ))
 }
 
-fn parse_binary_not_equal_expression<T: Expression + Rewritable<T>>(
+fn parse_binary_not_equal_expression<T: Expression>(
     node: &BinExpr,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -1529,16 +1562,16 @@ fn parse_binary_not_equal_expression<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let expression = parse_binary_equal_expression(node, scope, env, factory, allocator)?;
     Ok(factory.create_application_term(
-        factory.create_builtin_term(Stdlib::Not),
+        factory.create_builtin_term(Not),
         allocator.create_unit_list(expression),
     ))
 }
 
-fn parse_binary_logical_and_expression<T: Expression + Rewritable<T>>(
+fn parse_binary_logical_and_expression<T: Expression>(
     node: &BinExpr,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -1546,17 +1579,17 @@ fn parse_binary_logical_and_expression<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let left = parse_expression(&node.left, scope, env, factory, allocator)?;
     let right = parse_expression(&node.right, scope, env, factory, allocator)?;
     Ok(factory.create_application_term(
-        factory.create_builtin_term(Stdlib::And),
+        factory.create_builtin_term(And),
         allocator.create_pair(left, right),
     ))
 }
 
-fn parse_binary_logical_or_expression<T: Expression + Rewritable<T>>(
+fn parse_binary_logical_or_expression<T: Expression>(
     node: &BinExpr,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -1564,17 +1597,17 @@ fn parse_binary_logical_or_expression<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let left = parse_expression(&node.left, scope, env, factory, allocator)?;
     let right = parse_expression(&node.right, scope, env, factory, allocator)?;
     Ok(factory.create_application_term(
-        factory.create_builtin_term(Stdlib::Or),
+        factory.create_builtin_term(Or),
         allocator.create_pair(left, right),
     ))
 }
 
-fn parse_binary_in_expression<T: Expression + Rewritable<T>>(
+fn parse_binary_in_expression<T: Expression>(
     node: &BinExpr,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -1582,17 +1615,17 @@ fn parse_binary_in_expression<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let left = parse_expression(&node.left, scope, env, factory, allocator)?;
     let right = parse_expression(&node.right, scope, env, factory, allocator)?;
     Ok(factory.create_application_term(
-        factory.create_builtin_term(Stdlib::Has),
+        factory.create_builtin_term(Has),
         allocator.create_pair(right, left),
     ))
 }
 
-fn parse_conditional_expression<T: Expression + Rewritable<T>>(
+fn parse_conditional_expression<T: Expression>(
     node: &CondExpr,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -1600,7 +1633,7 @@ fn parse_conditional_expression<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let condition = parse_expression(&node.test, scope, env, factory, allocator)?;
     let consequent = parse_expression(&node.cons, scope, env, factory, allocator)?;
@@ -1610,7 +1643,7 @@ where
     ))
 }
 
-fn create_if_expression<T: Expression + Rewritable<T>>(
+fn create_if_expression<T: Expression>(
     condition: T,
     consequent: T,
     alternate: T,
@@ -1618,46 +1651,77 @@ fn create_if_expression<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> T
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     factory.create_application_term(
-        factory.create_builtin_term(Stdlib::If),
+        factory.create_builtin_term(If),
         allocator.create_triple(condition, consequent, alternate),
     )
 }
 
-fn create_try_catch_expression<T: Expression + Rewritable<T>>(
-    body: T,
-    handler: T,
+fn create_try_catch_expression<'a, T: Expression>(
+    node: &Stmt,
+    body: impl IntoIterator<Item = &'a Stmt>,
+    handler: impl IntoIterator<Item = &'a Stmt>,
+    error_identifier: Option<&BindingIdent>,
+    scope: &LexicalScope,
+    env: &Env<T>,
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
-) -> T
+) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
-    factory.create_application_term(
-        factory.create_builtin_term(Stdlib::IfError),
-        allocator.create_pair(
-            body,
-            factory.create_lambda_term(
+    let body = parse_branch(node, body, scope, env, factory, allocator)?;
+    match error_identifier {
+        Some(identifier) => {
+            let identifier = String::from(parse_identifier(&identifier.id));
+            let handler = factory.create_lambda_term(
                 1,
-                factory.create_application_term(
-                    handler
-                        .substitute_static(
-                            &Substitutions::increase_scope_offset(1, 0),
-                            factory,
-                            allocator,
-                            &mut NoopCache::default(),
-                        )
-                        .unwrap_or(handler),
-                    allocator.create_unit_list(factory.create_application_term(
-                        global_aggregate_error(factory, allocator),
-                        allocator.create_unit_list(factory.create_variable_term(0)),
-                    )),
+                parse_branch(
+                    node,
+                    handler,
+                    &scope.create_child([None, Some(identifier)]),
+                    env,
+                    factory,
+                    allocator,
+                )?,
+            );
+            Ok(factory.create_application_term(
+                factory.create_builtin_term(IfError),
+                allocator.create_pair(
+                    body,
+                    factory.create_lambda_term(
+                        1,
+                        factory.create_application_term(
+                            handler,
+                            allocator.create_unit_list(factory.create_application_term(
+                                global_aggregate_error(factory, allocator),
+                                allocator.create_unit_list(factory.create_variable_term(0)),
+                            )),
+                        ),
+                    ),
                 ),
-            ),
-        ),
-    )
+            ))
+        }
+        None => {
+            let handler = factory.create_lambda_term(
+                1,
+                parse_branch(
+                    node,
+                    handler,
+                    &scope.create_child([None]),
+                    env,
+                    factory,
+                    allocator,
+                )?,
+            );
+            Ok(factory.create_application_term(
+                factory.create_builtin_term(IfError),
+                allocator.create_pair(body, handler),
+            ))
+        }
+    }
 }
 
 fn global_aggregate_error<T: Expression>(
@@ -1665,7 +1729,7 @@ fn global_aggregate_error<T: Expression>(
     allocator: &impl HeapAllocator<T>,
 ) -> T
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     // TODO: Add optional JS AggregateError override message
     factory.create_lambda_term(
@@ -1678,14 +1742,14 @@ where
             .chain(once((
                 factory.create_string_term(allocator.create_static_string("message")),
                 factory.create_application_term(
-                    factory.create_builtin_term(Stdlib::FormatErrorMessage),
+                    factory.create_builtin_term(FormatErrorMessage),
                     allocator.create_unit_list(factory.create_variable_term(0)),
                 ),
             )))
             .chain(once((
                 factory.create_string_term(allocator.create_static_string("errors")),
                 factory.create_application_term(
-                    factory.create_builtin_term(Stdlib::CollectList),
+                    factory.create_builtin_term(CollectList),
                     allocator.create_unit_list(factory.create_variable_term(0)),
                 ),
             ))),
@@ -1695,7 +1759,7 @@ where
     )
 }
 
-fn parse_arrow_function_expression<T: Expression + Rewritable<T>>(
+fn parse_arrow_function_expression<T: Expression>(
     node: &ArrowExpr,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -1703,7 +1767,7 @@ fn parse_arrow_function_expression<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     if node.is_generator || node.is_async {
         Err(err_unimplemented(node))
@@ -1788,7 +1852,7 @@ where
     }
 }
 
-fn parse_member_expression<T: Expression + Rewritable<T>>(
+fn parse_member_expression<T: Expression>(
     node: &MemberExpr,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -1796,7 +1860,7 @@ fn parse_member_expression<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let target = parse_expression(&node.obj, scope, env, factory, allocator)?;
     let field = match &node.prop {
@@ -1809,42 +1873,42 @@ where
     Ok(get_dynamic_field(target, field, factory, allocator))
 }
 
-fn get_static_field<T: Expression + Rewritable<T>>(
+fn get_static_field<T: Expression>(
     target: T,
     field: &str,
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
 ) -> T
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let field = factory.create_string_term(allocator.create_string(field));
     get_dynamic_field(target, field, factory, allocator)
 }
 
-fn get_dynamic_field<T: Expression + Rewritable<T>>(
+fn get_dynamic_field<T: Expression>(
     target: T,
     field: T,
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
 ) -> T
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     factory.create_application_term(
-        factory.create_builtin_term(Stdlib::Accessor),
+        factory.create_builtin_term(Accessor),
         allocator.create_pair(target, field),
     )
 }
 
-fn get_indexed_field<T: Expression + Rewritable<T>>(
+fn get_indexed_field<T: Expression>(
     target: T,
     index: usize,
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
 ) -> T
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     get_dynamic_field(
         target,
@@ -1854,7 +1918,7 @@ where
     )
 }
 
-fn parse_call_expression<T: Expression + Rewritable<T>>(
+fn parse_call_expression<T: Expression>(
     node: &CallExpr,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -1862,7 +1926,7 @@ fn parse_call_expression<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
     let target = match &node.callee {
         Callee::Expr(callee) => parse_expression(callee, scope, env, factory, allocator),
@@ -1893,7 +1957,7 @@ where
             factory.create_partial_application_term(target, allocator.create_list(args))
         };
         Ok(factory.create_application_term(
-            factory.create_builtin_term(Stdlib::Apply),
+            factory.create_builtin_term(Apply),
             allocator.create_pair(target, spread),
         ))
     } else {
@@ -1901,7 +1965,7 @@ where
     }
 }
 
-fn parse_constructor_expression<T: Expression + Rewritable<T>>(
+fn parse_constructor_expression<T: Expression>(
     node: &NewExpr,
     scope: &LexicalScope,
     env: &Env<T>,
@@ -1909,20 +1973,26 @@ fn parse_constructor_expression<T: Expression + Rewritable<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: WasmParserBuiltin,
 {
-    let target = parse_expression(&node.callee, scope, env, factory, allocator);
-    let args = (&node.args).iter().flat_map(|args| {
-        args.iter().map(|arg| {
-            if arg.spread.is_some() {
-                Err(err_unimplemented(arg))
-            } else {
-                parse_expression(&arg.expr, scope, env, factory, allocator)
-            }
+    let target = parse_expression(&node.callee, scope, env, factory, allocator)?;
+    let args = (&node.args)
+        .iter()
+        .flat_map(|args| {
+            args.iter().map(|arg| {
+                if arg.spread.is_some() {
+                    Err(err_unimplemented(arg))
+                } else {
+                    parse_expression(&arg.expr, scope, env, factory, allocator)
+                }
+            })
         })
-    });
+        .collect::<Result<Vec<_>, _>>()?;
     Ok(factory.create_application_term(
-        factory.create_builtin_term(Stdlib::Construct),
-        allocator.create_list(once(target).chain(args).collect::<ParserResult<Vec<_>>>()?),
+        factory.create_builtin_term(Construct),
+        allocator.create_pair(
+            target,
+            factory.create_list_term(allocator.create_list(args)),
+        ),
     ))
 }

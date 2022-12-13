@@ -2,9 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
+use std::collections::HashSet;
+
+use chrono::{DateTime, NaiveDateTime, SecondsFormat, Utc};
+use reflex::core::{DependencyList, GraphNode, RefType, SerializeJson, StackOffset};
+use serde_json::Value as JsonValue;
+
 use crate::{
     allocator::ArenaAllocator,
     hash::{TermHash, TermHasher, TermSize},
+    ArenaRef,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -29,10 +36,90 @@ impl From<i64> for DateTerm {
         }
     }
 }
-impl Into<i64> for DateTerm {
-    fn into(self) -> i64 {
-        let Self { timestamp, .. } = self;
+impl From<DateTerm> for i64 {
+    fn from(value: DateTerm) -> Self {
+        let DateTerm { timestamp, .. } = value;
         chunks_to_i64(timestamp)
+    }
+}
+
+impl<'heap, A: ArenaAllocator> ArenaRef<'heap, DateTerm, A> {
+    pub fn timestamp(&self) -> i64 {
+        i64::from(*self.as_deref())
+    }
+}
+
+impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, DateTerm, A> {
+    fn size(&self) -> usize {
+        1
+    }
+    fn capture_depth(&self) -> StackOffset {
+        0
+    }
+    fn free_variables(&self) -> HashSet<StackOffset> {
+        HashSet::new()
+    }
+    fn count_variable_usages(&self, _offset: StackOffset) -> usize {
+        0
+    }
+    fn dynamic_dependencies(&self, _deep: bool) -> DependencyList {
+        DependencyList::empty()
+    }
+    fn has_dynamic_dependencies(&self, _deep: bool) -> bool {
+        false
+    }
+    fn is_static(&self) -> bool {
+        true
+    }
+    fn is_atomic(&self) -> bool {
+        true
+    }
+    fn is_complex(&self) -> bool {
+        false
+    }
+}
+
+impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, DateTerm, A> {
+    fn to_json(&self) -> Result<JsonValue, String> {
+        Ok(JsonValue::String(format!("{}", self)))
+    }
+    fn patch(&self, target: &Self) -> Result<Option<JsonValue>, String> {
+        if self.timestamp() == target.timestamp() {
+            Ok(None)
+        } else {
+            target.to_json().map(Some)
+        }
+    }
+}
+
+impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, DateTerm, A> {
+    fn eq(&self, other: &Self) -> bool {
+        self.timestamp() == other.timestamp()
+    }
+}
+impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, DateTerm, A> {}
+
+impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, DateTerm, A> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(self.as_deref(), f)
+    }
+}
+
+impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, DateTerm, A> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let timestamp = i64::from(*self.as_deref());
+        let seconds = timestamp / 1000;
+        let millis = timestamp % 10;
+        let nanos = millis * 1000;
+        write!(
+            f,
+            "{}",
+            DateTime::<Utc>::from_utc(
+                NaiveDateTime::from_timestamp_opt(seconds, nanos as u32).unwrap_or_default(),
+                Utc,
+            )
+            .to_rfc3339_opts(SecondsFormat::AutoSi, true)
+        )
     }
 }
 

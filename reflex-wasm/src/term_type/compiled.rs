@@ -1,15 +1,25 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
-// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
+// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
+use std::{
+    collections::{hash_map::DefaultHasher, HashSet},
+    hash::Hasher,
+};
+
 use reflex::{
-    core::{CompiledFunctionTermType, InstructionPointer, RefType, StackOffset},
+    core::{
+        Arity, CompiledFunctionTermType, DependencyList, GraphNode, InstructionPointer, RefType,
+        SerializeJson, StackOffset,
+    },
     hash::HashId,
 };
+use serde_json::Value as JsonValue;
 
 use crate::{
     allocator::ArenaAllocator,
     hash::{TermHash, TermHasher, TermSize},
+    term_type::TypedTerm,
     ArenaRef,
 };
 
@@ -32,6 +42,17 @@ impl From<u32> for CompiledFunctionIndex {
         Self(value)
     }
 }
+impl From<CompiledFunctionIndex> for u32 {
+    fn from(value: CompiledFunctionIndex) -> Self {
+        let CompiledFunctionIndex(value) = value;
+        value
+    }
+}
+impl std::fmt::Display for CompiledFunctionIndex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:#x}", self.0)
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
@@ -51,11 +72,14 @@ impl TermHash for CompiledTerm {
 }
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, CompiledTerm, A> {
-    fn target(&self) -> CompiledFunctionIndex {
+    pub fn target(&self) -> CompiledFunctionIndex {
         self.as_deref().target
     }
-    fn required_args(&self) -> u32 {
+    pub fn num_args(&self) -> u32 {
         self.as_deref().num_args
+    }
+    pub fn arity(&self) -> Arity {
+        Arity::lazy(self.num_args() as usize, 0, false)
     }
 }
 
@@ -63,12 +87,98 @@ impl<'heap, A: ArenaAllocator> CompiledFunctionTermType for ArenaRef<'heap, Comp
     fn address(&self) -> InstructionPointer {
         InstructionPointer::new(u32::from(self.target()) as usize)
     }
-    fn hash(&self) -> HashId {}
+    fn hash(&self) -> HashId {
+        let mut hasher = DefaultHasher::default();
+        hasher.write_u32(u32::from(self.target()));
+        hasher.finish()
+    }
     fn required_args(&self) -> StackOffset {
-        self.required_args() as usize
+        self.num_args() as usize
     }
     fn optional_args(&self) -> StackOffset {
         0
+    }
+}
+
+impl<'heap, A: ArenaAllocator> CompiledFunctionTermType
+    for ArenaRef<'heap, TypedTerm<CompiledTerm>, A>
+{
+    fn address(&self) -> InstructionPointer {
+        <ArenaRef<'heap, CompiledTerm, A> as CompiledFunctionTermType>::address(&self.as_inner())
+    }
+    fn hash(&self) -> HashId {
+        <ArenaRef<'heap, CompiledTerm, A> as CompiledFunctionTermType>::hash(&self.as_inner())
+    }
+    fn required_args(&self) -> StackOffset {
+        <ArenaRef<'heap, CompiledTerm, A> as CompiledFunctionTermType>::required_args(
+            &self.as_inner(),
+        )
+    }
+    fn optional_args(&self) -> StackOffset {
+        <ArenaRef<'heap, CompiledTerm, A> as CompiledFunctionTermType>::optional_args(
+            &self.as_inner(),
+        )
+    }
+}
+
+impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, CompiledTerm, A> {
+    fn size(&self) -> usize {
+        1
+    }
+    fn capture_depth(&self) -> StackOffset {
+        0
+    }
+    fn free_variables(&self) -> HashSet<StackOffset> {
+        HashSet::new()
+    }
+    fn count_variable_usages(&self, _offset: StackOffset) -> usize {
+        0
+    }
+    fn dynamic_dependencies(&self, _deep: bool) -> DependencyList {
+        DependencyList::empty()
+    }
+    fn has_dynamic_dependencies(&self, _deep: bool) -> bool {
+        false
+    }
+    fn is_static(&self) -> bool {
+        true
+    }
+    fn is_atomic(&self) -> bool {
+        true
+    }
+    fn is_complex(&self) -> bool {
+        false
+    }
+}
+
+impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, CompiledTerm, A> {
+    fn to_json(&self) -> Result<JsonValue, String> {
+        Err(format!("Unable to serialize term: {}", self))
+    }
+    fn patch(&self, target: &Self) -> Result<Option<JsonValue>, String> {
+        Err(format!(
+            "Unable to create patch for terms: {}, {}",
+            self, target
+        ))
+    }
+}
+
+impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, CompiledTerm, A> {
+    fn eq(&self, other: &Self) -> bool {
+        self.address() == other.address() && self.num_args() == other.num_args()
+    }
+}
+impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, CompiledTerm, A> {}
+
+impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, CompiledTerm, A> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(self.as_deref(), f)
+    }
+}
+
+impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, CompiledTerm, A> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<compiled:{}>", self.target())
     }
 }
 

@@ -1,0 +1,23 @@
+// SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
+use reflex::core::{uuid, ArgType, Arity, FunctionArity, Uid, Uuid};
+
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+pub struct Has;
+impl Has {
+    pub const UUID: Uuid = uuid!("7ed23b1e-14d6-4e39-b314-01184bf66b5a");
+    const ARITY: FunctionArity<2, 0> = FunctionArity {
+        required: [ArgType::Strict, ArgType::Strict],
+        optional: [],
+        variadic: None,
+    };
+    pub fn arity(&self) -> Arity {
+        Arity::from(&Self::ARITY)
+    }
+}
+impl Uid for Has {
+    fn uid(&self) -> Uuid {
+        Self::UUID
+    }
+}

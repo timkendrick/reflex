@@ -1,19 +1,25 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
-// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use reflex::core::{FloatTermType, FloatValue};
+// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
+use std::collections::HashSet;
+
+use reflex::core::{
+    DependencyList, FloatTermType, FloatValue, GraphNode, RefType, SerializeJson, StackOffset,
+};
+use serde_json::Value as JsonValue;
 
 use crate::{
     allocator::ArenaAllocator,
     hash::{TermHash, TermHasher, TermSize},
+    term_type::TypedTerm,
     ArenaRef,
 };
 
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct FloatTerm {
-    value: [u32; 2],
+    pub value: [u32; 2],
 }
 impl TermSize for FloatTerm {
     fn size_of(&self) -> usize {
@@ -32,9 +38,9 @@ impl From<f64> for FloatTerm {
         }
     }
 }
-impl Into<f64> for FloatTerm {
-    fn into(self) -> f64 {
-        let Self { value, .. } = self;
+impl From<FloatTerm> for f64 {
+    fn from(value: FloatTerm) -> Self {
+        let FloatTerm { value, .. } = value;
         chunks_to_f64(value)
     }
 }
@@ -63,7 +69,7 @@ fn chunks_to_f64(value: [u32; 2]) -> f64 {
 }
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, FloatTerm, A> {
-    fn value(&self) -> f64 {
+    pub fn value(&self) -> f64 {
         chunks_to_f64(self.as_deref().value)
     }
 }
@@ -71,6 +77,80 @@ impl<'heap, A: ArenaAllocator> ArenaRef<'heap, FloatTerm, A> {
 impl<'heap, A: ArenaAllocator> FloatTermType for ArenaRef<'heap, FloatTerm, A> {
     fn value(&self) -> FloatValue {
         self.value()
+    }
+}
+
+impl<'heap, A: ArenaAllocator> FloatTermType for ArenaRef<'heap, TypedTerm<FloatTerm>, A> {
+    fn value(&self) -> FloatValue {
+        <ArenaRef<'heap, FloatTerm, A> as FloatTermType>::value(&self.as_inner())
+    }
+}
+
+impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, FloatTerm, A> {
+    fn size(&self) -> usize {
+        1
+    }
+    fn capture_depth(&self) -> StackOffset {
+        0
+    }
+    fn free_variables(&self) -> HashSet<StackOffset> {
+        HashSet::new()
+    }
+    fn count_variable_usages(&self, _offset: StackOffset) -> usize {
+        0
+    }
+    fn dynamic_dependencies(&self, _deep: bool) -> DependencyList {
+        DependencyList::empty()
+    }
+    fn has_dynamic_dependencies(&self, _deep: bool) -> bool {
+        false
+    }
+    fn is_static(&self) -> bool {
+        true
+    }
+    fn is_atomic(&self) -> bool {
+        true
+    }
+    fn is_complex(&self) -> bool {
+        false
+    }
+}
+
+impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, FloatTerm, A> {
+    fn to_json(&self) -> Result<JsonValue, String> {
+        match serde_json::Number::from_f64(self.value()) {
+            Some(number) => Ok(JsonValue::Number(number)),
+            None => Err(format!(
+                "Unable to serialize float non-finite float as JSON value: {}",
+                self
+            )),
+        }
+    }
+    fn patch(&self, target: &Self) -> Result<Option<JsonValue>, String> {
+        if self.value() == target.value() {
+            Ok(None)
+        } else {
+            target.to_json().map(Some)
+        }
+    }
+}
+
+impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, FloatTerm, A> {
+    fn eq(&self, other: &Self) -> bool {
+        self.value() == other.value()
+    }
+}
+impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, FloatTerm, A> {}
+
+impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, FloatTerm, A> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(self.as_deref(), f)
+    }
+}
+
+impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, FloatTerm, A> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value())
     }
 }
 

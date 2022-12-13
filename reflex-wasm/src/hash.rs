@@ -5,7 +5,7 @@
 use crate::ArenaAllocator;
 
 pub trait TermSize {
-    fn size(&self) -> usize;
+    fn size_of(&self) -> usize;
 }
 
 pub trait TermHash {

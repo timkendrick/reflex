@@ -1,8 +1,14 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
-// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use reflex::core::RefType;
+// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
+use std::{collections::HashSet, marker::PhantomData};
+
+use reflex::{
+    core::{Arity, DependencyList, Expression, GraphNode, RefType, SerializeJson, StackOffset},
+    hash::HashId,
+};
+use serde_json::Value as JsonValue;
 use strum_macros::EnumDiscriminants;
 
 mod application;
@@ -62,7 +68,8 @@ pub use variable::*;
 use crate::{
     allocator::ArenaAllocator,
     hash::{TermHash, TermHasher, TermSize},
-    ArenaRef,
+    stdlib::Stdlib,
+    ArenaRef, Term,
 };
 
 #[derive(Clone, Copy, Debug, EnumDiscriminants)]
@@ -109,11 +116,59 @@ pub enum TermType {
     TakeIterator(TakeIteratorTerm),
     ZipIterator(ZipIteratorTerm),
 }
+impl TryFrom<u32> for TermTypeDiscriminants {
+    type Error = ();
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        match value {
+            value if value == Self::Application as u32 => Ok(Self::Application),
+            value if value == Self::Boolean as u32 => Ok(Self::Boolean),
+            value if value == Self::Builtin as u32 => Ok(Self::Builtin),
+            value if value == Self::Cell as u32 => Ok(Self::Cell),
+            value if value == Self::Compiled as u32 => Ok(Self::Compiled),
+            value if value == Self::Condition as u32 => Ok(Self::Condition),
+            value if value == Self::Constructor as u32 => Ok(Self::Constructor),
+            value if value == Self::Date as u32 => Ok(Self::Date),
+            value if value == Self::Effect as u32 => Ok(Self::Effect),
+            value if value == Self::Float as u32 => Ok(Self::Float),
+            value if value == Self::Hashmap as u32 => Ok(Self::Hashmap),
+            value if value == Self::Hashset as u32 => Ok(Self::Hashset),
+            value if value == Self::Int as u32 => Ok(Self::Int),
+            value if value == Self::Lambda as u32 => Ok(Self::Lambda),
+            value if value == Self::Let as u32 => Ok(Self::Let),
+            value if value == Self::List as u32 => Ok(Self::List),
+            value if value == Self::Nil as u32 => Ok(Self::Nil),
+            value if value == Self::Partial as u32 => Ok(Self::Partial),
+            value if value == Self::Pointer as u32 => Ok(Self::Pointer),
+            value if value == Self::Record as u32 => Ok(Self::Record),
+            value if value == Self::Signal as u32 => Ok(Self::Signal),
+            value if value == Self::String as u32 => Ok(Self::String),
+            value if value == Self::Symbol as u32 => Ok(Self::Symbol),
+            value if value == Self::Tree as u32 => Ok(Self::Tree),
+            value if value == Self::Variable as u32 => Ok(Self::Variable),
+            value if value == Self::EmptyIterator as u32 => Ok(Self::EmptyIterator),
+            value if value == Self::EvaluateIterator as u32 => Ok(Self::EvaluateIterator),
+            value if value == Self::FilterIterator as u32 => Ok(Self::FilterIterator),
+            value if value == Self::FlattenIterator as u32 => Ok(Self::FlattenIterator),
+            value if value == Self::HashmapKeysIterator as u32 => Ok(Self::HashmapKeysIterator),
+            value if value == Self::HashmapValuesIterator as u32 => Ok(Self::HashmapValuesIterator),
+            value if value == Self::IntegersIterator as u32 => Ok(Self::IntegersIterator),
+            value if value == Self::IntersperseIterator as u32 => Ok(Self::IntersperseIterator),
+            value if value == Self::MapIterator as u32 => Ok(Self::MapIterator),
+            value if value == Self::OnceIterator as u32 => Ok(Self::OnceIterator),
+            value if value == Self::RangeIterator as u32 => Ok(Self::RangeIterator),
+            value if value == Self::RepeatIterator as u32 => Ok(Self::RepeatIterator),
+            value if value == Self::SkipIterator as u32 => Ok(Self::SkipIterator),
+            value if value == Self::TakeIterator as u32 => Ok(Self::TakeIterator),
+            value if value == Self::ZipIterator as u32 => Ok(Self::ZipIterator),
+            _ => Err(()),
+        }
+    }
+}
 impl TermSize for TermType {
     fn size_of(&self) -> usize {
         let discriminant_size = std::mem::size_of::<u32>();
         let value_size = match self {
-            Self::Application(term) => term.size_of(),
+            TermType::Application(term) => term.size_of(),
             Self::Boolean(term) => term.size_of(),
             Self::Builtin(term) => term.size_of(),
             Self::Cell(term) => term.size_of(),
@@ -160,7 +215,7 @@ impl TermSize for TermType {
 impl TermHash for TermType {
     fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
         match self {
-            Self::Application(term) => hasher
+            TermType::Application(term) => hasher
                 .write_u8(TermTypeDiscriminants::Application as u8)
                 .hash(term, arena),
             Self::Boolean(term) => hasher
@@ -286,7 +341,7 @@ impl TermHash for TermType {
 impl<'a> Into<Option<&'a ApplicationTerm>> for &'a TermType {
     fn into(self) -> Option<&'a ApplicationTerm> {
         match self {
-            Self::Application(term) => Some(term),
+            TermType::Application(term) => Some(term),
             _ => None,
         }
     }
@@ -294,7 +349,7 @@ impl<'a> Into<Option<&'a ApplicationTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a BooleanTerm>> for &'a TermType {
     fn into(self) -> Option<&'a BooleanTerm> {
         match self {
-            Self::Boolean(term) => Some(term),
+            TermType::Boolean(term) => Some(term),
             _ => None,
         }
     }
@@ -302,7 +357,7 @@ impl<'a> Into<Option<&'a BooleanTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a BuiltinTerm>> for &'a TermType {
     fn into(self) -> Option<&'a BuiltinTerm> {
         match self {
-            Self::Builtin(term) => Some(term),
+            TermType::Builtin(term) => Some(term),
             _ => None,
         }
     }
@@ -310,7 +365,7 @@ impl<'a> Into<Option<&'a BuiltinTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a CellTerm>> for &'a TermType {
     fn into(self) -> Option<&'a CellTerm> {
         match self {
-            Self::Cell(term) => Some(term),
+            TermType::Cell(term) => Some(term),
             _ => None,
         }
     }
@@ -318,7 +373,7 @@ impl<'a> Into<Option<&'a CellTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a CompiledTerm>> for &'a TermType {
     fn into(self) -> Option<&'a CompiledTerm> {
         match self {
-            Self::Compiled(term) => Some(term),
+            TermType::Compiled(term) => Some(term),
             _ => None,
         }
     }
@@ -326,7 +381,7 @@ impl<'a> Into<Option<&'a CompiledTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a ConditionTerm>> for &'a TermType {
     fn into(self) -> Option<&'a ConditionTerm> {
         match self {
-            Self::Condition(term) => Some(term),
+            TermType::Condition(term) => Some(term),
             _ => None,
         }
     }
@@ -334,7 +389,7 @@ impl<'a> Into<Option<&'a ConditionTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a ConstructorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a ConstructorTerm> {
         match self {
-            Self::Constructor(term) => Some(term),
+            TermType::Constructor(term) => Some(term),
             _ => None,
         }
     }
@@ -342,7 +397,7 @@ impl<'a> Into<Option<&'a ConstructorTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a DateTerm>> for &'a TermType {
     fn into(self) -> Option<&'a DateTerm> {
         match self {
-            Self::Date(term) => Some(term),
+            TermType::Date(term) => Some(term),
             _ => None,
         }
     }
@@ -350,7 +405,7 @@ impl<'a> Into<Option<&'a DateTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a EffectTerm>> for &'a TermType {
     fn into(self) -> Option<&'a EffectTerm> {
         match self {
-            Self::Effect(term) => Some(term),
+            TermType::Effect(term) => Some(term),
             _ => None,
         }
     }
@@ -358,7 +413,7 @@ impl<'a> Into<Option<&'a EffectTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a FloatTerm>> for &'a TermType {
     fn into(self) -> Option<&'a FloatTerm> {
         match self {
-            Self::Float(term) => Some(term),
+            TermType::Float(term) => Some(term),
             _ => None,
         }
     }
@@ -366,7 +421,7 @@ impl<'a> Into<Option<&'a FloatTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a HashmapTerm>> for &'a TermType {
     fn into(self) -> Option<&'a HashmapTerm> {
         match self {
-            Self::Hashmap(term) => Some(term),
+            TermType::Hashmap(term) => Some(term),
             _ => None,
         }
     }
@@ -374,7 +429,7 @@ impl<'a> Into<Option<&'a HashmapTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a HashsetTerm>> for &'a TermType {
     fn into(self) -> Option<&'a HashsetTerm> {
         match self {
-            Self::Hashset(term) => Some(term),
+            TermType::Hashset(term) => Some(term),
             _ => None,
         }
     }
@@ -382,7 +437,7 @@ impl<'a> Into<Option<&'a HashsetTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a IntTerm>> for &'a TermType {
     fn into(self) -> Option<&'a IntTerm> {
         match self {
-            Self::Int(term) => Some(term),
+            TermType::Int(term) => Some(term),
             _ => None,
         }
     }
@@ -390,7 +445,7 @@ impl<'a> Into<Option<&'a IntTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a LambdaTerm>> for &'a TermType {
     fn into(self) -> Option<&'a LambdaTerm> {
         match self {
-            Self::Lambda(term) => Some(term),
+            TermType::Lambda(term) => Some(term),
             _ => None,
         }
     }
@@ -398,7 +453,7 @@ impl<'a> Into<Option<&'a LambdaTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a LetTerm>> for &'a TermType {
     fn into(self) -> Option<&'a LetTerm> {
         match self {
-            Self::Let(term) => Some(term),
+            TermType::Let(term) => Some(term),
             _ => None,
         }
     }
@@ -406,7 +461,7 @@ impl<'a> Into<Option<&'a LetTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a ListTerm>> for &'a TermType {
     fn into(self) -> Option<&'a ListTerm> {
         match self {
-            Self::List(term) => Some(term),
+            TermType::List(term) => Some(term),
             _ => None,
         }
     }
@@ -414,7 +469,7 @@ impl<'a> Into<Option<&'a ListTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a NilTerm>> for &'a TermType {
     fn into(self) -> Option<&'a NilTerm> {
         match self {
-            Self::Nil(term) => Some(term),
+            TermType::Nil(term) => Some(term),
             _ => None,
         }
     }
@@ -422,7 +477,7 @@ impl<'a> Into<Option<&'a NilTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a PartialTerm>> for &'a TermType {
     fn into(self) -> Option<&'a PartialTerm> {
         match self {
-            Self::Partial(term) => Some(term),
+            TermType::Partial(term) => Some(term),
             _ => None,
         }
     }
@@ -430,7 +485,7 @@ impl<'a> Into<Option<&'a PartialTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a PointerTerm>> for &'a TermType {
     fn into(self) -> Option<&'a PointerTerm> {
         match self {
-            Self::Pointer(term) => Some(term),
+            TermType::Pointer(term) => Some(term),
             _ => None,
         }
     }
@@ -438,7 +493,7 @@ impl<'a> Into<Option<&'a PointerTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a RecordTerm>> for &'a TermType {
     fn into(self) -> Option<&'a RecordTerm> {
         match self {
-            Self::Record(term) => Some(term),
+            TermType::Record(term) => Some(term),
             _ => None,
         }
     }
@@ -446,7 +501,7 @@ impl<'a> Into<Option<&'a RecordTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a SignalTerm>> for &'a TermType {
     fn into(self) -> Option<&'a SignalTerm> {
         match self {
-            Self::Signal(term) => Some(term),
+            TermType::Signal(term) => Some(term),
             _ => None,
         }
     }
@@ -454,7 +509,7 @@ impl<'a> Into<Option<&'a SignalTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a StringTerm>> for &'a TermType {
     fn into(self) -> Option<&'a StringTerm> {
         match self {
-            Self::String(term) => Some(term),
+            TermType::String(term) => Some(term),
             _ => None,
         }
     }
@@ -462,7 +517,7 @@ impl<'a> Into<Option<&'a StringTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a SymbolTerm>> for &'a TermType {
     fn into(self) -> Option<&'a SymbolTerm> {
         match self {
-            Self::Symbol(term) => Some(term),
+            TermType::Symbol(term) => Some(term),
             _ => None,
         }
     }
@@ -470,7 +525,7 @@ impl<'a> Into<Option<&'a SymbolTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a TreeTerm>> for &'a TermType {
     fn into(self) -> Option<&'a TreeTerm> {
         match self {
-            Self::Tree(term) => Some(term),
+            TermType::Tree(term) => Some(term),
             _ => None,
         }
     }
@@ -478,7 +533,7 @@ impl<'a> Into<Option<&'a TreeTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a VariableTerm>> for &'a TermType {
     fn into(self) -> Option<&'a VariableTerm> {
         match self {
-            Self::Variable(term) => Some(term),
+            TermType::Variable(term) => Some(term),
             _ => None,
         }
     }
@@ -486,7 +541,7 @@ impl<'a> Into<Option<&'a VariableTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a EmptyIteratorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a EmptyIteratorTerm> {
         match self {
-            Self::EmptyIterator(term) => Some(term),
+            TermType::EmptyIterator(term) => Some(term),
             _ => None,
         }
     }
@@ -494,7 +549,7 @@ impl<'a> Into<Option<&'a EmptyIteratorTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a EvaluateIteratorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a EvaluateIteratorTerm> {
         match self {
-            Self::EvaluateIterator(term) => Some(term),
+            TermType::EvaluateIterator(term) => Some(term),
             _ => None,
         }
     }
@@ -502,7 +557,7 @@ impl<'a> Into<Option<&'a EvaluateIteratorTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a FilterIteratorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a FilterIteratorTerm> {
         match self {
-            Self::FilterIterator(term) => Some(term),
+            TermType::FilterIterator(term) => Some(term),
             _ => None,
         }
     }
@@ -510,7 +565,7 @@ impl<'a> Into<Option<&'a FilterIteratorTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a FlattenIteratorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a FlattenIteratorTerm> {
         match self {
-            Self::FlattenIterator(term) => Some(term),
+            TermType::FlattenIterator(term) => Some(term),
             _ => None,
         }
     }
@@ -518,7 +573,7 @@ impl<'a> Into<Option<&'a FlattenIteratorTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a HashmapKeysIteratorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a HashmapKeysIteratorTerm> {
         match self {
-            Self::HashmapKeysIterator(term) => Some(term),
+            TermType::HashmapKeysIterator(term) => Some(term),
             _ => None,
         }
     }
@@ -526,7 +581,7 @@ impl<'a> Into<Option<&'a HashmapKeysIteratorTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a HashmapValuesIteratorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a HashmapValuesIteratorTerm> {
         match self {
-            Self::HashmapValuesIterator(term) => Some(term),
+            TermType::HashmapValuesIterator(term) => Some(term),
             _ => None,
         }
     }
@@ -534,7 +589,7 @@ impl<'a> Into<Option<&'a HashmapValuesIteratorTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a IntegersIteratorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a IntegersIteratorTerm> {
         match self {
-            Self::IntegersIterator(term) => Some(term),
+            TermType::IntegersIterator(term) => Some(term),
             _ => None,
         }
     }
@@ -542,7 +597,7 @@ impl<'a> Into<Option<&'a IntegersIteratorTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a IntersperseIteratorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a IntersperseIteratorTerm> {
         match self {
-            Self::IntersperseIterator(term) => Some(term),
+            TermType::IntersperseIterator(term) => Some(term),
             _ => None,
         }
     }
@@ -550,7 +605,7 @@ impl<'a> Into<Option<&'a IntersperseIteratorTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a MapIteratorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a MapIteratorTerm> {
         match self {
-            Self::MapIterator(term) => Some(term),
+            TermType::MapIterator(term) => Some(term),
             _ => None,
         }
     }
@@ -558,7 +613,7 @@ impl<'a> Into<Option<&'a MapIteratorTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a OnceIteratorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a OnceIteratorTerm> {
         match self {
-            Self::OnceIterator(term) => Some(term),
+            TermType::OnceIterator(term) => Some(term),
             _ => None,
         }
     }
@@ -566,7 +621,7 @@ impl<'a> Into<Option<&'a OnceIteratorTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a RangeIteratorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a RangeIteratorTerm> {
         match self {
-            Self::RangeIterator(term) => Some(term),
+            TermType::RangeIterator(term) => Some(term),
             _ => None,
         }
     }
@@ -574,7 +629,7 @@ impl<'a> Into<Option<&'a RangeIteratorTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a RepeatIteratorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a RepeatIteratorTerm> {
         match self {
-            Self::RepeatIterator(term) => Some(term),
+            TermType::RepeatIterator(term) => Some(term),
             _ => None,
         }
     }
@@ -582,7 +637,7 @@ impl<'a> Into<Option<&'a RepeatIteratorTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a SkipIteratorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a SkipIteratorTerm> {
         match self {
-            Self::SkipIterator(term) => Some(term),
+            TermType::SkipIterator(term) => Some(term),
             _ => None,
         }
     }
@@ -590,7 +645,7 @@ impl<'a> Into<Option<&'a SkipIteratorTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a TakeIteratorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a TakeIteratorTerm> {
         match self {
-            Self::TakeIterator(term) => Some(term),
+            TermType::TakeIterator(term) => Some(term),
             _ => None,
         }
     }
@@ -598,16 +653,32 @@ impl<'a> Into<Option<&'a TakeIteratorTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a ZipIteratorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a ZipIteratorTerm> {
         match self {
-            Self::ZipIterator(term) => Some(term),
+            TermType::ZipIterator(term) => Some(term),
             _ => None,
         }
     }
 }
 
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, TermType, A> {}
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, TermType, A> {
+impl<'heap, A: ArenaAllocator> ArenaRef<'heap, Term, A> {
+    pub(crate) fn arity(&self) -> Option<Arity> {
+        match &self.as_deref().value {
+            TermType::Builtin(term) => ArenaRef::new(self.arena, term).arity(),
+            TermType::Compiled(term) => Some(ArenaRef::new(self.arena, term).arity()),
+            TermType::Constructor(term) => Some(ArenaRef::new(self.arena, term).arity()),
+            TermType::Lambda(term) => Some(ArenaRef::new(self.arena, term).arity()),
+            TermType::Partial(term) => ArenaRef::new(self.arena, term).arity(),
+            _ => None,
+        }
+    }
+}
+
+impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, Term, A> {}
+impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, Term, A> {
     fn eq(&self, other: &Self) -> bool {
-        match (self.as_deref(), other.as_deref()) {
+        if self.value.header.hash != other.value.header.hash {
+            return false;
+        }
+        match (&self.as_deref().value, &other.as_deref().value) {
             (TermType::Application(left), TermType::Application(right)) => {
                 ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
             }
@@ -731,9 +802,861 @@ impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, TermType, A> {
         }
     }
 }
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, TermType, A> {
+
+impl<'heap, A: ArenaAllocator> Expression for ArenaRef<'heap, Term, A> {
+    type String = ArenaRef<'heap, TypedTerm<StringTerm>, A>;
+    type Builtin = Stdlib;
+    type Signal<T: Expression> = ArenaRef<'heap, TypedTerm<ConditionTerm>, A>;
+    type SignalList<T: Expression> = ArenaRef<'heap, TypedTerm<TreeTerm>, A>;
+    type StructPrototype<T: Expression> = ArenaRef<'heap, TypedTerm<ListTerm>, A>;
+    type ExpressionList<T: Expression> = ArenaRef<'heap, TypedTerm<ListTerm>, A>;
+    type NilTerm = ArenaRef<'heap, TypedTerm<NilTerm>, A>;
+    type BooleanTerm = ArenaRef<'heap, TypedTerm<BooleanTerm>, A>;
+    type IntTerm = ArenaRef<'heap, TypedTerm<IntTerm>, A>;
+    type FloatTerm = ArenaRef<'heap, TypedTerm<FloatTerm>, A>;
+    type StringTerm<T: Expression> = ArenaRef<'heap, TypedTerm<StringTerm>, A>;
+    type SymbolTerm = ArenaRef<'heap, TypedTerm<SymbolTerm>, A>;
+    type VariableTerm = ArenaRef<'heap, TypedTerm<VariableTerm>, A>;
+    type EffectTerm<T: Expression> = ArenaRef<'heap, TypedTerm<EffectTerm>, A>;
+    type LetTerm<T: Expression> = ArenaRef<'heap, TypedTerm<LetTerm>, A>;
+    type LambdaTerm<T: Expression> = ArenaRef<'heap, TypedTerm<LambdaTerm>, A>;
+    type ApplicationTerm<T: Expression> = ArenaRef<'heap, TypedTerm<ApplicationTerm>, A>;
+    type PartialApplicationTerm<T: Expression> = ArenaRef<'heap, TypedTerm<PartialTerm>, A>;
+    // FIXME: implement recursive term type
+    type RecursiveTerm<T: Expression> = ArenaRef<'heap, TypedTerm<NilTerm>, A>;
+    type BuiltinTerm<T: Expression> = ArenaRef<'heap, TypedTerm<BuiltinTerm>, A>;
+    type CompiledFunctionTerm<T: Expression> = ArenaRef<'heap, TypedTerm<CompiledTerm>, A>;
+    type RecordTerm<T: Expression> = ArenaRef<'heap, TypedTerm<RecordTerm>, A>;
+    type ConstructorTerm<T: Expression> = ArenaRef<'heap, TypedTerm<ConstructorTerm>, A>;
+    type ListTerm<T: Expression> = ArenaRef<'heap, TypedTerm<ListTerm>, A>;
+    type HashmapTerm<T: Expression> = ArenaRef<'heap, TypedTerm<HashmapTerm>, A>;
+    type HashsetTerm<T: Expression> = ArenaRef<'heap, TypedTerm<HashsetTerm>, A>;
+    type SignalTerm<T: Expression> = ArenaRef<'heap, TypedTerm<SignalTerm>, A>;
+
+    type StringRef<'a> = ArenaRef<'a, TypedTerm<StringTerm>, A> where Self: 'a;
+    type SignalRef<'a, T: Expression> = ArenaRef<'a, TypedTerm<ConditionTerm>, A> where T: 'a, Self::Signal<T>: 'a, Self: 'a;
+    type StructPrototypeRef<'a, T: Expression> = ArenaRef<'a, TypedTerm<ListTerm>, A> where T: 'a, Self::StructPrototype<T>: 'a, Self: 'a;
+    type SignalListRef<'a, T: Expression> = ArenaRef<'a, TypedTerm<TreeTerm>, A> where T: 'a, Self::SignalList<T>: 'a, Self: 'a;
+    type ExpressionListRef<'a, T: Expression> = ArenaRef<'a, TypedTerm<ListTerm>, A> where T: 'a, Self::ExpressionList<T>: 'a, Self: 'a;
+    type ExpressionRef<'a> = ArenaRef<'a, Term, A> where Self: 'a;
+
+    fn id(&self) -> HashId {
+        self.as_deref().id()
+    }
+}
+
+impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, Term, A> {
+    fn size(&self) -> usize {
+        match &self.as_deref().value {
+            TermType::Application(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::Boolean(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::Builtin(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::Cell(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::Compiled(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::Condition(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::Constructor(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::Date(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::Effect(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::Float(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::Hashmap(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::Hashset(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::Int(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::Lambda(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::Let(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::List(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::Nil(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::Partial(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::Pointer(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::Record(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::Signal(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::String(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::Symbol(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::Tree(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::Variable(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::EmptyIterator(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::EvaluateIterator(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::FilterIterator(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::FlattenIterator(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::HashmapKeysIterator(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::HashmapValuesIterator(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::IntegersIterator(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::IntersperseIterator(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::MapIterator(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::OnceIterator(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::RangeIterator(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::RepeatIterator(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::SkipIterator(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::TakeIterator(term) => ArenaRef::new(self.arena, term).size(),
+            TermType::ZipIterator(term) => ArenaRef::new(self.arena, term).size(),
+        }
+    }
+    fn capture_depth(&self) -> StackOffset {
+        match &self.as_deref().value {
+            TermType::Application(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::Boolean(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::Builtin(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::Cell(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::Compiled(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::Condition(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::Constructor(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::Date(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::Effect(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::Float(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::Hashmap(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::Hashset(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::Int(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::Lambda(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::Let(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::List(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::Nil(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::Partial(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::Pointer(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::Record(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::Signal(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::String(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::Symbol(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::Tree(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::Variable(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::EmptyIterator(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::EvaluateIterator(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::FilterIterator(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::FlattenIterator(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::HashmapKeysIterator(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::HashmapValuesIterator(term) => {
+                ArenaRef::new(self.arena, term).capture_depth()
+            }
+            TermType::IntegersIterator(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::IntersperseIterator(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::MapIterator(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::OnceIterator(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::RangeIterator(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::RepeatIterator(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::SkipIterator(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::TakeIterator(term) => ArenaRef::new(self.arena, term).capture_depth(),
+            TermType::ZipIterator(term) => ArenaRef::new(self.arena, term).capture_depth(),
+        }
+    }
+    fn free_variables(&self) -> HashSet<StackOffset> {
+        match &self.as_deref().value {
+            TermType::Application(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::Boolean(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::Builtin(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::Cell(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::Compiled(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::Condition(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::Constructor(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::Date(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::Effect(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::Float(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::Hashmap(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::Hashset(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::Int(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::Lambda(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::Let(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::List(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::Nil(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::Partial(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::Pointer(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::Record(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::Signal(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::String(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::Symbol(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::Tree(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::Variable(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::EmptyIterator(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::EvaluateIterator(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::FilterIterator(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::FlattenIterator(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::HashmapKeysIterator(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::HashmapValuesIterator(term) => {
+                ArenaRef::new(self.arena, term).free_variables()
+            }
+            TermType::IntegersIterator(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::IntersperseIterator(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::MapIterator(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::OnceIterator(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::RangeIterator(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::RepeatIterator(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::SkipIterator(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::TakeIterator(term) => ArenaRef::new(self.arena, term).free_variables(),
+            TermType::ZipIterator(term) => ArenaRef::new(self.arena, term).free_variables(),
+        }
+    }
+    fn count_variable_usages(&self, offset: StackOffset) -> usize {
+        match &self.as_deref().value {
+            TermType::Application(term) => {
+                ArenaRef::new(self.arena, term).count_variable_usages(offset)
+            }
+            TermType::Boolean(term) => {
+                ArenaRef::new(self.arena, term).count_variable_usages(offset)
+            }
+            TermType::Builtin(term) => {
+                ArenaRef::new(self.arena, term).count_variable_usages(offset)
+            }
+            TermType::Cell(term) => ArenaRef::new(self.arena, term).count_variable_usages(offset),
+            TermType::Compiled(term) => {
+                ArenaRef::new(self.arena, term).count_variable_usages(offset)
+            }
+            TermType::Condition(term) => {
+                ArenaRef::new(self.arena, term).count_variable_usages(offset)
+            }
+            TermType::Constructor(term) => {
+                ArenaRef::new(self.arena, term).count_variable_usages(offset)
+            }
+            TermType::Date(term) => ArenaRef::new(self.arena, term).count_variable_usages(offset),
+            TermType::Effect(term) => ArenaRef::new(self.arena, term).count_variable_usages(offset),
+            TermType::Float(term) => ArenaRef::new(self.arena, term).count_variable_usages(offset),
+            TermType::Hashmap(term) => {
+                ArenaRef::new(self.arena, term).count_variable_usages(offset)
+            }
+            TermType::Hashset(term) => {
+                ArenaRef::new(self.arena, term).count_variable_usages(offset)
+            }
+            TermType::Int(term) => ArenaRef::new(self.arena, term).count_variable_usages(offset),
+            TermType::Lambda(term) => ArenaRef::new(self.arena, term).count_variable_usages(offset),
+            TermType::Let(term) => ArenaRef::new(self.arena, term).count_variable_usages(offset),
+            TermType::List(term) => ArenaRef::new(self.arena, term).count_variable_usages(offset),
+            TermType::Nil(term) => ArenaRef::new(self.arena, term).count_variable_usages(offset),
+            TermType::Partial(term) => {
+                ArenaRef::new(self.arena, term).count_variable_usages(offset)
+            }
+            TermType::Pointer(term) => {
+                ArenaRef::new(self.arena, term).count_variable_usages(offset)
+            }
+            TermType::Record(term) => ArenaRef::new(self.arena, term).count_variable_usages(offset),
+            TermType::Signal(term) => ArenaRef::new(self.arena, term).count_variable_usages(offset),
+            TermType::String(term) => ArenaRef::new(self.arena, term).count_variable_usages(offset),
+            TermType::Symbol(term) => ArenaRef::new(self.arena, term).count_variable_usages(offset),
+            TermType::Tree(term) => ArenaRef::new(self.arena, term).count_variable_usages(offset),
+            TermType::Variable(term) => {
+                ArenaRef::new(self.arena, term).count_variable_usages(offset)
+            }
+            TermType::EmptyIterator(term) => {
+                ArenaRef::new(self.arena, term).count_variable_usages(offset)
+            }
+            TermType::EvaluateIterator(term) => {
+                ArenaRef::new(self.arena, term).count_variable_usages(offset)
+            }
+            TermType::FilterIterator(term) => {
+                ArenaRef::new(self.arena, term).count_variable_usages(offset)
+            }
+            TermType::FlattenIterator(term) => {
+                ArenaRef::new(self.arena, term).count_variable_usages(offset)
+            }
+            TermType::HashmapKeysIterator(term) => {
+                ArenaRef::new(self.arena, term).count_variable_usages(offset)
+            }
+            TermType::HashmapValuesIterator(term) => {
+                ArenaRef::new(self.arena, term).count_variable_usages(offset)
+            }
+            TermType::IntegersIterator(term) => {
+                ArenaRef::new(self.arena, term).count_variable_usages(offset)
+            }
+            TermType::IntersperseIterator(term) => {
+                ArenaRef::new(self.arena, term).count_variable_usages(offset)
+            }
+            TermType::MapIterator(term) => {
+                ArenaRef::new(self.arena, term).count_variable_usages(offset)
+            }
+            TermType::OnceIterator(term) => {
+                ArenaRef::new(self.arena, term).count_variable_usages(offset)
+            }
+            TermType::RangeIterator(term) => {
+                ArenaRef::new(self.arena, term).count_variable_usages(offset)
+            }
+            TermType::RepeatIterator(term) => {
+                ArenaRef::new(self.arena, term).count_variable_usages(offset)
+            }
+            TermType::SkipIterator(term) => {
+                ArenaRef::new(self.arena, term).count_variable_usages(offset)
+            }
+            TermType::TakeIterator(term) => {
+                ArenaRef::new(self.arena, term).count_variable_usages(offset)
+            }
+            TermType::ZipIterator(term) => {
+                ArenaRef::new(self.arena, term).count_variable_usages(offset)
+            }
+        }
+    }
+    fn dynamic_dependencies(&self, deep: bool) -> DependencyList {
+        match &self.as_deref().value {
+            TermType::Application(term) => {
+                ArenaRef::new(self.arena, term).dynamic_dependencies(deep)
+            }
+            TermType::Boolean(term) => ArenaRef::new(self.arena, term).dynamic_dependencies(deep),
+            TermType::Builtin(term) => ArenaRef::new(self.arena, term).dynamic_dependencies(deep),
+            TermType::Cell(term) => ArenaRef::new(self.arena, term).dynamic_dependencies(deep),
+            TermType::Compiled(term) => ArenaRef::new(self.arena, term).dynamic_dependencies(deep),
+            TermType::Condition(term) => ArenaRef::new(self.arena, term).dynamic_dependencies(deep),
+            TermType::Constructor(term) => {
+                ArenaRef::new(self.arena, term).dynamic_dependencies(deep)
+            }
+            TermType::Date(term) => ArenaRef::new(self.arena, term).dynamic_dependencies(deep),
+            TermType::Effect(term) => ArenaRef::new(self.arena, term).dynamic_dependencies(deep),
+            TermType::Float(term) => ArenaRef::new(self.arena, term).dynamic_dependencies(deep),
+            TermType::Hashmap(term) => ArenaRef::new(self.arena, term).dynamic_dependencies(deep),
+            TermType::Hashset(term) => ArenaRef::new(self.arena, term).dynamic_dependencies(deep),
+            TermType::Int(term) => ArenaRef::new(self.arena, term).dynamic_dependencies(deep),
+            TermType::Lambda(term) => ArenaRef::new(self.arena, term).dynamic_dependencies(deep),
+            TermType::Let(term) => ArenaRef::new(self.arena, term).dynamic_dependencies(deep),
+            TermType::List(term) => ArenaRef::new(self.arena, term).dynamic_dependencies(deep),
+            TermType::Nil(term) => ArenaRef::new(self.arena, term).dynamic_dependencies(deep),
+            TermType::Partial(term) => ArenaRef::new(self.arena, term).dynamic_dependencies(deep),
+            TermType::Pointer(term) => ArenaRef::new(self.arena, term).dynamic_dependencies(deep),
+            TermType::Record(term) => ArenaRef::new(self.arena, term).dynamic_dependencies(deep),
+            TermType::Signal(term) => ArenaRef::new(self.arena, term).dynamic_dependencies(deep),
+            TermType::String(term) => ArenaRef::new(self.arena, term).dynamic_dependencies(deep),
+            TermType::Symbol(term) => ArenaRef::new(self.arena, term).dynamic_dependencies(deep),
+            TermType::Tree(term) => ArenaRef::new(self.arena, term).dynamic_dependencies(deep),
+            TermType::Variable(term) => ArenaRef::new(self.arena, term).dynamic_dependencies(deep),
+            TermType::EmptyIterator(term) => {
+                ArenaRef::new(self.arena, term).dynamic_dependencies(deep)
+            }
+            TermType::EvaluateIterator(term) => {
+                ArenaRef::new(self.arena, term).dynamic_dependencies(deep)
+            }
+            TermType::FilterIterator(term) => {
+                ArenaRef::new(self.arena, term).dynamic_dependencies(deep)
+            }
+            TermType::FlattenIterator(term) => {
+                ArenaRef::new(self.arena, term).dynamic_dependencies(deep)
+            }
+            TermType::HashmapKeysIterator(term) => {
+                ArenaRef::new(self.arena, term).dynamic_dependencies(deep)
+            }
+            TermType::HashmapValuesIterator(term) => {
+                ArenaRef::new(self.arena, term).dynamic_dependencies(deep)
+            }
+            TermType::IntegersIterator(term) => {
+                ArenaRef::new(self.arena, term).dynamic_dependencies(deep)
+            }
+            TermType::IntersperseIterator(term) => {
+                ArenaRef::new(self.arena, term).dynamic_dependencies(deep)
+            }
+            TermType::MapIterator(term) => {
+                ArenaRef::new(self.arena, term).dynamic_dependencies(deep)
+            }
+            TermType::OnceIterator(term) => {
+                ArenaRef::new(self.arena, term).dynamic_dependencies(deep)
+            }
+            TermType::RangeIterator(term) => {
+                ArenaRef::new(self.arena, term).dynamic_dependencies(deep)
+            }
+            TermType::RepeatIterator(term) => {
+                ArenaRef::new(self.arena, term).dynamic_dependencies(deep)
+            }
+            TermType::SkipIterator(term) => {
+                ArenaRef::new(self.arena, term).dynamic_dependencies(deep)
+            }
+            TermType::TakeIterator(term) => {
+                ArenaRef::new(self.arena, term).dynamic_dependencies(deep)
+            }
+            TermType::ZipIterator(term) => {
+                ArenaRef::new(self.arena, term).dynamic_dependencies(deep)
+            }
+        }
+    }
+    fn has_dynamic_dependencies(&self, deep: bool) -> bool {
+        match &self.as_deref().value {
+            TermType::Application(term) => {
+                ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
+            }
+            TermType::Boolean(term) => {
+                ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
+            }
+            TermType::Builtin(term) => {
+                ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
+            }
+            TermType::Cell(term) => ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep),
+            TermType::Compiled(term) => {
+                ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
+            }
+            TermType::Condition(term) => {
+                ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
+            }
+            TermType::Constructor(term) => {
+                ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
+            }
+            TermType::Date(term) => ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep),
+            TermType::Effect(term) => {
+                ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
+            }
+            TermType::Float(term) => ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep),
+            TermType::Hashmap(term) => {
+                ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
+            }
+            TermType::Hashset(term) => {
+                ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
+            }
+            TermType::Int(term) => ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep),
+            TermType::Lambda(term) => {
+                ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
+            }
+            TermType::Let(term) => ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep),
+            TermType::List(term) => ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep),
+            TermType::Nil(term) => ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep),
+            TermType::Partial(term) => {
+                ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
+            }
+            TermType::Pointer(term) => {
+                ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
+            }
+            TermType::Record(term) => {
+                ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
+            }
+            TermType::Signal(term) => {
+                ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
+            }
+            TermType::String(term) => {
+                ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
+            }
+            TermType::Symbol(term) => {
+                ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
+            }
+            TermType::Tree(term) => ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep),
+            TermType::Variable(term) => {
+                ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
+            }
+            TermType::EmptyIterator(term) => {
+                ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
+            }
+            TermType::EvaluateIterator(term) => {
+                ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
+            }
+            TermType::FilterIterator(term) => {
+                ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
+            }
+            TermType::FlattenIterator(term) => {
+                ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
+            }
+            TermType::HashmapKeysIterator(term) => {
+                ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
+            }
+            TermType::HashmapValuesIterator(term) => {
+                ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
+            }
+            TermType::IntegersIterator(term) => {
+                ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
+            }
+            TermType::IntersperseIterator(term) => {
+                ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
+            }
+            TermType::MapIterator(term) => {
+                ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
+            }
+            TermType::OnceIterator(term) => {
+                ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
+            }
+            TermType::RangeIterator(term) => {
+                ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
+            }
+            TermType::RepeatIterator(term) => {
+                ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
+            }
+            TermType::SkipIterator(term) => {
+                ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
+            }
+            TermType::TakeIterator(term) => {
+                ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
+            }
+            TermType::ZipIterator(term) => {
+                ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
+            }
+        }
+    }
+    fn is_static(&self) -> bool {
+        match &self.as_deref().value {
+            TermType::Application(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::Boolean(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::Builtin(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::Cell(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::Compiled(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::Condition(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::Constructor(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::Date(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::Effect(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::Float(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::Hashmap(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::Hashset(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::Int(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::Lambda(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::Let(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::List(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::Nil(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::Partial(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::Pointer(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::Record(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::Signal(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::String(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::Symbol(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::Tree(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::Variable(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::EmptyIterator(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::EvaluateIterator(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::FilterIterator(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::FlattenIterator(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::HashmapKeysIterator(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::HashmapValuesIterator(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::IntegersIterator(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::IntersperseIterator(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::MapIterator(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::OnceIterator(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::RangeIterator(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::RepeatIterator(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::SkipIterator(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::TakeIterator(term) => ArenaRef::new(self.arena, term).is_static(),
+            TermType::ZipIterator(term) => ArenaRef::new(self.arena, term).is_static(),
+        }
+    }
+    fn is_atomic(&self) -> bool {
+        match &self.as_deref().value {
+            TermType::Application(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::Boolean(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::Builtin(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::Cell(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::Compiled(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::Condition(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::Constructor(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::Date(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::Effect(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::Float(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::Hashmap(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::Hashset(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::Int(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::Lambda(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::Let(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::List(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::Nil(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::Partial(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::Pointer(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::Record(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::Signal(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::String(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::Symbol(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::Tree(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::Variable(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::EmptyIterator(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::EvaluateIterator(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::FilterIterator(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::FlattenIterator(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::HashmapKeysIterator(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::HashmapValuesIterator(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::IntegersIterator(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::IntersperseIterator(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::MapIterator(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::OnceIterator(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::RangeIterator(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::RepeatIterator(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::SkipIterator(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::TakeIterator(term) => ArenaRef::new(self.arena, term).is_atomic(),
+            TermType::ZipIterator(term) => ArenaRef::new(self.arena, term).is_static(),
+        }
+    }
+    fn is_complex(&self) -> bool {
+        match &self.as_deref().value {
+            TermType::Application(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::Boolean(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::Builtin(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::Cell(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::Compiled(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::Condition(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::Constructor(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::Date(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::Effect(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::Float(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::Hashmap(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::Hashset(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::Int(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::Lambda(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::Let(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::List(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::Nil(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::Partial(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::Pointer(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::Record(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::Signal(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::String(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::Symbol(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::Tree(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::Variable(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::EmptyIterator(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::EvaluateIterator(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::FilterIterator(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::FlattenIterator(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::HashmapKeysIterator(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::HashmapValuesIterator(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::IntegersIterator(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::IntersperseIterator(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::MapIterator(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::OnceIterator(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::RangeIterator(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::RepeatIterator(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::SkipIterator(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::TakeIterator(term) => ArenaRef::new(self.arena, term).is_complex(),
+            TermType::ZipIterator(term) => ArenaRef::new(self.arena, term).is_complex(),
+        }
+    }
+}
+
+impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, Term, A> {
+    fn to_json(&self) -> Result<JsonValue, String> {
+        match &self.as_deref().value {
+            TermType::Application(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::Boolean(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::Builtin(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::Cell(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::Compiled(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::Condition(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::Constructor(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::Date(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::Effect(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::Float(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::Hashmap(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::Hashset(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::Int(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::Lambda(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::Let(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::List(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::Nil(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::Partial(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::Pointer(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::Record(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::Signal(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::String(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::Symbol(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::Tree(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::Variable(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::EmptyIterator(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::EvaluateIterator(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::FilterIterator(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::FlattenIterator(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::HashmapKeysIterator(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::HashmapValuesIterator(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::IntegersIterator(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::IntersperseIterator(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::MapIterator(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::OnceIterator(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::RangeIterator(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::RepeatIterator(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::SkipIterator(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::TakeIterator(term) => ArenaRef::new(self.arena, term).to_json(),
+            TermType::ZipIterator(term) => ArenaRef::new(self.arena, term).to_json(),
+        }
+    }
+    fn patch(&self, target: &Self) -> Result<Option<JsonValue>, String> {
+        if self.id() == target.id() {
+            return Ok(None);
+        }
+        match (&self.as_deref().value, &target.as_deref().value) {
+            (TermType::Application(term), TermType::Application(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::Boolean(term), TermType::Boolean(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::Builtin(term), TermType::Builtin(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::Cell(term), TermType::Cell(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::Compiled(term), TermType::Compiled(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::Condition(term), TermType::Condition(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::Constructor(term), TermType::Constructor(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::Date(term), TermType::Date(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::Effect(term), TermType::Effect(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::Float(term), TermType::Float(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::Hashmap(term), TermType::Hashmap(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::Hashset(term), TermType::Hashset(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::Int(term), TermType::Int(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::Lambda(term), TermType::Lambda(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::Let(term), TermType::Let(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::List(term), TermType::List(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::Nil(term), TermType::Nil(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::Partial(term), TermType::Partial(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::Pointer(term), TermType::Pointer(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::Record(term), TermType::Record(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::Signal(term), TermType::Signal(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::String(term), TermType::String(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::Symbol(term), TermType::Symbol(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::Tree(term), TermType::Tree(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::Variable(term), TermType::Variable(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::EmptyIterator(term), TermType::EmptyIterator(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::EvaluateIterator(term), TermType::EvaluateIterator(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::FilterIterator(term), TermType::FilterIterator(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::FlattenIterator(term), TermType::FlattenIterator(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::HashmapKeysIterator(term), TermType::HashmapKeysIterator(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::HashmapValuesIterator(term), TermType::HashmapValuesIterator(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::IntegersIterator(term), TermType::IntegersIterator(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::IntersperseIterator(term), TermType::IntersperseIterator(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::MapIterator(term), TermType::MapIterator(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::OnceIterator(term), TermType::OnceIterator(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::RangeIterator(term), TermType::RangeIterator(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::RepeatIterator(term), TermType::RepeatIterator(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::SkipIterator(term), TermType::SkipIterator(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::TakeIterator(term), TermType::TakeIterator(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            (TermType::ZipIterator(term), TermType::ZipIterator(target)) => {
+                ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
+            }
+            _ => target.to_json().map(Some),
+        }
+    }
+}
+
+impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, Term, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.as_deref() {
+        match &self.as_deref().value {
+            TermType::Application(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::Boolean(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Builtin(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Cell(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Compiled(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Condition(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Constructor(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::Date(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Effect(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Float(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Hashmap(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Hashset(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Int(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Lambda(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Let(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::List(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Nil(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Partial(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Pointer(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Record(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Signal(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::String(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Symbol(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Tree(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Variable(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::EmptyIterator(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::EvaluateIterator(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::FilterIterator(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::FlattenIterator(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::HashmapKeysIterator(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::HashmapValuesIterator(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::IntegersIterator(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::IntersperseIterator(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::MapIterator(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::OnceIterator(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::RangeIterator(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::RepeatIterator(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::SkipIterator(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::TakeIterator(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::ZipIterator(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+        }
+    }
+}
+
+impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, Term, A> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.as_deref().value {
             TermType::Application(term) => {
                 std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f)
             }
@@ -899,6 +1822,159 @@ impl TermType {
     fn as_bytes(&self) -> &[u32] {
         let num_words = crate::pad_to_4_byte_offset(self.size_of() as usize) / 4;
         unsafe { std::slice::from_raw_parts(self as *const Self as *const u32, num_words) }
+    }
+}
+
+#[repr(C)]
+struct TypedTerm<V> {
+    term: Term,
+    _type: PhantomData<V>,
+}
+impl<V> TypedTerm<V> {
+    pub fn id(&self) -> HashId {
+        self.term.id()
+    }
+    fn get_inner(&self) -> &V {
+        unsafe {
+            match &self.term.as_value() {
+                TermType::Application(inner) => std::mem::transmute::<&ApplicationTerm, &V>(inner),
+                TermType::Boolean(inner) => std::mem::transmute::<&BooleanTerm, &V>(inner),
+                TermType::Builtin(inner) => std::mem::transmute::<&BuiltinTerm, &V>(inner),
+                TermType::Cell(inner) => std::mem::transmute::<&CellTerm, &V>(inner),
+                TermType::Compiled(inner) => std::mem::transmute::<&CompiledTerm, &V>(inner),
+                TermType::Condition(inner) => std::mem::transmute::<&ConditionTerm, &V>(inner),
+                TermType::Constructor(inner) => std::mem::transmute::<&ConstructorTerm, &V>(inner),
+                TermType::Date(inner) => std::mem::transmute::<&DateTerm, &V>(inner),
+                TermType::Effect(inner) => std::mem::transmute::<&EffectTerm, &V>(inner),
+                TermType::Float(inner) => std::mem::transmute::<&FloatTerm, &V>(inner),
+                TermType::Hashmap(inner) => std::mem::transmute::<&HashmapTerm, &V>(inner),
+                TermType::Hashset(inner) => std::mem::transmute::<&HashsetTerm, &V>(inner),
+                TermType::Int(inner) => std::mem::transmute::<&IntTerm, &V>(inner),
+                TermType::Lambda(inner) => std::mem::transmute::<&LambdaTerm, &V>(inner),
+                TermType::Let(inner) => std::mem::transmute::<&LetTerm, &V>(inner),
+                TermType::List(inner) => std::mem::transmute::<&ListTerm, &V>(inner),
+                TermType::Nil(inner) => std::mem::transmute::<&NilTerm, &V>(inner),
+                TermType::Partial(inner) => std::mem::transmute::<&PartialTerm, &V>(inner),
+                TermType::Pointer(inner) => std::mem::transmute::<&PointerTerm, &V>(inner),
+                TermType::Record(inner) => std::mem::transmute::<&RecordTerm, &V>(inner),
+                TermType::Signal(inner) => std::mem::transmute::<&SignalTerm, &V>(inner),
+                TermType::String(inner) => std::mem::transmute::<&StringTerm, &V>(inner),
+                TermType::Symbol(inner) => std::mem::transmute::<&SymbolTerm, &V>(inner),
+                TermType::Tree(inner) => std::mem::transmute::<&TreeTerm, &V>(inner),
+                TermType::Variable(inner) => std::mem::transmute::<&VariableTerm, &V>(inner),
+                TermType::EmptyIterator(inner) => {
+                    std::mem::transmute::<&EmptyIteratorTerm, &V>(inner)
+                }
+                TermType::EvaluateIterator(inner) => {
+                    std::mem::transmute::<&EvaluateIteratorTerm, &V>(inner)
+                }
+                TermType::FilterIterator(inner) => {
+                    std::mem::transmute::<&FilterIteratorTerm, &V>(inner)
+                }
+                TermType::FlattenIterator(inner) => {
+                    std::mem::transmute::<&FlattenIteratorTerm, &V>(inner)
+                }
+                TermType::HashmapKeysIterator(inner) => {
+                    std::mem::transmute::<&HashmapKeysIteratorTerm, &V>(inner)
+                }
+                TermType::HashmapValuesIterator(inner) => {
+                    std::mem::transmute::<&HashmapValuesIteratorTerm, &V>(inner)
+                }
+                TermType::IntegersIterator(inner) => {
+                    std::mem::transmute::<&IntegersIteratorTerm, &V>(inner)
+                }
+                TermType::IntersperseIterator(inner) => {
+                    std::mem::transmute::<&IntersperseIteratorTerm, &V>(inner)
+                }
+                TermType::MapIterator(inner) => std::mem::transmute::<&MapIteratorTerm, &V>(inner),
+                TermType::OnceIterator(inner) => {
+                    std::mem::transmute::<&OnceIteratorTerm, &V>(inner)
+                }
+                TermType::RangeIterator(inner) => {
+                    std::mem::transmute::<&RangeIteratorTerm, &V>(inner)
+                }
+                TermType::RepeatIterator(inner) => {
+                    std::mem::transmute::<&RepeatIteratorTerm, &V>(inner)
+                }
+                TermType::SkipIterator(inner) => {
+                    std::mem::transmute::<&SkipIteratorTerm, &V>(inner)
+                }
+                TermType::TakeIterator(inner) => {
+                    std::mem::transmute::<&TakeIteratorTerm, &V>(inner)
+                }
+                TermType::ZipIterator(inner) => std::mem::transmute::<&ZipIteratorTerm, &V>(inner),
+            }
+        }
+    }
+}
+
+impl<'heap, A: ArenaAllocator, V> ArenaRef<'heap, TypedTerm<V>, A> {
+    pub fn as_inner(&self) -> ArenaRef<'heap, V, A> {
+        ArenaRef::new(self.arena, self.as_deref().get_inner())
+    }
+}
+
+impl<'heap, A: ArenaAllocator, V> GraphNode for ArenaRef<'heap, TypedTerm<V>, A>
+where
+    ArenaRef<'heap, V, A>: GraphNode,
+{
+    fn size(&self) -> usize {
+        <ArenaRef<'heap, V, A> as GraphNode>::size(&self.as_inner())
+    }
+    fn capture_depth(&self) -> StackOffset {
+        <ArenaRef<'heap, V, A> as GraphNode>::capture_depth(&self.as_inner())
+    }
+    fn free_variables(&self) -> HashSet<StackOffset> {
+        <ArenaRef<'heap, V, A> as GraphNode>::free_variables(&self.as_inner())
+    }
+    fn count_variable_usages(&self, offset: StackOffset) -> usize {
+        <ArenaRef<'heap, V, A> as GraphNode>::count_variable_usages(&self.as_inner(), offset)
+    }
+    fn dynamic_dependencies(&self, deep: bool) -> DependencyList {
+        <ArenaRef<'heap, V, A> as GraphNode>::dynamic_dependencies(&self.as_inner(), deep)
+    }
+    fn has_dynamic_dependencies(&self, deep: bool) -> bool {
+        <ArenaRef<'heap, V, A> as GraphNode>::has_dynamic_dependencies(&self.as_inner(), deep)
+    }
+    fn is_static(&self) -> bool {
+        <ArenaRef<'heap, V, A> as GraphNode>::is_static(&self.as_inner())
+    }
+    fn is_atomic(&self) -> bool {
+        <ArenaRef<'heap, V, A> as GraphNode>::is_atomic(&self.as_inner())
+    }
+    fn is_complex(&self) -> bool {
+        <ArenaRef<'heap, V, A> as GraphNode>::is_complex(&self.as_inner())
+    }
+}
+
+impl<'heap, A: ArenaAllocator, V> PartialEq for ArenaRef<'heap, TypedTerm<V>, A>
+where
+    ArenaRef<'heap, V, A>: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        <ArenaRef<'heap, V, A> as PartialEq>::eq(&self.as_inner(), &other.as_inner())
+    }
+}
+impl<'heap, A: ArenaAllocator, V> Eq for ArenaRef<'heap, TypedTerm<V>, A> where
+    ArenaRef<'heap, V, A>: Eq
+{
+}
+
+impl<'heap, A: ArenaAllocator, V> std::fmt::Debug for ArenaRef<'heap, TypedTerm<V>, A>
+where
+    ArenaRef<'heap, V, A>: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        <ArenaRef<'heap, V, A> as std::fmt::Debug>::fmt(&self.as_inner(), f)
+    }
+}
+
+impl<'heap, A: ArenaAllocator, V> std::fmt::Display for ArenaRef<'heap, TypedTerm<V>, A>
+where
+    ArenaRef<'heap, V, A>: std::fmt::Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        <ArenaRef<'heap, V, A> as std::fmt::Display>::fmt(&self.as_inner(), f)
     }
 }
 

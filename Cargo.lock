@@ -2390,7 +2390,10 @@ dependencies = [
 name = "reflex-wasm"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "reflex",
+ "reflex-macros",
+ "reflex-utils",
  "serde_json",
  "strum",
  "strum_macros",

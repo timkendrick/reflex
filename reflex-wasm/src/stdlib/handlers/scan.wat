@@ -8,6 +8,7 @@
     (@args (@lazy $self) (@strict $seed) (@strict $iteratee))
 
     (@impl
+      (i32.eq (global.get $TermType::String))
       (i32.or (i32.const 0xFFFFFFFF))
       (i32.or (i32.const 0xFFFFFFFF))
       (call $TermType::implements::apply)

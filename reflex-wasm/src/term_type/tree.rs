@@ -1,26 +1,34 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
-// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use std::marker::PhantomData;
+// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
+use std::collections::HashSet;
 
 use reflex::{
-    core::{ConditionListType, Expression, RefType},
+    core::{
+        ConditionListType, DependencyList, Expression, GraphNode, RefType, SerializeJson,
+        StackOffset,
+    },
     hash::HashId,
 };
+use reflex_utils::{MapIntoIterator, WithExactSizeIterator};
+use serde_json::Value as JsonValue;
 
 use crate::{
     allocator::ArenaAllocator,
     hash::{TermHash, TermHasher, TermSize},
-    term_type::TermTypeDiscriminants,
-    ArenaRef, Term, TermPointer, TypedTerm,
+    term_type::{TermTypeDiscriminants, TypedTerm},
+    ArenaRef, IntoArenaRefIterator, Term, TermPointer,
 };
+
+use super::ConditionTerm;
 
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct TreeTerm {
     pub left: TermPointer,
     pub right: TermPointer,
+    pub length: u32,
 }
 impl TermSize for TreeTerm {
     fn size_of(&self) -> usize {
@@ -33,18 +41,54 @@ impl TermHash for TreeTerm {
     }
 }
 
-impl<'heap, T: Expression, A: ArenaAllocator> ConditionListType<T>
-    for ArenaRef<'heap, TypedTerm<TreeTerm>, A>
+impl<'heap, A: ArenaAllocator> ArenaRef<'heap, TreeTerm, A> {
+    pub fn left(&self) -> Option<ArenaRef<'heap, Term, A>> {
+        let pointer = self.as_deref().left;
+        if pointer == TermPointer::null() {
+            None
+        } else {
+            Some(ArenaRef::new(self.arena, self.arena.get(pointer)))
+        }
+    }
+    pub fn right(&self) -> Option<ArenaRef<'heap, Term, A>> {
+        let pointer = self.as_deref().right;
+        if pointer == TermPointer::null() {
+            None
+        } else {
+            Some(ArenaRef::new(self.arena, self.arena.get(pointer)))
+        }
+    }
+    pub fn iter<'a>(&'a self) -> TreeIterator<'a, A> {
+        TreeIterator::new(*self)
+    }
+    pub fn nodes<'a>(&'a self) -> IntoArenaRefIterator<'a, Term, A, TreeIterator<'a, A>> {
+        IntoArenaRefIterator::new(self.arena, self.iter())
+    }
+    pub fn len(&self) -> u32 {
+        self.as_deref().length
+    }
+}
+
+impl<'heap, T: Expression, A: ArenaAllocator> ConditionListType<T> for ArenaRef<'heap, TreeTerm, A>
 where
-    for<'a> T::Ref<'a, T>: From<ArenaRef<'a, Term, A>>,
+    for<'a> T::SignalRef<'a, T>: From<ArenaRef<'a, TypedTerm<ConditionTerm>, A>>,
 {
-    type Iterator<'a> = TreeIterator<'a, T, A>
+    type Iterator<'a> = WithExactSizeIterator<MapIntoIterator<
+        MatchConditionTermsIterator<'a, TreeIterator<'a, A>, A>,
+        ArenaRef<'a, TypedTerm<ConditionTerm>, A>,
+        T::SignalRef<'a, T>
+    >>
     where
         T::Signal<T>: 'a,
         T: 'a,
         Self: 'a;
     fn id(&self) -> HashId {
-        self.as_deref().id()
+        // FIXME: convert to 64-bit term hashes
+        u32::from(
+            self.as_deref()
+                .hash(TermHasher::default(), self.arena)
+                .finish(),
+        ) as HashId
     }
     fn len(&self) -> usize {
         self.iter().count()
@@ -54,33 +98,221 @@ where
         T::Signal<T>: 'a,
         T: 'a,
     {
-        TreeIterator::new(self)
+        WithExactSizeIterator::new(
+            // This assumes every node in the tree is a condition term
+            self.len() as usize,
+            MapIntoIterator::new(MatchConditionTermsIterator::new(self.arena, self.iter())),
+        )
+    }
+}
+pub struct MatchConditionTermsIterator<'heap, T, A>
+where
+    T: Iterator<Item = TermPointer>,
+    A: ArenaAllocator,
+{
+    inner: T,
+    arena: &'heap A,
+}
+impl<'heap, T, A> MatchConditionTermsIterator<'heap, T, A>
+where
+    T: Iterator<Item = TermPointer>,
+    A: ArenaAllocator,
+{
+    pub fn new(arena: &'heap A, inner: T) -> Self {
+        Self { arena, inner }
     }
 }
 
-struct TreeIterator<'heap, T: Expression + 'heap, A: ArenaAllocator> {
+impl<'heap, T, A> Iterator for MatchConditionTermsIterator<'heap, T, A>
+where
+    T: Iterator<Item = TermPointer>,
+    A: ArenaAllocator,
+{
+    type Item = ArenaRef<'heap, TypedTerm<ConditionTerm>, A>;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next().and_then(|item_pointer| {
+            let item = ArenaRef::<'heap, Term, A>::new(self.arena, self.arena.get(item_pointer));
+            match item.as_deref().type_id() {
+                TermTypeDiscriminants::Condition => {
+                    let condition_term = ArenaRef::<TypedTerm<ConditionTerm>, A>::new(
+                        self.arena,
+                        self.arena.get(item_pointer),
+                    );
+                    Some(condition_term)
+                }
+                _ => self.next(),
+            }
+        })
+    }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.inner.size_hint()
+    }
+}
+
+impl<'heap, T, A> ExactSizeIterator for MatchConditionTermsIterator<'heap, T, A>
+where
+    T: Iterator<Item = TermPointer> + ExactSizeIterator,
+    A: ArenaAllocator,
+{
+    fn len(&self) -> usize {
+        self.inner.len()
+    }
+}
+
+impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, TreeTerm, A> {
+    fn size(&self) -> usize {
+        1 + self.left().map(|term| term.size()).unwrap_or(0)
+            + self.right().map(|term| term.size()).unwrap_or(0)
+    }
+    fn capture_depth(&self) -> StackOffset {
+        self.left()
+            .map(|term| term.size())
+            .unwrap_or(0)
+            .max(self.right().map(|term| term.size()).unwrap_or(0))
+    }
+    fn free_variables(&self) -> HashSet<StackOffset> {
+        let left_free_variables = self
+            .left()
+            .map(|term| term.free_variables())
+            .unwrap_or_default();
+        let right_free_variables = self
+            .right()
+            .map(|term| term.free_variables())
+            .unwrap_or_default();
+        if left_free_variables.is_empty() {
+            right_free_variables
+        } else if right_free_variables.is_empty() {
+            left_free_variables
+        } else {
+            let mut combined = left_free_variables;
+            combined.extend(right_free_variables);
+            combined
+        }
+    }
+    fn count_variable_usages(&self, offset: StackOffset) -> usize {
+        self.left()
+            .map(|term| term.count_variable_usages(offset))
+            .unwrap_or(0)
+            + self
+                .right()
+                .map(|term| term.count_variable_usages(offset))
+                .unwrap_or(0)
+    }
+    fn dynamic_dependencies(&self, deep: bool) -> DependencyList {
+        if deep {
+            self.left()
+                .map(|term| term.dynamic_dependencies(deep))
+                .unwrap_or_default()
+                .union(
+                    self.right()
+                        .map(|term| term.dynamic_dependencies(deep))
+                        .unwrap_or_default(),
+                )
+        } else {
+            DependencyList::empty()
+        }
+    }
+    fn has_dynamic_dependencies(&self, deep: bool) -> bool {
+        if deep {
+            self.left()
+                .map(|term| term.has_dynamic_dependencies(deep))
+                .unwrap_or(false)
+                || self
+                    .right()
+                    .map(|term| term.has_dynamic_dependencies(deep))
+                    .unwrap_or(false)
+        } else {
+            false
+        }
+    }
+    fn is_static(&self) -> bool {
+        true
+    }
+    fn is_atomic(&self) -> bool {
+        self.left().map(|term| term.is_atomic()).unwrap_or(true)
+            || self.right().map(|term| term.is_atomic()).unwrap_or(true)
+    }
+    fn is_complex(&self) -> bool {
+        true
+    }
+}
+
+impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, TreeTerm, A> {
+    fn to_json(&self) -> Result<JsonValue, String> {
+        Err(format!("Unable to serialize term: {}", self))
+    }
+    fn patch(&self, target: &Self) -> Result<Option<JsonValue>, String> {
+        Err(format!(
+            "Unable to create patch for terms: {}, {}",
+            self, target
+        ))
+    }
+}
+
+impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, TreeTerm, A> {
+    fn eq(&self, other: &Self) -> bool {
+        // TODO: Clarify PartialEq implementations for container terms
+        // This assumes that trees with the same length and hash are almost certainly identical
+        self.len() == other.len()
+    }
+}
+impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, TreeTerm, A> {}
+
+impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, TreeTerm, A> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(self.as_deref(), f)
+    }
+}
+
+impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, TreeTerm, A> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let left = self.as_deref().left;
+        let right = self.as_deref().right;
+        write!(f, "(")?;
+        if TermPointer::is_null(left) {
+            write!(f, "NULL")?;
+        } else {
+            write!(
+                f,
+                "{}",
+                ArenaRef::new(self.arena, self.arena.get::<Term>(left))
+            )?;
+        }
+        write!(f, " . ");
+        if TermPointer::is_null(right) {
+            write!(f, "NULL")?;
+        } else {
+            write!(
+                f,
+                "{}",
+                ArenaRef::new(self.arena, self.arena.get::<Term>(right))
+            )?;
+        }
+        write!(f, ")")
+    }
+}
+
+struct TreeIterator<'heap, A: ArenaAllocator> {
     stack: TreeIteratorStack<'heap, A>,
     arena: &'heap A,
-    _expression: PhantomData<T>,
 }
-impl<'a, T: Expression, A: ArenaAllocator> TreeIterator<'a, T, A> {
-    fn new(root: ArenaRef<'a, TypedTerm<TreeTerm>, A>) -> Self {
+impl<'a, A: ArenaAllocator> TreeIterator<'a, A> {
+    fn new(root: ArenaRef<'a, TreeTerm, A>) -> Self {
         Self {
             arena: root.arena,
             stack: TreeIteratorStack {
                 cursor: TreeIteratorCursor::Left,
                 items: vec![root],
             },
-            _expression: PhantomData,
         }
     }
 }
 struct TreeIteratorStack<'a, A: ArenaAllocator> {
     cursor: TreeIteratorCursor,
-    items: Vec<ArenaRef<'a, TypedTerm<TreeTerm>, A>>,
+    items: Vec<ArenaRef<'a, TreeTerm, A>>,
 }
 impl<'a, A: ArenaAllocator> TreeIteratorStack<'a, A> {
-    fn push(&mut self, item: ArenaRef<'a, TypedTerm<TreeTerm>, A>) {
+    fn push(&mut self, item: ArenaRef<'a, TreeTerm, A>) {
         match self.cursor {
             TreeIteratorCursor::Left => {
                 // If we were processing the left branch, create a new stack entry so that we can return later to process the right branch
@@ -99,93 +331,87 @@ impl<'a, A: ArenaAllocator> TreeIteratorStack<'a, A> {
         match self.cursor {
             TreeIteratorCursor::Left => unreachable!(),
             TreeIteratorCursor::Right => {
-                self.stack.pop();
+                self.items.pop();
             }
         }
     }
-    fn peek(&self) -> Option<&TreeTerm> {
+    fn peek(&self) -> Option<&ArenaRef<'a, TreeTerm, A>> {
         if self.items.is_empty() {
             None
         } else {
-            Some(self.items[self.items.len() - 1].as_deref().get_inner())
+            Some(&self.items[self.items.len() - 1])
         }
     }
     fn is_empty(&self) -> bool {
         self.items.is_empty()
     }
 }
-impl<'heap, T: Expression + 'heap, A: ArenaAllocator> Iterator for TreeIterator<'heap, T, A>
-where
-    for<'a> T::Ref<'a, T>: From<ArenaRef<'a, Term, A>>,
-{
-    type Item = T::Ref<'heap, T>;
+impl<'heap, A: ArenaAllocator> Iterator for TreeIterator<'heap, A> {
+    type Item = TermPointer;
     fn next(&mut self) -> Option<Self::Item> {
-        let (cursor, child_pointer) = match self.stack.peek() {
+        let (cursor, child_pointer, child) = match self.stack.peek() {
             None => None,
             Some(tree_term) => {
-                let child_pointer = match self.stack.cursor {
-                    TreeIteratorCursor::Left => tree_term.left,
-                    TreeIteratorCursor::Right => tree_term.right,
+                let (child_pointer, child) = match self.stack.cursor {
+                    TreeIteratorCursor::Left => (tree_term.as_deref().left, tree_term.left()),
+                    TreeIteratorCursor::Right => (tree_term.as_deref().right, tree_term.right()),
                 };
-                Some((self.stack.cursor, child_pointer))
+                Some((self.stack.cursor, child_pointer, child))
             }
         }?;
         match cursor {
-            TreeIteratorCursor::Left => {
-                let left_pointer = child_pointer;
+            TreeIteratorCursor::Left => match child {
                 // If this is the null leaf marker, we need to shift from the left to the right branch
-                if left_pointer == TermPointer::null() {
+                None => {
                     self.stack.cursor = TreeIteratorCursor::Right;
                     return self.next();
                 }
-                // Determine whether the current item is itself a cell which needs to be traversed deeper
-                let left_term = ArenaRef::<Term, A>::new(self.arena, self.arena.get(left_pointer));
-                match left_term.as_deref().type_id() {
-                    // If so, push the cell to the stack and repeat the iteration with the updated stack
-                    TermTypeDiscriminants::Tree => {
-                        let tree_term = ArenaRef::<TypedTerm<TreeTerm>, A>::new(
-                            self.arena,
-                            self.arena.get(left_pointer),
-                        );
-                        self.stack.push(tree_term);
-                        return self.next();
-                    }
-                    // Otherwise emit the value and shift from the left to the right branch
-                    _ => {
-                        let item = <T::Ref<T> as From<ArenaRef<'heap, Term, A>>>::from(left_term);
-                        self.stack.cursor = TreeIteratorCursor::Right;
-                        Some(item)
+                Some(child) => {
+                    // Determine whether the current item is itself a cell which needs to be traversed deeper
+                    match child.as_deref().type_id() {
+                        // If so, push the cell to the stack and repeat the iteration with the updated stack
+                        TermTypeDiscriminants::Tree => {
+                            let tree_term = ArenaRef::<TypedTerm<TreeTerm>, A>::new(
+                                self.arena,
+                                self.arena.get(child_pointer),
+                            );
+                            self.stack.push(tree_term.as_inner());
+                            return self.next();
+                        }
+                        // Otherwise emit the value and shift from the left to the right branch
+                        _ => {
+                            self.stack.cursor = TreeIteratorCursor::Right;
+                            Some(child_pointer)
+                        }
                     }
                 }
-            }
-            TreeIteratorCursor::Right => {
-                let right_pointer = child_pointer;
+            },
+            TreeIteratorCursor::Right => match child {
                 // If this is the null leaf marker, we are at the end of a list and need to pop the stack
-                if right_pointer == TermPointer::null() {
+                None => {
                     // Pop the current entry from the stack and repeat the iteration with the updated stack
                     self.stack.pop();
                     return self.next();
                 }
-                // Determine whether the current item is itself a cell which needs to be traversed deeper
-                let right_term =
-                    ArenaRef::<Term, A>::new(self.arena, self.arena.get(right_pointer));
-                match right_term.as_deref().type_id() {
-                    // If so, push the cell to the stack and repeat the iteration with the updated stack
-                    TermTypeDiscriminants::Tree => {
-                        let tree_term = ArenaRef::<TypedTerm<TreeTerm>, A>::new(
-                            self.arena,
-                            self.arena.get(right_pointer),
-                        );
-                        self.stack.push(tree_term);
-                        return self.next();
-                    }
-                    _ => {
-                        let item = <T::Ref<T> as From<ArenaRef<'heap, Term, A>>>::from(right_term);
-                        self.stack.pop();
-                        Some(item)
+                Some(child) => {
+                    // Determine whether the current item is itself a cell which needs to be traversed deeper
+                    match child.as_deref().type_id() {
+                        // If so, push the cell to the stack and repeat the iteration with the updated stack
+                        TermTypeDiscriminants::Tree => {
+                            let tree_term = ArenaRef::<TypedTerm<TreeTerm>, A>::new(
+                                self.arena,
+                                self.arena.get(child_pointer),
+                            );
+                            self.stack.push(tree_term.as_inner());
+                            return self.next();
+                        }
+                        _ => {
+                            self.stack.pop();
+                            Some(child_pointer)
+                        }
                     }
                 }
-            }
+            },
         }
     }
 }
@@ -206,9 +432,10 @@ mod tests {
             TermType::Tree(TreeTerm {
                 left: TermPointer(12345),
                 right: TermPointer(67890),
+                length: 54321
             })
             .as_bytes(),
-            [TermTypeDiscriminants::Tree as u32, 12345, 67890],
+            [TermTypeDiscriminants::Tree as u32, 12345, 67890, 54321],
         );
     }
 }
