@@ -1143,7 +1143,11 @@ where
     } else {
         factory.create_application_term(
             factory.create_builtin_term(Merge),
-            allocator.create_unit_list(factory.create_list_term(allocator.create_list(field_sets))),
+            // TODO: Avoid unnecessary list allocation when merging objects
+            allocator.create_unit_list(factory.create_application_term(
+                factory.create_builtin_term(CollectList),
+                allocator.create_list(field_sets),
+            )),
         )
     })
 }
