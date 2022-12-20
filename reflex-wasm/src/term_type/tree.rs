@@ -34,7 +34,17 @@ impl TermSize for TreeTerm {
 }
 impl TermHash for TreeTerm {
     fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
-        hasher.hash(&self.left, arena).hash(&self.right, arena)
+        let hasher = if self.left.is_null() {
+            hasher.write_bool(false)
+        } else {
+            hasher.hash(arena.get::<Term>(self.left), arena)
+        };
+        let hasher = if self.right.is_null() {
+            hasher.write_bool(false)
+        } else {
+            hasher.hash(arena.get::<Term>(self.right), arena)
+        };
+        hasher.hash(&self.length, arena)
     }
 }
 

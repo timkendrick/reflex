@@ -48,14 +48,15 @@ impl TermSize for ConditionTerm {
 }
 impl TermHash for ConditionTerm {
     fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+        let hasher = hasher.write_u8(ConditionTermDiscriminants::from(self) as u8);
         match self {
-            Self::Custom(condition) => condition.hash(hasher.write_u8(0), arena),
-            Self::Pending(condition) => condition.hash(hasher.write_u8(0), arena),
-            Self::Error(condition) => condition.hash(hasher.write_u8(0), arena),
-            Self::TypeError(condition) => condition.hash(hasher.write_u8(0), arena),
-            Self::InvalidFunctionTarget(condition) => condition.hash(hasher.write_u8(0), arena),
-            Self::InvalidFunctionArgs(condition) => condition.hash(hasher.write_u8(0), arena),
-            Self::InvalidPointer(condition) => condition.hash(hasher.write_u8(0), arena),
+            Self::Custom(condition) => condition.hash(hasher, arena),
+            Self::Pending(condition) => condition.hash(hasher, arena),
+            Self::Error(condition) => condition.hash(hasher, arena),
+            Self::TypeError(condition) => condition.hash(hasher, arena),
+            Self::InvalidFunctionTarget(condition) => condition.hash(hasher, arena),
+            Self::InvalidFunctionArgs(condition) => condition.hash(hasher, arena),
+            Self::InvalidPointer(condition) => condition.hash(hasher, arena),
         }
     }
 }
@@ -366,9 +367,9 @@ impl TermSize for CustomCondition {
 impl TermHash for CustomCondition {
     fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
         hasher
-            .hash(&self.effect_type, arena)
-            .hash(&self.payload, arena)
-            .hash(&self.token, arena)
+            .hash(arena.get::<Term>(self.effect_type), arena)
+            .hash(arena.get::<Term>(self.payload), arena)
+            .hash(arena.get::<Term>(self.token), arena)
     }
 }
 

@@ -17,6 +17,12 @@ pub trait ArenaAllocator: Sized {
 }
 
 pub struct VecAllocator(Vec<u32>);
+
+impl VecAllocator {
+    pub fn from_vec_u32(data: Vec<u32>) -> Self {
+        Self(data)
+    }
+}
 impl Default for VecAllocator {
     fn default() -> Self {
         Self(Default::default())
@@ -54,8 +60,7 @@ impl ArenaAllocator for VecAllocator {
     fn slice<T: Sized>(&self, offset: TermPointer, count: usize) -> &[T] {
         let Self(data) = self;
         let offset = u32::from(offset) as usize;
-        let slice = &data[(offset / 4)..((offset / 4) + count)];
-        unsafe { std::mem::transmute::<&[u32], &[T]>(slice) }
+        unsafe { std::slice::from_raw_parts((&data[offset / 4]) as *const u32 as *const T, count) }
     }
     fn extend(&mut self, offset: TermPointer, size: usize) {
         let offset = u32::from(offset);

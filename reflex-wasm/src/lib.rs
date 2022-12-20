@@ -12,6 +12,7 @@ use term_type::*;
 
 pub mod allocator;
 pub mod hash;
+pub mod interpreter;
 pub mod parser;
 pub mod stdlib;
 pub mod term_type;
@@ -176,6 +177,12 @@ impl TermHash for Term {
     }
 }
 
+impl<'heap, A: ArenaAllocator> TermHash for ArenaRef<'heap, Term, A> {
+    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+        TermHash::hash(self.as_value(), hasher, arena)
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct TermHeader {
@@ -203,6 +210,13 @@ impl TermPointer {
     pub(crate) fn offset(self, offset: u32) -> Self {
         let Self(existing_offset) = self;
         Self(existing_offset + offset)
+    }
+    pub(crate) fn as_non_null(self) -> Option<Self> {
+        if self.is_null() {
+            None
+        } else {
+            Some(self)
+        }
     }
 }
 impl From<TermPointer> for u32 {

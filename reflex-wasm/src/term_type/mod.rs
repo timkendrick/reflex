@@ -1839,7 +1839,7 @@ impl<V> TypedTerm<V> {
     pub fn id(&self) -> HashId {
         self.term.id()
     }
-    fn get_inner(&self) -> &V {
+    pub(crate) fn get_inner(&self) -> &V {
         unsafe {
             match &self.term.as_value() {
                 TermType::Application(inner) => std::mem::transmute::<&ApplicationTerm, &V>(inner),
@@ -1962,7 +1962,7 @@ where
     ArenaRef<'heap, V, A>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
-        <ArenaRef<'heap, V, A> as PartialEq>::eq(&self.as_inner(), &other.as_inner())
+        self.as_term() == other.as_term()
     }
 }
 impl<'heap, A: ArenaAllocator, V> Eq for ArenaRef<'heap, TypedTerm<V>, A> where
@@ -1975,7 +1975,10 @@ where
     ArenaRef<'heap, V, A>: std::fmt::Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        <ArenaRef<'heap, V, A> as std::fmt::Debug>::fmt(&self.as_inner(), f)
+        f.debug_struct("Term")
+            .field("hash", &self.as_value().id())
+            .field("value", &self.as_inner())
+            .finish()
     }
 }
 

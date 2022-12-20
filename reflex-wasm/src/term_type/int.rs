@@ -17,7 +17,7 @@ use crate::{
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct IntTerm {
-    value: i32,
+    pub value: i32,
 }
 impl TermSize for IntTerm {
     fn size_of(&self) -> usize {
