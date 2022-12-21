@@ -169,8 +169,10 @@ impl TermSize for Term {
     }
 }
 impl TermHash for Term {
-    fn hash(&self, hasher: TermHasher, _arena: &impl ArenaAllocator) -> TermHasher {
-        hasher.write_hash(self.header.hash)
+    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+        // TODO: Investigate shallow hashing for compound terms
+        // hasher.write_hash(self.header.hash)
+        self.value.hash(hasher, arena)
     }
 }
 
