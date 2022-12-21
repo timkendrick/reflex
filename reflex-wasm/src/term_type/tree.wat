@@ -138,16 +138,16 @@
 
   (func $Term::Tree::traits::union (param $self i32) (param $other i32) (result i32)
     (if (result i32)
-      (i32.eq (global.get $NULL) (local.get $self))
+      (i32.or
+        (i32.eq (global.get $NULL) (local.get $self))
+        (i32.eq (global.get $NULL) (local.get $other)))
       (then
-        (local.get $other))
+        (select
+          (local.get $other)
+          (local.get $self)
+          (i32.eq (global.get $NULL) (local.get $self))))
       (else
-        (if (result i32)
-          (i32.eq (global.get $NULL) (local.get $other))
-          (then
-            (local.get $self))
-          (else
-            (call $Term::Tree::new (local.get $self) (local.get $other)))))))
+        (call $Term::Tree::new (local.get $self) (local.get $other)))))
 
   (func $Term::Tree::traits::length (param $self i32) (result i32)
     (call $Term::Tree::get::length (local.get $self)))
