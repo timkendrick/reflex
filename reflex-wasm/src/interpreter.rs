@@ -89,8 +89,10 @@ impl WasmContextBuilder {
 
         wasmtime_wasi::add_to_linker(&mut linker, |s| s).map_err(InterpreterError::Linking)?;
 
-        let module =
-            Module::new(store.engine(), program_bytes).map_err(InterpreterError::ModuleCreation)?;
+        let module = unsafe {
+            Module::deserialize(store.engine(), program_bytes)
+                .map_err(InterpreterError::ModuleCreation)?
+        };
 
         Ok(Self {
             store,
@@ -122,7 +124,7 @@ impl WasmContextBuilder {
             .map_err(InterpreterError::Linking)?;
 
         instance
-            .get_typed_func::<(), (), _>(&mut self.store, "_initialize")
+            .get_typed_func::<(), ()>(&mut self.store, "_initialize")
             .map_err(InterpreterError::FunctionNotFound)?
             .call(&mut self.store, ())
             .map_err(InterpreterError::FunctionEvaluation)?;
@@ -162,7 +164,7 @@ impl WasmInterpreter {
         let eval_func = self
             .0
             .program
-            .get_typed_func::<(u32, u32), (u32, u32), _>(&mut self.0.store, "evaluate")
+            .get_typed_func::<(u32, u32), (u32, u32)>(&mut self.0.store, "evaluate")
             .map_err(InterpreterError::FunctionNotFound)?;
 
         let (result, dependencies) = eval_func
@@ -291,7 +293,7 @@ mod tests {
 
     use super::{InterpreterError, WasmContextBuilder};
 
-    const RUNTIME_BYTES: &'static [u8] = include_bytes!("../build/runtime.wasm");
+    const RUNTIME_BYTES: &'static [u8] = include_bytes!("../build/runtime.cwasm");
 
     fn create_mock_wasm_context() -> Result<WasmContext, InterpreterError> {
         WasmContextBuilder::new(RUNTIME_BYTES)?

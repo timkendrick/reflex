@@ -5,6 +5,14 @@ license = "Apache-2.0"
 authors = ["Marshall Wace LLP <opensource@mwam.com>", "Tim Kendrick <t.kendrick@mwam.com>", "Jordan Hall <j.hall@mwam.com>", "Chris Campbell <c.campbell@mwam.com>"]
 edition = "2021"
 
+[dev-dependencies]
+criterion = {version="*", features=["html_reports"]}
+
+
+[[bench]]
+name = "wasm"
+harness = false
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -14,3 +22,4 @@ reflex-js = { path = "../reflex-js"}
 reflex-lang = { path = "../reflex-lang"}
 reflex-lisp = { path = "../reflex-lisp"}
 reflex-stdlib = { path = "../reflex-stdlib"}
+reflex-wasm = { path = "../reflex-wasm"}
