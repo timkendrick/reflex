@@ -72,7 +72,7 @@ impl From<Stdlib> for BuiltinTerm {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, BuiltinTerm, A> {
+impl<A: ArenaAllocator + Clone> ArenaRef<BuiltinTerm, A> {
     pub fn target(&self) -> FunctionIndex {
         self.as_value().uid
     }
@@ -83,7 +83,7 @@ impl<'heap, A: ArenaAllocator> ArenaRef<'heap, BuiltinTerm, A> {
     }
 }
 
-impl<'heap, T: Expression, A: ArenaAllocator> BuiltinTermType<T> for ArenaRef<'heap, BuiltinTerm, A>
+impl<T: Expression, A: ArenaAllocator + Clone> BuiltinTermType<T> for ArenaRef<BuiltinTerm, A>
 where
     T::Builtin: From<FunctionIndex>,
 {
@@ -96,8 +96,8 @@ where
     }
 }
 
-impl<'heap, T: Expression, A: ArenaAllocator> BuiltinTermType<T>
-    for ArenaRef<'heap, TypedTerm<BuiltinTerm>, A>
+impl<T: Expression, A: ArenaAllocator + Clone> BuiltinTermType<T>
+    for ArenaRef<TypedTerm<BuiltinTerm>, A>
 where
     T::Builtin: From<FunctionIndex>,
 {
@@ -106,11 +106,11 @@ where
         T: 'a,
         T::Builtin: 'a,
     {
-        <ArenaRef<'heap, BuiltinTerm, A> as BuiltinTermType<T>>::target(&self.as_inner())
+        <ArenaRef<BuiltinTerm, A> as BuiltinTermType<T>>::target(&self.as_inner())
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, BuiltinTerm, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<BuiltinTerm, A> {
     fn size(&self) -> usize {
         1
     }
@@ -140,7 +140,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, BuiltinTerm, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, BuiltinTerm, A> {
+impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<BuiltinTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -152,20 +152,20 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, BuiltinTerm, A>
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, BuiltinTerm, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<BuiltinTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.target() == other.target()
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, BuiltinTerm, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<BuiltinTerm, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, BuiltinTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<BuiltinTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, BuiltinTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<BuiltinTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<stdlib:{:?}>", self.target())
     }

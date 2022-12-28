@@ -30,25 +30,25 @@ impl TermHash for VariableTerm {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, VariableTerm, A> {
+impl<A: ArenaAllocator + Clone> ArenaRef<VariableTerm, A> {
     pub fn stack_offset(&self) -> u32 {
         self.as_value().stack_offset
     }
 }
 
-impl<'heap, A: ArenaAllocator> VariableTermType for ArenaRef<'heap, VariableTerm, A> {
+impl<A: ArenaAllocator + Clone> VariableTermType for ArenaRef<VariableTerm, A> {
     fn offset(&self) -> StackOffset {
         self.stack_offset() as StackOffset
     }
 }
 
-impl<'heap, A: ArenaAllocator> VariableTermType for ArenaRef<'heap, TypedTerm<VariableTerm>, A> {
+impl<A: ArenaAllocator + Clone> VariableTermType for ArenaRef<TypedTerm<VariableTerm>, A> {
     fn offset(&self) -> StackOffset {
-        <ArenaRef<'heap, VariableTerm, A> as VariableTermType>::offset(&self.as_inner())
+        <ArenaRef<VariableTerm, A> as VariableTermType>::offset(&self.as_inner())
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, VariableTerm, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<VariableTerm, A> {
     fn size(&self) -> usize {
         1
     }
@@ -82,7 +82,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, VariableTerm, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, VariableTerm, A> {
+impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<VariableTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -94,20 +94,20 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, VariableTerm, A
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, VariableTerm, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<VariableTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.stack_offset() == other.stack_offset()
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, VariableTerm, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<VariableTerm, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, VariableTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<VariableTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, VariableTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<VariableTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<variable:{}>", self.stack_offset())
     }

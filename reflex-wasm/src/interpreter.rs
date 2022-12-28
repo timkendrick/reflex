@@ -21,32 +21,29 @@ pub struct UnboundEvaluationResult {
 }
 
 impl UnboundEvaluationResult {
-    pub fn bind<'heap, A: ArenaAllocator>(
-        self,
-        arena: &'heap A,
-    ) -> InterpreterEvaluationResult<'heap, A> {
+    pub fn bind<A: ArenaAllocator>(self, arena: A) -> InterpreterEvaluationResult<A> {
         InterpreterEvaluationResult {
-            arena: arena,
+            arena,
             result_pointer: self.result_pointer,
             dependencies_pointer: self.dependencies_pointer,
         }
     }
 }
 
-pub struct InterpreterEvaluationResult<'heap, A: ArenaAllocator> {
-    arena: &'heap A,
+pub struct InterpreterEvaluationResult<A: ArenaAllocator> {
+    arena: A,
     result_pointer: TermPointer,
     dependencies_pointer: Option<TermPointer>,
 }
 
-impl<'heap, A: ArenaAllocator> InterpreterEvaluationResult<'heap, A> {
-    pub fn result(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::<Term, _>::new(self.arena, self.result_pointer)
+impl<A: ArenaAllocator + Clone> InterpreterEvaluationResult<A> {
+    pub fn result(&self) -> ArenaRef<Term, A> {
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.result_pointer)
     }
 
-    pub fn dependencies(&self) -> Option<ArenaRef<'heap, TypedTerm<TreeTerm>, A>> {
+    pub fn dependencies(&self) -> Option<ArenaRef<TypedTerm<TreeTerm>, A>> {
         self.dependencies_pointer.map(|dependencies_pointer| {
-            ArenaRef::<TypedTerm<TreeTerm>, _>::new(self.arena, dependencies_pointer)
+            ArenaRef::<TypedTerm<TreeTerm>, _>::new(self.arena.clone(), dependencies_pointer)
         })
     }
 }

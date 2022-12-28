@@ -30,16 +30,16 @@ impl TermHash for ZipIteratorTerm {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, ZipIteratorTerm, A> {
-    pub fn left(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::<Term, _>::new(self.arena, self.as_value().left)
+impl<A: ArenaAllocator + Clone> ArenaRef<ZipIteratorTerm, A> {
+    pub fn left(&self) -> ArenaRef<Term, A> {
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().left)
     }
-    pub fn right(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::<Term, _>::new(self.arena, self.as_value().right)
+    pub fn right(&self) -> ArenaRef<Term, A> {
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().right)
     }
 }
 
-impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, ZipIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<ZipIteratorTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -51,26 +51,26 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, ZipIteratorTerm
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, ZipIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<ZipIteratorTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.left() == other.left() && self.right() == other.right()
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, ZipIteratorTerm, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<ZipIteratorTerm, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, ZipIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<ZipIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, ZipIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<ZipIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "ZipIterator")
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, ZipIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<ZipIteratorTerm, A> {
     fn size(&self) -> usize {
         1 + self.left().size() + self.right().size()
     }

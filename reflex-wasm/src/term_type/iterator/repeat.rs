@@ -29,13 +29,13 @@ impl TermHash for RepeatIteratorTerm {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, RepeatIteratorTerm, A> {
-    pub fn value(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::<Term, _>::new(self.arena, self.as_value().value)
+impl<A: ArenaAllocator + Clone> ArenaRef<RepeatIteratorTerm, A> {
+    pub fn value(&self) -> ArenaRef<Term, A> {
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().value)
     }
 }
 
-impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, RepeatIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<RepeatIteratorTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -47,26 +47,26 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, RepeatIteratorT
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, RepeatIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<RepeatIteratorTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.value() == other.value()
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, RepeatIteratorTerm, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<RepeatIteratorTerm, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, RepeatIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<RepeatIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, RepeatIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<RepeatIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "RepeatIterator")
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, RepeatIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<RepeatIteratorTerm, A> {
     fn size(&self) -> usize {
         1 + self.value().size()
     }

@@ -18,12 +18,12 @@ pub mod parser;
 pub mod stdlib;
 pub mod term_type;
 
-pub struct ArenaRef<'a, T, A: ArenaAllocator> {
-    pub(crate) arena: &'a A,
+pub struct ArenaRef<T, A: ArenaAllocator> {
+    pub(crate) arena: A,
     pointer: TermPointer,
     _type: PhantomData<T>,
 }
-impl<'a, T, A: ArenaAllocator> std::hash::Hash for ArenaRef<'a, T, A>
+impl<T, A: ArenaAllocator> std::hash::Hash for ArenaRef<T, A>
 where
     T: Hash,
 {
@@ -31,41 +31,45 @@ where
         self.as_value().hash(state)
     }
 }
-impl<'a, T, A: ArenaAllocator> ArenaRef<'a, T, A> {
-    fn new(arena: &'a A, pointer: TermPointer) -> Self {
+impl<T, A: ArenaAllocator> ArenaRef<T, A> {
+    fn new(arena: A, pointer: TermPointer) -> Self {
         Self {
             arena,
             pointer,
             _type: PhantomData,
         }
     }
-    pub fn as_value(&self) -> &'a T {
+    pub fn as_value(&self) -> &T {
         self.arena.get::<T>(self.pointer)
     }
     pub(crate) fn as_pointer(&self) -> TermPointer {
         self.pointer
     }
 }
-impl<'a, T, A: ArenaAllocator> Copy for ArenaRef<'a, T, A> {}
-impl<'a, T, A: ArenaAllocator> Clone for ArenaRef<'a, T, A> {
+impl<T, A: ArenaAllocator> Copy for ArenaRef<T, A> where A: Copy {}
+impl<T, A: ArenaAllocator> Clone for ArenaRef<T, A>
+where
+    A: Clone,
+{
     fn clone(&self) -> Self {
         Self {
-            arena: self.arena,
+            arena: self.arena.clone(),
             pointer: self.pointer,
             _type: PhantomData,
         }
     }
 }
 
-impl<'a, 'heap: 'a, T, A: ArenaAllocator> From<&'a ArenaRef<'heap, T, A>>
-    for ArenaRef<'heap, T, A>
+impl<'a, T, A: ArenaAllocator> From<&'a ArenaRef<T, A>> for ArenaRef<T, A>
+where
+    A: Clone,
 {
-    fn from(value: &'a ArenaRef<'heap, T, A>) -> Self {
-        *value
+    fn from(value: &'a ArenaRef<T, A>) -> Self {
+        value.clone()
     }
 }
 
-impl<'a, 'heap: 'a, T, A: ArenaAllocator> RefType<'a, Self> for ArenaRef<'heap, T, A> {
+impl<'a, T, A: ArenaAllocator> RefType<'a, Self> for ArenaRef<T, A> {
     fn as_deref(&self) -> &'a Self {
         // FIXME: this is vulnerable to use-after-free errors
         // We know 'heap lasts longer than 'a, which ensures the reference to `self` will be freed before 'heap,
@@ -91,20 +95,20 @@ impl<'a, T: 'a, A: ArenaAllocator, TInner: Iterator<Item = TermPointer>>
         }
     }
 }
-impl<'a, T: 'a, A: ArenaAllocator, TInner: Iterator<Item = TermPointer>> Iterator
+impl<'a, T: 'a, A: ArenaAllocator + Clone, TInner: Iterator<Item = TermPointer>> Iterator
     for IntoArenaRefIterator<'a, T, A, TInner>
 {
-    type Item = ArenaRef<'a, T, A>;
+    type Item = ArenaRef<T, A>;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner
             .next()
-            .map(|pointer| ArenaRef::<T, _>::new(self.arena, pointer))
+            .map(|pointer| ArenaRef::<T, _>::new(self.arena.clone(), pointer))
     }
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.inner.size_hint()
     }
 }
-impl<'a, T: 'a, A: ArenaAllocator, TInner: Iterator<Item = TermPointer>> ExactSizeIterator
+impl<'a, T: 'a, A: ArenaAllocator + Clone, TInner: Iterator<Item = TermPointer>> ExactSizeIterator
     for IntoArenaRefIterator<'a, T, A, TInner>
 where
     TInner: ExactSizeIterator,
@@ -163,7 +167,7 @@ impl TermHash for Term {
     }
 }
 
-impl<'heap, A: ArenaAllocator> TermHash for ArenaRef<'heap, Term, A> {
+impl<A: ArenaAllocator> TermHash for ArenaRef<Term, A> {
     fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
         TermHash::hash(self.as_value(), hasher, arena)
     }
@@ -310,11 +314,11 @@ where
     }
 }
 
-impl<'heap, T, A: ArenaAllocator> ArenaRef<'heap, Array<T>, A> {
+impl<T, A: ArenaAllocator> ArenaRef<Array<T>, A> {
     pub fn len(&self) -> usize {
         self.as_value().len()
     }
-    pub fn iter(&self) -> ArrayIter<'heap, T> {
+    pub fn iter(&self) -> ArrayIter<'_, T> {
         self.as_value().iter()
     }
     pub fn get(&self, index: usize) -> Option<&T> {

@@ -108,12 +108,12 @@ impl std::fmt::Display for StringTerm {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, StringTerm, A> {
+impl<A: ArenaAllocator + Clone> ArenaRef<StringTerm, A> {
     pub fn string_hash(&self) -> HashId {
         // FIXME: Convert to 64-bit hashes
         u32::from(
             self.as_value()
-                .hash(TermHasher::default(), self.arena)
+                .hash(TermHasher::default(), &self.arena)
                 .finish(),
         ) as HashId
     }
@@ -122,7 +122,7 @@ impl<'heap, A: ArenaAllocator> ArenaRef<'heap, StringTerm, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> StringValue for ArenaRef<'heap, StringTerm, A> {
+impl<A: ArenaAllocator + Clone> StringValue for ArenaRef<StringTerm, A> {
     fn id(&self) -> HashId {
         self.string_hash()
     }
@@ -135,12 +135,12 @@ impl<'heap, A: ArenaAllocator> StringValue for ArenaRef<'heap, StringTerm, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> StringValue for ArenaRef<'heap, TypedTerm<StringTerm>, A> {
+impl<A: ArenaAllocator + Clone> StringValue for ArenaRef<TypedTerm<StringTerm>, A> {
     fn id(&self) -> HashId {
-        <ArenaRef<'heap, StringTerm, A> as StringValue>::id(&self.as_inner())
+        <ArenaRef<StringTerm, A> as StringValue>::id(&self.as_inner())
     }
     fn as_str(&self) -> &str {
-        self.as_inner().as_value().as_str()
+        self.as_inner_value().as_str()
     }
     fn from_static(_self: Option<Self>, _value: &'static str) -> Option<Self> {
         // FIXME: Implement StringValue::from_static() for WASM StringTerm type
@@ -148,31 +148,31 @@ impl<'heap, A: ArenaAllocator> StringValue for ArenaRef<'heap, TypedTerm<StringT
     }
 }
 
-// impl<'heap, A: ArenaAllocator> StringTermType<ArenaRef<'heap, Term, A>>
-//     for ArenaRef<'heap, TypedTerm<StringTerm>, A>
+// impl<A: ArenaAllocator + Clone> StringTermType<ArenaRef<Term, A>>
+//     for ArenaRef<TypedTerm<StringTerm>, A>
 // {
-//     fn value<'a>(&'a self) -> <ArenaRef<'heap, Term, A> as Expression>::StringRef<'a>
+//     fn value<'a>(&'a self) -> <ArenaRef<Term, A> as Expression>::StringRef<'a>
 //     where
-//         <ArenaRef<'heap, Term, A> as Expression>::String: 'a,
-//         ArenaRef<'heap, Term, A>: 'a,
+//         <ArenaRef<Term, A> as Expression>::String: 'a,
+//         ArenaRef<Term, A>: 'a,
 //     {
 //         (*self).into()
 //     }
 // }
 
-impl<'heap, A: ArenaAllocator> StringTermType<WasmExpression<'heap, A>>
-    for ArenaRef<'heap, TypedTerm<StringTerm>, A>
+impl<A: ArenaAllocator + Clone> StringTermType<WasmExpression<A>>
+    for ArenaRef<TypedTerm<StringTerm>, A>
 {
-    fn value<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::StringRef<'a>
+    fn value<'a>(&'a self) -> <WasmExpression<A> as Expression>::StringRef<'a>
     where
-        <WasmExpression<'heap, A> as Expression>::String: 'a,
-        WasmExpression<'heap, A>: 'a,
+        <WasmExpression<A> as Expression>::String: 'a,
+        WasmExpression<A>: 'a,
     {
-        (*self).into()
+        self.clone()
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, StringTerm, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<StringTerm, A> {
     fn size(&self) -> usize {
         1
     }
@@ -202,7 +202,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, StringTerm, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, StringTerm, A> {
+impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<StringTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Ok(JsonValue::String(String::from(self.as_str())))
     }
@@ -215,20 +215,20 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, StringTerm, A> 
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, StringTerm, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<StringTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.as_value() == other.as_value()
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, StringTerm, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<StringTerm, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, StringTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<StringTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, StringTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<StringTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }

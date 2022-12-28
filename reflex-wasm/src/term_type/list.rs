@@ -73,24 +73,22 @@ impl ListTerm {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, ListTerm, A> {
-    pub fn items(&self) -> ArenaRef<'heap, Array<TermPointer>, A> {
+impl<A: ArenaAllocator + Clone> ArenaRef<ListTerm, A> {
+    pub fn items(&self) -> ArenaRef<Array<TermPointer>, A> {
         ArenaRef::<Array<TermPointer>, _>::new(
-            self.arena,
+            self.arena.clone(),
             self.arena.get_offset(&self.as_value().items),
         )
     }
-    pub fn iter<'a>(
-        &'a self,
-    ) -> IntoArenaRefIterator<'heap, Term, A, Copied<ArrayIter<'heap, TermPointer>>> {
-        IntoArenaRefIterator::new(self.arena, self.items().iter().copied())
+    pub fn iter(&self) -> IntoArenaRefIterator<'_, Term, A, Copied<ArrayIter<'_, TermPointer>>> {
+        IntoArenaRefIterator::new(&self.arena, self.items().iter().copied())
     }
     pub fn len(&self) -> usize {
         self.items().len()
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, ListTerm, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<ListTerm, A> {
     fn size(&self) -> usize {
         1 + self.iter().map(|term| term.size()).sum::<usize>()
     }
@@ -135,40 +133,40 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, ListTerm, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ListTermType<WasmExpression<'heap, A>>
-    for ArenaRef<'heap, TypedTerm<ListTerm>, A>
+impl<A: ArenaAllocator + Clone> ListTermType<WasmExpression<A>>
+    for ArenaRef<TypedTerm<ListTerm>, A>
 {
-    fn items<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::ExpressionListRef<'a>
+    fn items<'a>(&'a self) -> <WasmExpression<A> as Expression>::ExpressionListRef<'a>
     where
-        <WasmExpression<'heap, A> as Expression>::ExpressionList: 'a,
-        WasmExpression<'heap, A>: 'a,
+        <WasmExpression<A> as Expression>::ExpressionList: 'a,
+        WasmExpression<A>: 'a,
     {
-        (*self).into()
+        self.clone()
     }
 }
 
-impl<'heap, A: ArenaAllocator> StructPrototypeType<WasmExpression<'heap, A>>
-    for ArenaRef<'heap, TypedTerm<ListTerm>, A>
+impl<A: ArenaAllocator + Clone> StructPrototypeType<WasmExpression<A>>
+    for ArenaRef<TypedTerm<ListTerm>, A>
 {
-    fn keys<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::ExpressionListRef<'a>
+    fn keys<'a>(&'a self) -> <WasmExpression<A> as Expression>::ExpressionListRef<'a>
     where
-        <WasmExpression<'heap, A> as Expression>::ExpressionList: 'a,
-        WasmExpression<'heap, A>: 'a,
+        <WasmExpression<A> as Expression>::ExpressionList: 'a,
+        WasmExpression<A>: 'a,
     {
-        (*self).into()
+        self.clone()
     }
 }
 
-impl<'heap, A: ArenaAllocator> ExpressionListType<WasmExpression<'heap, A>>
-    for ArenaRef<'heap, TypedTerm<ListTerm>, A>
+impl<A: ArenaAllocator + Clone> ExpressionListType<WasmExpression<A>>
+    for ArenaRef<TypedTerm<ListTerm>, A>
 {
     type Iterator<'a> = MapIntoIterator<
-        IntoArenaRefIterator<'heap, Term, A, Copied<ArrayIter<'heap, TermPointer>>>,
-        ArenaRef<'heap, Term, A>,
-        <WasmExpression<'heap, A> as Expression>::ExpressionRef<'a>,
+        IntoArenaRefIterator<'a, Term, A, Copied<ArrayIter<'a, TermPointer>>>,
+        ArenaRef<Term, A>,
+        <WasmExpression<A> as Expression>::ExpressionRef<'a>,
     >
     where
-        WasmExpression<'heap, A>: 'a,
+        WasmExpression<A>: 'a,
         Self: 'a;
     fn id(&self) -> HashId {
         self.as_value().id()
@@ -179,25 +177,25 @@ impl<'heap, A: ArenaAllocator> ExpressionListType<WasmExpression<'heap, A>>
     fn get<'a>(
         &'a self,
         index: usize,
-    ) -> Option<<WasmExpression<'heap, A> as Expression>::ExpressionRef<'a>>
+    ) -> Option<<WasmExpression<A> as Expression>::ExpressionRef<'a>>
     where
-        WasmExpression<'heap, A>: 'a,
+        WasmExpression<A>: 'a,
     {
         self.as_inner()
             .items()
             .get(index)
             .copied()
-            .map(|pointer| ArenaRef::<Term, _>::new(self.arena, pointer).into())
+            .map(|pointer| ArenaRef::<Term, _>::new(self.arena.clone(), pointer).into())
     }
     fn iter<'a>(&'a self) -> Self::Iterator<'a>
     where
-        WasmExpression<'heap, A>: 'a,
+        WasmExpression<A>: 'a,
     {
         MapIntoIterator::new(self.as_inner().iter())
     }
 }
 
-impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, ListTerm, A> {
+impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<ListTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         self.iter()
             .map(|key| key.to_json())
@@ -235,22 +233,22 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, ListTerm, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, ListTerm, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<ListTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         // TODO: Clarify PartialEq implementations for container terms
         // This assumes that lists with the same length and hash are almost certainly identical
         self.len() == other.len()
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, ListTerm, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<ListTerm, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, ListTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<ListTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, ListTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<ListTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let max_displayed_items = 100;
         let items = self.iter();

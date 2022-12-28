@@ -27,7 +27,7 @@ impl TermHash for EmptyIteratorTerm {
     }
 }
 
-impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, EmptyIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<EmptyIteratorTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -39,26 +39,26 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, EmptyIteratorTe
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, EmptyIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<EmptyIteratorTerm, A> {
     fn eq(&self, _other: &Self) -> bool {
         true
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, EmptyIteratorTerm, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<EmptyIteratorTerm, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, EmptyIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<EmptyIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, EmptyIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<EmptyIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "EmptyIterator")
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, EmptyIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<EmptyIteratorTerm, A> {
     fn size(&self) -> usize {
         1
     }

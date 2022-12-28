@@ -29,13 +29,13 @@ impl TermHash for HashmapKeysIteratorTerm {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, HashmapKeysIteratorTerm, A> {
-    pub fn source(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::<Term, _>::new(self.arena, self.as_value().source)
+impl<A: ArenaAllocator + Clone> ArenaRef<HashmapKeysIteratorTerm, A> {
+    pub fn source(&self) -> ArenaRef<Term, A> {
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().source)
     }
 }
 
-impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, HashmapKeysIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<HashmapKeysIteratorTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -47,26 +47,26 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, HashmapKeysIter
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, HashmapKeysIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<HashmapKeysIteratorTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.source() == other.source()
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, HashmapKeysIteratorTerm, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<HashmapKeysIteratorTerm, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, HashmapKeysIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<HashmapKeysIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, HashmapKeysIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<HashmapKeysIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "HashmapKeysIterator")
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, HashmapKeysIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<HashmapKeysIteratorTerm, A> {
     fn size(&self) -> usize {
         1 + self.source().size()
     }

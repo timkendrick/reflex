@@ -29,13 +29,13 @@ impl TermHash for PointerTerm {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, PointerTerm, A> {
-    pub fn target(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::<Term, _>::new(self.arena, self.as_value().target)
+impl<A: ArenaAllocator + Clone> ArenaRef<PointerTerm, A> {
+    pub fn target(&self) -> ArenaRef<Term, A> {
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().target)
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, PointerTerm, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<PointerTerm, A> {
     fn size(&self) -> usize {
         self.target().size()
     }
@@ -65,7 +65,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, PointerTerm, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, PointerTerm, A> {
+impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<PointerTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -77,20 +77,20 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, PointerTerm, A>
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, PointerTerm, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<PointerTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.target() == other.target()
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, PointerTerm, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<PointerTerm, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, PointerTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<PointerTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, PointerTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<PointerTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Pointer({:#x})", u32::from(self.as_value().target))
     }

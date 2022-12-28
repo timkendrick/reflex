@@ -37,14 +37,14 @@ impl TermHash for RecordTerm {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, RecordTerm, A> {
-    fn keys(&self) -> ArenaRef<'heap, TypedTerm<ListTerm>, A> {
-        ArenaRef::<TypedTerm<ListTerm>, _>::new(self.arena, self.as_value().keys)
+impl<A: ArenaAllocator + Clone> ArenaRef<RecordTerm, A> {
+    fn keys(&self) -> ArenaRef<TypedTerm<ListTerm>, A> {
+        ArenaRef::<TypedTerm<ListTerm>, _>::new(self.arena.clone(), self.as_value().keys)
     }
-    fn values(&self) -> ArenaRef<'heap, TypedTerm<ListTerm>, A> {
-        ArenaRef::<TypedTerm<ListTerm>, _>::new(self.arena, self.as_value().values)
+    fn values(&self) -> ArenaRef<TypedTerm<ListTerm>, A> {
+        ArenaRef::<TypedTerm<ListTerm>, _>::new(self.arena.clone(), self.as_value().values)
     }
-    fn get<T: Expression>(&self, key: &T) -> Option<ArenaRef<'heap, Term, A>> {
+    fn get<T: Expression>(&self, key: &T) -> Option<ArenaRef<Term, A>> {
         self.keys()
             .as_inner()
             .iter()
@@ -56,75 +56,66 @@ impl<'heap, A: ArenaAllocator> ArenaRef<'heap, RecordTerm, A> {
                     .items()
                     .get(index)
                     .copied()
-                    .map(|pointer| ArenaRef::<Term, _>::new(self.arena, pointer))
+                    .map(|pointer| ArenaRef::<Term, _>::new(self.arena.clone(), pointer))
             })
     }
 }
 
-impl<'heap, A: ArenaAllocator> RecordTermType<WasmExpression<'heap, A>>
-    for ArenaRef<'heap, RecordTerm, A>
-{
-    fn prototype<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::StructPrototypeRef<'a>
+impl<A: ArenaAllocator + Clone> RecordTermType<WasmExpression<A>> for ArenaRef<RecordTerm, A> {
+    fn prototype<'a>(&'a self) -> <WasmExpression<A> as Expression>::StructPrototypeRef<'a>
     where
-        <WasmExpression<'heap, A> as Expression>::StructPrototype: 'a,
-        WasmExpression<'heap, A>: 'a,
+        <WasmExpression<A> as Expression>::StructPrototype: 'a,
+        WasmExpression<A>: 'a,
     {
         self.keys().into()
     }
-    fn values<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::ExpressionListRef<'a>
+    fn values<'a>(&'a self) -> <WasmExpression<A> as Expression>::ExpressionListRef<'a>
     where
-        <WasmExpression<'heap, A> as Expression>::ExpressionList: 'a,
-        WasmExpression<'heap, A>: 'a,
+        <WasmExpression<A> as Expression>::ExpressionList: 'a,
+        WasmExpression<A>: 'a,
     {
         self.values().into()
     }
     fn get<'a>(
         &'a self,
-        key: &WasmExpression<'heap, A>,
-    ) -> Option<<WasmExpression<'heap, A> as Expression>::ExpressionRef<'a>>
+        key: &WasmExpression<A>,
+    ) -> Option<<WasmExpression<A> as Expression>::ExpressionRef<'a>>
     where
-        WasmExpression<'heap, A>: 'a,
+        WasmExpression<A>: 'a,
     {
         self.get(key).map(|value| value.into())
     }
 }
 
-impl<'heap, A: ArenaAllocator> RecordTermType<WasmExpression<'heap, A>>
-    for ArenaRef<'heap, TypedTerm<RecordTerm>, A>
+impl<A: ArenaAllocator + Clone> RecordTermType<WasmExpression<A>>
+    for ArenaRef<TypedTerm<RecordTerm>, A>
 {
-    fn prototype<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::StructPrototypeRef<'a>
+    fn prototype<'a>(&'a self) -> <WasmExpression<A> as Expression>::StructPrototypeRef<'a>
     where
-        <WasmExpression<'heap, A> as Expression>::StructPrototype: 'a,
-        WasmExpression<'heap, A>: 'a,
+        <WasmExpression<A> as Expression>::StructPrototype: 'a,
+        WasmExpression<A>: 'a,
     {
-        <ArenaRef<'heap, RecordTerm, A> as RecordTermType<WasmExpression<'heap, A>>>::prototype(
-            &self.as_inner(),
-        )
+        <ArenaRef<RecordTerm, A> as RecordTermType<WasmExpression<A>>>::prototype(&self.as_inner())
     }
-    fn values<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::ExpressionListRef<'a>
+    fn values<'a>(&'a self) -> <WasmExpression<A> as Expression>::ExpressionListRef<'a>
     where
-        <WasmExpression<'heap, A> as Expression>::ExpressionList: 'a,
-        WasmExpression<'heap, A>: 'a,
+        <WasmExpression<A> as Expression>::ExpressionList: 'a,
+        WasmExpression<A>: 'a,
     {
-        <ArenaRef<'heap, RecordTerm, A> as RecordTermType<WasmExpression<'heap, A>>>::values(
-            &self.as_inner(),
-        )
+        <ArenaRef<RecordTerm, A> as RecordTermType<WasmExpression<A>>>::values(&self.as_inner())
     }
     fn get<'a>(
         &'a self,
-        key: &WasmExpression<'heap, A>,
-    ) -> Option<<WasmExpression<'heap, A> as Expression>::ExpressionRef<'a>>
+        key: &WasmExpression<A>,
+    ) -> Option<<WasmExpression<A> as Expression>::ExpressionRef<'a>>
     where
-        WasmExpression<'heap, A>: 'a,
+        WasmExpression<A>: 'a,
     {
-        <ArenaRef<'heap, RecordTerm, A> as RecordTermType<WasmExpression<'heap, A>>>::get(
-            &self.as_inner(),
-            key,
-        )
+        <ArenaRef<RecordTerm, A> as RecordTermType<WasmExpression<A>>>::get(&self.as_inner(), key)
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, RecordTerm, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<RecordTerm, A> {
     fn size(&self) -> usize {
         1 + self.keys().size() + self.values().size()
     }
@@ -162,10 +153,12 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, RecordTerm, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, RecordTerm, A> {
+impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<RecordTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
-        let keys = self.keys().as_inner().iter();
-        let values = self.values().as_inner().iter();
+        let keys = self.keys().as_inner();
+        let values = self.values().as_inner();
+        let keys = keys.iter();
+        let values = values.iter();
         let entries = keys.zip(values);
         let fields = entries
             .map(|(key, value)| {
@@ -180,18 +173,19 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, RecordTerm, A> 
         Ok(JsonValue::Object(fields))
     }
     fn patch(&self, target: &Self) -> Result<Option<JsonValue>, String> {
-        if self.keys().as_inner().len() != target.keys().as_inner().len() {
+        let keys = self.keys().as_inner();
+        let target_keys = target.keys().as_inner();
+        if keys.len() != target_keys.len() {
             return Err(format!(
                 "Prototype has changed from {} to {}",
                 self.keys(),
                 target.keys()
             ));
         }
-        let keys = self.keys().as_inner().iter();
-        let values = self.values().as_inner().iter();
-        let entries = keys.zip(values);
+        let target_values = target.values().as_inner();
+        let target_entries = target_keys.iter().zip(target_values.iter());
         let updates = JsonValue::Object(
-            entries
+            target_entries
                 .map(|(key, new_value)| {
                     let previous_value = self.get(&key).ok_or_else(|| {
                         format!(
@@ -221,20 +215,20 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, RecordTerm, A> 
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, RecordTerm, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<RecordTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.keys() == other.keys() && self.values() == other.values()
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, RecordTerm, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<RecordTerm, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, RecordTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<RecordTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, RecordTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<RecordTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.keys().as_inner().len() {
             0 => write!(f, "{{}}"),

@@ -61,13 +61,14 @@ impl TermHash for ConditionTerm {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, ConditionTerm, A> {
+impl<A: ArenaAllocator + Clone> ArenaRef<ConditionTerm, A> {
     pub fn signal_type(&self) -> SignalType {
         match self.as_value() {
-            ConditionTerm::Custom(condition) => {
-                ArenaRef::<CustomCondition, _>::new(self.arena, self.arena.get_offset(condition))
-                    .signal_type()
-            }
+            ConditionTerm::Custom(condition) => ArenaRef::<CustomCondition, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(condition),
+            )
+            .signal_type(),
             ConditionTerm::Pending(_) => SignalType::Pending,
             ConditionTerm::Error(_) => SignalType::Error,
             ConditionTerm::TypeError(_) => SignalType::Error,
@@ -76,32 +77,41 @@ impl<'heap, A: ArenaAllocator> ArenaRef<'heap, ConditionTerm, A> {
             ConditionTerm::InvalidPointer(_) => SignalType::Error,
         }
     }
-    pub fn payload(&self) -> Option<ArenaRef<'heap, Term, A>> {
+    pub fn payload(&self) -> Option<ArenaRef<Term, A>> {
         match self.as_value() {
             ConditionTerm::Custom(inner) => Some(
-                ArenaRef::<CustomCondition, _>::new(self.arena, self.arena.get_offset(inner))
-                    .payload(),
+                ArenaRef::<CustomCondition, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(inner),
+                )
+                .payload(),
             ),
             ConditionTerm::Error(inner) => Some(
-                ArenaRef::<ErrorCondition, _>::new(self.arena, self.arena.get_offset(inner))
-                    .payload(),
+                ArenaRef::<ErrorCondition, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(inner),
+                )
+                .payload(),
             ),
             _ => None,
         }
     }
-    pub fn token(&self) -> Option<ArenaRef<'heap, Term, A>> {
+    pub fn token(&self) -> Option<ArenaRef<Term, A>> {
         match self.as_value() {
             ConditionTerm::Custom(inner) => Some(
-                ArenaRef::<CustomCondition, _>::new(self.arena, self.arena.get_offset(inner))
-                    .token(),
+                ArenaRef::<CustomCondition, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(inner),
+                )
+                .token(),
             ),
             _ => None,
         }
     }
 }
 
-impl<'heap, A: ArenaAllocator> ConditionType<WasmExpression<'heap, A>>
-    for ArenaRef<'heap, TypedTerm<ConditionTerm>, A>
+impl<A: ArenaAllocator + Clone> ConditionType<WasmExpression<A>>
+    for ArenaRef<TypedTerm<ConditionTerm>, A>
 {
     fn id(&self) -> StateToken {
         self.as_value().id()
@@ -109,49 +119,58 @@ impl<'heap, A: ArenaAllocator> ConditionType<WasmExpression<'heap, A>>
     fn signal_type(&self) -> SignalType {
         self.as_inner().signal_type()
     }
-    fn payload<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::ExpressionRef<'a> {
+    fn payload<'a>(&'a self) -> <WasmExpression<A> as Expression>::ExpressionRef<'a> {
         // FIXME: Improve condition API
-        self.as_inner().payload().unwrap_or_else(|| *self.as_term())
+        self.as_inner()
+            .payload()
+            .unwrap_or_else(|| self.as_term().clone())
     }
-    fn token<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::ExpressionRef<'a> {
+    fn token<'a>(&'a self) -> <WasmExpression<A> as Expression>::ExpressionRef<'a> {
         // FIXME: Improve condition API
-        self.as_inner().token().unwrap_or_else(|| *self.as_term())
+        self.as_inner()
+            .token()
+            .unwrap_or_else(|| self.as_term().clone())
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, ConditionTerm, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<ConditionTerm, A> {
     fn size(&self) -> usize {
         match self.as_value() {
-            ConditionTerm::Custom(inner) => {
-                ArenaRef::<CustomCondition, _>::new(self.arena, self.arena.get_offset(inner)).size()
-            }
-            ConditionTerm::Pending(inner) => {
-                ArenaRef::<PendingCondition, _>::new(self.arena, self.arena.get_offset(inner))
-                    .size()
-            }
+            ConditionTerm::Custom(inner) => ArenaRef::<CustomCondition, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(inner),
+            )
+            .size(),
+            ConditionTerm::Pending(inner) => ArenaRef::<PendingCondition, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(inner),
+            )
+            .size(),
             ConditionTerm::Error(inner) => {
-                ArenaRef::<ErrorCondition, _>::new(self.arena, self.arena.get_offset(inner)).size()
-            }
-            ConditionTerm::TypeError(inner) => {
-                ArenaRef::<TypeErrorCondition, _>::new(self.arena, self.arena.get_offset(inner))
+                ArenaRef::<ErrorCondition, _>::new(self.arena.clone(), self.arena.get_offset(inner))
                     .size()
             }
+            ConditionTerm::TypeError(inner) => ArenaRef::<TypeErrorCondition, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(inner),
+            )
+            .size(),
             ConditionTerm::InvalidFunctionTarget(inner) => {
                 ArenaRef::<InvalidFunctionTargetCondition, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(inner),
                 )
                 .size()
             }
             ConditionTerm::InvalidFunctionArgs(inner) => {
                 ArenaRef::<InvalidFunctionArgsCondition, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(inner),
                 )
                 .size()
             }
             ConditionTerm::InvalidPointer(inner) => ArenaRef::<InvalidPointerCondition, _>::new(
-                self.arena,
+                self.arena.clone(),
                 self.arena.get_offset(inner),
             )
             .size(),
@@ -159,38 +178,41 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, ConditionTerm, A> {
     }
     fn capture_depth(&self) -> StackOffset {
         match self.as_value() {
-            ConditionTerm::Custom(inner) => {
-                ArenaRef::<CustomCondition, _>::new(self.arena, self.arena.get_offset(inner))
-                    .capture_depth()
-            }
-            ConditionTerm::Pending(inner) => {
-                ArenaRef::<PendingCondition, _>::new(self.arena, self.arena.get_offset(inner))
-                    .capture_depth()
-            }
+            ConditionTerm::Custom(inner) => ArenaRef::<CustomCondition, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(inner),
+            )
+            .capture_depth(),
+            ConditionTerm::Pending(inner) => ArenaRef::<PendingCondition, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(inner),
+            )
+            .capture_depth(),
             ConditionTerm::Error(inner) => {
-                ArenaRef::<ErrorCondition, _>::new(self.arena, self.arena.get_offset(inner))
+                ArenaRef::<ErrorCondition, _>::new(self.arena.clone(), self.arena.get_offset(inner))
                     .capture_depth()
             }
-            ConditionTerm::TypeError(inner) => {
-                ArenaRef::<TypeErrorCondition, _>::new(self.arena, self.arena.get_offset(inner))
-                    .capture_depth()
-            }
+            ConditionTerm::TypeError(inner) => ArenaRef::<TypeErrorCondition, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(inner),
+            )
+            .capture_depth(),
             ConditionTerm::InvalidFunctionTarget(inner) => {
                 ArenaRef::<InvalidFunctionTargetCondition, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(inner),
                 )
                 .capture_depth()
             }
             ConditionTerm::InvalidFunctionArgs(inner) => {
                 ArenaRef::<InvalidFunctionArgsCondition, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(inner),
                 )
                 .capture_depth()
             }
             ConditionTerm::InvalidPointer(inner) => ArenaRef::<InvalidPointerCondition, _>::new(
-                self.arena,
+                self.arena.clone(),
                 self.arena.get_offset(inner),
             )
             .capture_depth(),
@@ -198,38 +220,41 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, ConditionTerm, A> {
     }
     fn free_variables(&self) -> HashSet<StackOffset> {
         match self.as_value() {
-            ConditionTerm::Custom(inner) => {
-                ArenaRef::<CustomCondition, _>::new(self.arena, self.arena.get_offset(inner))
-                    .free_variables()
-            }
-            ConditionTerm::Pending(inner) => {
-                ArenaRef::<PendingCondition, _>::new(self.arena, self.arena.get_offset(inner))
-                    .free_variables()
-            }
+            ConditionTerm::Custom(inner) => ArenaRef::<CustomCondition, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(inner),
+            )
+            .free_variables(),
+            ConditionTerm::Pending(inner) => ArenaRef::<PendingCondition, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(inner),
+            )
+            .free_variables(),
             ConditionTerm::Error(inner) => {
-                ArenaRef::<ErrorCondition, _>::new(self.arena, self.arena.get_offset(inner))
+                ArenaRef::<ErrorCondition, _>::new(self.arena.clone(), self.arena.get_offset(inner))
                     .free_variables()
             }
-            ConditionTerm::TypeError(inner) => {
-                ArenaRef::<TypeErrorCondition, _>::new(self.arena, self.arena.get_offset(inner))
-                    .free_variables()
-            }
+            ConditionTerm::TypeError(inner) => ArenaRef::<TypeErrorCondition, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(inner),
+            )
+            .free_variables(),
             ConditionTerm::InvalidFunctionTarget(inner) => {
                 ArenaRef::<InvalidFunctionTargetCondition, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(inner),
                 )
                 .free_variables()
             }
             ConditionTerm::InvalidFunctionArgs(inner) => {
                 ArenaRef::<InvalidFunctionArgsCondition, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(inner),
                 )
                 .free_variables()
             }
             ConditionTerm::InvalidPointer(inner) => ArenaRef::<InvalidPointerCondition, _>::new(
-                self.arena,
+                self.arena.clone(),
                 self.arena.get_offset(inner),
             )
             .free_variables(),
@@ -237,38 +262,41 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, ConditionTerm, A> {
     }
     fn count_variable_usages(&self, offset: StackOffset) -> usize {
         match self.as_value() {
-            ConditionTerm::Custom(inner) => {
-                ArenaRef::<CustomCondition, _>::new(self.arena, self.arena.get_offset(inner))
-                    .count_variable_usages(offset)
-            }
-            ConditionTerm::Pending(inner) => {
-                ArenaRef::<PendingCondition, _>::new(self.arena, self.arena.get_offset(inner))
-                    .count_variable_usages(offset)
-            }
+            ConditionTerm::Custom(inner) => ArenaRef::<CustomCondition, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(inner),
+            )
+            .count_variable_usages(offset),
+            ConditionTerm::Pending(inner) => ArenaRef::<PendingCondition, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(inner),
+            )
+            .count_variable_usages(offset),
             ConditionTerm::Error(inner) => {
-                ArenaRef::<ErrorCondition, _>::new(self.arena, self.arena.get_offset(inner))
+                ArenaRef::<ErrorCondition, _>::new(self.arena.clone(), self.arena.get_offset(inner))
                     .count_variable_usages(offset)
             }
-            ConditionTerm::TypeError(inner) => {
-                ArenaRef::<TypeErrorCondition, _>::new(self.arena, self.arena.get_offset(inner))
-                    .count_variable_usages(offset)
-            }
+            ConditionTerm::TypeError(inner) => ArenaRef::<TypeErrorCondition, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(inner),
+            )
+            .count_variable_usages(offset),
             ConditionTerm::InvalidFunctionTarget(inner) => {
                 ArenaRef::<InvalidFunctionTargetCondition, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(inner),
                 )
                 .count_variable_usages(offset)
             }
             ConditionTerm::InvalidFunctionArgs(inner) => {
                 ArenaRef::<InvalidFunctionArgsCondition, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(inner),
                 )
                 .count_variable_usages(offset)
             }
             ConditionTerm::InvalidPointer(inner) => ArenaRef::<InvalidPointerCondition, _>::new(
-                self.arena,
+                self.arena.clone(),
                 self.arena.get_offset(inner),
             )
             .count_variable_usages(offset),
@@ -276,38 +304,41 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, ConditionTerm, A> {
     }
     fn dynamic_dependencies(&self, deep: bool) -> DependencyList {
         match self.as_value() {
-            ConditionTerm::Custom(inner) => {
-                ArenaRef::<CustomCondition, _>::new(self.arena, self.arena.get_offset(inner))
-                    .dynamic_dependencies(deep)
-            }
-            ConditionTerm::Pending(inner) => {
-                ArenaRef::<PendingCondition, _>::new(self.arena, self.arena.get_offset(inner))
-                    .dynamic_dependencies(deep)
-            }
+            ConditionTerm::Custom(inner) => ArenaRef::<CustomCondition, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(inner),
+            )
+            .dynamic_dependencies(deep),
+            ConditionTerm::Pending(inner) => ArenaRef::<PendingCondition, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(inner),
+            )
+            .dynamic_dependencies(deep),
             ConditionTerm::Error(inner) => {
-                ArenaRef::<ErrorCondition, _>::new(self.arena, self.arena.get_offset(inner))
+                ArenaRef::<ErrorCondition, _>::new(self.arena.clone(), self.arena.get_offset(inner))
                     .dynamic_dependencies(deep)
             }
-            ConditionTerm::TypeError(inner) => {
-                ArenaRef::<TypeErrorCondition, _>::new(self.arena, self.arena.get_offset(inner))
-                    .dynamic_dependencies(deep)
-            }
+            ConditionTerm::TypeError(inner) => ArenaRef::<TypeErrorCondition, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(inner),
+            )
+            .dynamic_dependencies(deep),
             ConditionTerm::InvalidFunctionTarget(inner) => {
                 ArenaRef::<InvalidFunctionTargetCondition, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(inner),
                 )
                 .dynamic_dependencies(deep)
             }
             ConditionTerm::InvalidFunctionArgs(inner) => {
                 ArenaRef::<InvalidFunctionArgsCondition, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(inner),
                 )
                 .dynamic_dependencies(deep)
             }
             ConditionTerm::InvalidPointer(inner) => ArenaRef::<InvalidPointerCondition, _>::new(
-                self.arena,
+                self.arena.clone(),
                 self.arena.get_offset(inner),
             )
             .dynamic_dependencies(deep),
@@ -315,38 +346,41 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, ConditionTerm, A> {
     }
     fn has_dynamic_dependencies(&self, deep: bool) -> bool {
         match self.as_value() {
-            ConditionTerm::Custom(inner) => {
-                ArenaRef::<CustomCondition, _>::new(self.arena, self.arena.get_offset(inner))
-                    .has_dynamic_dependencies(deep)
-            }
-            ConditionTerm::Pending(inner) => {
-                ArenaRef::<PendingCondition, _>::new(self.arena, self.arena.get_offset(inner))
-                    .has_dynamic_dependencies(deep)
-            }
+            ConditionTerm::Custom(inner) => ArenaRef::<CustomCondition, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(inner),
+            )
+            .has_dynamic_dependencies(deep),
+            ConditionTerm::Pending(inner) => ArenaRef::<PendingCondition, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(inner),
+            )
+            .has_dynamic_dependencies(deep),
             ConditionTerm::Error(inner) => {
-                ArenaRef::<ErrorCondition, _>::new(self.arena, self.arena.get_offset(inner))
+                ArenaRef::<ErrorCondition, _>::new(self.arena.clone(), self.arena.get_offset(inner))
                     .has_dynamic_dependencies(deep)
             }
-            ConditionTerm::TypeError(inner) => {
-                ArenaRef::<TypeErrorCondition, _>::new(self.arena, self.arena.get_offset(inner))
-                    .has_dynamic_dependencies(deep)
-            }
+            ConditionTerm::TypeError(inner) => ArenaRef::<TypeErrorCondition, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(inner),
+            )
+            .has_dynamic_dependencies(deep),
             ConditionTerm::InvalidFunctionTarget(inner) => {
                 ArenaRef::<InvalidFunctionTargetCondition, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(inner),
                 )
                 .has_dynamic_dependencies(deep)
             }
             ConditionTerm::InvalidFunctionArgs(inner) => {
                 ArenaRef::<InvalidFunctionArgsCondition, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(inner),
                 )
                 .has_dynamic_dependencies(deep)
             }
             ConditionTerm::InvalidPointer(inner) => ArenaRef::<InvalidPointerCondition, _>::new(
-                self.arena,
+                self.arena.clone(),
                 self.arena.get_offset(inner),
             )
             .has_dynamic_dependencies(deep),
@@ -354,38 +388,41 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, ConditionTerm, A> {
     }
     fn is_static(&self) -> bool {
         match self.as_value() {
-            ConditionTerm::Custom(inner) => {
-                ArenaRef::<CustomCondition, _>::new(self.arena, self.arena.get_offset(inner))
-                    .is_static()
-            }
-            ConditionTerm::Pending(inner) => {
-                ArenaRef::<PendingCondition, _>::new(self.arena, self.arena.get_offset(inner))
-                    .is_static()
-            }
+            ConditionTerm::Custom(inner) => ArenaRef::<CustomCondition, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(inner),
+            )
+            .is_static(),
+            ConditionTerm::Pending(inner) => ArenaRef::<PendingCondition, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(inner),
+            )
+            .is_static(),
             ConditionTerm::Error(inner) => {
-                ArenaRef::<ErrorCondition, _>::new(self.arena, self.arena.get_offset(inner))
+                ArenaRef::<ErrorCondition, _>::new(self.arena.clone(), self.arena.get_offset(inner))
                     .is_static()
             }
-            ConditionTerm::TypeError(inner) => {
-                ArenaRef::<TypeErrorCondition, _>::new(self.arena, self.arena.get_offset(inner))
-                    .is_static()
-            }
+            ConditionTerm::TypeError(inner) => ArenaRef::<TypeErrorCondition, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(inner),
+            )
+            .is_static(),
             ConditionTerm::InvalidFunctionTarget(inner) => {
                 ArenaRef::<InvalidFunctionTargetCondition, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(inner),
                 )
                 .is_static()
             }
             ConditionTerm::InvalidFunctionArgs(inner) => {
                 ArenaRef::<InvalidFunctionArgsCondition, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(inner),
                 )
                 .is_static()
             }
             ConditionTerm::InvalidPointer(inner) => ArenaRef::<InvalidPointerCondition, _>::new(
-                self.arena,
+                self.arena.clone(),
                 self.arena.get_offset(inner),
             )
             .is_static(),
@@ -393,38 +430,41 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, ConditionTerm, A> {
     }
     fn is_atomic(&self) -> bool {
         match self.as_value() {
-            ConditionTerm::Custom(inner) => {
-                ArenaRef::<CustomCondition, _>::new(self.arena, self.arena.get_offset(inner))
-                    .is_atomic()
-            }
-            ConditionTerm::Pending(inner) => {
-                ArenaRef::<PendingCondition, _>::new(self.arena, self.arena.get_offset(inner))
-                    .is_atomic()
-            }
+            ConditionTerm::Custom(inner) => ArenaRef::<CustomCondition, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(inner),
+            )
+            .is_atomic(),
+            ConditionTerm::Pending(inner) => ArenaRef::<PendingCondition, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(inner),
+            )
+            .is_atomic(),
             ConditionTerm::Error(inner) => {
-                ArenaRef::<ErrorCondition, _>::new(self.arena, self.arena.get_offset(inner))
+                ArenaRef::<ErrorCondition, _>::new(self.arena.clone(), self.arena.get_offset(inner))
                     .is_atomic()
             }
-            ConditionTerm::TypeError(inner) => {
-                ArenaRef::<TypeErrorCondition, _>::new(self.arena, self.arena.get_offset(inner))
-                    .is_atomic()
-            }
+            ConditionTerm::TypeError(inner) => ArenaRef::<TypeErrorCondition, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(inner),
+            )
+            .is_atomic(),
             ConditionTerm::InvalidFunctionTarget(inner) => {
                 ArenaRef::<InvalidFunctionTargetCondition, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(inner),
                 )
                 .is_atomic()
             }
             ConditionTerm::InvalidFunctionArgs(inner) => {
                 ArenaRef::<InvalidFunctionArgsCondition, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(inner),
                 )
                 .is_atomic()
             }
             ConditionTerm::InvalidPointer(inner) => ArenaRef::<InvalidPointerCondition, _>::new(
-                self.arena,
+                self.arena.clone(),
                 self.arena.get_offset(inner),
             )
             .is_atomic(),
@@ -432,38 +472,41 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, ConditionTerm, A> {
     }
     fn is_complex(&self) -> bool {
         match self.as_value() {
-            ConditionTerm::Custom(inner) => {
-                ArenaRef::<CustomCondition, _>::new(self.arena, self.arena.get_offset(inner))
-                    .is_complex()
-            }
-            ConditionTerm::Pending(inner) => {
-                ArenaRef::<PendingCondition, _>::new(self.arena, self.arena.get_offset(inner))
-                    .is_complex()
-            }
+            ConditionTerm::Custom(inner) => ArenaRef::<CustomCondition, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(inner),
+            )
+            .is_complex(),
+            ConditionTerm::Pending(inner) => ArenaRef::<PendingCondition, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(inner),
+            )
+            .is_complex(),
             ConditionTerm::Error(inner) => {
-                ArenaRef::<ErrorCondition, _>::new(self.arena, self.arena.get_offset(inner))
+                ArenaRef::<ErrorCondition, _>::new(self.arena.clone(), self.arena.get_offset(inner))
                     .is_complex()
             }
-            ConditionTerm::TypeError(inner) => {
-                ArenaRef::<TypeErrorCondition, _>::new(self.arena, self.arena.get_offset(inner))
-                    .is_complex()
-            }
+            ConditionTerm::TypeError(inner) => ArenaRef::<TypeErrorCondition, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(inner),
+            )
+            .is_complex(),
             ConditionTerm::InvalidFunctionTarget(inner) => {
                 ArenaRef::<InvalidFunctionTargetCondition, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(inner),
                 )
                 .is_complex()
             }
             ConditionTerm::InvalidFunctionArgs(inner) => {
                 ArenaRef::<InvalidFunctionArgsCondition, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(inner),
                 )
                 .is_complex()
             }
             ConditionTerm::InvalidPointer(inner) => ArenaRef::<InvalidPointerCondition, _>::new(
-                self.arena,
+                self.arena.clone(),
                 self.arena.get_offset(inner),
             )
             .is_complex(),
@@ -471,7 +514,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, ConditionTerm, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, ConditionTerm, A> {
+impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<ConditionTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -483,40 +526,52 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, ConditionTerm, 
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, ConditionTerm, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<ConditionTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         match (self.as_value(), other.as_value()) {
             (ConditionTerm::Custom(inner), ConditionTerm::Custom(other)) => {
-                ArenaRef::<CustomCondition, _>::new(self.arena, self.arena.get_offset(inner))
-                    == ArenaRef::<CustomCondition, _>::new(self.arena, self.arena.get_offset(other))
+                ArenaRef::<CustomCondition, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(inner),
+                ) == ArenaRef::<CustomCondition, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(other),
+                )
             }
             (ConditionTerm::Pending(inner), ConditionTerm::Pending(other)) => {
-                ArenaRef::<PendingCondition, _>::new(self.arena, self.arena.get_offset(inner))
-                    == ArenaRef::<PendingCondition, _>::new(
-                        self.arena,
-                        self.arena.get_offset(other),
-                    )
+                ArenaRef::<PendingCondition, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(inner),
+                ) == ArenaRef::<PendingCondition, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(other),
+                )
             }
             (ConditionTerm::Error(inner), ConditionTerm::Error(other)) => {
-                ArenaRef::<ErrorCondition, _>::new(self.arena, self.arena.get_offset(inner))
-                    == ArenaRef::<ErrorCondition, _>::new(self.arena, self.arena.get_offset(other))
-            }
-            (ConditionTerm::TypeError(inner), ConditionTerm::TypeError(other)) => {
-                ArenaRef::<TypeErrorCondition, _>::new(self.arena, self.arena.get_offset(inner))
-                    == ArenaRef::<TypeErrorCondition, _>::new(
-                        self.arena,
+                ArenaRef::<ErrorCondition, _>::new(self.arena.clone(), self.arena.get_offset(inner))
+                    == ArenaRef::<ErrorCondition, _>::new(
+                        self.arena.clone(),
                         self.arena.get_offset(other),
                     )
+            }
+            (ConditionTerm::TypeError(inner), ConditionTerm::TypeError(other)) => {
+                ArenaRef::<TypeErrorCondition, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(inner),
+                ) == ArenaRef::<TypeErrorCondition, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(other),
+                )
             }
             (
                 ConditionTerm::InvalidFunctionTarget(inner),
                 ConditionTerm::InvalidFunctionTarget(other),
             ) => {
                 ArenaRef::<InvalidFunctionTargetCondition, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(inner),
                 ) == ArenaRef::<InvalidFunctionTargetCondition, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(other),
                 )
             }
@@ -525,19 +580,19 @@ impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, ConditionTerm, A> {
                 ConditionTerm::InvalidFunctionArgs(other),
             ) => {
                 ArenaRef::<InvalidFunctionArgsCondition, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(inner),
                 ) == ArenaRef::<InvalidFunctionArgsCondition, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(other),
                 )
             }
             (ConditionTerm::InvalidPointer(inner), ConditionTerm::InvalidPointer(other)) => {
                 ArenaRef::<InvalidPointerCondition, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(inner),
                 ) == ArenaRef::<InvalidPointerCondition, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(other),
                 )
             }
@@ -545,44 +600,56 @@ impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, ConditionTerm, A> {
         }
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, ConditionTerm, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<ConditionTerm, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, ConditionTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<ConditionTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.as_value() {
             ConditionTerm::Custom(inner) => std::fmt::Display::fmt(
-                &ArenaRef::<CustomCondition, _>::new(self.arena, self.arena.get_offset(inner)),
+                &ArenaRef::<CustomCondition, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(inner),
+                ),
                 f,
             ),
             ConditionTerm::Pending(inner) => std::fmt::Display::fmt(
-                &ArenaRef::<PendingCondition, _>::new(self.arena, self.arena.get_offset(inner)),
+                &ArenaRef::<PendingCondition, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(inner),
+                ),
                 f,
             ),
             ConditionTerm::Error(inner) => std::fmt::Display::fmt(
-                &ArenaRef::<ErrorCondition, _>::new(self.arena, self.arena.get_offset(inner)),
+                &ArenaRef::<ErrorCondition, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(inner),
+                ),
                 f,
             ),
             ConditionTerm::TypeError(inner) => std::fmt::Display::fmt(
-                &ArenaRef::<TypeErrorCondition, _>::new(self.arena, self.arena.get_offset(inner)),
+                &ArenaRef::<TypeErrorCondition, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(inner),
+                ),
                 f,
             ),
             ConditionTerm::InvalidFunctionTarget(inner) => std::fmt::Display::fmt(
                 &ArenaRef::<InvalidFunctionTargetCondition, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(inner),
                 ),
                 f,
             ),
             ConditionTerm::InvalidFunctionArgs(inner) => std::fmt::Display::fmt(
                 &ArenaRef::<InvalidFunctionArgsCondition, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(inner),
                 ),
                 f,
             ),
             ConditionTerm::InvalidPointer(inner) => std::fmt::Display::fmt(
                 &ArenaRef::<InvalidPointerCondition, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(inner),
                 ),
                 f,
@@ -590,7 +657,7 @@ impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, ConditionTe
         }
     }
 }
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, ConditionTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<ConditionTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
@@ -617,14 +684,14 @@ impl TermHash for CustomCondition {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, CustomCondition, A> {
+impl<A: ArenaAllocator + Clone> ArenaRef<CustomCondition, A> {
     pub fn signal_type(&self) -> SignalType {
         let effect_type = self.effect_type();
         // FIXME: Allow arbitrary expressions as condition types
         let custom_effect_type = match effect_type.as_value().type_id() {
             TermTypeDiscriminants::String => {
                 let string_term = ArenaRef::<TypedTerm<StringTerm>, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.as_value().effect_type,
                 );
                 String::from(string_term.as_inner().as_value().as_str())
@@ -635,19 +702,19 @@ impl<'heap, A: ArenaAllocator> ArenaRef<'heap, CustomCondition, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, CustomCondition, A> {
-    pub fn effect_type(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::<Term, _>::new(self.arena, self.as_value().effect_type)
+impl<A: ArenaAllocator + Clone> ArenaRef<CustomCondition, A> {
+    pub fn effect_type(&self) -> ArenaRef<Term, A> {
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().effect_type)
     }
-    pub fn payload(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::<Term, _>::new(self.arena, self.as_value().payload)
+    pub fn payload(&self) -> ArenaRef<Term, A> {
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().payload)
     }
-    pub fn token(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::<Term, _>::new(self.arena, self.as_value().token)
+    pub fn token(&self) -> ArenaRef<Term, A> {
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().token)
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, CustomCondition, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<CustomCondition, A> {
     fn size(&self) -> usize {
         1
     }
@@ -694,22 +761,22 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, CustomCondition, A>
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, CustomCondition, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<CustomCondition, A> {
     fn eq(&self, other: &Self) -> bool {
         self.effect_type() == other.effect_type()
             && self.payload() == other.payload()
             && self.token() == other.token()
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, CustomCondition, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<CustomCondition, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, CustomCondition, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<CustomCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, CustomCondition, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<CustomCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -735,7 +802,7 @@ impl TermHash for PendingCondition {
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, PendingCondition, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<PendingCondition, A> {
     fn size(&self) -> usize {
         1
     }
@@ -765,20 +832,20 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, PendingCondition, A
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, PendingCondition, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<PendingCondition, A> {
     fn eq(&self, _other: &Self) -> bool {
         true
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, PendingCondition, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<PendingCondition, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, PendingCondition, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<PendingCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, PendingCondition, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<PendingCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Pending")
     }
@@ -800,13 +867,13 @@ impl TermHash for ErrorCondition {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, ErrorCondition, A> {
-    pub fn payload(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::<Term, _>::new(self.arena, self.as_value().payload)
+impl<A: ArenaAllocator + Clone> ArenaRef<ErrorCondition, A> {
+    pub fn payload(&self) -> ArenaRef<Term, A> {
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().payload)
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, ErrorCondition, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<ErrorCondition, A> {
     fn size(&self) -> usize {
         1
     }
@@ -844,20 +911,20 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, ErrorCondition, A> 
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, ErrorCondition, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<ErrorCondition, A> {
     fn eq(&self, other: &Self) -> bool {
         self.payload() == other.payload()
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, ErrorCondition, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<ErrorCondition, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, ErrorCondition, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<ErrorCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, ErrorCondition, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<ErrorCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Error:{}", self.payload())
     }
@@ -882,16 +949,16 @@ impl TermHash for TypeErrorCondition {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, TypeErrorCondition, A> {
+impl<A: ArenaAllocator + Clone> ArenaRef<TypeErrorCondition, A> {
     pub fn expected(&self) -> Option<TermTypeDiscriminants> {
         TermTypeDiscriminants::try_from(self.as_value().expected).ok()
     }
-    pub fn payload(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::<Term, _>::new(self.arena, self.as_value().payload)
+    pub fn payload(&self) -> ArenaRef<Term, A> {
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().payload)
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, TypeErrorCondition, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<TypeErrorCondition, A> {
     fn size(&self) -> usize {
         1
     }
@@ -929,20 +996,20 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, TypeErrorCondition,
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, TypeErrorCondition, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<TypeErrorCondition, A> {
     fn eq(&self, other: &Self) -> bool {
         self.as_value().expected == other.as_value().expected && self.payload() == other.payload()
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, TypeErrorCondition, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<TypeErrorCondition, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, TypeErrorCondition, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<TypeErrorCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, TypeErrorCondition, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<TypeErrorCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(expected) = self.expected() {
             write!(f, "TypeError:{:?}:{}", expected, self.payload())
@@ -968,13 +1035,13 @@ impl TermHash for InvalidFunctionTargetCondition {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, InvalidFunctionTargetCondition, A> {
-    pub fn target(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::<Term, _>::new(self.arena, self.as_value().target)
+impl<A: ArenaAllocator + Clone> ArenaRef<InvalidFunctionTargetCondition, A> {
+    pub fn target(&self) -> ArenaRef<Term, A> {
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().target)
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, InvalidFunctionTargetCondition, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<InvalidFunctionTargetCondition, A> {
     fn size(&self) -> usize {
         1
     }
@@ -1012,24 +1079,20 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, InvalidFunctionTarg
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, InvalidFunctionTargetCondition, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<InvalidFunctionTargetCondition, A> {
     fn eq(&self, other: &Self) -> bool {
         self.target() == other.target()
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, InvalidFunctionTargetCondition, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<InvalidFunctionTargetCondition, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug
-    for ArenaRef<'heap, InvalidFunctionTargetCondition, A>
-{
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<InvalidFunctionTargetCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display
-    for ArenaRef<'heap, InvalidFunctionTargetCondition, A>
-{
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<InvalidFunctionTargetCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "InvalidFunctionTarget:{}", self.target())
     }
@@ -1052,16 +1115,16 @@ impl TermHash for InvalidFunctionArgsCondition {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, InvalidFunctionArgsCondition, A> {
-    pub fn target(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::<Term, _>::new(self.arena, self.as_value().target)
+impl<A: ArenaAllocator + Clone> ArenaRef<InvalidFunctionArgsCondition, A> {
+    pub fn target(&self) -> ArenaRef<Term, A> {
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().target)
     }
-    pub fn args(&self) -> ArenaRef<'heap, TypedTerm<ListTerm>, A> {
-        ArenaRef::<TypedTerm<ListTerm>, _>::new(self.arena, self.as_value().args)
+    pub fn args(&self) -> ArenaRef<TypedTerm<ListTerm>, A> {
+        ArenaRef::<TypedTerm<ListTerm>, _>::new(self.arena.clone(), self.as_value().args)
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, InvalidFunctionArgsCondition, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<InvalidFunctionArgsCondition, A> {
     fn size(&self) -> usize {
         1
     }
@@ -1108,24 +1171,20 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, InvalidFunctionArgs
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, InvalidFunctionArgsCondition, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<InvalidFunctionArgsCondition, A> {
     fn eq(&self, other: &Self) -> bool {
         self.target() == other.target() && self.args() == other.args()
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, InvalidFunctionArgsCondition, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<InvalidFunctionArgsCondition, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug
-    for ArenaRef<'heap, InvalidFunctionArgsCondition, A>
-{
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<InvalidFunctionArgsCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display
-    for ArenaRef<'heap, InvalidFunctionArgsCondition, A>
-{
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<InvalidFunctionArgsCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "InvalidFunctionArgs:{}:{}", self.target(), self.args())
     }
@@ -1145,7 +1204,7 @@ impl TermHash for InvalidPointerCondition {
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, InvalidPointerCondition, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<InvalidPointerCondition, A> {
     fn size(&self) -> usize {
         1
     }
@@ -1175,20 +1234,20 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, InvalidPointerCondi
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, InvalidPointerCondition, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<InvalidPointerCondition, A> {
     fn eq(&self, _other: &Self) -> bool {
         true
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, InvalidPointerCondition, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<InvalidPointerCondition, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, InvalidPointerCondition, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<InvalidPointerCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, InvalidPointerCondition, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<InvalidPointerCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "InvalidPointer")
     }

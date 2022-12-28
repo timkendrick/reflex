@@ -32,16 +32,16 @@ impl TermHash for FilterIteratorTerm {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, FilterIteratorTerm, A> {
-    pub fn source(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::<Term, _>::new(self.arena, self.as_value().source)
+impl<A: ArenaAllocator + Clone> ArenaRef<FilterIteratorTerm, A> {
+    pub fn source(&self) -> ArenaRef<Term, A> {
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().source)
     }
-    pub fn predicate(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::<Term, _>::new(self.arena, self.as_value().predicate)
+    pub fn predicate(&self) -> ArenaRef<Term, A> {
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().predicate)
     }
 }
 
-impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, FilterIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<FilterIteratorTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -53,26 +53,26 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, FilterIteratorT
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, FilterIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<FilterIteratorTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.source() == other.source() && other.predicate() == other.predicate()
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, FilterIteratorTerm, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<FilterIteratorTerm, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, FilterIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<FilterIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, FilterIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<FilterIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "FilterIterator")
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, FilterIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<FilterIteratorTerm, A> {
     fn size(&self) -> usize {
         1 + self.source().size() + self.predicate().size()
     }

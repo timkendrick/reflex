@@ -1,7 +1,11 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use std::{cell::RefCell, ops::Deref, rc::Rc};
+use std::{
+    cell::RefCell,
+    ops::{Deref, DerefMut},
+    rc::Rc,
+};
 
 use reflex::{
     core::{
@@ -23,12 +27,45 @@ use crate::{
     ArenaRef, Term, TermPointer,
 };
 
-#[derive(Clone, Debug)]
-struct ArenaFactory<'heap, A: ArenaAllocator> {
-    arena: Rc<RefCell<&'heap mut A>>,
+#[derive(Debug)]
+struct ArenaFactory<A: ArenaAllocator> {
+    arena: Rc<RefCell<A>>,
+}
+impl<A: ArenaAllocator> Clone for ArenaFactory<A> {
+    fn clone(&self) -> Self {
+        Self {
+            arena: Rc::clone(&self.arena),
+        }
+    }
+}
+impl<'heap, A: ArenaAllocator> ArenaAllocator for &'heap mut A {
+    fn len(&self) -> usize {
+        self.deref().len()
+    }
+    fn allocate<T: TermSize>(&mut self, value: T) -> TermPointer {
+        self.deref_mut().allocate(value)
+    }
+    fn get<T>(&self, offset: TermPointer) -> &T {
+        self.deref().get(offset)
+    }
+    fn get_mut<T>(&mut self, offset: TermPointer) -> &mut T {
+        self.deref_mut().get_mut(offset)
+    }
+    fn get_offset<T>(&self, value: &T) -> TermPointer {
+        self.deref().get_offset(value)
+    }
+    fn slice<T: Sized>(&self, offset: TermPointer, count: usize) -> &[T] {
+        self.deref().slice(offset, count)
+    }
+    fn extend(&mut self, offset: TermPointer, size: usize) {
+        self.deref_mut().extend(offset, size)
+    }
+    fn shrink(&mut self, offset: TermPointer, size: usize) {
+        self.deref_mut().shrink(offset, size)
+    }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaAllocator for Rc<RefCell<&'heap mut A>> {
+impl<A: ArenaAllocator> ArenaAllocator for Rc<RefCell<A>> {
     fn len(&self) -> usize {
         self.deref().borrow().len()
     }
@@ -55,7 +92,7 @@ impl<'heap, A: ArenaAllocator> ArenaAllocator for Rc<RefCell<&'heap mut A>> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaAllocator for ArenaFactory<'heap, A> {
+impl<A: ArenaAllocator> ArenaAllocator for ArenaFactory<A> {
     fn len(&self) -> usize {
         self.arena.borrow().len()
     }
@@ -82,189 +119,184 @@ impl<'heap, A: ArenaAllocator> ArenaAllocator for ArenaFactory<'heap, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ExpressionFactory<ArenaRef<'heap, Term, Self>>
-    for ArenaFactory<'heap, A>
-{
-    fn create_nil_term(&self) -> ArenaRef<'heap, Term, Self> {
-        let term = Term::new(TermType::Nil(NilTerm), &**self.arena.borrow());
+impl<A: ArenaAllocator + Clone> ExpressionFactory<ArenaRef<Term, Self>> for ArenaFactory<A> {
+    fn create_nil_term(&self) -> ArenaRef<Term, Self> {
+        let term = Term::new(TermType::Nil(NilTerm), &*self.arena.borrow());
         let pointer = self.arena.borrow_mut().allocate(term);
-        ArenaRef::<'heap, Term, Self>::new(self, pointer)
+        ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
-    fn create_boolean_term(&self, value: bool) -> ArenaRef<'heap, Term, Self> {
+    fn create_boolean_term(&self, value: bool) -> ArenaRef<Term, Self> {
         let term = Term::new(
             TermType::Boolean(BooleanTerm::from(value)),
-            &**self.arena.borrow(),
+            &*self.arena.borrow(),
         );
         let pointer = self.arena.borrow_mut().allocate(term);
-        ArenaRef::<'heap, Term, Self>::new(self, pointer)
+        ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
-    fn create_int_term(&self, value: IntValue) -> ArenaRef<'heap, Term, Self> {
-        let term = Term::new(TermType::Int(IntTerm { value }), &**self.arena.borrow());
+    fn create_int_term(&self, value: IntValue) -> ArenaRef<Term, Self> {
+        let term = Term::new(TermType::Int(IntTerm { value }), &*self.arena.borrow());
         let pointer = self.arena.borrow_mut().allocate(term);
-        ArenaRef::<'heap, Term, Self>::new(self, pointer)
+        ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
-    fn create_float_term(&self, value: FloatValue) -> ArenaRef<'heap, Term, Self> {
+    fn create_float_term(&self, value: FloatValue) -> ArenaRef<Term, Self> {
         let term = Term::new(
             TermType::Float(FloatTerm::from(value)),
-            &**self.arena.borrow(),
+            &*self.arena.borrow(),
         );
         let pointer = self.arena.borrow_mut().allocate(term);
-        ArenaRef::<'heap, Term, Self>::new(self, pointer)
+        ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
     fn create_string_term(
         &self,
-        value: <ArenaRef<'heap, Term, Self> as Expression>::String,
-    ) -> ArenaRef<'heap, Term, Self> {
+        value: <ArenaRef<Term, Self> as Expression>::String,
+    ) -> ArenaRef<Term, Self> {
         debug_assert!(std::ptr::eq(
-            &**value.arena.arena.borrow(),
-            &**self.arena.borrow()
+            &*value.arena.arena.borrow(),
+            &*self.arena.borrow()
         ));
-        *value.as_term()
+        value.as_term().clone()
     }
 
-    fn create_symbol_term(&self, value: SymbolId) -> ArenaRef<'heap, Term, Self> {
+    fn create_symbol_term(&self, value: SymbolId) -> ArenaRef<Term, Self> {
         let term = Term::new(
             TermType::Symbol(SymbolTerm {
                 // TODO: Change SymbolId type to u32
                 id: (value & 0x00000000FFFFFFFF) as u32,
             }),
-            &**self.arena.borrow(),
+            &*self.arena.borrow(),
         );
         let pointer = self.arena.borrow_mut().allocate(term);
-        ArenaRef::<'heap, Term, Self>::new(self, pointer)
+        ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
-    fn create_variable_term(&self, offset: StackOffset) -> ArenaRef<'heap, Term, Self> {
+    fn create_variable_term(&self, offset: StackOffset) -> ArenaRef<Term, Self> {
         let term = Term::new(
             TermType::Variable(VariableTerm {
                 stack_offset: offset as u32,
             }),
-            &**self.arena.borrow(),
+            &*self.arena.borrow(),
         );
         let pointer = self.arena.borrow_mut().allocate(term);
-        ArenaRef::<'heap, Term, Self>::new(self, pointer)
+        ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
     fn create_effect_term(
         &self,
-        condition: <ArenaRef<'heap, Term, Self> as Expression>::Signal,
-    ) -> ArenaRef<'heap, Term, Self> {
+        condition: <ArenaRef<Term, Self> as Expression>::Signal,
+    ) -> ArenaRef<Term, Self> {
         debug_assert!(std::ptr::eq(
-            &**condition.arena.arena.borrow(),
-            &**self.arena.borrow()
+            &*condition.arena.arena.borrow(),
+            &*self.arena.borrow()
         ));
         let term = Term::new(
             TermType::Effect(EffectTerm {
                 condition: condition.as_pointer(),
             }),
-            &**self.arena.borrow(),
+            &*self.arena.borrow(),
         );
         let pointer = self.arena.borrow_mut().allocate(term);
-        ArenaRef::<'heap, Term, Self>::new(self, pointer)
+        ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
     fn create_let_term(
         &self,
-        initializer: ArenaRef<'heap, Term, Self>,
-        body: ArenaRef<'heap, Term, Self>,
-    ) -> ArenaRef<'heap, Term, Self> {
+        initializer: ArenaRef<Term, Self>,
+        body: ArenaRef<Term, Self>,
+    ) -> ArenaRef<Term, Self> {
         debug_assert!(
-            std::ptr::eq(&**initializer.arena.arena.borrow(), &**self.arena.borrow())
-                && std::ptr::eq(&**body.arena.arena.borrow(), &**self.arena.borrow())
+            std::ptr::eq(&*initializer.arena.arena.borrow(), &*self.arena.borrow())
+                && std::ptr::eq(&*body.arena.arena.borrow(), &*self.arena.borrow())
         );
         let term = Term::new(
             TermType::Let(LetTerm {
                 initializer: initializer.as_pointer(),
                 body: body.as_pointer(),
             }),
-            &**self.arena.borrow(),
+            &*self.arena.borrow(),
         );
         let pointer = self.arena.borrow_mut().allocate(term);
-        ArenaRef::<'heap, Term, Self>::new(self, pointer)
+        ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
     fn create_lambda_term(
         &self,
         num_args: StackOffset,
-        body: ArenaRef<'heap, Term, Self>,
-    ) -> ArenaRef<'heap, Term, Self> {
+        body: ArenaRef<Term, Self>,
+    ) -> ArenaRef<Term, Self> {
         debug_assert!(std::ptr::eq(
-            &**body.arena.arena.borrow(),
-            &**self.arena.borrow()
+            &*body.arena.arena.borrow(),
+            &*self.arena.borrow()
         ));
         let term = Term::new(
             TermType::Lambda(LambdaTerm {
                 num_args: num_args as u32,
                 body: body.as_pointer(),
             }),
-            &**self.arena.borrow(),
+            &*self.arena.borrow(),
         );
         let pointer = self.arena.borrow_mut().allocate(term);
-        ArenaRef::<'heap, Term, Self>::new(self, pointer)
+        ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
     fn create_application_term(
         &self,
-        target: ArenaRef<'heap, Term, Self>,
-        args: <ArenaRef<'heap, Term, Self> as Expression>::ExpressionList,
-    ) -> ArenaRef<'heap, Term, Self> {
+        target: ArenaRef<Term, Self>,
+        args: <ArenaRef<Term, Self> as Expression>::ExpressionList,
+    ) -> ArenaRef<Term, Self> {
         debug_assert!(
-            std::ptr::eq(&**target.arena.arena.borrow(), &**self.arena.borrow())
-                && std::ptr::eq(&**args.arena.arena.borrow(), &**self.arena.borrow())
+            std::ptr::eq(&*target.arena.arena.borrow(), &*self.arena.borrow())
+                && std::ptr::eq(&*args.arena.arena.borrow(), &*self.arena.borrow())
         );
         let term = Term::new(
             TermType::Application(ApplicationTerm {
                 target: target.as_pointer(),
                 args: args.as_pointer(),
             }),
-            &**self.arena.borrow(),
+            &*self.arena.borrow(),
         );
         let pointer = self.arena.borrow_mut().allocate(term);
-        ArenaRef::<'heap, Term, Self>::new(self, pointer)
+        ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
     fn create_partial_application_term(
         &self,
-        target: ArenaRef<'heap, Term, Self>,
-        args: <ArenaRef<'heap, Term, Self> as Expression>::ExpressionList,
-    ) -> ArenaRef<'heap, Term, Self> {
+        target: ArenaRef<Term, Self>,
+        args: <ArenaRef<Term, Self> as Expression>::ExpressionList,
+    ) -> ArenaRef<Term, Self> {
         debug_assert!(
-            std::ptr::eq(&**target.arena.arena.borrow(), &**self.arena.borrow())
-                && std::ptr::eq(&**args.arena.arena.borrow(), &**self.arena.borrow())
+            std::ptr::eq(&*target.arena.arena.borrow(), &*self.arena.borrow())
+                && std::ptr::eq(&*args.arena.arena.borrow(), &*self.arena.borrow())
         );
         let term = Term::new(
             TermType::Partial(PartialTerm {
                 target: target.as_pointer(),
                 args: args.as_pointer(),
             }),
-            &**self.arena.borrow(),
+            &*self.arena.borrow(),
         );
         let pointer = self.arena.borrow_mut().allocate(term);
-        ArenaRef::<'heap, Term, Self>::new(self, pointer)
+        ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
-    fn create_recursive_term(
-        &self,
-        factory: ArenaRef<'heap, Term, Self>,
-    ) -> ArenaRef<'heap, Term, Self> {
+    fn create_recursive_term(&self, factory: ArenaRef<Term, Self>) -> ArenaRef<Term, Self> {
         debug_assert!(std::ptr::eq(
-            &**factory.arena.arena.borrow(),
-            &**self.arena.borrow()
+            &*factory.arena.arena.borrow(),
+            &*self.arena.borrow()
         ));
         // TODO: support recursive WASM terms
         let error_message = StringTerm::allocate(
             "Recursive terms not currently supported",
-            &mut **self.arena.borrow_mut(),
+            &mut *self.arena.borrow_mut(),
         );
         let condition_term = Term::new(
             TermType::Condition(ConditionTerm::Error(ErrorCondition {
                 payload: error_message,
             })),
-            &**self.arena.borrow(),
+            &*self.arena.borrow(),
         );
         let condition_pointer = self.arena.borrow_mut().allocate(condition_term);
         let signal_list_term = Term::new(
@@ -273,24 +305,25 @@ impl<'heap, A: ArenaAllocator> ExpressionFactory<ArenaRef<'heap, Term, Self>>
                 right: TermPointer::null(),
                 length: 1,
             }),
-            &**self.arena.borrow(),
+            &*self.arena.borrow(),
         );
         let signal_list_pointer = self.arena.borrow_mut().allocate(signal_list_term);
-        let signal_list = ArenaRef::<TypedTerm<TreeTerm>, _>::new(self, signal_list_pointer);
+        let signal_list =
+            ArenaRef::<TypedTerm<TreeTerm>, _>::new(self.clone(), signal_list_pointer);
         self.create_signal_term(signal_list)
     }
 
     fn create_builtin_term(
         &self,
-        target: impl Into<<ArenaRef<'heap, Term, Self> as Expression>::Builtin>,
-    ) -> ArenaRef<'heap, Term, Self> {
+        target: impl Into<<ArenaRef<Term, Self> as Expression>::Builtin>,
+    ) -> ArenaRef<Term, Self> {
         let target = target.into();
         let term = Term::new(
             TermType::Builtin(BuiltinTerm::from(target)),
-            &**self.arena.borrow(),
+            &*self.arena.borrow(),
         );
         let pointer = self.arena.borrow_mut().allocate(term);
-        ArenaRef::<'heap, Term, Self>::new(self, pointer)
+        ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
     fn create_compiled_function_term(
@@ -299,123 +332,121 @@ impl<'heap, A: ArenaAllocator> ExpressionFactory<ArenaRef<'heap, Term, Self>>
         _hash: HashId,
         required_args: StackOffset,
         optional_args: StackOffset,
-    ) -> ArenaRef<'heap, Term, Self> {
+    ) -> ArenaRef<Term, Self> {
         let term = Term::new(
             TermType::Compiled(CompiledTerm {
                 target: CompiledFunctionIndex::from(address.get() as u32),
                 num_args: (required_args + optional_args) as u32,
             }),
-            &**self.arena.borrow(),
+            &*self.arena.borrow(),
         );
         let pointer = self.arena.borrow_mut().allocate(term);
-        ArenaRef::<'heap, Term, Self>::new(self, pointer)
+        ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
     fn create_record_term(
         &self,
-        prototype: <ArenaRef<'heap, Term, Self> as Expression>::StructPrototype,
-        fields: <ArenaRef<'heap, Term, Self> as Expression>::ExpressionList,
-    ) -> ArenaRef<'heap, Term, Self> {
+        prototype: <ArenaRef<Term, Self> as Expression>::StructPrototype,
+        fields: <ArenaRef<Term, Self> as Expression>::ExpressionList,
+    ) -> ArenaRef<Term, Self> {
         debug_assert!(
-            std::ptr::eq(&**prototype.arena.arena.borrow(), &**self.arena.borrow())
-                && std::ptr::eq(&**fields.arena.arena.borrow(), &**self.arena.borrow())
+            std::ptr::eq(&*prototype.arena.arena.borrow(), &*self.arena.borrow())
+                && std::ptr::eq(&*fields.arena.arena.borrow(), &*self.arena.borrow())
         );
         let term = Term::new(
             TermType::Record(RecordTerm {
                 keys: prototype.as_pointer(),
                 values: fields.as_pointer(),
             }),
-            &**self.arena.borrow(),
+            &*self.arena.borrow(),
         );
         let pointer = self.arena.borrow_mut().allocate(term);
-        ArenaRef::<'heap, Term, Self>::new(self, pointer)
+        ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
     fn create_constructor_term(
         &self,
-        prototype: <ArenaRef<'heap, Term, Self> as Expression>::StructPrototype,
-    ) -> ArenaRef<'heap, Term, Self> {
+        prototype: <ArenaRef<Term, Self> as Expression>::StructPrototype,
+    ) -> ArenaRef<Term, Self> {
         debug_assert!(std::ptr::eq(
-            &**prototype.arena.arena.borrow(),
-            &**self.arena.borrow()
+            &*prototype.arena.arena.borrow(),
+            &*self.arena.borrow()
         ));
         let term = Term::new(
             TermType::Constructor(ConstructorTerm {
                 keys: prototype.as_pointer(),
             }),
-            &**self.arena.borrow(),
+            &*self.arena.borrow(),
         );
         let pointer = self.arena.borrow_mut().allocate(term);
-        ArenaRef::<'heap, Term, Self>::new(self, pointer)
+        ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
     fn create_list_term(
         &self,
-        items: <ArenaRef<'heap, Term, Self> as Expression>::ExpressionList,
-    ) -> ArenaRef<'heap, Term, Self> {
+        items: <ArenaRef<Term, Self> as Expression>::ExpressionList,
+    ) -> ArenaRef<Term, Self> {
         debug_assert!(std::ptr::eq(
-            &**items.arena.arena.borrow(),
-            &**self.arena.borrow()
+            &*items.arena.arena.borrow(),
+            &*self.arena.borrow()
         ));
-        *items.as_term()
+        items.as_term().clone()
     }
 
     fn create_hashmap_term(
         &self,
         entries: impl IntoIterator<
-            Item = (ArenaRef<'heap, Term, Self>, ArenaRef<'heap, Term, Self>),
-            IntoIter = impl ExactSizeIterator<
-                Item = (ArenaRef<'heap, Term, Self>, ArenaRef<'heap, Term, Self>),
-            >,
+            Item = (ArenaRef<Term, Self>, ArenaRef<Term, Self>),
+            IntoIter = impl ExactSizeIterator<Item = (ArenaRef<Term, Self>, ArenaRef<Term, Self>)>,
         >,
-    ) -> ArenaRef<'heap, Term, Self> {
+    ) -> ArenaRef<Term, Self> {
         let pointer = HashmapTerm::allocate(
             entries
                 .into_iter()
                 .map(|(key, value)| (key.as_pointer(), value.as_pointer())),
-            &mut **self.arena.borrow_mut(),
+            &mut *self.arena.borrow_mut(),
         );
-        ArenaRef::<'heap, Term, Self>::new(self, pointer)
+        ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
     fn create_hashset_term(
         &self,
         values: impl IntoIterator<
-            Item = ArenaRef<'heap, Term, Self>,
-            IntoIter = impl ExactSizeIterator<Item = ArenaRef<'heap, Term, Self>>,
+            Item = ArenaRef<Term, Self>,
+            IntoIter = impl ExactSizeIterator<Item = ArenaRef<Term, Self>>,
         >,
-    ) -> ArenaRef<'heap, Term, Self> {
+    ) -> ArenaRef<Term, Self> {
         let nil = self.create_nil_term();
         let entries = self
-            .create_hashmap_term(values.into_iter().map(|value| (value, nil)))
+            .create_hashmap_term(values.into_iter().map(|value| (value, nil.clone())))
             .as_pointer();
         let term = HashsetTerm { entries };
         let pointer = self.arena.borrow_mut().allocate(term);
-        ArenaRef::<'heap, Term, Self>::new(self, pointer)
+        ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
     fn create_signal_term(
         &self,
-        signals: <ArenaRef<'heap, Term, Self> as Expression>::SignalList,
-    ) -> ArenaRef<'heap, Term, Self> {
+        signals: <ArenaRef<Term, Self> as Expression>::SignalList,
+    ) -> ArenaRef<Term, Self> {
         debug_assert!(std::ptr::eq(
-            &**signals.arena.arena.borrow(),
-            &**self.arena.borrow()
+            &*signals.arena.arena.borrow(),
+            &*self.arena.borrow()
         ));
         let term = Term::new(
             TermType::Signal(SignalTerm {
                 conditions: signals.as_pointer(),
             }),
-            &**self.arena.borrow(),
+            &*self.arena.borrow(),
         );
         let pointer = self.arena.borrow_mut().allocate(term);
-        ArenaRef::<'heap, Term, Self>::new(self, pointer)
+        ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
     fn match_nil_term<'a>(
         &self,
-        expression: &'a ArenaRef<'heap, Term, Self>,
-    ) -> Option<&'a <ArenaRef<'heap, Term, Self> as Expression>::NilTerm> {
+        expression: &'a ArenaRef<Term, Self>,
+    ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::NilTerm> {
         match &expression.as_value().value {
             TermType::Nil(_) => Some(expression.as_type::<NilTerm>()),
             _ => None,
@@ -424,8 +455,8 @@ impl<'heap, A: ArenaAllocator> ExpressionFactory<ArenaRef<'heap, Term, Self>>
 
     fn match_boolean_term<'a>(
         &self,
-        expression: &'a ArenaRef<'heap, Term, Self>,
-    ) -> Option<&'a <ArenaRef<'heap, Term, Self> as Expression>::BooleanTerm> {
+        expression: &'a ArenaRef<Term, Self>,
+    ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::BooleanTerm> {
         match &expression.as_value().value {
             TermType::Boolean(_) => Some(expression.as_type::<BooleanTerm>()),
             _ => None,
@@ -434,8 +465,8 @@ impl<'heap, A: ArenaAllocator> ExpressionFactory<ArenaRef<'heap, Term, Self>>
 
     fn match_int_term<'a>(
         &self,
-        expression: &'a ArenaRef<'heap, Term, Self>,
-    ) -> Option<&'a <ArenaRef<'heap, Term, Self> as Expression>::IntTerm> {
+        expression: &'a ArenaRef<Term, Self>,
+    ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::IntTerm> {
         match &expression.as_value().value {
             TermType::Int(_) => Some(expression.as_type::<IntTerm>()),
             _ => None,
@@ -444,8 +475,8 @@ impl<'heap, A: ArenaAllocator> ExpressionFactory<ArenaRef<'heap, Term, Self>>
 
     fn match_float_term<'a>(
         &self,
-        expression: &'a ArenaRef<'heap, Term, Self>,
-    ) -> Option<&'a <ArenaRef<'heap, Term, Self> as Expression>::FloatTerm> {
+        expression: &'a ArenaRef<Term, Self>,
+    ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::FloatTerm> {
         match &expression.as_value().value {
             TermType::Float(_) => Some(expression.as_type::<FloatTerm>()),
             _ => None,
@@ -454,8 +485,8 @@ impl<'heap, A: ArenaAllocator> ExpressionFactory<ArenaRef<'heap, Term, Self>>
 
     fn match_string_term<'a>(
         &self,
-        expression: &'a ArenaRef<'heap, Term, Self>,
-    ) -> Option<&'a <ArenaRef<'heap, Term, Self> as Expression>::StringTerm> {
+        expression: &'a ArenaRef<Term, Self>,
+    ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::StringTerm> {
         match &expression.as_value().value {
             TermType::String(_) => Some(expression.as_type::<StringTerm>()),
             _ => None,
@@ -464,8 +495,8 @@ impl<'heap, A: ArenaAllocator> ExpressionFactory<ArenaRef<'heap, Term, Self>>
 
     fn match_symbol_term<'a>(
         &self,
-        expression: &'a ArenaRef<'heap, Term, Self>,
-    ) -> Option<&'a <ArenaRef<'heap, Term, Self> as Expression>::SymbolTerm> {
+        expression: &'a ArenaRef<Term, Self>,
+    ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::SymbolTerm> {
         match &expression.as_value().value {
             TermType::Symbol(_) => Some(expression.as_type::<SymbolTerm>()),
             _ => None,
@@ -474,8 +505,8 @@ impl<'heap, A: ArenaAllocator> ExpressionFactory<ArenaRef<'heap, Term, Self>>
 
     fn match_variable_term<'a>(
         &self,
-        expression: &'a ArenaRef<'heap, Term, Self>,
-    ) -> Option<&'a <ArenaRef<'heap, Term, Self> as Expression>::VariableTerm> {
+        expression: &'a ArenaRef<Term, Self>,
+    ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::VariableTerm> {
         match &expression.as_value().value {
             TermType::Variable(_) => Some(expression.as_type::<VariableTerm>()),
             _ => None,
@@ -484,8 +515,8 @@ impl<'heap, A: ArenaAllocator> ExpressionFactory<ArenaRef<'heap, Term, Self>>
 
     fn match_effect_term<'a>(
         &self,
-        expression: &'a ArenaRef<'heap, Term, Self>,
-    ) -> Option<&'a <ArenaRef<'heap, Term, Self> as Expression>::EffectTerm> {
+        expression: &'a ArenaRef<Term, Self>,
+    ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::EffectTerm> {
         match &expression.as_value().value {
             TermType::Effect(_) => Some(expression.as_type::<EffectTerm>()),
             _ => None,
@@ -494,8 +525,8 @@ impl<'heap, A: ArenaAllocator> ExpressionFactory<ArenaRef<'heap, Term, Self>>
 
     fn match_let_term<'a>(
         &self,
-        expression: &'a ArenaRef<'heap, Term, Self>,
-    ) -> Option<&'a <ArenaRef<'heap, Term, Self> as Expression>::LetTerm> {
+        expression: &'a ArenaRef<Term, Self>,
+    ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::LetTerm> {
         match &expression.as_value().value {
             TermType::Let(_) => Some(expression.as_type::<LetTerm>()),
             _ => None,
@@ -504,8 +535,8 @@ impl<'heap, A: ArenaAllocator> ExpressionFactory<ArenaRef<'heap, Term, Self>>
 
     fn match_lambda_term<'a>(
         &self,
-        expression: &'a ArenaRef<'heap, Term, Self>,
-    ) -> Option<&'a <ArenaRef<'heap, Term, Self> as Expression>::LambdaTerm> {
+        expression: &'a ArenaRef<Term, Self>,
+    ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::LambdaTerm> {
         match &expression.as_value().value {
             TermType::Lambda(_) => Some(expression.as_type::<LambdaTerm>()),
             _ => None,
@@ -514,8 +545,8 @@ impl<'heap, A: ArenaAllocator> ExpressionFactory<ArenaRef<'heap, Term, Self>>
 
     fn match_application_term<'a>(
         &self,
-        expression: &'a ArenaRef<'heap, Term, Self>,
-    ) -> Option<&'a <ArenaRef<'heap, Term, Self> as Expression>::ApplicationTerm> {
+        expression: &'a ArenaRef<Term, Self>,
+    ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::ApplicationTerm> {
         match &expression.as_value().value {
             TermType::Application(_) => Some(expression.as_type::<ApplicationTerm>()),
             _ => None,
@@ -524,8 +555,8 @@ impl<'heap, A: ArenaAllocator> ExpressionFactory<ArenaRef<'heap, Term, Self>>
 
     fn match_partial_application_term<'a>(
         &self,
-        expression: &'a ArenaRef<'heap, Term, Self>,
-    ) -> Option<&'a <ArenaRef<'heap, Term, Self> as Expression>::PartialApplicationTerm> {
+        expression: &'a ArenaRef<Term, Self>,
+    ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::PartialApplicationTerm> {
         match &expression.as_value().value {
             TermType::Partial(_) => Some(expression.as_type::<PartialTerm>()),
             _ => None,
@@ -534,8 +565,8 @@ impl<'heap, A: ArenaAllocator> ExpressionFactory<ArenaRef<'heap, Term, Self>>
 
     fn match_recursive_term<'a>(
         &self,
-        expression: &'a ArenaRef<'heap, Term, Self>,
-    ) -> Option<&'a <ArenaRef<'heap, Term, Self> as Expression>::RecursiveTerm> {
+        expression: &'a ArenaRef<Term, Self>,
+    ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::RecursiveTerm> {
         match &expression.as_value().value {
             // TODO: Implement WASM recursive term
             _ => None,
@@ -544,8 +575,8 @@ impl<'heap, A: ArenaAllocator> ExpressionFactory<ArenaRef<'heap, Term, Self>>
 
     fn match_builtin_term<'a>(
         &self,
-        expression: &'a ArenaRef<'heap, Term, Self>,
-    ) -> Option<&'a <ArenaRef<'heap, Term, Self> as Expression>::BuiltinTerm> {
+        expression: &'a ArenaRef<Term, Self>,
+    ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::BuiltinTerm> {
         match &expression.as_value().value {
             TermType::Builtin(_) => Some(expression.as_type::<BuiltinTerm>()),
             _ => None,
@@ -554,8 +585,8 @@ impl<'heap, A: ArenaAllocator> ExpressionFactory<ArenaRef<'heap, Term, Self>>
 
     fn match_compiled_function_term<'a>(
         &self,
-        expression: &'a ArenaRef<'heap, Term, Self>,
-    ) -> Option<&'a <ArenaRef<'heap, Term, Self> as Expression>::CompiledFunctionTerm> {
+        expression: &'a ArenaRef<Term, Self>,
+    ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::CompiledFunctionTerm> {
         match &expression.as_value().value {
             TermType::Compiled(_) => Some(expression.as_type::<CompiledTerm>()),
             _ => None,
@@ -564,8 +595,8 @@ impl<'heap, A: ArenaAllocator> ExpressionFactory<ArenaRef<'heap, Term, Self>>
 
     fn match_record_term<'a>(
         &self,
-        expression: &'a ArenaRef<'heap, Term, Self>,
-    ) -> Option<&'a <ArenaRef<'heap, Term, Self> as Expression>::RecordTerm> {
+        expression: &'a ArenaRef<Term, Self>,
+    ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::RecordTerm> {
         match &expression.as_value().value {
             TermType::Record(_) => Some(expression.as_type::<RecordTerm>()),
             _ => None,
@@ -574,8 +605,8 @@ impl<'heap, A: ArenaAllocator> ExpressionFactory<ArenaRef<'heap, Term, Self>>
 
     fn match_constructor_term<'a>(
         &self,
-        expression: &'a ArenaRef<'heap, Term, Self>,
-    ) -> Option<&'a <ArenaRef<'heap, Term, Self> as Expression>::ConstructorTerm> {
+        expression: &'a ArenaRef<Term, Self>,
+    ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::ConstructorTerm> {
         match &expression.as_value().value {
             TermType::Constructor(_) => Some(expression.as_type::<ConstructorTerm>()),
             _ => None,
@@ -584,8 +615,8 @@ impl<'heap, A: ArenaAllocator> ExpressionFactory<ArenaRef<'heap, Term, Self>>
 
     fn match_list_term<'a>(
         &self,
-        expression: &'a ArenaRef<'heap, Term, Self>,
-    ) -> Option<&'a <ArenaRef<'heap, Term, Self> as Expression>::ListTerm> {
+        expression: &'a ArenaRef<Term, Self>,
+    ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::ListTerm> {
         match &expression.as_value().value {
             TermType::List(_) => Some(expression.as_type::<ListTerm>()),
             _ => None,
@@ -594,8 +625,8 @@ impl<'heap, A: ArenaAllocator> ExpressionFactory<ArenaRef<'heap, Term, Self>>
 
     fn match_hashmap_term<'a>(
         &self,
-        expression: &'a ArenaRef<'heap, Term, Self>,
-    ) -> Option<&'a <ArenaRef<'heap, Term, Self> as Expression>::HashmapTerm> {
+        expression: &'a ArenaRef<Term, Self>,
+    ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::HashmapTerm> {
         match &expression.as_value().value {
             TermType::Hashmap(_) => Some(expression.as_type::<HashmapTerm>()),
             _ => None,
@@ -604,8 +635,8 @@ impl<'heap, A: ArenaAllocator> ExpressionFactory<ArenaRef<'heap, Term, Self>>
 
     fn match_hashset_term<'a>(
         &self,
-        expression: &'a ArenaRef<'heap, Term, Self>,
-    ) -> Option<&'a <ArenaRef<'heap, Term, Self> as Expression>::HashsetTerm> {
+        expression: &'a ArenaRef<Term, Self>,
+    ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::HashsetTerm> {
         match &expression.as_value().value {
             TermType::Hashset(_) => Some(expression.as_type::<HashsetTerm>()),
             _ => None,
@@ -614,8 +645,8 @@ impl<'heap, A: ArenaAllocator> ExpressionFactory<ArenaRef<'heap, Term, Self>>
 
     fn match_signal_term<'a>(
         &self,
-        expression: &'a ArenaRef<'heap, Term, Self>,
-    ) -> Option<&'a <ArenaRef<'heap, Term, Self> as Expression>::SignalTerm> {
+        expression: &'a ArenaRef<Term, Self>,
+    ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::SignalTerm> {
         match &expression.as_value().value {
             TermType::Signal(_) => Some(expression.as_type::<SignalTerm>()),
             _ => None,

@@ -68,25 +68,25 @@ fn chunks_to_f64(value: [u32; 2]) -> f64 {
     ])
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, FloatTerm, A> {
+impl<A: ArenaAllocator + Clone> ArenaRef<FloatTerm, A> {
     pub fn value(&self) -> f64 {
         chunks_to_f64(self.as_value().value)
     }
 }
 
-impl<'heap, A: ArenaAllocator> FloatTermType for ArenaRef<'heap, FloatTerm, A> {
+impl<A: ArenaAllocator + Clone> FloatTermType for ArenaRef<FloatTerm, A> {
     fn value(&self) -> FloatValue {
         self.value()
     }
 }
 
-impl<'heap, A: ArenaAllocator> FloatTermType for ArenaRef<'heap, TypedTerm<FloatTerm>, A> {
+impl<A: ArenaAllocator + Clone> FloatTermType for ArenaRef<TypedTerm<FloatTerm>, A> {
     fn value(&self) -> FloatValue {
-        <ArenaRef<'heap, FloatTerm, A> as FloatTermType>::value(&self.as_inner())
+        <ArenaRef<FloatTerm, A> as FloatTermType>::value(&self.as_inner())
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, FloatTerm, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<FloatTerm, A> {
     fn size(&self) -> usize {
         1
     }
@@ -116,7 +116,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, FloatTerm, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, FloatTerm, A> {
+impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<FloatTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         match serde_json::Number::from_f64(self.value()) {
             Some(number) => Ok(JsonValue::Number(number)),
@@ -135,20 +135,20 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, FloatTerm, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, FloatTerm, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<FloatTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.value() == other.value()
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, FloatTerm, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<FloatTerm, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, FloatTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<FloatTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, FloatTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<FloatTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.value())
     }

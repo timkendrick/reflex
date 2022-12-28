@@ -120,73 +120,74 @@ impl TermHash for HashmapBucket {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, HashmapTerm, A> {
+impl<A: ArenaAllocator + Clone> ArenaRef<HashmapTerm, A> {
     pub fn num_entries(&self) -> u32 {
         self.as_value().num_entries
     }
-    pub fn buckets(&self) -> ArenaRef<'heap, Array<HashmapBucket>, A> {
+    pub fn buckets(&self) -> ArenaRef<Array<HashmapBucket>, A> {
         ArenaRef::<Array<HashmapBucket>, _>::new(
-            self.arena,
+            self.arena.clone(),
             self.arena.get_offset(&self.as_value().buckets),
         )
     }
-    pub fn entries(&self) -> HashmapBucketsIterator<'heap, ArrayIter<'heap, HashmapBucket>> {
+    pub fn entries(&self) -> HashmapBucketsIterator<'_, ArrayIter<'_, HashmapBucket>> {
         HashmapBucketsIterator::new(self.num_entries() as usize, self.buckets().iter())
     }
     pub fn keys(
         &self,
     ) -> IntoArenaRefIterator<
-        'heap,
+        '_,
         Term,
         A,
-        HashmapBucketKeysIterator<'heap, ArrayIter<'heap, HashmapBucket>>,
+        HashmapBucketKeysIterator<'_, ArrayIter<'_, HashmapBucket>>,
     > {
-        IntoArenaRefIterator::new(self.arena, HashmapBucketKeysIterator::new(self.entries()))
+        IntoArenaRefIterator::new(&self.arena, HashmapBucketKeysIterator::new(self.entries()))
     }
     pub fn values(
         &self,
     ) -> IntoArenaRefIterator<
-        'heap,
+        '_,
         Term,
         A,
-        HashmapBucketValuesIterator<'heap, ArrayIter<'heap, HashmapBucket>>,
+        HashmapBucketValuesIterator<'_, ArrayIter<'_, HashmapBucket>>,
     > {
-        IntoArenaRefIterator::new(self.arena, HashmapBucketValuesIterator::new(self.entries()))
+        IntoArenaRefIterator::new(
+            &self.arena,
+            HashmapBucketValuesIterator::new(self.entries()),
+        )
     }
 }
 
-impl<'heap, A: ArenaAllocator> HashmapTermType<WasmExpression<'heap, A>>
-    for ArenaRef<'heap, HashmapTerm, A>
-{
+impl<A: ArenaAllocator + Clone> HashmapTermType<WasmExpression<A>> for ArenaRef<HashmapTerm, A> {
     type KeysIterator<'a> = MapIntoIterator<
-        IntoArenaRefIterator<'heap, Term, A, HashmapBucketKeysIterator<'heap, ArrayIter<'heap, HashmapBucket>>>,
-        ArenaRef<'heap, Term, A>,
-        <WasmExpression<'heap, A> as Expression>::ExpressionRef<'a>
+        IntoArenaRefIterator<'a, Term, A, HashmapBucketKeysIterator<'a, ArrayIter<'a, HashmapBucket>>>,
+        ArenaRef<Term, A>,
+        <WasmExpression<A> as Expression>::ExpressionRef<'a>
     >
     where
-        WasmExpression<'heap, A>: 'a,
+        WasmExpression<A>: 'a,
         Self: 'a;
     type ValuesIterator<'a> = MapIntoIterator<
-        IntoArenaRefIterator<'heap, Term, A, HashmapBucketValuesIterator<'heap, ArrayIter<'heap, HashmapBucket>>>,
-        ArenaRef<'heap, Term, A>,
-        <WasmExpression<'heap, A> as Expression>::ExpressionRef<'a>
+        IntoArenaRefIterator<'a, Term, A, HashmapBucketValuesIterator<'a, ArrayIter<'a, HashmapBucket>>>,
+        ArenaRef<Term, A>,
+        <WasmExpression<A> as Expression>::ExpressionRef<'a>
     >
     where
-        WasmExpression<'heap, A>: 'a,
+        WasmExpression<A>: 'a,
         Self: 'a;
     fn get<'a>(
         &'a self,
-        key: &WasmExpression<'heap, A>,
-    ) -> Option<<WasmExpression<'heap, A> as Expression>::ExpressionRef<'a>>
+        key: &WasmExpression<A>,
+    ) -> Option<<WasmExpression<A> as Expression>::ExpressionRef<'a>>
     where
-        WasmExpression<'heap, A>: 'a,
+        WasmExpression<A>: 'a,
     {
         // TODO: implement `HashMapTermType::get()` using hashmap lookup
         self.entries()
             .map(|bucket| {
                 (
-                    ArenaRef::<Term, _>::new(self.arena, bucket.key),
-                    ArenaRef::<Term, _>::new(self.arena, bucket.value),
+                    ArenaRef::<Term, _>::new(self.arena.clone(), bucket.key),
+                    ArenaRef::<Term, _>::new(self.arena.clone(), bucket.value),
                 )
             })
             .filter_map({
@@ -203,60 +204,53 @@ impl<'heap, A: ArenaAllocator> HashmapTermType<WasmExpression<'heap, A>>
     }
     fn keys<'a>(&'a self) -> Self::KeysIterator<'a>
     where
-        WasmExpression<'heap, A>: 'a,
+        WasmExpression<A>: 'a,
     {
         MapIntoIterator::new(self.keys())
     }
     fn values<'a>(&'a self) -> Self::ValuesIterator<'a>
     where
-        WasmExpression<'heap, A>: 'a,
+        WasmExpression<A>: 'a,
     {
         MapIntoIterator::new(self.values())
     }
 }
 
-impl<'heap, A: ArenaAllocator> HashmapTermType<WasmExpression<'heap, A>>
-    for ArenaRef<'heap, TypedTerm<HashmapTerm>, A>
+impl<A: ArenaAllocator + Clone> HashmapTermType<WasmExpression<A>>
+    for ArenaRef<TypedTerm<HashmapTerm>, A>
 {
-    type KeysIterator<'a> = <ArenaRef<'heap, HashmapTerm, A> as HashmapTermType<WasmExpression<'heap, A>>>::KeysIterator<'a>
+    type KeysIterator<'a> = <ArenaRef<HashmapTerm, A> as HashmapTermType<WasmExpression<A>>>::KeysIterator<'a>
     where
-        WasmExpression<'heap, A>: 'a,
+        WasmExpression<A>: 'a,
         Self: 'a;
-    type ValuesIterator<'a> = <ArenaRef<'heap, HashmapTerm, A> as HashmapTermType<WasmExpression<'heap, A>>>::ValuesIterator<'a>
+    type ValuesIterator<'a> = <ArenaRef<HashmapTerm, A> as HashmapTermType<WasmExpression<A>>>::ValuesIterator<'a>
     where
-        WasmExpression<'heap, A>: 'a,
+        WasmExpression<A>: 'a,
         Self: 'a;
     fn get<'a>(
         &'a self,
-        key: &WasmExpression<'heap, A>,
-    ) -> Option<<WasmExpression<'heap, A> as Expression>::ExpressionRef<'a>>
+        key: &WasmExpression<A>,
+    ) -> Option<<WasmExpression<A> as Expression>::ExpressionRef<'a>>
     where
-        WasmExpression<'heap, A>: 'a,
+        WasmExpression<A>: 'a,
     {
-        <ArenaRef<'heap, HashmapTerm, A> as HashmapTermType<WasmExpression<'heap, A>>>::get(
-            &self.as_inner(),
-            key,
-        )
+        <ArenaRef<HashmapTerm, A> as HashmapTermType<WasmExpression<A>>>::get(&self.as_inner(), key)
     }
     fn keys<'a>(&'a self) -> Self::KeysIterator<'a>
     where
-        WasmExpression<'heap, A>: 'a,
+        WasmExpression<A>: 'a,
     {
-        <ArenaRef<'heap, HashmapTerm, A> as HashmapTermType<WasmExpression<'heap, A>>>::keys(
-            &self.as_inner(),
-        )
+        <ArenaRef<HashmapTerm, A> as HashmapTermType<WasmExpression<A>>>::keys(&self.as_inner())
     }
     fn values<'a>(&'a self) -> Self::ValuesIterator<'a>
     where
-        WasmExpression<'heap, A>: 'a,
+        WasmExpression<A>: 'a,
     {
-        <ArenaRef<'heap, HashmapTerm, A> as HashmapTermType<WasmExpression<'heap, A>>>::values(
-            &self.as_inner(),
-        )
+        <ArenaRef<HashmapTerm, A> as HashmapTermType<WasmExpression<A>>>::values(&self.as_inner())
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, HashmapTerm, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<HashmapTerm, A> {
     fn size(&self) -> usize {
         1 + self.keys().map(|item| item.size()).sum::<usize>()
             + self.values().map(|item| item.size()).sum::<usize>()
@@ -322,7 +316,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, HashmapTerm, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, HashmapTerm, A> {
+impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<HashmapTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -334,22 +328,22 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, HashmapTerm, A>
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, HashmapTerm, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<HashmapTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         // This assumes that hashmaps with the same size and hash are almost certainly identical
         // TODO: Clarify PartialEq implementations for container terms
         self.num_entries() == other.num_entries()
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, HashmapTerm, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<HashmapTerm, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, HashmapTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<HashmapTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, HashmapTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<HashmapTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let max_displayed_entries = 10;
         let keys = self.keys();

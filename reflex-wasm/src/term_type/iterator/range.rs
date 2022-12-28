@@ -30,7 +30,7 @@ impl TermHash for RangeIteratorTerm {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, RangeIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> ArenaRef<RangeIteratorTerm, A> {
     pub fn offset(&self) -> i32 {
         self.as_value().offset
     }
@@ -39,7 +39,7 @@ impl<'heap, A: ArenaAllocator> ArenaRef<'heap, RangeIteratorTerm, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, RangeIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<RangeIteratorTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -51,26 +51,26 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, RangeIteratorTe
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, RangeIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<RangeIteratorTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.offset() == other.offset() && self.length() == other.length()
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, RangeIteratorTerm, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<RangeIteratorTerm, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, RangeIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<RangeIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, RangeIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<RangeIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "RangeIterator")
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, RangeIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<RangeIteratorTerm, A> {
     fn size(&self) -> usize {
         1
     }

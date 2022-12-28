@@ -32,16 +32,16 @@ impl TermHash for IntersperseIteratorTerm {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, IntersperseIteratorTerm, A> {
-    pub fn source(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::<Term, _>::new(self.arena, self.as_value().source)
+impl<A: ArenaAllocator + Clone> ArenaRef<IntersperseIteratorTerm, A> {
+    pub fn source(&self) -> ArenaRef<Term, A> {
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().source)
     }
-    pub fn separator(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::<Term, _>::new(self.arena, self.as_value().separator)
+    pub fn separator(&self) -> ArenaRef<Term, A> {
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().separator)
     }
 }
 
-impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, IntersperseIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<IntersperseIteratorTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -53,26 +53,26 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, IntersperseIter
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, IntersperseIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<IntersperseIteratorTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.source() == other.source() && self.separator() == other.separator()
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, IntersperseIteratorTerm, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<IntersperseIteratorTerm, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, IntersperseIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<IntersperseIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, IntersperseIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<IntersperseIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "IntersperseIterator")
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, IntersperseIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<IntersperseIteratorTerm, A> {
     fn size(&self) -> usize {
         1 + self.source().size() + self.separator().size()
     }

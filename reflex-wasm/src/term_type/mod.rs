@@ -659,247 +659,347 @@ impl<'a> Into<Option<&'a ZipIteratorTerm>> for &'a TermType {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, Term, A> {
+impl<A: ArenaAllocator + Clone> ArenaRef<Term, A> {
     pub fn arity(&self) -> Option<Arity> {
         match &self.as_value().value {
             TermType::Builtin(term) => {
-                ArenaRef::<BuiltinTerm, _>::new(self.arena, self.arena.get_offset(term)).arity()
+                ArenaRef::<BuiltinTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .arity()
             }
             TermType::Compiled(term) => Some(
-                ArenaRef::<CompiledTerm, _>::new(self.arena, self.arena.get_offset(term)).arity(),
-            ),
-            TermType::Constructor(term) => Some(
-                ArenaRef::<ConstructorTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<CompiledTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .arity(),
             ),
+            TermType::Constructor(term) => Some(
+                ArenaRef::<ConstructorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                )
+                .arity(),
+            ),
             TermType::Lambda(term) => Some(
-                ArenaRef::<LambdaTerm, _>::new(self.arena, self.arena.get_offset(term)).arity(),
+                ArenaRef::<LambdaTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .arity(),
             ),
             TermType::Partial(term) => {
-                ArenaRef::<PartialTerm, _>::new(self.arena, self.arena.get_offset(term)).arity()
+                ArenaRef::<PartialTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .arity()
             }
             _ => None,
         }
     }
 }
 
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, Term, A> {}
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, Term, A> {
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<Term, A> {}
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<Term, A> {
     fn eq(&self, other: &Self) -> bool {
         if self.as_value().header.hash != other.as_value().header.hash {
             return false;
         }
         match (&self.as_value().value, &other.as_value().value) {
             (TermType::Application(left), TermType::Application(right)) => {
-                ArenaRef::<ApplicationTerm, _>::new(self.arena, self.arena.get_offset(left))
+                ArenaRef::<ApplicationTerm, _>::new(self.arena.clone(), self.arena.get_offset(left))
                     == ArenaRef::<ApplicationTerm, _>::new(
-                        other.arena,
+                        other.arena.clone(),
                         self.arena.get_offset(right),
                     )
             }
             (TermType::Boolean(left), TermType::Boolean(right)) => {
-                ArenaRef::<BooleanTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<BooleanTerm, _>::new(other.arena, self.arena.get_offset(right))
+                ArenaRef::<BooleanTerm, _>::new(self.arena.clone(), self.arena.get_offset(left))
+                    == ArenaRef::<BooleanTerm, _>::new(
+                        other.arena.clone(),
+                        self.arena.get_offset(right),
+                    )
             }
             (TermType::Builtin(left), TermType::Builtin(right)) => {
-                ArenaRef::<BuiltinTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<BuiltinTerm, _>::new(other.arena, self.arena.get_offset(right))
+                ArenaRef::<BuiltinTerm, _>::new(self.arena.clone(), self.arena.get_offset(left))
+                    == ArenaRef::<BuiltinTerm, _>::new(
+                        other.arena.clone(),
+                        self.arena.get_offset(right),
+                    )
             }
             (TermType::Cell(left), TermType::Cell(right)) => {
-                ArenaRef::<CellTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<CellTerm, _>::new(other.arena, self.arena.get_offset(right))
+                ArenaRef::<CellTerm, _>::new(self.arena.clone(), self.arena.get_offset(left))
+                    == ArenaRef::<CellTerm, _>::new(
+                        other.arena.clone(),
+                        self.arena.get_offset(right),
+                    )
             }
             (TermType::Compiled(left), TermType::Compiled(right)) => {
-                ArenaRef::<CompiledTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<CompiledTerm, _>::new(other.arena, self.arena.get_offset(right))
+                ArenaRef::<CompiledTerm, _>::new(self.arena.clone(), self.arena.get_offset(left))
+                    == ArenaRef::<CompiledTerm, _>::new(
+                        other.arena.clone(),
+                        self.arena.get_offset(right),
+                    )
             }
             (TermType::Condition(left), TermType::Condition(right)) => {
-                ArenaRef::<ConditionTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<ConditionTerm, _>::new(other.arena, self.arena.get_offset(right))
+                ArenaRef::<ConditionTerm, _>::new(self.arena.clone(), self.arena.get_offset(left))
+                    == ArenaRef::<ConditionTerm, _>::new(
+                        other.arena.clone(),
+                        self.arena.get_offset(right),
+                    )
             }
             (TermType::Constructor(left), TermType::Constructor(right)) => {
-                ArenaRef::<ConstructorTerm, _>::new(self.arena, self.arena.get_offset(left))
+                ArenaRef::<ConstructorTerm, _>::new(self.arena.clone(), self.arena.get_offset(left))
                     == ArenaRef::<ConstructorTerm, _>::new(
-                        other.arena,
+                        other.arena.clone(),
                         self.arena.get_offset(right),
                     )
             }
             (TermType::Date(left), TermType::Date(right)) => {
-                ArenaRef::<DateTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<DateTerm, _>::new(other.arena, self.arena.get_offset(right))
+                ArenaRef::<DateTerm, _>::new(self.arena.clone(), self.arena.get_offset(left))
+                    == ArenaRef::<DateTerm, _>::new(
+                        other.arena.clone(),
+                        self.arena.get_offset(right),
+                    )
             }
             (TermType::Effect(left), TermType::Effect(right)) => {
-                ArenaRef::<EffectTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<EffectTerm, _>::new(other.arena, self.arena.get_offset(right))
+                ArenaRef::<EffectTerm, _>::new(self.arena.clone(), self.arena.get_offset(left))
+                    == ArenaRef::<EffectTerm, _>::new(
+                        other.arena.clone(),
+                        self.arena.get_offset(right),
+                    )
             }
             (TermType::Float(left), TermType::Float(right)) => {
-                ArenaRef::<FloatTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<FloatTerm, _>::new(other.arena, self.arena.get_offset(right))
+                ArenaRef::<FloatTerm, _>::new(self.arena.clone(), self.arena.get_offset(left))
+                    == ArenaRef::<FloatTerm, _>::new(
+                        other.arena.clone(),
+                        self.arena.get_offset(right),
+                    )
             }
             (TermType::Hashmap(left), TermType::Hashmap(right)) => {
-                ArenaRef::<HashmapTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<HashmapTerm, _>::new(other.arena, self.arena.get_offset(right))
+                ArenaRef::<HashmapTerm, _>::new(self.arena.clone(), self.arena.get_offset(left))
+                    == ArenaRef::<HashmapTerm, _>::new(
+                        other.arena.clone(),
+                        self.arena.get_offset(right),
+                    )
             }
             (TermType::Hashset(left), TermType::Hashset(right)) => {
-                ArenaRef::<HashsetTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<HashsetTerm, _>::new(other.arena, self.arena.get_offset(right))
+                ArenaRef::<HashsetTerm, _>::new(self.arena.clone(), self.arena.get_offset(left))
+                    == ArenaRef::<HashsetTerm, _>::new(
+                        other.arena.clone(),
+                        self.arena.get_offset(right),
+                    )
             }
             (TermType::Int(left), TermType::Int(right)) => {
-                ArenaRef::<IntTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<IntTerm, _>::new(other.arena, self.arena.get_offset(right))
+                ArenaRef::<IntTerm, _>::new(self.arena.clone(), self.arena.get_offset(left))
+                    == ArenaRef::<IntTerm, _>::new(
+                        other.arena.clone(),
+                        self.arena.get_offset(right),
+                    )
             }
             (TermType::Lambda(left), TermType::Lambda(right)) => {
-                ArenaRef::<LambdaTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<LambdaTerm, _>::new(other.arena, self.arena.get_offset(right))
+                ArenaRef::<LambdaTerm, _>::new(self.arena.clone(), self.arena.get_offset(left))
+                    == ArenaRef::<LambdaTerm, _>::new(
+                        other.arena.clone(),
+                        self.arena.get_offset(right),
+                    )
             }
             (TermType::Let(left), TermType::Let(right)) => {
-                ArenaRef::<LetTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<LetTerm, _>::new(other.arena, self.arena.get_offset(right))
+                ArenaRef::<LetTerm, _>::new(self.arena.clone(), self.arena.get_offset(left))
+                    == ArenaRef::<LetTerm, _>::new(
+                        other.arena.clone(),
+                        self.arena.get_offset(right),
+                    )
             }
             (TermType::List(left), TermType::List(right)) => {
-                ArenaRef::<ListTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<ListTerm, _>::new(other.arena, self.arena.get_offset(right))
+                ArenaRef::<ListTerm, _>::new(self.arena.clone(), self.arena.get_offset(left))
+                    == ArenaRef::<ListTerm, _>::new(
+                        other.arena.clone(),
+                        self.arena.get_offset(right),
+                    )
             }
             (TermType::Nil(left), TermType::Nil(right)) => {
-                ArenaRef::<NilTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<NilTerm, _>::new(other.arena, self.arena.get_offset(right))
+                ArenaRef::<NilTerm, _>::new(self.arena.clone(), self.arena.get_offset(left))
+                    == ArenaRef::<NilTerm, _>::new(
+                        other.arena.clone(),
+                        self.arena.get_offset(right),
+                    )
             }
             (TermType::Partial(left), TermType::Partial(right)) => {
-                ArenaRef::<PartialTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<PartialTerm, _>::new(other.arena, self.arena.get_offset(right))
+                ArenaRef::<PartialTerm, _>::new(self.arena.clone(), self.arena.get_offset(left))
+                    == ArenaRef::<PartialTerm, _>::new(
+                        other.arena.clone(),
+                        self.arena.get_offset(right),
+                    )
             }
             (TermType::Pointer(left), TermType::Pointer(right)) => {
-                ArenaRef::<PointerTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<PointerTerm, _>::new(other.arena, self.arena.get_offset(right))
+                ArenaRef::<PointerTerm, _>::new(self.arena.clone(), self.arena.get_offset(left))
+                    == ArenaRef::<PointerTerm, _>::new(
+                        other.arena.clone(),
+                        self.arena.get_offset(right),
+                    )
             }
             (TermType::Record(left), TermType::Record(right)) => {
-                ArenaRef::<RecordTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<RecordTerm, _>::new(other.arena, self.arena.get_offset(right))
+                ArenaRef::<RecordTerm, _>::new(self.arena.clone(), self.arena.get_offset(left))
+                    == ArenaRef::<RecordTerm, _>::new(
+                        other.arena.clone(),
+                        self.arena.get_offset(right),
+                    )
             }
             (TermType::Signal(left), TermType::Signal(right)) => {
-                ArenaRef::<SignalTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<SignalTerm, _>::new(other.arena, self.arena.get_offset(right))
+                ArenaRef::<SignalTerm, _>::new(self.arena.clone(), self.arena.get_offset(left))
+                    == ArenaRef::<SignalTerm, _>::new(
+                        other.arena.clone(),
+                        self.arena.get_offset(right),
+                    )
             }
             (TermType::String(left), TermType::String(right)) => {
-                ArenaRef::<StringTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<StringTerm, _>::new(other.arena, self.arena.get_offset(right))
+                ArenaRef::<StringTerm, _>::new(self.arena.clone(), self.arena.get_offset(left))
+                    == ArenaRef::<StringTerm, _>::new(
+                        other.arena.clone(),
+                        self.arena.get_offset(right),
+                    )
             }
             (TermType::Symbol(left), TermType::Symbol(right)) => {
-                ArenaRef::<SymbolTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<SymbolTerm, _>::new(other.arena, self.arena.get_offset(right))
+                ArenaRef::<SymbolTerm, _>::new(self.arena.clone(), self.arena.get_offset(left))
+                    == ArenaRef::<SymbolTerm, _>::new(
+                        other.arena.clone(),
+                        self.arena.get_offset(right),
+                    )
             }
             (TermType::Tree(left), TermType::Tree(right)) => {
-                ArenaRef::<TreeTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<TreeTerm, _>::new(other.arena, self.arena.get_offset(right))
+                ArenaRef::<TreeTerm, _>::new(self.arena.clone(), self.arena.get_offset(left))
+                    == ArenaRef::<TreeTerm, _>::new(
+                        other.arena.clone(),
+                        self.arena.get_offset(right),
+                    )
             }
             (TermType::Variable(left), TermType::Variable(right)) => {
-                ArenaRef::<VariableTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<VariableTerm, _>::new(other.arena, self.arena.get_offset(right))
+                ArenaRef::<VariableTerm, _>::new(self.arena.clone(), self.arena.get_offset(left))
+                    == ArenaRef::<VariableTerm, _>::new(
+                        other.arena.clone(),
+                        self.arena.get_offset(right),
+                    )
             }
             (TermType::EmptyIterator(left), TermType::EmptyIterator(right)) => {
-                ArenaRef::<EmptyIteratorTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<EmptyIteratorTerm, _>::new(
-                        other.arena,
-                        self.arena.get_offset(right),
-                    )
+                ArenaRef::<EmptyIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(left),
+                ) == ArenaRef::<EmptyIteratorTerm, _>::new(
+                    other.arena.clone(),
+                    self.arena.get_offset(right),
+                )
             }
             (TermType::EvaluateIterator(left), TermType::EvaluateIterator(right)) => {
-                ArenaRef::<EvaluateIteratorTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<EvaluateIteratorTerm, _>::new(
-                        other.arena,
-                        self.arena.get_offset(right),
-                    )
+                ArenaRef::<EvaluateIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(left),
+                ) == ArenaRef::<EvaluateIteratorTerm, _>::new(
+                    other.arena.clone(),
+                    self.arena.get_offset(right),
+                )
             }
             (TermType::FilterIterator(left), TermType::FilterIterator(right)) => {
-                ArenaRef::<FilterIteratorTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<FilterIteratorTerm, _>::new(
-                        other.arena,
-                        self.arena.get_offset(right),
-                    )
+                ArenaRef::<FilterIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(left),
+                ) == ArenaRef::<FilterIteratorTerm, _>::new(
+                    other.arena.clone(),
+                    self.arena.get_offset(right),
+                )
             }
             (TermType::FlattenIterator(left), TermType::FlattenIterator(right)) => {
-                ArenaRef::<FlattenIteratorTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<FlattenIteratorTerm, _>::new(
-                        other.arena,
-                        self.arena.get_offset(right),
-                    )
+                ArenaRef::<FlattenIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(left),
+                ) == ArenaRef::<FlattenIteratorTerm, _>::new(
+                    other.arena.clone(),
+                    self.arena.get_offset(right),
+                )
             }
             (TermType::HashmapKeysIterator(left), TermType::HashmapKeysIterator(right)) => {
-                ArenaRef::<HashmapKeysIteratorTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<HashmapKeysIteratorTerm, _>::new(
-                        other.arena,
-                        self.arena.get_offset(right),
-                    )
+                ArenaRef::<HashmapKeysIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(left),
+                ) == ArenaRef::<HashmapKeysIteratorTerm, _>::new(
+                    other.arena.clone(),
+                    self.arena.get_offset(right),
+                )
             }
             (TermType::HashmapValuesIterator(left), TermType::HashmapValuesIterator(right)) => {
                 ArenaRef::<HashmapValuesIteratorTerm, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(left),
                 ) == ArenaRef::<HashmapValuesIteratorTerm, _>::new(
-                    other.arena,
+                    other.arena.clone(),
                     self.arena.get_offset(right),
                 )
             }
             (TermType::IntegersIterator(left), TermType::IntegersIterator(right)) => {
-                ArenaRef::<IntegersIteratorTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<IntegersIteratorTerm, _>::new(
-                        other.arena,
-                        self.arena.get_offset(right),
-                    )
+                ArenaRef::<IntegersIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(left),
+                ) == ArenaRef::<IntegersIteratorTerm, _>::new(
+                    other.arena.clone(),
+                    self.arena.get_offset(right),
+                )
             }
             (TermType::IntersperseIterator(left), TermType::IntersperseIterator(right)) => {
-                ArenaRef::<IntersperseIteratorTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<IntersperseIteratorTerm, _>::new(
-                        other.arena,
-                        self.arena.get_offset(right),
-                    )
+                ArenaRef::<IntersperseIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(left),
+                ) == ArenaRef::<IntersperseIteratorTerm, _>::new(
+                    other.arena.clone(),
+                    self.arena.get_offset(right),
+                )
             }
             (TermType::MapIterator(left), TermType::MapIterator(right)) => {
-                ArenaRef::<MapIteratorTerm, _>::new(self.arena, self.arena.get_offset(left))
+                ArenaRef::<MapIteratorTerm, _>::new(self.arena.clone(), self.arena.get_offset(left))
                     == ArenaRef::<MapIteratorTerm, _>::new(
-                        other.arena,
+                        other.arena.clone(),
                         self.arena.get_offset(right),
                     )
             }
             (TermType::OnceIterator(left), TermType::OnceIterator(right)) => {
-                ArenaRef::<OnceIteratorTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<OnceIteratorTerm, _>::new(
-                        other.arena,
-                        self.arena.get_offset(right),
-                    )
+                ArenaRef::<OnceIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(left),
+                ) == ArenaRef::<OnceIteratorTerm, _>::new(
+                    other.arena.clone(),
+                    self.arena.get_offset(right),
+                )
             }
             (TermType::RangeIterator(left), TermType::RangeIterator(right)) => {
-                ArenaRef::<RangeIteratorTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<RangeIteratorTerm, _>::new(
-                        other.arena,
-                        self.arena.get_offset(right),
-                    )
+                ArenaRef::<RangeIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(left),
+                ) == ArenaRef::<RangeIteratorTerm, _>::new(
+                    other.arena.clone(),
+                    self.arena.get_offset(right),
+                )
             }
             (TermType::RepeatIterator(left), TermType::RepeatIterator(right)) => {
-                ArenaRef::<RepeatIteratorTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<RepeatIteratorTerm, _>::new(
-                        other.arena,
-                        self.arena.get_offset(right),
-                    )
+                ArenaRef::<RepeatIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(left),
+                ) == ArenaRef::<RepeatIteratorTerm, _>::new(
+                    other.arena.clone(),
+                    self.arena.get_offset(right),
+                )
             }
             (TermType::SkipIterator(left), TermType::SkipIterator(right)) => {
-                ArenaRef::<SkipIteratorTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<SkipIteratorTerm, _>::new(
-                        other.arena,
-                        self.arena.get_offset(right),
-                    )
+                ArenaRef::<SkipIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(left),
+                ) == ArenaRef::<SkipIteratorTerm, _>::new(
+                    other.arena.clone(),
+                    self.arena.get_offset(right),
+                )
             }
             (TermType::TakeIterator(left), TermType::TakeIterator(right)) => {
-                ArenaRef::<TakeIteratorTerm, _>::new(self.arena, self.arena.get_offset(left))
-                    == ArenaRef::<TakeIteratorTerm, _>::new(
-                        other.arena,
-                        self.arena.get_offset(right),
-                    )
+                ArenaRef::<TakeIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(left),
+                ) == ArenaRef::<TakeIteratorTerm, _>::new(
+                    other.arena.clone(),
+                    self.arena.get_offset(right),
+                )
             }
             (TermType::ZipIterator(left), TermType::ZipIterator(right)) => {
-                ArenaRef::<ZipIteratorTerm, _>::new(self.arena, self.arena.get_offset(left))
+                ArenaRef::<ZipIteratorTerm, _>::new(self.arena.clone(), self.arena.get_offset(left))
                     == ArenaRef::<ZipIteratorTerm, _>::new(
-                        other.arena,
+                        other.arena.clone(),
                         self.arena.get_offset(right),
                     )
             }
@@ -908,346 +1008,396 @@ impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, Term, A> {
     }
 }
 
-pub(crate) type WasmExpression<'heap, A> = ArenaRef<'heap, Term, A>;
+pub(crate) type WasmExpression<A> = ArenaRef<Term, A>;
 
-impl<'heap, A: ArenaAllocator> Expression for ArenaRef<'heap, Term, A> {
-    type String = ArenaRef<'heap, TypedTerm<StringTerm>, A>;
+impl<A: ArenaAllocator + Clone> Expression for ArenaRef<Term, A> {
+    type String = ArenaRef<TypedTerm<StringTerm>, A>;
     type Builtin = Stdlib;
-    type Signal = ArenaRef<'heap, TypedTerm<ConditionTerm>, A>;
-    type SignalList = ArenaRef<'heap, TypedTerm<TreeTerm>, A>;
-    type StructPrototype = ArenaRef<'heap, TypedTerm<ListTerm>, A>;
-    type ExpressionList = ArenaRef<'heap, TypedTerm<ListTerm>, A>;
-    type NilTerm = ArenaRef<'heap, TypedTerm<NilTerm>, A>;
-    type BooleanTerm = ArenaRef<'heap, TypedTerm<BooleanTerm>, A>;
-    type IntTerm = ArenaRef<'heap, TypedTerm<IntTerm>, A>;
-    type FloatTerm = ArenaRef<'heap, TypedTerm<FloatTerm>, A>;
-    type StringTerm = ArenaRef<'heap, TypedTerm<StringTerm>, A>;
-    type SymbolTerm = ArenaRef<'heap, TypedTerm<SymbolTerm>, A>;
-    type VariableTerm = ArenaRef<'heap, TypedTerm<VariableTerm>, A>;
-    type EffectTerm = ArenaRef<'heap, TypedTerm<EffectTerm>, A>;
-    type LetTerm = ArenaRef<'heap, TypedTerm<LetTerm>, A>;
-    type LambdaTerm = ArenaRef<'heap, TypedTerm<LambdaTerm>, A>;
-    type ApplicationTerm = ArenaRef<'heap, TypedTerm<ApplicationTerm>, A>;
-    type PartialApplicationTerm = ArenaRef<'heap, TypedTerm<PartialTerm>, A>;
+    type Signal = ArenaRef<TypedTerm<ConditionTerm>, A>;
+    type SignalList = ArenaRef<TypedTerm<TreeTerm>, A>;
+    type StructPrototype = ArenaRef<TypedTerm<ListTerm>, A>;
+    type ExpressionList = ArenaRef<TypedTerm<ListTerm>, A>;
+    type NilTerm = ArenaRef<TypedTerm<NilTerm>, A>;
+    type BooleanTerm = ArenaRef<TypedTerm<BooleanTerm>, A>;
+    type IntTerm = ArenaRef<TypedTerm<IntTerm>, A>;
+    type FloatTerm = ArenaRef<TypedTerm<FloatTerm>, A>;
+    type StringTerm = ArenaRef<TypedTerm<StringTerm>, A>;
+    type SymbolTerm = ArenaRef<TypedTerm<SymbolTerm>, A>;
+    type VariableTerm = ArenaRef<TypedTerm<VariableTerm>, A>;
+    type EffectTerm = ArenaRef<TypedTerm<EffectTerm>, A>;
+    type LetTerm = ArenaRef<TypedTerm<LetTerm>, A>;
+    type LambdaTerm = ArenaRef<TypedTerm<LambdaTerm>, A>;
+    type ApplicationTerm = ArenaRef<TypedTerm<ApplicationTerm>, A>;
+    type PartialApplicationTerm = ArenaRef<TypedTerm<PartialTerm>, A>;
     // FIXME: implement recursive term type
-    type RecursiveTerm = ArenaRef<'heap, TypedTerm<NilTerm>, A>;
-    type BuiltinTerm = ArenaRef<'heap, TypedTerm<BuiltinTerm>, A>;
-    type CompiledFunctionTerm = ArenaRef<'heap, TypedTerm<CompiledTerm>, A>;
-    type RecordTerm = ArenaRef<'heap, TypedTerm<RecordTerm>, A>;
-    type ConstructorTerm = ArenaRef<'heap, TypedTerm<ConstructorTerm>, A>;
-    type ListTerm = ArenaRef<'heap, TypedTerm<ListTerm>, A>;
-    type HashmapTerm = ArenaRef<'heap, TypedTerm<HashmapTerm>, A>;
-    type HashsetTerm = ArenaRef<'heap, TypedTerm<HashsetTerm>, A>;
-    type SignalTerm = ArenaRef<'heap, TypedTerm<SignalTerm>, A>;
+    type RecursiveTerm = ArenaRef<TypedTerm<NilTerm>, A>;
+    type BuiltinTerm = ArenaRef<TypedTerm<BuiltinTerm>, A>;
+    type CompiledFunctionTerm = ArenaRef<TypedTerm<CompiledTerm>, A>;
+    type RecordTerm = ArenaRef<TypedTerm<RecordTerm>, A>;
+    type ConstructorTerm = ArenaRef<TypedTerm<ConstructorTerm>, A>;
+    type ListTerm = ArenaRef<TypedTerm<ListTerm>, A>;
+    type HashmapTerm = ArenaRef<TypedTerm<HashmapTerm>, A>;
+    type HashsetTerm = ArenaRef<TypedTerm<HashsetTerm>, A>;
+    type SignalTerm = ArenaRef<TypedTerm<SignalTerm>, A>;
 
-    type StringRef<'a> = ArenaRef<'heap, TypedTerm<StringTerm>, A> where Self: 'a;
-    type SignalRef<'a> = ArenaRef<'heap, TypedTerm<ConditionTerm>, A> where Self::Signal: 'a, Self: 'a;
-    type StructPrototypeRef<'a> = ArenaRef<'heap, TypedTerm<ListTerm>, A> where Self::StructPrototype: 'a, Self: 'a;
-    type SignalListRef<'a> = ArenaRef<'heap, TypedTerm<TreeTerm>, A> where Self::SignalList: 'a, Self: 'a;
-    type ExpressionListRef<'a> = ArenaRef<'heap, TypedTerm<ListTerm>, A> where Self::ExpressionList: 'a, Self: 'a;
-    type ExpressionRef<'a> = ArenaRef<'heap, Term, A> where Self: 'a;
+    type StringRef<'a> = ArenaRef<TypedTerm<StringTerm>, A> where Self: 'a;
+    type SignalRef<'a> = ArenaRef<TypedTerm<ConditionTerm>, A> where Self::Signal: 'a, Self: 'a;
+    type StructPrototypeRef<'a> = ArenaRef<TypedTerm<ListTerm>, A> where Self::StructPrototype: 'a, Self: 'a;
+    type SignalListRef<'a> = ArenaRef<TypedTerm<TreeTerm>, A> where Self::SignalList: 'a, Self: 'a;
+    type ExpressionListRef<'a> = ArenaRef<TypedTerm<ListTerm>, A> where Self::ExpressionList: 'a, Self: 'a;
+    type ExpressionRef<'a> = ArenaRef<Term, A> where Self: 'a;
 }
 
-impl<'heap, A: ArenaAllocator> NodeId for ArenaRef<'heap, Term, A> {
+impl<A: ArenaAllocator + Clone> NodeId for ArenaRef<Term, A> {
     fn id(&self) -> HashId {
         self.as_value().id()
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, Term, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<Term, A> {
     fn size(&self) -> usize {
         match &self.as_value().value {
             TermType::Application(term) => {
-                ArenaRef::<ApplicationTerm, _>::new(self.arena, self.arena.get_offset(term)).size()
+                ArenaRef::<ApplicationTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .size()
             }
             TermType::Boolean(term) => {
-                ArenaRef::<BooleanTerm, _>::new(self.arena, self.arena.get_offset(term)).size()
+                ArenaRef::<BooleanTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .size()
             }
             TermType::Builtin(term) => {
-                ArenaRef::<BuiltinTerm, _>::new(self.arena, self.arena.get_offset(term)).size()
+                ArenaRef::<BuiltinTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .size()
             }
             TermType::Cell(term) => {
-                ArenaRef::<CellTerm, _>::new(self.arena, self.arena.get_offset(term)).size()
+                ArenaRef::<CellTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)).size()
             }
             TermType::Compiled(term) => {
-                ArenaRef::<CompiledTerm, _>::new(self.arena, self.arena.get_offset(term)).size()
+                ArenaRef::<CompiledTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .size()
             }
             TermType::Condition(term) => {
-                ArenaRef::<ConditionTerm, _>::new(self.arena, self.arena.get_offset(term)).size()
+                ArenaRef::<ConditionTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .size()
             }
             TermType::Constructor(term) => {
-                ArenaRef::<ConstructorTerm, _>::new(self.arena, self.arena.get_offset(term)).size()
+                ArenaRef::<ConstructorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .size()
             }
             TermType::Date(term) => {
-                ArenaRef::<DateTerm, _>::new(self.arena, self.arena.get_offset(term)).size()
+                ArenaRef::<DateTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)).size()
             }
             TermType::Effect(term) => {
-                ArenaRef::<EffectTerm, _>::new(self.arena, self.arena.get_offset(term)).size()
+                ArenaRef::<EffectTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .size()
             }
             TermType::Float(term) => {
-                ArenaRef::<FloatTerm, _>::new(self.arena, self.arena.get_offset(term)).size()
+                ArenaRef::<FloatTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .size()
             }
             TermType::Hashmap(term) => {
-                ArenaRef::<HashmapTerm, _>::new(self.arena, self.arena.get_offset(term)).size()
+                ArenaRef::<HashmapTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .size()
             }
             TermType::Hashset(term) => {
-                ArenaRef::<HashsetTerm, _>::new(self.arena, self.arena.get_offset(term)).size()
+                ArenaRef::<HashsetTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .size()
             }
             TermType::Int(term) => {
-                ArenaRef::<IntTerm, _>::new(self.arena, self.arena.get_offset(term)).size()
+                ArenaRef::<IntTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)).size()
             }
             TermType::Lambda(term) => {
-                ArenaRef::<LambdaTerm, _>::new(self.arena, self.arena.get_offset(term)).size()
+                ArenaRef::<LambdaTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .size()
             }
             TermType::Let(term) => {
-                ArenaRef::<LetTerm, _>::new(self.arena, self.arena.get_offset(term)).size()
+                ArenaRef::<LetTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)).size()
             }
             TermType::List(term) => {
-                ArenaRef::<ListTerm, _>::new(self.arena, self.arena.get_offset(term)).size()
+                ArenaRef::<ListTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)).size()
             }
             TermType::Nil(term) => {
-                ArenaRef::<NilTerm, _>::new(self.arena, self.arena.get_offset(term)).size()
+                ArenaRef::<NilTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)).size()
             }
             TermType::Partial(term) => {
-                ArenaRef::<PartialTerm, _>::new(self.arena, self.arena.get_offset(term)).size()
+                ArenaRef::<PartialTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .size()
             }
             TermType::Pointer(term) => {
-                ArenaRef::<PointerTerm, _>::new(self.arena, self.arena.get_offset(term)).size()
+                ArenaRef::<PointerTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .size()
             }
             TermType::Record(term) => {
-                ArenaRef::<RecordTerm, _>::new(self.arena, self.arena.get_offset(term)).size()
+                ArenaRef::<RecordTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .size()
             }
             TermType::Signal(term) => {
-                ArenaRef::<SignalTerm, _>::new(self.arena, self.arena.get_offset(term)).size()
+                ArenaRef::<SignalTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .size()
             }
             TermType::String(term) => {
-                ArenaRef::<StringTerm, _>::new(self.arena, self.arena.get_offset(term)).size()
+                ArenaRef::<StringTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .size()
             }
             TermType::Symbol(term) => {
-                ArenaRef::<SymbolTerm, _>::new(self.arena, self.arena.get_offset(term)).size()
+                ArenaRef::<SymbolTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .size()
             }
             TermType::Tree(term) => {
-                ArenaRef::<TreeTerm, _>::new(self.arena, self.arena.get_offset(term)).size()
+                ArenaRef::<TreeTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)).size()
             }
             TermType::Variable(term) => {
-                ArenaRef::<VariableTerm, _>::new(self.arena, self.arena.get_offset(term)).size()
-            }
-            TermType::EmptyIterator(term) => {
-                ArenaRef::<EmptyIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<VariableTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .size()
             }
-            TermType::EvaluateIterator(term) => {
-                ArenaRef::<EvaluateIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .size()
-            }
-            TermType::FilterIterator(term) => {
-                ArenaRef::<FilterIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .size()
-            }
-            TermType::FlattenIterator(term) => {
-                ArenaRef::<FlattenIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .size()
-            }
-            TermType::HashmapKeysIterator(term) => {
-                ArenaRef::<HashmapKeysIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .size()
-            }
-            TermType::HashmapValuesIterator(term) => ArenaRef::<HashmapValuesIteratorTerm, _>::new(
-                self.arena,
+            TermType::EmptyIterator(term) => ArenaRef::<EmptyIteratorTerm, _>::new(
+                self.arena.clone(),
                 self.arena.get_offset(term),
             )
             .size(),
-            TermType::IntegersIterator(term) => {
-                ArenaRef::<IntegersIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .size()
-            }
-            TermType::IntersperseIterator(term) => {
-                ArenaRef::<IntersperseIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .size()
-            }
+            TermType::EvaluateIterator(term) => ArenaRef::<EvaluateIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .size(),
+            TermType::FilterIterator(term) => ArenaRef::<FilterIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .size(),
+            TermType::FlattenIterator(term) => ArenaRef::<FlattenIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .size(),
+            TermType::HashmapKeysIterator(term) => ArenaRef::<HashmapKeysIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .size(),
+            TermType::HashmapValuesIterator(term) => ArenaRef::<HashmapValuesIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .size(),
+            TermType::IntegersIterator(term) => ArenaRef::<IntegersIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .size(),
+            TermType::IntersperseIterator(term) => ArenaRef::<IntersperseIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .size(),
             TermType::MapIterator(term) => {
-                ArenaRef::<MapIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)).size()
-            }
-            TermType::OnceIterator(term) => {
-                ArenaRef::<OnceIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)).size()
-            }
-            TermType::RangeIterator(term) => {
-                ArenaRef::<RangeIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<MapIteratorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .size()
             }
-            TermType::RepeatIterator(term) => {
-                ArenaRef::<RepeatIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .size()
-            }
-            TermType::SkipIterator(term) => {
-                ArenaRef::<SkipIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)).size()
-            }
-            TermType::TakeIterator(term) => {
-                ArenaRef::<TakeIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)).size()
-            }
+            TermType::OnceIterator(term) => ArenaRef::<OnceIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .size(),
+            TermType::RangeIterator(term) => ArenaRef::<RangeIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .size(),
+            TermType::RepeatIterator(term) => ArenaRef::<RepeatIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .size(),
+            TermType::SkipIterator(term) => ArenaRef::<SkipIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .size(),
+            TermType::TakeIterator(term) => ArenaRef::<TakeIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .size(),
             TermType::ZipIterator(term) => {
-                ArenaRef::<ZipIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)).size()
+                ArenaRef::<ZipIteratorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .size()
             }
         }
     }
     fn capture_depth(&self) -> StackOffset {
         match &self.as_value().value {
             TermType::Application(term) => {
-                ArenaRef::<ApplicationTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ApplicationTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .capture_depth()
             }
             TermType::Boolean(term) => {
-                ArenaRef::<BooleanTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<BooleanTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .capture_depth()
             }
             TermType::Builtin(term) => {
-                ArenaRef::<BuiltinTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<BuiltinTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .capture_depth()
             }
             TermType::Cell(term) => {
-                ArenaRef::<CellTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<CellTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .capture_depth()
             }
             TermType::Compiled(term) => {
-                ArenaRef::<CompiledTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<CompiledTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .capture_depth()
             }
             TermType::Condition(term) => {
-                ArenaRef::<ConditionTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ConditionTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .capture_depth()
             }
             TermType::Constructor(term) => {
-                ArenaRef::<ConstructorTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ConstructorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .capture_depth()
             }
             TermType::Date(term) => {
-                ArenaRef::<DateTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<DateTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .capture_depth()
             }
             TermType::Effect(term) => {
-                ArenaRef::<EffectTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<EffectTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .capture_depth()
             }
             TermType::Float(term) => {
-                ArenaRef::<FloatTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<FloatTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .capture_depth()
             }
             TermType::Hashmap(term) => {
-                ArenaRef::<HashmapTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<HashmapTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .capture_depth()
             }
             TermType::Hashset(term) => {
-                ArenaRef::<HashsetTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<HashsetTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .capture_depth()
             }
             TermType::Int(term) => {
-                ArenaRef::<IntTerm, _>::new(self.arena, self.arena.get_offset(term)).capture_depth()
+                ArenaRef::<IntTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .capture_depth()
             }
             TermType::Lambda(term) => {
-                ArenaRef::<LambdaTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<LambdaTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .capture_depth()
             }
             TermType::Let(term) => {
-                ArenaRef::<LetTerm, _>::new(self.arena, self.arena.get_offset(term)).capture_depth()
+                ArenaRef::<LetTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .capture_depth()
             }
             TermType::List(term) => {
-                ArenaRef::<ListTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ListTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .capture_depth()
             }
             TermType::Nil(term) => {
-                ArenaRef::<NilTerm, _>::new(self.arena, self.arena.get_offset(term)).capture_depth()
+                ArenaRef::<NilTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .capture_depth()
             }
             TermType::Partial(term) => {
-                ArenaRef::<PartialTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<PartialTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .capture_depth()
             }
             TermType::Pointer(term) => {
-                ArenaRef::<PointerTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<PointerTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .capture_depth()
             }
             TermType::Record(term) => {
-                ArenaRef::<RecordTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<RecordTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .capture_depth()
             }
             TermType::Signal(term) => {
-                ArenaRef::<SignalTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<SignalTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .capture_depth()
             }
             TermType::String(term) => {
-                ArenaRef::<StringTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<StringTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .capture_depth()
             }
             TermType::Symbol(term) => {
-                ArenaRef::<SymbolTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<SymbolTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .capture_depth()
             }
             TermType::Tree(term) => {
-                ArenaRef::<TreeTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<TreeTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .capture_depth()
             }
             TermType::Variable(term) => {
-                ArenaRef::<VariableTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<VariableTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .capture_depth()
             }
-            TermType::EmptyIterator(term) => {
-                ArenaRef::<EmptyIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .capture_depth()
-            }
-            TermType::EvaluateIterator(term) => {
-                ArenaRef::<EvaluateIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .capture_depth()
-            }
-            TermType::FilterIterator(term) => {
-                ArenaRef::<FilterIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .capture_depth()
-            }
-            TermType::FlattenIterator(term) => {
-                ArenaRef::<FlattenIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .capture_depth()
-            }
-            TermType::HashmapKeysIterator(term) => {
-                ArenaRef::<HashmapKeysIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .capture_depth()
-            }
-            TermType::HashmapValuesIterator(term) => ArenaRef::<HashmapValuesIteratorTerm, _>::new(
-                self.arena,
+            TermType::EmptyIterator(term) => ArenaRef::<EmptyIteratorTerm, _>::new(
+                self.arena.clone(),
                 self.arena.get_offset(term),
             )
             .capture_depth(),
-            TermType::IntegersIterator(term) => {
-                ArenaRef::<IntegersIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .capture_depth()
-            }
-            TermType::IntersperseIterator(term) => {
-                ArenaRef::<IntersperseIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .capture_depth()
-            }
+            TermType::EvaluateIterator(term) => ArenaRef::<EvaluateIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .capture_depth(),
+            TermType::FilterIterator(term) => ArenaRef::<FilterIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .capture_depth(),
+            TermType::FlattenIterator(term) => ArenaRef::<FlattenIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .capture_depth(),
+            TermType::HashmapKeysIterator(term) => ArenaRef::<HashmapKeysIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .capture_depth(),
+            TermType::HashmapValuesIterator(term) => ArenaRef::<HashmapValuesIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .capture_depth(),
+            TermType::IntegersIterator(term) => ArenaRef::<IntegersIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .capture_depth(),
+            TermType::IntersperseIterator(term) => ArenaRef::<IntersperseIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .capture_depth(),
             TermType::MapIterator(term) => {
-                ArenaRef::<MapIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<MapIteratorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .capture_depth()
             }
-            TermType::OnceIterator(term) => {
-                ArenaRef::<OnceIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .capture_depth()
-            }
-            TermType::RangeIterator(term) => {
-                ArenaRef::<RangeIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .capture_depth()
-            }
-            TermType::RepeatIterator(term) => {
-                ArenaRef::<RepeatIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .capture_depth()
-            }
-            TermType::SkipIterator(term) => {
-                ArenaRef::<SkipIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .capture_depth()
-            }
-            TermType::TakeIterator(term) => {
-                ArenaRef::<TakeIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .capture_depth()
-            }
+            TermType::OnceIterator(term) => ArenaRef::<OnceIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .capture_depth(),
+            TermType::RangeIterator(term) => ArenaRef::<RangeIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .capture_depth(),
+            TermType::RepeatIterator(term) => ArenaRef::<RepeatIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .capture_depth(),
+            TermType::SkipIterator(term) => ArenaRef::<SkipIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .capture_depth(),
+            TermType::TakeIterator(term) => ArenaRef::<TakeIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .capture_depth(),
             TermType::ZipIterator(term) => {
-                ArenaRef::<ZipIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ZipIteratorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .capture_depth()
             }
         }
@@ -1255,164 +1405,176 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, Term, A> {
     fn free_variables(&self) -> HashSet<StackOffset> {
         match &self.as_value().value {
             TermType::Application(term) => {
-                ArenaRef::<ApplicationTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ApplicationTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .free_variables()
             }
             TermType::Boolean(term) => {
-                ArenaRef::<BooleanTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<BooleanTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .free_variables()
             }
             TermType::Builtin(term) => {
-                ArenaRef::<BuiltinTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<BuiltinTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .free_variables()
             }
             TermType::Cell(term) => {
-                ArenaRef::<CellTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<CellTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .free_variables()
             }
             TermType::Compiled(term) => {
-                ArenaRef::<CompiledTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<CompiledTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .free_variables()
             }
             TermType::Condition(term) => {
-                ArenaRef::<ConditionTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ConditionTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .free_variables()
             }
             TermType::Constructor(term) => {
-                ArenaRef::<ConstructorTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ConstructorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .free_variables()
             }
             TermType::Date(term) => {
-                ArenaRef::<DateTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<DateTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .free_variables()
             }
             TermType::Effect(term) => {
-                ArenaRef::<EffectTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<EffectTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .free_variables()
             }
             TermType::Float(term) => {
-                ArenaRef::<FloatTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<FloatTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .free_variables()
             }
             TermType::Hashmap(term) => {
-                ArenaRef::<HashmapTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<HashmapTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .free_variables()
             }
             TermType::Hashset(term) => {
-                ArenaRef::<HashsetTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<HashsetTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .free_variables()
             }
             TermType::Int(term) => {
-                ArenaRef::<IntTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<IntTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .free_variables()
             }
             TermType::Lambda(term) => {
-                ArenaRef::<LambdaTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<LambdaTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .free_variables()
             }
             TermType::Let(term) => {
-                ArenaRef::<LetTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<LetTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .free_variables()
             }
             TermType::List(term) => {
-                ArenaRef::<ListTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ListTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .free_variables()
             }
             TermType::Nil(term) => {
-                ArenaRef::<NilTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<NilTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .free_variables()
             }
             TermType::Partial(term) => {
-                ArenaRef::<PartialTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<PartialTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .free_variables()
             }
             TermType::Pointer(term) => {
-                ArenaRef::<PointerTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<PointerTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .free_variables()
             }
             TermType::Record(term) => {
-                ArenaRef::<RecordTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<RecordTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .free_variables()
             }
             TermType::Signal(term) => {
-                ArenaRef::<SignalTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<SignalTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .free_variables()
             }
             TermType::String(term) => {
-                ArenaRef::<StringTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<StringTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .free_variables()
             }
             TermType::Symbol(term) => {
-                ArenaRef::<SymbolTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<SymbolTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .free_variables()
             }
             TermType::Tree(term) => {
-                ArenaRef::<TreeTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<TreeTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .free_variables()
             }
             TermType::Variable(term) => {
-                ArenaRef::<VariableTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<VariableTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .free_variables()
             }
-            TermType::EmptyIterator(term) => {
-                ArenaRef::<EmptyIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .free_variables()
-            }
-            TermType::EvaluateIterator(term) => {
-                ArenaRef::<EvaluateIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .free_variables()
-            }
-            TermType::FilterIterator(term) => {
-                ArenaRef::<FilterIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .free_variables()
-            }
-            TermType::FlattenIterator(term) => {
-                ArenaRef::<FlattenIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .free_variables()
-            }
-            TermType::HashmapKeysIterator(term) => {
-                ArenaRef::<HashmapKeysIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .free_variables()
-            }
-            TermType::HashmapValuesIterator(term) => ArenaRef::<HashmapValuesIteratorTerm, _>::new(
-                self.arena,
+            TermType::EmptyIterator(term) => ArenaRef::<EmptyIteratorTerm, _>::new(
+                self.arena.clone(),
                 self.arena.get_offset(term),
             )
             .free_variables(),
-            TermType::IntegersIterator(term) => {
-                ArenaRef::<IntegersIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .free_variables()
-            }
-            TermType::IntersperseIterator(term) => {
-                ArenaRef::<IntersperseIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .free_variables()
-            }
+            TermType::EvaluateIterator(term) => ArenaRef::<EvaluateIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .free_variables(),
+            TermType::FilterIterator(term) => ArenaRef::<FilterIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .free_variables(),
+            TermType::FlattenIterator(term) => ArenaRef::<FlattenIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .free_variables(),
+            TermType::HashmapKeysIterator(term) => ArenaRef::<HashmapKeysIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .free_variables(),
+            TermType::HashmapValuesIterator(term) => ArenaRef::<HashmapValuesIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .free_variables(),
+            TermType::IntegersIterator(term) => ArenaRef::<IntegersIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .free_variables(),
+            TermType::IntersperseIterator(term) => ArenaRef::<IntersperseIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .free_variables(),
             TermType::MapIterator(term) => {
-                ArenaRef::<MapIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<MapIteratorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .free_variables()
             }
-            TermType::OnceIterator(term) => {
-                ArenaRef::<OnceIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .free_variables()
-            }
-            TermType::RangeIterator(term) => {
-                ArenaRef::<RangeIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .free_variables()
-            }
-            TermType::RepeatIterator(term) => {
-                ArenaRef::<RepeatIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .free_variables()
-            }
-            TermType::SkipIterator(term) => {
-                ArenaRef::<SkipIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .free_variables()
-            }
-            TermType::TakeIterator(term) => {
-                ArenaRef::<TakeIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .free_variables()
-            }
+            TermType::OnceIterator(term) => ArenaRef::<OnceIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .free_variables(),
+            TermType::RangeIterator(term) => ArenaRef::<RangeIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .free_variables(),
+            TermType::RepeatIterator(term) => ArenaRef::<RepeatIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .free_variables(),
+            TermType::SkipIterator(term) => ArenaRef::<SkipIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .free_variables(),
+            TermType::TakeIterator(term) => ArenaRef::<TakeIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .free_variables(),
             TermType::ZipIterator(term) => {
-                ArenaRef::<ZipIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ZipIteratorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .free_variables()
             }
         }
@@ -1420,164 +1582,176 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, Term, A> {
     fn count_variable_usages(&self, offset: StackOffset) -> usize {
         match &self.as_value().value {
             TermType::Application(term) => {
-                ArenaRef::<ApplicationTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ApplicationTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .count_variable_usages(offset)
             }
             TermType::Boolean(term) => {
-                ArenaRef::<BooleanTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<BooleanTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .count_variable_usages(offset)
             }
             TermType::Builtin(term) => {
-                ArenaRef::<BuiltinTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<BuiltinTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .count_variable_usages(offset)
             }
             TermType::Cell(term) => {
-                ArenaRef::<CellTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<CellTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .count_variable_usages(offset)
             }
             TermType::Compiled(term) => {
-                ArenaRef::<CompiledTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<CompiledTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .count_variable_usages(offset)
             }
             TermType::Condition(term) => {
-                ArenaRef::<ConditionTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ConditionTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .count_variable_usages(offset)
             }
             TermType::Constructor(term) => {
-                ArenaRef::<ConstructorTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ConstructorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .count_variable_usages(offset)
             }
             TermType::Date(term) => {
-                ArenaRef::<DateTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<DateTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .count_variable_usages(offset)
             }
             TermType::Effect(term) => {
-                ArenaRef::<EffectTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<EffectTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .count_variable_usages(offset)
             }
             TermType::Float(term) => {
-                ArenaRef::<FloatTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<FloatTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .count_variable_usages(offset)
             }
             TermType::Hashmap(term) => {
-                ArenaRef::<HashmapTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<HashmapTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .count_variable_usages(offset)
             }
             TermType::Hashset(term) => {
-                ArenaRef::<HashsetTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<HashsetTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .count_variable_usages(offset)
             }
             TermType::Int(term) => {
-                ArenaRef::<IntTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<IntTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .count_variable_usages(offset)
             }
             TermType::Lambda(term) => {
-                ArenaRef::<LambdaTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<LambdaTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .count_variable_usages(offset)
             }
             TermType::Let(term) => {
-                ArenaRef::<LetTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<LetTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .count_variable_usages(offset)
             }
             TermType::List(term) => {
-                ArenaRef::<ListTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ListTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .count_variable_usages(offset)
             }
             TermType::Nil(term) => {
-                ArenaRef::<NilTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<NilTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .count_variable_usages(offset)
             }
             TermType::Partial(term) => {
-                ArenaRef::<PartialTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<PartialTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .count_variable_usages(offset)
             }
             TermType::Pointer(term) => {
-                ArenaRef::<PointerTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<PointerTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .count_variable_usages(offset)
             }
             TermType::Record(term) => {
-                ArenaRef::<RecordTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<RecordTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .count_variable_usages(offset)
             }
             TermType::Signal(term) => {
-                ArenaRef::<SignalTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<SignalTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .count_variable_usages(offset)
             }
             TermType::String(term) => {
-                ArenaRef::<StringTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<StringTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .count_variable_usages(offset)
             }
             TermType::Symbol(term) => {
-                ArenaRef::<SymbolTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<SymbolTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .count_variable_usages(offset)
             }
             TermType::Tree(term) => {
-                ArenaRef::<TreeTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<TreeTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .count_variable_usages(offset)
             }
             TermType::Variable(term) => {
-                ArenaRef::<VariableTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<VariableTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .count_variable_usages(offset)
             }
-            TermType::EmptyIterator(term) => {
-                ArenaRef::<EmptyIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .count_variable_usages(offset)
-            }
-            TermType::EvaluateIterator(term) => {
-                ArenaRef::<EvaluateIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .count_variable_usages(offset)
-            }
-            TermType::FilterIterator(term) => {
-                ArenaRef::<FilterIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .count_variable_usages(offset)
-            }
-            TermType::FlattenIterator(term) => {
-                ArenaRef::<FlattenIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .count_variable_usages(offset)
-            }
-            TermType::HashmapKeysIterator(term) => {
-                ArenaRef::<HashmapKeysIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .count_variable_usages(offset)
-            }
-            TermType::HashmapValuesIterator(term) => ArenaRef::<HashmapValuesIteratorTerm, _>::new(
-                self.arena,
+            TermType::EmptyIterator(term) => ArenaRef::<EmptyIteratorTerm, _>::new(
+                self.arena.clone(),
                 self.arena.get_offset(term),
             )
             .count_variable_usages(offset),
-            TermType::IntegersIterator(term) => {
-                ArenaRef::<IntegersIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .count_variable_usages(offset)
-            }
-            TermType::IntersperseIterator(term) => {
-                ArenaRef::<IntersperseIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .count_variable_usages(offset)
-            }
+            TermType::EvaluateIterator(term) => ArenaRef::<EvaluateIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .count_variable_usages(offset),
+            TermType::FilterIterator(term) => ArenaRef::<FilterIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .count_variable_usages(offset),
+            TermType::FlattenIterator(term) => ArenaRef::<FlattenIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .count_variable_usages(offset),
+            TermType::HashmapKeysIterator(term) => ArenaRef::<HashmapKeysIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .count_variable_usages(offset),
+            TermType::HashmapValuesIterator(term) => ArenaRef::<HashmapValuesIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .count_variable_usages(offset),
+            TermType::IntegersIterator(term) => ArenaRef::<IntegersIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .count_variable_usages(offset),
+            TermType::IntersperseIterator(term) => ArenaRef::<IntersperseIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .count_variable_usages(offset),
             TermType::MapIterator(term) => {
-                ArenaRef::<MapIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<MapIteratorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .count_variable_usages(offset)
             }
-            TermType::OnceIterator(term) => {
-                ArenaRef::<OnceIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .count_variable_usages(offset)
-            }
-            TermType::RangeIterator(term) => {
-                ArenaRef::<RangeIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .count_variable_usages(offset)
-            }
-            TermType::RepeatIterator(term) => {
-                ArenaRef::<RepeatIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .count_variable_usages(offset)
-            }
-            TermType::SkipIterator(term) => {
-                ArenaRef::<SkipIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .count_variable_usages(offset)
-            }
-            TermType::TakeIterator(term) => {
-                ArenaRef::<TakeIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .count_variable_usages(offset)
-            }
+            TermType::OnceIterator(term) => ArenaRef::<OnceIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .count_variable_usages(offset),
+            TermType::RangeIterator(term) => ArenaRef::<RangeIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .count_variable_usages(offset),
+            TermType::RepeatIterator(term) => ArenaRef::<RepeatIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .count_variable_usages(offset),
+            TermType::SkipIterator(term) => ArenaRef::<SkipIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .count_variable_usages(offset),
+            TermType::TakeIterator(term) => ArenaRef::<TakeIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .count_variable_usages(offset),
             TermType::ZipIterator(term) => {
-                ArenaRef::<ZipIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ZipIteratorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .count_variable_usages(offset)
             }
         }
@@ -1585,164 +1759,176 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, Term, A> {
     fn dynamic_dependencies(&self, deep: bool) -> DependencyList {
         match &self.as_value().value {
             TermType::Application(term) => {
-                ArenaRef::<ApplicationTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ApplicationTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .dynamic_dependencies(deep)
             }
             TermType::Boolean(term) => {
-                ArenaRef::<BooleanTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<BooleanTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .dynamic_dependencies(deep)
             }
             TermType::Builtin(term) => {
-                ArenaRef::<BuiltinTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<BuiltinTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .dynamic_dependencies(deep)
             }
             TermType::Cell(term) => {
-                ArenaRef::<CellTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<CellTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .dynamic_dependencies(deep)
             }
             TermType::Compiled(term) => {
-                ArenaRef::<CompiledTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<CompiledTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .dynamic_dependencies(deep)
             }
             TermType::Condition(term) => {
-                ArenaRef::<ConditionTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ConditionTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .dynamic_dependencies(deep)
             }
             TermType::Constructor(term) => {
-                ArenaRef::<ConstructorTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ConstructorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .dynamic_dependencies(deep)
             }
             TermType::Date(term) => {
-                ArenaRef::<DateTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<DateTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .dynamic_dependencies(deep)
             }
             TermType::Effect(term) => {
-                ArenaRef::<EffectTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<EffectTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .dynamic_dependencies(deep)
             }
             TermType::Float(term) => {
-                ArenaRef::<FloatTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<FloatTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .dynamic_dependencies(deep)
             }
             TermType::Hashmap(term) => {
-                ArenaRef::<HashmapTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<HashmapTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .dynamic_dependencies(deep)
             }
             TermType::Hashset(term) => {
-                ArenaRef::<HashsetTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<HashsetTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .dynamic_dependencies(deep)
             }
             TermType::Int(term) => {
-                ArenaRef::<IntTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<IntTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .dynamic_dependencies(deep)
             }
             TermType::Lambda(term) => {
-                ArenaRef::<LambdaTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<LambdaTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .dynamic_dependencies(deep)
             }
             TermType::Let(term) => {
-                ArenaRef::<LetTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<LetTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .dynamic_dependencies(deep)
             }
             TermType::List(term) => {
-                ArenaRef::<ListTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ListTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .dynamic_dependencies(deep)
             }
             TermType::Nil(term) => {
-                ArenaRef::<NilTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<NilTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .dynamic_dependencies(deep)
             }
             TermType::Partial(term) => {
-                ArenaRef::<PartialTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<PartialTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .dynamic_dependencies(deep)
             }
             TermType::Pointer(term) => {
-                ArenaRef::<PointerTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<PointerTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .dynamic_dependencies(deep)
             }
             TermType::Record(term) => {
-                ArenaRef::<RecordTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<RecordTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .dynamic_dependencies(deep)
             }
             TermType::Signal(term) => {
-                ArenaRef::<SignalTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<SignalTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .dynamic_dependencies(deep)
             }
             TermType::String(term) => {
-                ArenaRef::<StringTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<StringTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .dynamic_dependencies(deep)
             }
             TermType::Symbol(term) => {
-                ArenaRef::<SymbolTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<SymbolTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .dynamic_dependencies(deep)
             }
             TermType::Tree(term) => {
-                ArenaRef::<TreeTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<TreeTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .dynamic_dependencies(deep)
             }
             TermType::Variable(term) => {
-                ArenaRef::<VariableTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<VariableTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .dynamic_dependencies(deep)
             }
-            TermType::EmptyIterator(term) => {
-                ArenaRef::<EmptyIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .dynamic_dependencies(deep)
-            }
-            TermType::EvaluateIterator(term) => {
-                ArenaRef::<EvaluateIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .dynamic_dependencies(deep)
-            }
-            TermType::FilterIterator(term) => {
-                ArenaRef::<FilterIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .dynamic_dependencies(deep)
-            }
-            TermType::FlattenIterator(term) => {
-                ArenaRef::<FlattenIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .dynamic_dependencies(deep)
-            }
-            TermType::HashmapKeysIterator(term) => {
-                ArenaRef::<HashmapKeysIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .dynamic_dependencies(deep)
-            }
-            TermType::HashmapValuesIterator(term) => ArenaRef::<HashmapValuesIteratorTerm, _>::new(
-                self.arena,
+            TermType::EmptyIterator(term) => ArenaRef::<EmptyIteratorTerm, _>::new(
+                self.arena.clone(),
                 self.arena.get_offset(term),
             )
             .dynamic_dependencies(deep),
-            TermType::IntegersIterator(term) => {
-                ArenaRef::<IntegersIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .dynamic_dependencies(deep)
-            }
-            TermType::IntersperseIterator(term) => {
-                ArenaRef::<IntersperseIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .dynamic_dependencies(deep)
-            }
+            TermType::EvaluateIterator(term) => ArenaRef::<EvaluateIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .dynamic_dependencies(deep),
+            TermType::FilterIterator(term) => ArenaRef::<FilterIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .dynamic_dependencies(deep),
+            TermType::FlattenIterator(term) => ArenaRef::<FlattenIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .dynamic_dependencies(deep),
+            TermType::HashmapKeysIterator(term) => ArenaRef::<HashmapKeysIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .dynamic_dependencies(deep),
+            TermType::HashmapValuesIterator(term) => ArenaRef::<HashmapValuesIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .dynamic_dependencies(deep),
+            TermType::IntegersIterator(term) => ArenaRef::<IntegersIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .dynamic_dependencies(deep),
+            TermType::IntersperseIterator(term) => ArenaRef::<IntersperseIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .dynamic_dependencies(deep),
             TermType::MapIterator(term) => {
-                ArenaRef::<MapIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<MapIteratorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .dynamic_dependencies(deep)
             }
-            TermType::OnceIterator(term) => {
-                ArenaRef::<OnceIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .dynamic_dependencies(deep)
-            }
-            TermType::RangeIterator(term) => {
-                ArenaRef::<RangeIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .dynamic_dependencies(deep)
-            }
-            TermType::RepeatIterator(term) => {
-                ArenaRef::<RepeatIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .dynamic_dependencies(deep)
-            }
-            TermType::SkipIterator(term) => {
-                ArenaRef::<SkipIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .dynamic_dependencies(deep)
-            }
-            TermType::TakeIterator(term) => {
-                ArenaRef::<TakeIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .dynamic_dependencies(deep)
-            }
+            TermType::OnceIterator(term) => ArenaRef::<OnceIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .dynamic_dependencies(deep),
+            TermType::RangeIterator(term) => ArenaRef::<RangeIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .dynamic_dependencies(deep),
+            TermType::RepeatIterator(term) => ArenaRef::<RepeatIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .dynamic_dependencies(deep),
+            TermType::SkipIterator(term) => ArenaRef::<SkipIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .dynamic_dependencies(deep),
+            TermType::TakeIterator(term) => ArenaRef::<TakeIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .dynamic_dependencies(deep),
             TermType::ZipIterator(term) => {
-                ArenaRef::<ZipIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ZipIteratorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .dynamic_dependencies(deep)
             }
         }
@@ -1750,164 +1936,176 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, Term, A> {
     fn has_dynamic_dependencies(&self, deep: bool) -> bool {
         match &self.as_value().value {
             TermType::Application(term) => {
-                ArenaRef::<ApplicationTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ApplicationTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .has_dynamic_dependencies(deep)
             }
             TermType::Boolean(term) => {
-                ArenaRef::<BooleanTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<BooleanTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .has_dynamic_dependencies(deep)
             }
             TermType::Builtin(term) => {
-                ArenaRef::<BuiltinTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<BuiltinTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .has_dynamic_dependencies(deep)
             }
             TermType::Cell(term) => {
-                ArenaRef::<CellTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<CellTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .has_dynamic_dependencies(deep)
             }
             TermType::Compiled(term) => {
-                ArenaRef::<CompiledTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<CompiledTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .has_dynamic_dependencies(deep)
             }
             TermType::Condition(term) => {
-                ArenaRef::<ConditionTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ConditionTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .has_dynamic_dependencies(deep)
             }
             TermType::Constructor(term) => {
-                ArenaRef::<ConstructorTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ConstructorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .has_dynamic_dependencies(deep)
             }
             TermType::Date(term) => {
-                ArenaRef::<DateTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<DateTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .has_dynamic_dependencies(deep)
             }
             TermType::Effect(term) => {
-                ArenaRef::<EffectTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<EffectTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .has_dynamic_dependencies(deep)
             }
             TermType::Float(term) => {
-                ArenaRef::<FloatTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<FloatTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .has_dynamic_dependencies(deep)
             }
             TermType::Hashmap(term) => {
-                ArenaRef::<HashmapTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<HashmapTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .has_dynamic_dependencies(deep)
             }
             TermType::Hashset(term) => {
-                ArenaRef::<HashsetTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<HashsetTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .has_dynamic_dependencies(deep)
             }
             TermType::Int(term) => {
-                ArenaRef::<IntTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<IntTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .has_dynamic_dependencies(deep)
             }
             TermType::Lambda(term) => {
-                ArenaRef::<LambdaTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<LambdaTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .has_dynamic_dependencies(deep)
             }
             TermType::Let(term) => {
-                ArenaRef::<LetTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<LetTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .has_dynamic_dependencies(deep)
             }
             TermType::List(term) => {
-                ArenaRef::<ListTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ListTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .has_dynamic_dependencies(deep)
             }
             TermType::Nil(term) => {
-                ArenaRef::<NilTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<NilTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .has_dynamic_dependencies(deep)
             }
             TermType::Partial(term) => {
-                ArenaRef::<PartialTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<PartialTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .has_dynamic_dependencies(deep)
             }
             TermType::Pointer(term) => {
-                ArenaRef::<PointerTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<PointerTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .has_dynamic_dependencies(deep)
             }
             TermType::Record(term) => {
-                ArenaRef::<RecordTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<RecordTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .has_dynamic_dependencies(deep)
             }
             TermType::Signal(term) => {
-                ArenaRef::<SignalTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<SignalTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .has_dynamic_dependencies(deep)
             }
             TermType::String(term) => {
-                ArenaRef::<StringTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<StringTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .has_dynamic_dependencies(deep)
             }
             TermType::Symbol(term) => {
-                ArenaRef::<SymbolTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<SymbolTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .has_dynamic_dependencies(deep)
             }
             TermType::Tree(term) => {
-                ArenaRef::<TreeTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<TreeTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .has_dynamic_dependencies(deep)
             }
             TermType::Variable(term) => {
-                ArenaRef::<VariableTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<VariableTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .has_dynamic_dependencies(deep)
             }
-            TermType::EmptyIterator(term) => {
-                ArenaRef::<EmptyIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .has_dynamic_dependencies(deep)
-            }
-            TermType::EvaluateIterator(term) => {
-                ArenaRef::<EvaluateIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .has_dynamic_dependencies(deep)
-            }
-            TermType::FilterIterator(term) => {
-                ArenaRef::<FilterIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .has_dynamic_dependencies(deep)
-            }
-            TermType::FlattenIterator(term) => {
-                ArenaRef::<FlattenIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .has_dynamic_dependencies(deep)
-            }
-            TermType::HashmapKeysIterator(term) => {
-                ArenaRef::<HashmapKeysIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .has_dynamic_dependencies(deep)
-            }
-            TermType::HashmapValuesIterator(term) => ArenaRef::<HashmapValuesIteratorTerm, _>::new(
-                self.arena,
+            TermType::EmptyIterator(term) => ArenaRef::<EmptyIteratorTerm, _>::new(
+                self.arena.clone(),
                 self.arena.get_offset(term),
             )
             .has_dynamic_dependencies(deep),
-            TermType::IntegersIterator(term) => {
-                ArenaRef::<IntegersIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .has_dynamic_dependencies(deep)
-            }
-            TermType::IntersperseIterator(term) => {
-                ArenaRef::<IntersperseIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .has_dynamic_dependencies(deep)
-            }
+            TermType::EvaluateIterator(term) => ArenaRef::<EvaluateIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .has_dynamic_dependencies(deep),
+            TermType::FilterIterator(term) => ArenaRef::<FilterIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .has_dynamic_dependencies(deep),
+            TermType::FlattenIterator(term) => ArenaRef::<FlattenIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .has_dynamic_dependencies(deep),
+            TermType::HashmapKeysIterator(term) => ArenaRef::<HashmapKeysIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .has_dynamic_dependencies(deep),
+            TermType::HashmapValuesIterator(term) => ArenaRef::<HashmapValuesIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .has_dynamic_dependencies(deep),
+            TermType::IntegersIterator(term) => ArenaRef::<IntegersIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .has_dynamic_dependencies(deep),
+            TermType::IntersperseIterator(term) => ArenaRef::<IntersperseIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .has_dynamic_dependencies(deep),
             TermType::MapIterator(term) => {
-                ArenaRef::<MapIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<MapIteratorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .has_dynamic_dependencies(deep)
             }
-            TermType::OnceIterator(term) => {
-                ArenaRef::<OnceIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .has_dynamic_dependencies(deep)
-            }
-            TermType::RangeIterator(term) => {
-                ArenaRef::<RangeIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .has_dynamic_dependencies(deep)
-            }
-            TermType::RepeatIterator(term) => {
-                ArenaRef::<RepeatIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .has_dynamic_dependencies(deep)
-            }
-            TermType::SkipIterator(term) => {
-                ArenaRef::<SkipIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .has_dynamic_dependencies(deep)
-            }
-            TermType::TakeIterator(term) => {
-                ArenaRef::<TakeIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .has_dynamic_dependencies(deep)
-            }
+            TermType::OnceIterator(term) => ArenaRef::<OnceIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .has_dynamic_dependencies(deep),
+            TermType::RangeIterator(term) => ArenaRef::<RangeIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .has_dynamic_dependencies(deep),
+            TermType::RepeatIterator(term) => ArenaRef::<RepeatIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .has_dynamic_dependencies(deep),
+            TermType::SkipIterator(term) => ArenaRef::<SkipIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .has_dynamic_dependencies(deep),
+            TermType::TakeIterator(term) => ArenaRef::<TakeIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .has_dynamic_dependencies(deep),
             TermType::ZipIterator(term) => {
-                ArenaRef::<ZipIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ZipIteratorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .has_dynamic_dependencies(deep)
             }
         }
@@ -1915,144 +2113,176 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, Term, A> {
     fn is_static(&self) -> bool {
         match &self.as_value().value {
             TermType::Application(term) => {
-                ArenaRef::<ApplicationTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ApplicationTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .is_static()
             }
             TermType::Boolean(term) => {
-                ArenaRef::<BooleanTerm, _>::new(self.arena, self.arena.get_offset(term)).is_static()
+                ArenaRef::<BooleanTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_static()
             }
             TermType::Builtin(term) => {
-                ArenaRef::<BuiltinTerm, _>::new(self.arena, self.arena.get_offset(term)).is_static()
+                ArenaRef::<BuiltinTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_static()
             }
             TermType::Cell(term) => {
-                ArenaRef::<CellTerm, _>::new(self.arena, self.arena.get_offset(term)).is_static()
+                ArenaRef::<CellTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_static()
             }
             TermType::Compiled(term) => {
-                ArenaRef::<CompiledTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<CompiledTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .is_static()
             }
             TermType::Condition(term) => {
-                ArenaRef::<ConditionTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ConditionTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .is_static()
             }
             TermType::Constructor(term) => {
-                ArenaRef::<ConstructorTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ConstructorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .is_static()
             }
             TermType::Date(term) => {
-                ArenaRef::<DateTerm, _>::new(self.arena, self.arena.get_offset(term)).is_static()
+                ArenaRef::<DateTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_static()
             }
             TermType::Effect(term) => {
-                ArenaRef::<EffectTerm, _>::new(self.arena, self.arena.get_offset(term)).is_static()
+                ArenaRef::<EffectTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_static()
             }
             TermType::Float(term) => {
-                ArenaRef::<FloatTerm, _>::new(self.arena, self.arena.get_offset(term)).is_static()
+                ArenaRef::<FloatTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_static()
             }
             TermType::Hashmap(term) => {
-                ArenaRef::<HashmapTerm, _>::new(self.arena, self.arena.get_offset(term)).is_static()
+                ArenaRef::<HashmapTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_static()
             }
             TermType::Hashset(term) => {
-                ArenaRef::<HashsetTerm, _>::new(self.arena, self.arena.get_offset(term)).is_static()
+                ArenaRef::<HashsetTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_static()
             }
             TermType::Int(term) => {
-                ArenaRef::<IntTerm, _>::new(self.arena, self.arena.get_offset(term)).is_static()
+                ArenaRef::<IntTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_static()
             }
             TermType::Lambda(term) => {
-                ArenaRef::<LambdaTerm, _>::new(self.arena, self.arena.get_offset(term)).is_static()
+                ArenaRef::<LambdaTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_static()
             }
             TermType::Let(term) => {
-                ArenaRef::<LetTerm, _>::new(self.arena, self.arena.get_offset(term)).is_static()
+                ArenaRef::<LetTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_static()
             }
             TermType::List(term) => {
-                ArenaRef::<ListTerm, _>::new(self.arena, self.arena.get_offset(term)).is_static()
+                ArenaRef::<ListTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_static()
             }
             TermType::Nil(term) => {
-                ArenaRef::<NilTerm, _>::new(self.arena, self.arena.get_offset(term)).is_static()
+                ArenaRef::<NilTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_static()
             }
             TermType::Partial(term) => {
-                ArenaRef::<PartialTerm, _>::new(self.arena, self.arena.get_offset(term)).is_static()
+                ArenaRef::<PartialTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_static()
             }
             TermType::Pointer(term) => {
-                ArenaRef::<PointerTerm, _>::new(self.arena, self.arena.get_offset(term)).is_static()
+                ArenaRef::<PointerTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_static()
             }
             TermType::Record(term) => {
-                ArenaRef::<RecordTerm, _>::new(self.arena, self.arena.get_offset(term)).is_static()
+                ArenaRef::<RecordTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_static()
             }
             TermType::Signal(term) => {
-                ArenaRef::<SignalTerm, _>::new(self.arena, self.arena.get_offset(term)).is_static()
+                ArenaRef::<SignalTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_static()
             }
             TermType::String(term) => {
-                ArenaRef::<StringTerm, _>::new(self.arena, self.arena.get_offset(term)).is_static()
+                ArenaRef::<StringTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_static()
             }
             TermType::Symbol(term) => {
-                ArenaRef::<SymbolTerm, _>::new(self.arena, self.arena.get_offset(term)).is_static()
+                ArenaRef::<SymbolTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_static()
             }
             TermType::Tree(term) => {
-                ArenaRef::<TreeTerm, _>::new(self.arena, self.arena.get_offset(term)).is_static()
+                ArenaRef::<TreeTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_static()
             }
             TermType::Variable(term) => {
-                ArenaRef::<VariableTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<VariableTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .is_static()
             }
-            TermType::EmptyIterator(term) => {
-                ArenaRef::<EmptyIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_static()
-            }
-            TermType::EvaluateIterator(term) => {
-                ArenaRef::<EvaluateIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_static()
-            }
-            TermType::FilterIterator(term) => {
-                ArenaRef::<FilterIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_static()
-            }
-            TermType::FlattenIterator(term) => {
-                ArenaRef::<FlattenIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_static()
-            }
-            TermType::HashmapKeysIterator(term) => {
-                ArenaRef::<HashmapKeysIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_static()
-            }
-            TermType::HashmapValuesIterator(term) => ArenaRef::<HashmapValuesIteratorTerm, _>::new(
-                self.arena,
+            TermType::EmptyIterator(term) => ArenaRef::<EmptyIteratorTerm, _>::new(
+                self.arena.clone(),
                 self.arena.get_offset(term),
             )
             .is_static(),
-            TermType::IntegersIterator(term) => {
-                ArenaRef::<IntegersIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_static()
-            }
-            TermType::IntersperseIterator(term) => {
-                ArenaRef::<IntersperseIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_static()
-            }
+            TermType::EvaluateIterator(term) => ArenaRef::<EvaluateIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_static(),
+            TermType::FilterIterator(term) => ArenaRef::<FilterIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_static(),
+            TermType::FlattenIterator(term) => ArenaRef::<FlattenIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_static(),
+            TermType::HashmapKeysIterator(term) => ArenaRef::<HashmapKeysIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_static(),
+            TermType::HashmapValuesIterator(term) => ArenaRef::<HashmapValuesIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_static(),
+            TermType::IntegersIterator(term) => ArenaRef::<IntegersIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_static(),
+            TermType::IntersperseIterator(term) => ArenaRef::<IntersperseIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_static(),
             TermType::MapIterator(term) => {
-                ArenaRef::<MapIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<MapIteratorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .is_static()
             }
-            TermType::OnceIterator(term) => {
-                ArenaRef::<OnceIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_static()
-            }
-            TermType::RangeIterator(term) => {
-                ArenaRef::<RangeIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_static()
-            }
-            TermType::RepeatIterator(term) => {
-                ArenaRef::<RepeatIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_static()
-            }
-            TermType::SkipIterator(term) => {
-                ArenaRef::<SkipIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_static()
-            }
-            TermType::TakeIterator(term) => {
-                ArenaRef::<TakeIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_static()
-            }
+            TermType::OnceIterator(term) => ArenaRef::<OnceIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_static(),
+            TermType::RangeIterator(term) => ArenaRef::<RangeIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_static(),
+            TermType::RepeatIterator(term) => ArenaRef::<RepeatIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_static(),
+            TermType::SkipIterator(term) => ArenaRef::<SkipIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_static(),
+            TermType::TakeIterator(term) => ArenaRef::<TakeIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_static(),
             TermType::ZipIterator(term) => {
-                ArenaRef::<ZipIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ZipIteratorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .is_static()
             }
         }
@@ -2060,144 +2290,176 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, Term, A> {
     fn is_atomic(&self) -> bool {
         match &self.as_value().value {
             TermType::Application(term) => {
-                ArenaRef::<ApplicationTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ApplicationTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .is_atomic()
             }
             TermType::Boolean(term) => {
-                ArenaRef::<BooleanTerm, _>::new(self.arena, self.arena.get_offset(term)).is_atomic()
+                ArenaRef::<BooleanTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_atomic()
             }
             TermType::Builtin(term) => {
-                ArenaRef::<BuiltinTerm, _>::new(self.arena, self.arena.get_offset(term)).is_atomic()
+                ArenaRef::<BuiltinTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_atomic()
             }
             TermType::Cell(term) => {
-                ArenaRef::<CellTerm, _>::new(self.arena, self.arena.get_offset(term)).is_atomic()
+                ArenaRef::<CellTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_atomic()
             }
             TermType::Compiled(term) => {
-                ArenaRef::<CompiledTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<CompiledTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .is_atomic()
             }
             TermType::Condition(term) => {
-                ArenaRef::<ConditionTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ConditionTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .is_atomic()
             }
             TermType::Constructor(term) => {
-                ArenaRef::<ConstructorTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ConstructorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .is_atomic()
             }
             TermType::Date(term) => {
-                ArenaRef::<DateTerm, _>::new(self.arena, self.arena.get_offset(term)).is_atomic()
+                ArenaRef::<DateTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_atomic()
             }
             TermType::Effect(term) => {
-                ArenaRef::<EffectTerm, _>::new(self.arena, self.arena.get_offset(term)).is_atomic()
+                ArenaRef::<EffectTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_atomic()
             }
             TermType::Float(term) => {
-                ArenaRef::<FloatTerm, _>::new(self.arena, self.arena.get_offset(term)).is_atomic()
+                ArenaRef::<FloatTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_atomic()
             }
             TermType::Hashmap(term) => {
-                ArenaRef::<HashmapTerm, _>::new(self.arena, self.arena.get_offset(term)).is_atomic()
+                ArenaRef::<HashmapTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_atomic()
             }
             TermType::Hashset(term) => {
-                ArenaRef::<HashsetTerm, _>::new(self.arena, self.arena.get_offset(term)).is_atomic()
+                ArenaRef::<HashsetTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_atomic()
             }
             TermType::Int(term) => {
-                ArenaRef::<IntTerm, _>::new(self.arena, self.arena.get_offset(term)).is_atomic()
+                ArenaRef::<IntTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_atomic()
             }
             TermType::Lambda(term) => {
-                ArenaRef::<LambdaTerm, _>::new(self.arena, self.arena.get_offset(term)).is_atomic()
+                ArenaRef::<LambdaTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_atomic()
             }
             TermType::Let(term) => {
-                ArenaRef::<LetTerm, _>::new(self.arena, self.arena.get_offset(term)).is_atomic()
+                ArenaRef::<LetTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_atomic()
             }
             TermType::List(term) => {
-                ArenaRef::<ListTerm, _>::new(self.arena, self.arena.get_offset(term)).is_atomic()
+                ArenaRef::<ListTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_atomic()
             }
             TermType::Nil(term) => {
-                ArenaRef::<NilTerm, _>::new(self.arena, self.arena.get_offset(term)).is_atomic()
+                ArenaRef::<NilTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_atomic()
             }
             TermType::Partial(term) => {
-                ArenaRef::<PartialTerm, _>::new(self.arena, self.arena.get_offset(term)).is_atomic()
+                ArenaRef::<PartialTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_atomic()
             }
             TermType::Pointer(term) => {
-                ArenaRef::<PointerTerm, _>::new(self.arena, self.arena.get_offset(term)).is_atomic()
+                ArenaRef::<PointerTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_atomic()
             }
             TermType::Record(term) => {
-                ArenaRef::<RecordTerm, _>::new(self.arena, self.arena.get_offset(term)).is_atomic()
+                ArenaRef::<RecordTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_atomic()
             }
             TermType::Signal(term) => {
-                ArenaRef::<SignalTerm, _>::new(self.arena, self.arena.get_offset(term)).is_atomic()
+                ArenaRef::<SignalTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_atomic()
             }
             TermType::String(term) => {
-                ArenaRef::<StringTerm, _>::new(self.arena, self.arena.get_offset(term)).is_atomic()
+                ArenaRef::<StringTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_atomic()
             }
             TermType::Symbol(term) => {
-                ArenaRef::<SymbolTerm, _>::new(self.arena, self.arena.get_offset(term)).is_atomic()
+                ArenaRef::<SymbolTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_atomic()
             }
             TermType::Tree(term) => {
-                ArenaRef::<TreeTerm, _>::new(self.arena, self.arena.get_offset(term)).is_atomic()
+                ArenaRef::<TreeTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_atomic()
             }
             TermType::Variable(term) => {
-                ArenaRef::<VariableTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<VariableTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .is_atomic()
             }
-            TermType::EmptyIterator(term) => {
-                ArenaRef::<EmptyIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_atomic()
-            }
-            TermType::EvaluateIterator(term) => {
-                ArenaRef::<EvaluateIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_atomic()
-            }
-            TermType::FilterIterator(term) => {
-                ArenaRef::<FilterIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_atomic()
-            }
-            TermType::FlattenIterator(term) => {
-                ArenaRef::<FlattenIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_atomic()
-            }
-            TermType::HashmapKeysIterator(term) => {
-                ArenaRef::<HashmapKeysIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_atomic()
-            }
-            TermType::HashmapValuesIterator(term) => ArenaRef::<HashmapValuesIteratorTerm, _>::new(
-                self.arena,
+            TermType::EmptyIterator(term) => ArenaRef::<EmptyIteratorTerm, _>::new(
+                self.arena.clone(),
                 self.arena.get_offset(term),
             )
             .is_atomic(),
-            TermType::IntegersIterator(term) => {
-                ArenaRef::<IntegersIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_atomic()
-            }
-            TermType::IntersperseIterator(term) => {
-                ArenaRef::<IntersperseIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_atomic()
-            }
+            TermType::EvaluateIterator(term) => ArenaRef::<EvaluateIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_atomic(),
+            TermType::FilterIterator(term) => ArenaRef::<FilterIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_atomic(),
+            TermType::FlattenIterator(term) => ArenaRef::<FlattenIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_atomic(),
+            TermType::HashmapKeysIterator(term) => ArenaRef::<HashmapKeysIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_atomic(),
+            TermType::HashmapValuesIterator(term) => ArenaRef::<HashmapValuesIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_atomic(),
+            TermType::IntegersIterator(term) => ArenaRef::<IntegersIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_atomic(),
+            TermType::IntersperseIterator(term) => ArenaRef::<IntersperseIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_atomic(),
             TermType::MapIterator(term) => {
-                ArenaRef::<MapIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<MapIteratorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .is_atomic()
             }
-            TermType::OnceIterator(term) => {
-                ArenaRef::<OnceIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_atomic()
-            }
-            TermType::RangeIterator(term) => {
-                ArenaRef::<RangeIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_atomic()
-            }
-            TermType::RepeatIterator(term) => {
-                ArenaRef::<RepeatIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_atomic()
-            }
-            TermType::SkipIterator(term) => {
-                ArenaRef::<SkipIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_atomic()
-            }
-            TermType::TakeIterator(term) => {
-                ArenaRef::<TakeIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_atomic()
-            }
+            TermType::OnceIterator(term) => ArenaRef::<OnceIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_atomic(),
+            TermType::RangeIterator(term) => ArenaRef::<RangeIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_atomic(),
+            TermType::RepeatIterator(term) => ArenaRef::<RepeatIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_atomic(),
+            TermType::SkipIterator(term) => ArenaRef::<SkipIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_atomic(),
+            TermType::TakeIterator(term) => ArenaRef::<TakeIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_atomic(),
             TermType::ZipIterator(term) => {
-                ArenaRef::<ZipIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ZipIteratorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .is_static()
             }
         }
@@ -2205,295 +2467,356 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, Term, A> {
     fn is_complex(&self) -> bool {
         match &self.as_value().value {
             TermType::Application(term) => {
-                ArenaRef::<ApplicationTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ApplicationTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .is_complex()
             }
             TermType::Boolean(term) => {
-                ArenaRef::<BooleanTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<BooleanTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .is_complex()
             }
             TermType::Builtin(term) => {
-                ArenaRef::<BuiltinTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<BuiltinTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .is_complex()
             }
             TermType::Cell(term) => {
-                ArenaRef::<CellTerm, _>::new(self.arena, self.arena.get_offset(term)).is_complex()
+                ArenaRef::<CellTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_complex()
             }
             TermType::Compiled(term) => {
-                ArenaRef::<CompiledTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<CompiledTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .is_complex()
             }
             TermType::Condition(term) => {
-                ArenaRef::<ConditionTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ConditionTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .is_complex()
             }
             TermType::Constructor(term) => {
-                ArenaRef::<ConstructorTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ConstructorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .is_complex()
             }
             TermType::Date(term) => {
-                ArenaRef::<DateTerm, _>::new(self.arena, self.arena.get_offset(term)).is_complex()
+                ArenaRef::<DateTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_complex()
             }
             TermType::Effect(term) => {
-                ArenaRef::<EffectTerm, _>::new(self.arena, self.arena.get_offset(term)).is_complex()
+                ArenaRef::<EffectTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_complex()
             }
             TermType::Float(term) => {
-                ArenaRef::<FloatTerm, _>::new(self.arena, self.arena.get_offset(term)).is_complex()
+                ArenaRef::<FloatTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_complex()
             }
             TermType::Hashmap(term) => {
-                ArenaRef::<HashmapTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<HashmapTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .is_complex()
             }
             TermType::Hashset(term) => {
-                ArenaRef::<HashsetTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<HashsetTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .is_complex()
             }
             TermType::Int(term) => {
-                ArenaRef::<IntTerm, _>::new(self.arena, self.arena.get_offset(term)).is_complex()
+                ArenaRef::<IntTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_complex()
             }
             TermType::Lambda(term) => {
-                ArenaRef::<LambdaTerm, _>::new(self.arena, self.arena.get_offset(term)).is_complex()
+                ArenaRef::<LambdaTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_complex()
             }
             TermType::Let(term) => {
-                ArenaRef::<LetTerm, _>::new(self.arena, self.arena.get_offset(term)).is_complex()
+                ArenaRef::<LetTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_complex()
             }
             TermType::List(term) => {
-                ArenaRef::<ListTerm, _>::new(self.arena, self.arena.get_offset(term)).is_complex()
+                ArenaRef::<ListTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_complex()
             }
             TermType::Nil(term) => {
-                ArenaRef::<NilTerm, _>::new(self.arena, self.arena.get_offset(term)).is_complex()
+                ArenaRef::<NilTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_complex()
             }
             TermType::Partial(term) => {
-                ArenaRef::<PartialTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<PartialTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .is_complex()
             }
             TermType::Pointer(term) => {
-                ArenaRef::<PointerTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<PointerTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .is_complex()
             }
             TermType::Record(term) => {
-                ArenaRef::<RecordTerm, _>::new(self.arena, self.arena.get_offset(term)).is_complex()
+                ArenaRef::<RecordTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_complex()
             }
             TermType::Signal(term) => {
-                ArenaRef::<SignalTerm, _>::new(self.arena, self.arena.get_offset(term)).is_complex()
+                ArenaRef::<SignalTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_complex()
             }
             TermType::String(term) => {
-                ArenaRef::<StringTerm, _>::new(self.arena, self.arena.get_offset(term)).is_complex()
+                ArenaRef::<StringTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_complex()
             }
             TermType::Symbol(term) => {
-                ArenaRef::<SymbolTerm, _>::new(self.arena, self.arena.get_offset(term)).is_complex()
+                ArenaRef::<SymbolTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_complex()
             }
             TermType::Tree(term) => {
-                ArenaRef::<TreeTerm, _>::new(self.arena, self.arena.get_offset(term)).is_complex()
+                ArenaRef::<TreeTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .is_complex()
             }
             TermType::Variable(term) => {
-                ArenaRef::<VariableTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<VariableTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .is_complex()
             }
-            TermType::EmptyIterator(term) => {
-                ArenaRef::<EmptyIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_complex()
-            }
-            TermType::EvaluateIterator(term) => {
-                ArenaRef::<EvaluateIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_complex()
-            }
-            TermType::FilterIterator(term) => {
-                ArenaRef::<FilterIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_complex()
-            }
-            TermType::FlattenIterator(term) => {
-                ArenaRef::<FlattenIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_complex()
-            }
-            TermType::HashmapKeysIterator(term) => {
-                ArenaRef::<HashmapKeysIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_complex()
-            }
-            TermType::HashmapValuesIterator(term) => ArenaRef::<HashmapValuesIteratorTerm, _>::new(
-                self.arena,
+            TermType::EmptyIterator(term) => ArenaRef::<EmptyIteratorTerm, _>::new(
+                self.arena.clone(),
                 self.arena.get_offset(term),
             )
             .is_complex(),
-            TermType::IntegersIterator(term) => {
-                ArenaRef::<IntegersIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_complex()
-            }
-            TermType::IntersperseIterator(term) => {
-                ArenaRef::<IntersperseIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_complex()
-            }
+            TermType::EvaluateIterator(term) => ArenaRef::<EvaluateIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_complex(),
+            TermType::FilterIterator(term) => ArenaRef::<FilterIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_complex(),
+            TermType::FlattenIterator(term) => ArenaRef::<FlattenIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_complex(),
+            TermType::HashmapKeysIterator(term) => ArenaRef::<HashmapKeysIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_complex(),
+            TermType::HashmapValuesIterator(term) => ArenaRef::<HashmapValuesIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_complex(),
+            TermType::IntegersIterator(term) => ArenaRef::<IntegersIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_complex(),
+            TermType::IntersperseIterator(term) => ArenaRef::<IntersperseIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_complex(),
             TermType::MapIterator(term) => {
-                ArenaRef::<MapIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<MapIteratorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .is_complex()
             }
-            TermType::OnceIterator(term) => {
-                ArenaRef::<OnceIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_complex()
-            }
-            TermType::RangeIterator(term) => {
-                ArenaRef::<RangeIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_complex()
-            }
-            TermType::RepeatIterator(term) => {
-                ArenaRef::<RepeatIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_complex()
-            }
-            TermType::SkipIterator(term) => {
-                ArenaRef::<SkipIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_complex()
-            }
-            TermType::TakeIterator(term) => {
-                ArenaRef::<TakeIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .is_complex()
-            }
+            TermType::OnceIterator(term) => ArenaRef::<OnceIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_complex(),
+            TermType::RangeIterator(term) => ArenaRef::<RangeIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_complex(),
+            TermType::RepeatIterator(term) => ArenaRef::<RepeatIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_complex(),
+            TermType::SkipIterator(term) => ArenaRef::<SkipIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_complex(),
+            TermType::TakeIterator(term) => ArenaRef::<TakeIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .is_complex(),
             TermType::ZipIterator(term) => {
-                ArenaRef::<ZipIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ZipIteratorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .is_complex()
             }
         }
     }
 }
 
-impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, Term, A> {
+impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<Term, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         match &self.as_value().value {
             TermType::Application(term) => {
-                ArenaRef::<ApplicationTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ApplicationTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .to_json()
             }
             TermType::Boolean(term) => {
-                ArenaRef::<BooleanTerm, _>::new(self.arena, self.arena.get_offset(term)).to_json()
+                ArenaRef::<BooleanTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .to_json()
             }
             TermType::Builtin(term) => {
-                ArenaRef::<BuiltinTerm, _>::new(self.arena, self.arena.get_offset(term)).to_json()
+                ArenaRef::<BuiltinTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .to_json()
             }
             TermType::Cell(term) => {
-                ArenaRef::<CellTerm, _>::new(self.arena, self.arena.get_offset(term)).to_json()
+                ArenaRef::<CellTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .to_json()
             }
             TermType::Compiled(term) => {
-                ArenaRef::<CompiledTerm, _>::new(self.arena, self.arena.get_offset(term)).to_json()
+                ArenaRef::<CompiledTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .to_json()
             }
             TermType::Condition(term) => {
-                ArenaRef::<ConditionTerm, _>::new(self.arena, self.arena.get_offset(term)).to_json()
+                ArenaRef::<ConditionTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .to_json()
             }
             TermType::Constructor(term) => {
-                ArenaRef::<ConstructorTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ConstructorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .to_json()
             }
             TermType::Date(term) => {
-                ArenaRef::<DateTerm, _>::new(self.arena, self.arena.get_offset(term)).to_json()
+                ArenaRef::<DateTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .to_json()
             }
             TermType::Effect(term) => {
-                ArenaRef::<EffectTerm, _>::new(self.arena, self.arena.get_offset(term)).to_json()
+                ArenaRef::<EffectTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .to_json()
             }
             TermType::Float(term) => {
-                ArenaRef::<FloatTerm, _>::new(self.arena, self.arena.get_offset(term)).to_json()
+                ArenaRef::<FloatTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .to_json()
             }
             TermType::Hashmap(term) => {
-                ArenaRef::<HashmapTerm, _>::new(self.arena, self.arena.get_offset(term)).to_json()
+                ArenaRef::<HashmapTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .to_json()
             }
             TermType::Hashset(term) => {
-                ArenaRef::<HashsetTerm, _>::new(self.arena, self.arena.get_offset(term)).to_json()
+                ArenaRef::<HashsetTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .to_json()
             }
             TermType::Int(term) => {
-                ArenaRef::<IntTerm, _>::new(self.arena, self.arena.get_offset(term)).to_json()
+                ArenaRef::<IntTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .to_json()
             }
             TermType::Lambda(term) => {
-                ArenaRef::<LambdaTerm, _>::new(self.arena, self.arena.get_offset(term)).to_json()
+                ArenaRef::<LambdaTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .to_json()
             }
             TermType::Let(term) => {
-                ArenaRef::<LetTerm, _>::new(self.arena, self.arena.get_offset(term)).to_json()
+                ArenaRef::<LetTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .to_json()
             }
             TermType::List(term) => {
-                ArenaRef::<ListTerm, _>::new(self.arena, self.arena.get_offset(term)).to_json()
+                ArenaRef::<ListTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .to_json()
             }
             TermType::Nil(term) => {
-                ArenaRef::<NilTerm, _>::new(self.arena, self.arena.get_offset(term)).to_json()
+                ArenaRef::<NilTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .to_json()
             }
             TermType::Partial(term) => {
-                ArenaRef::<PartialTerm, _>::new(self.arena, self.arena.get_offset(term)).to_json()
+                ArenaRef::<PartialTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .to_json()
             }
             TermType::Pointer(term) => {
-                ArenaRef::<PointerTerm, _>::new(self.arena, self.arena.get_offset(term)).to_json()
+                ArenaRef::<PointerTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .to_json()
             }
             TermType::Record(term) => {
-                ArenaRef::<RecordTerm, _>::new(self.arena, self.arena.get_offset(term)).to_json()
+                ArenaRef::<RecordTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .to_json()
             }
             TermType::Signal(term) => {
-                ArenaRef::<SignalTerm, _>::new(self.arena, self.arena.get_offset(term)).to_json()
+                ArenaRef::<SignalTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .to_json()
             }
             TermType::String(term) => {
-                ArenaRef::<StringTerm, _>::new(self.arena, self.arena.get_offset(term)).to_json()
+                ArenaRef::<StringTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .to_json()
             }
             TermType::Symbol(term) => {
-                ArenaRef::<SymbolTerm, _>::new(self.arena, self.arena.get_offset(term)).to_json()
+                ArenaRef::<SymbolTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .to_json()
             }
             TermType::Tree(term) => {
-                ArenaRef::<TreeTerm, _>::new(self.arena, self.arena.get_offset(term)).to_json()
+                ArenaRef::<TreeTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .to_json()
             }
             TermType::Variable(term) => {
-                ArenaRef::<VariableTerm, _>::new(self.arena, self.arena.get_offset(term)).to_json()
-            }
-            TermType::EmptyIterator(term) => {
-                ArenaRef::<EmptyIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<VariableTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .to_json()
             }
-            TermType::EvaluateIterator(term) => {
-                ArenaRef::<EvaluateIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .to_json()
-            }
-            TermType::FilterIterator(term) => {
-                ArenaRef::<FilterIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .to_json()
-            }
-            TermType::FlattenIterator(term) => {
-                ArenaRef::<FlattenIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .to_json()
-            }
-            TermType::HashmapKeysIterator(term) => {
-                ArenaRef::<HashmapKeysIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .to_json()
-            }
-            TermType::HashmapValuesIterator(term) => ArenaRef::<HashmapValuesIteratorTerm, _>::new(
-                self.arena,
+            TermType::EmptyIterator(term) => ArenaRef::<EmptyIteratorTerm, _>::new(
+                self.arena.clone(),
                 self.arena.get_offset(term),
             )
             .to_json(),
-            TermType::IntegersIterator(term) => {
-                ArenaRef::<IntegersIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .to_json()
-            }
-            TermType::IntersperseIterator(term) => {
-                ArenaRef::<IntersperseIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .to_json()
-            }
+            TermType::EvaluateIterator(term) => ArenaRef::<EvaluateIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .to_json(),
+            TermType::FilterIterator(term) => ArenaRef::<FilterIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .to_json(),
+            TermType::FlattenIterator(term) => ArenaRef::<FlattenIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .to_json(),
+            TermType::HashmapKeysIterator(term) => ArenaRef::<HashmapKeysIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .to_json(),
+            TermType::HashmapValuesIterator(term) => ArenaRef::<HashmapValuesIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .to_json(),
+            TermType::IntegersIterator(term) => ArenaRef::<IntegersIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .to_json(),
+            TermType::IntersperseIterator(term) => ArenaRef::<IntersperseIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .to_json(),
             TermType::MapIterator(term) => {
-                ArenaRef::<MapIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<MapIteratorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .to_json()
             }
-            TermType::OnceIterator(term) => {
-                ArenaRef::<OnceIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .to_json()
-            }
-            TermType::RangeIterator(term) => {
-                ArenaRef::<RangeIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .to_json()
-            }
-            TermType::RepeatIterator(term) => {
-                ArenaRef::<RepeatIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .to_json()
-            }
-            TermType::SkipIterator(term) => {
-                ArenaRef::<SkipIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .to_json()
-            }
-            TermType::TakeIterator(term) => {
-                ArenaRef::<TakeIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .to_json()
-            }
+            TermType::OnceIterator(term) => ArenaRef::<OnceIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .to_json(),
+            TermType::RangeIterator(term) => ArenaRef::<RangeIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .to_json(),
+            TermType::RepeatIterator(term) => ArenaRef::<RepeatIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .to_json(),
+            TermType::SkipIterator(term) => ArenaRef::<SkipIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .to_json(),
+            TermType::TakeIterator(term) => ArenaRef::<TakeIteratorTerm, _>::new(
+                self.arena.clone(),
+                self.arena.get_offset(term),
+            )
+            .to_json(),
             TermType::ZipIterator(term) => {
-                ArenaRef::<ZipIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
+                ArenaRef::<ZipIteratorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
                     .to_json()
             }
         }
@@ -2504,763 +2827,974 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, Term, A> {
         }
         match (&self.as_value().value, &target.as_value().value) {
             (TermType::Application(term), TermType::Application(target)) => {
-                ArenaRef::<ApplicationTerm, _>::new(self.arena, self.arena.get_offset(term)).patch(
-                    &ArenaRef::<ApplicationTerm, _>::new(self.arena, self.arena.get_offset(target)),
-                )
+                ArenaRef::<ApplicationTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .patch(&ArenaRef::<ApplicationTerm, _>::new(
+                        self.arena.clone(),
+                        self.arena.get_offset(target),
+                    ))
             }
             (TermType::Boolean(term), TermType::Boolean(target)) => {
-                ArenaRef::<BooleanTerm, _>::new(self.arena, self.arena.get_offset(term)).patch(
-                    &ArenaRef::<BooleanTerm, _>::new(self.arena, self.arena.get_offset(target)),
-                )
+                ArenaRef::<BooleanTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .patch(&ArenaRef::<BooleanTerm, _>::new(
+                        self.arena.clone(),
+                        self.arena.get_offset(target),
+                    ))
             }
             (TermType::Builtin(term), TermType::Builtin(target)) => {
-                ArenaRef::<BuiltinTerm, _>::new(self.arena, self.arena.get_offset(term)).patch(
-                    &ArenaRef::<BuiltinTerm, _>::new(self.arena, self.arena.get_offset(target)),
-                )
+                ArenaRef::<BuiltinTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .patch(&ArenaRef::<BuiltinTerm, _>::new(
+                        self.arena.clone(),
+                        self.arena.get_offset(target),
+                    ))
             }
             (TermType::Cell(term), TermType::Cell(target)) => {
-                ArenaRef::<CellTerm, _>::new(self.arena, self.arena.get_offset(term)).patch(
-                    &ArenaRef::<CellTerm, _>::new(self.arena, self.arena.get_offset(target)),
+                ArenaRef::<CellTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)).patch(
+                    &ArenaRef::<CellTerm, _>::new(
+                        self.arena.clone(),
+                        self.arena.get_offset(target),
+                    ),
                 )
             }
             (TermType::Compiled(term), TermType::Compiled(target)) => {
-                ArenaRef::<CompiledTerm, _>::new(self.arena, self.arena.get_offset(term)).patch(
-                    &ArenaRef::<CompiledTerm, _>::new(self.arena, self.arena.get_offset(target)),
-                )
+                ArenaRef::<CompiledTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .patch(&ArenaRef::<CompiledTerm, _>::new(
+                        self.arena.clone(),
+                        self.arena.get_offset(target),
+                    ))
             }
             (TermType::Condition(term), TermType::Condition(target)) => {
-                ArenaRef::<ConditionTerm, _>::new(self.arena, self.arena.get_offset(term)).patch(
-                    &ArenaRef::<ConditionTerm, _>::new(self.arena, self.arena.get_offset(target)),
-                )
+                ArenaRef::<ConditionTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .patch(&ArenaRef::<ConditionTerm, _>::new(
+                        self.arena.clone(),
+                        self.arena.get_offset(target),
+                    ))
             }
             (TermType::Constructor(term), TermType::Constructor(target)) => {
-                ArenaRef::<ConstructorTerm, _>::new(self.arena, self.arena.get_offset(term)).patch(
-                    &ArenaRef::<ConstructorTerm, _>::new(self.arena, self.arena.get_offset(target)),
-                )
+                ArenaRef::<ConstructorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .patch(&ArenaRef::<ConstructorTerm, _>::new(
+                        self.arena.clone(),
+                        self.arena.get_offset(target),
+                    ))
             }
             (TermType::Date(term), TermType::Date(target)) => {
-                ArenaRef::<DateTerm, _>::new(self.arena, self.arena.get_offset(term)).patch(
-                    &ArenaRef::<DateTerm, _>::new(self.arena, self.arena.get_offset(target)),
+                ArenaRef::<DateTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)).patch(
+                    &ArenaRef::<DateTerm, _>::new(
+                        self.arena.clone(),
+                        self.arena.get_offset(target),
+                    ),
                 )
             }
             (TermType::Effect(term), TermType::Effect(target)) => {
-                ArenaRef::<EffectTerm, _>::new(self.arena, self.arena.get_offset(term)).patch(
-                    &ArenaRef::<EffectTerm, _>::new(self.arena, self.arena.get_offset(target)),
-                )
+                ArenaRef::<EffectTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .patch(&ArenaRef::<EffectTerm, _>::new(
+                        self.arena.clone(),
+                        self.arena.get_offset(target),
+                    ))
             }
             (TermType::Float(term), TermType::Float(target)) => {
-                ArenaRef::<FloatTerm, _>::new(self.arena, self.arena.get_offset(term)).patch(
-                    &ArenaRef::<FloatTerm, _>::new(self.arena, self.arena.get_offset(target)),
-                )
+                ArenaRef::<FloatTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .patch(&ArenaRef::<FloatTerm, _>::new(
+                        self.arena.clone(),
+                        self.arena.get_offset(target),
+                    ))
             }
             (TermType::Hashmap(term), TermType::Hashmap(target)) => {
-                ArenaRef::<HashmapTerm, _>::new(self.arena, self.arena.get_offset(term)).patch(
-                    &ArenaRef::<HashmapTerm, _>::new(self.arena, self.arena.get_offset(target)),
-                )
+                ArenaRef::<HashmapTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .patch(&ArenaRef::<HashmapTerm, _>::new(
+                        self.arena.clone(),
+                        self.arena.get_offset(target),
+                    ))
             }
             (TermType::Hashset(term), TermType::Hashset(target)) => {
-                ArenaRef::<HashsetTerm, _>::new(self.arena, self.arena.get_offset(term)).patch(
-                    &ArenaRef::<HashsetTerm, _>::new(self.arena, self.arena.get_offset(target)),
-                )
+                ArenaRef::<HashsetTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .patch(&ArenaRef::<HashsetTerm, _>::new(
+                        self.arena.clone(),
+                        self.arena.get_offset(target),
+                    ))
             }
             (TermType::Int(term), TermType::Int(target)) => {
-                ArenaRef::<IntTerm, _>::new(self.arena, self.arena.get_offset(term)).patch(
-                    &ArenaRef::<IntTerm, _>::new(self.arena, self.arena.get_offset(target)),
+                ArenaRef::<IntTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)).patch(
+                    &ArenaRef::<IntTerm, _>::new(self.arena.clone(), self.arena.get_offset(target)),
                 )
             }
             (TermType::Lambda(term), TermType::Lambda(target)) => {
-                ArenaRef::<LambdaTerm, _>::new(self.arena, self.arena.get_offset(term)).patch(
-                    &ArenaRef::<LambdaTerm, _>::new(self.arena, self.arena.get_offset(target)),
-                )
+                ArenaRef::<LambdaTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .patch(&ArenaRef::<LambdaTerm, _>::new(
+                        self.arena.clone(),
+                        self.arena.get_offset(target),
+                    ))
             }
             (TermType::Let(term), TermType::Let(target)) => {
-                ArenaRef::<LetTerm, _>::new(self.arena, self.arena.get_offset(term)).patch(
-                    &ArenaRef::<LetTerm, _>::new(self.arena, self.arena.get_offset(target)),
+                ArenaRef::<LetTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)).patch(
+                    &ArenaRef::<LetTerm, _>::new(self.arena.clone(), self.arena.get_offset(target)),
                 )
             }
             (TermType::List(term), TermType::List(target)) => {
-                ArenaRef::<ListTerm, _>::new(self.arena, self.arena.get_offset(term)).patch(
-                    &ArenaRef::<ListTerm, _>::new(self.arena, self.arena.get_offset(target)),
+                ArenaRef::<ListTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)).patch(
+                    &ArenaRef::<ListTerm, _>::new(
+                        self.arena.clone(),
+                        self.arena.get_offset(target),
+                    ),
                 )
             }
             (TermType::Nil(term), TermType::Nil(target)) => {
-                ArenaRef::<NilTerm, _>::new(self.arena, self.arena.get_offset(term)).patch(
-                    &ArenaRef::<NilTerm, _>::new(self.arena, self.arena.get_offset(target)),
+                ArenaRef::<NilTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)).patch(
+                    &ArenaRef::<NilTerm, _>::new(self.arena.clone(), self.arena.get_offset(target)),
                 )
             }
             (TermType::Partial(term), TermType::Partial(target)) => {
-                ArenaRef::<PartialTerm, _>::new(self.arena, self.arena.get_offset(term)).patch(
-                    &ArenaRef::<PartialTerm, _>::new(self.arena, self.arena.get_offset(target)),
-                )
+                ArenaRef::<PartialTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .patch(&ArenaRef::<PartialTerm, _>::new(
+                        self.arena.clone(),
+                        self.arena.get_offset(target),
+                    ))
             }
             (TermType::Pointer(term), TermType::Pointer(target)) => {
-                ArenaRef::<PointerTerm, _>::new(self.arena, self.arena.get_offset(term)).patch(
-                    &ArenaRef::<PointerTerm, _>::new(self.arena, self.arena.get_offset(target)),
-                )
+                ArenaRef::<PointerTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .patch(&ArenaRef::<PointerTerm, _>::new(
+                        self.arena.clone(),
+                        self.arena.get_offset(target),
+                    ))
             }
             (TermType::Record(term), TermType::Record(target)) => {
-                ArenaRef::<RecordTerm, _>::new(self.arena, self.arena.get_offset(term)).patch(
-                    &ArenaRef::<RecordTerm, _>::new(self.arena, self.arena.get_offset(target)),
-                )
+                ArenaRef::<RecordTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .patch(&ArenaRef::<RecordTerm, _>::new(
+                        self.arena.clone(),
+                        self.arena.get_offset(target),
+                    ))
             }
             (TermType::Signal(term), TermType::Signal(target)) => {
-                ArenaRef::<SignalTerm, _>::new(self.arena, self.arena.get_offset(term)).patch(
-                    &ArenaRef::<SignalTerm, _>::new(self.arena, self.arena.get_offset(target)),
-                )
+                ArenaRef::<SignalTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .patch(&ArenaRef::<SignalTerm, _>::new(
+                        self.arena.clone(),
+                        self.arena.get_offset(target),
+                    ))
             }
             (TermType::String(term), TermType::String(target)) => {
-                ArenaRef::<StringTerm, _>::new(self.arena, self.arena.get_offset(term)).patch(
-                    &ArenaRef::<StringTerm, _>::new(self.arena, self.arena.get_offset(target)),
-                )
+                ArenaRef::<StringTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .patch(&ArenaRef::<StringTerm, _>::new(
+                        self.arena.clone(),
+                        self.arena.get_offset(target),
+                    ))
             }
             (TermType::Symbol(term), TermType::Symbol(target)) => {
-                ArenaRef::<SymbolTerm, _>::new(self.arena, self.arena.get_offset(term)).patch(
-                    &ArenaRef::<SymbolTerm, _>::new(self.arena, self.arena.get_offset(target)),
-                )
+                ArenaRef::<SymbolTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .patch(&ArenaRef::<SymbolTerm, _>::new(
+                        self.arena.clone(),
+                        self.arena.get_offset(target),
+                    ))
             }
             (TermType::Tree(term), TermType::Tree(target)) => {
-                ArenaRef::<TreeTerm, _>::new(self.arena, self.arena.get_offset(term)).patch(
-                    &ArenaRef::<TreeTerm, _>::new(self.arena, self.arena.get_offset(target)),
+                ArenaRef::<TreeTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)).patch(
+                    &ArenaRef::<TreeTerm, _>::new(
+                        self.arena.clone(),
+                        self.arena.get_offset(target),
+                    ),
                 )
             }
             (TermType::Variable(term), TermType::Variable(target)) => {
-                ArenaRef::<VariableTerm, _>::new(self.arena, self.arena.get_offset(term)).patch(
-                    &ArenaRef::<VariableTerm, _>::new(self.arena, self.arena.get_offset(target)),
-                )
+                ArenaRef::<VariableTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .patch(&ArenaRef::<VariableTerm, _>::new(
+                        self.arena.clone(),
+                        self.arena.get_offset(target),
+                    ))
             }
             (TermType::EmptyIterator(term), TermType::EmptyIterator(target)) => {
-                ArenaRef::<EmptyIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .patch(&ArenaRef::<EmptyIteratorTerm, _>::new(
-                        self.arena,
-                        self.arena.get_offset(target),
-                    ))
+                ArenaRef::<EmptyIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                )
+                .patch(&ArenaRef::<EmptyIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(target),
+                ))
             }
             (TermType::EvaluateIterator(term), TermType::EvaluateIterator(target)) => {
-                ArenaRef::<EvaluateIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .patch(&ArenaRef::<EvaluateIteratorTerm, _>::new(
-                        self.arena,
-                        self.arena.get_offset(target),
-                    ))
+                ArenaRef::<EvaluateIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                )
+                .patch(&ArenaRef::<EvaluateIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(target),
+                ))
             }
             (TermType::FilterIterator(term), TermType::FilterIterator(target)) => {
-                ArenaRef::<FilterIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .patch(&ArenaRef::<FilterIteratorTerm, _>::new(
-                        self.arena,
-                        self.arena.get_offset(target),
-                    ))
+                ArenaRef::<FilterIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                )
+                .patch(&ArenaRef::<FilterIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(target),
+                ))
             }
             (TermType::FlattenIterator(term), TermType::FlattenIterator(target)) => {
-                ArenaRef::<FlattenIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .patch(&ArenaRef::<FlattenIteratorTerm, _>::new(
-                        self.arena,
-                        self.arena.get_offset(target),
-                    ))
+                ArenaRef::<FlattenIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                )
+                .patch(&ArenaRef::<FlattenIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(target),
+                ))
             }
             (TermType::HashmapKeysIterator(term), TermType::HashmapKeysIterator(target)) => {
-                ArenaRef::<HashmapKeysIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .patch(&ArenaRef::<HashmapKeysIteratorTerm, _>::new(
-                        self.arena,
-                        self.arena.get_offset(target),
-                    ))
+                ArenaRef::<HashmapKeysIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                )
+                .patch(&ArenaRef::<HashmapKeysIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(target),
+                ))
             }
             (TermType::HashmapValuesIterator(term), TermType::HashmapValuesIterator(target)) => {
                 ArenaRef::<HashmapValuesIteratorTerm, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(term),
                 )
                 .patch(&ArenaRef::<HashmapValuesIteratorTerm, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(target),
                 ))
             }
             (TermType::IntegersIterator(term), TermType::IntegersIterator(target)) => {
-                ArenaRef::<IntegersIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .patch(&ArenaRef::<IntegersIteratorTerm, _>::new(
-                        self.arena,
-                        self.arena.get_offset(target),
-                    ))
+                ArenaRef::<IntegersIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                )
+                .patch(&ArenaRef::<IntegersIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(target),
+                ))
             }
             (TermType::IntersperseIterator(term), TermType::IntersperseIterator(target)) => {
-                ArenaRef::<IntersperseIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .patch(&ArenaRef::<IntersperseIteratorTerm, _>::new(
-                        self.arena,
-                        self.arena.get_offset(target),
-                    ))
+                ArenaRef::<IntersperseIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                )
+                .patch(&ArenaRef::<IntersperseIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(target),
+                ))
             }
             (TermType::MapIterator(term), TermType::MapIterator(target)) => {
-                ArenaRef::<MapIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)).patch(
-                    &ArenaRef::<MapIteratorTerm, _>::new(self.arena, self.arena.get_offset(target)),
-                )
+                ArenaRef::<MapIteratorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .patch(&ArenaRef::<MapIteratorTerm, _>::new(
+                        self.arena.clone(),
+                        self.arena.get_offset(target),
+                    ))
             }
             (TermType::OnceIterator(term), TermType::OnceIterator(target)) => {
-                ArenaRef::<OnceIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)).patch(
-                    &ArenaRef::<OnceIteratorTerm, _>::new(
-                        self.arena,
-                        self.arena.get_offset(target),
-                    ),
+                ArenaRef::<OnceIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
                 )
+                .patch(&ArenaRef::<OnceIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(target),
+                ))
             }
             (TermType::RangeIterator(term), TermType::RangeIterator(target)) => {
-                ArenaRef::<RangeIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .patch(&ArenaRef::<RangeIteratorTerm, _>::new(
-                        self.arena,
-                        self.arena.get_offset(target),
-                    ))
+                ArenaRef::<RangeIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                )
+                .patch(&ArenaRef::<RangeIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(target),
+                ))
             }
             (TermType::RepeatIterator(term), TermType::RepeatIterator(target)) => {
-                ArenaRef::<RepeatIteratorTerm, _>::new(self.arena, self.arena.get_offset(term))
-                    .patch(&ArenaRef::<RepeatIteratorTerm, _>::new(
-                        self.arena,
-                        self.arena.get_offset(target),
-                    ))
+                ArenaRef::<RepeatIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                )
+                .patch(&ArenaRef::<RepeatIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(target),
+                ))
             }
             (TermType::SkipIterator(term), TermType::SkipIterator(target)) => {
-                ArenaRef::<SkipIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)).patch(
-                    &ArenaRef::<SkipIteratorTerm, _>::new(
-                        self.arena,
-                        self.arena.get_offset(target),
-                    ),
+                ArenaRef::<SkipIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
                 )
+                .patch(&ArenaRef::<SkipIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(target),
+                ))
             }
             (TermType::TakeIterator(term), TermType::TakeIterator(target)) => {
-                ArenaRef::<TakeIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)).patch(
-                    &ArenaRef::<TakeIteratorTerm, _>::new(
-                        self.arena,
-                        self.arena.get_offset(target),
-                    ),
+                ArenaRef::<TakeIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
                 )
+                .patch(&ArenaRef::<TakeIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(target),
+                ))
             }
             (TermType::ZipIterator(term), TermType::ZipIterator(target)) => {
-                ArenaRef::<ZipIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)).patch(
-                    &ArenaRef::<ZipIteratorTerm, _>::new(self.arena, self.arena.get_offset(target)),
-                )
+                ArenaRef::<ZipIteratorTerm, _>::new(self.arena.clone(), self.arena.get_offset(term))
+                    .patch(&ArenaRef::<ZipIteratorTerm, _>::new(
+                        self.arena.clone(),
+                        self.arena.get_offset(target),
+                    ))
             }
             _ => target.to_json().map(Some),
         }
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, Term, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<Term, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.as_value().value {
             TermType::Application(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<ApplicationTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<ApplicationTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::Boolean(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<BooleanTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<BooleanTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Builtin(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<BuiltinTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<BuiltinTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Cell(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<CellTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<CellTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Compiled(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<CompiledTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<CompiledTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Condition(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<ConditionTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<ConditionTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Constructor(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<ConstructorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<ConstructorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::Date(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<DateTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<DateTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Effect(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<EffectTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<EffectTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Float(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<FloatTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<FloatTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Hashmap(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<HashmapTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<HashmapTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Hashset(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<HashsetTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<HashsetTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Int(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<IntTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<IntTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Lambda(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<LambdaTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<LambdaTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Let(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<LetTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<LetTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::List(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<ListTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<ListTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Nil(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<NilTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<NilTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Partial(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<PartialTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<PartialTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Pointer(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<PointerTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<PointerTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Record(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<RecordTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<RecordTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Signal(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<SignalTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<SignalTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::String(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<StringTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<StringTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Symbol(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<SymbolTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<SymbolTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Tree(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<TreeTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<TreeTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Variable(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<VariableTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<VariableTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::EmptyIterator(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<EmptyIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<EmptyIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::EvaluateIterator(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<EvaluateIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<EvaluateIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::FilterIterator(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<FilterIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<FilterIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::FlattenIterator(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<FlattenIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<FlattenIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::HashmapKeysIterator(term) => std::fmt::Debug::fmt(
                 &ArenaRef::<HashmapKeysIteratorTerm, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(term),
                 ),
                 f,
             ),
             TermType::HashmapValuesIterator(term) => std::fmt::Debug::fmt(
                 &ArenaRef::<HashmapValuesIteratorTerm, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(term),
                 ),
                 f,
             ),
             TermType::IntegersIterator(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<IntegersIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<IntegersIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::IntersperseIterator(term) => std::fmt::Debug::fmt(
                 &ArenaRef::<IntersperseIteratorTerm, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(term),
                 ),
                 f,
             ),
             TermType::MapIterator(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<MapIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<MapIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::OnceIterator(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<OnceIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<OnceIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::RangeIterator(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<RangeIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<RangeIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::RepeatIterator(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<RepeatIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<RepeatIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::SkipIterator(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<SkipIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<SkipIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::TakeIterator(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<TakeIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<TakeIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::ZipIterator(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<ZipIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<ZipIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
         }
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, Term, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<Term, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.as_value().value {
             TermType::Application(term) => std::fmt::Display::fmt(
-                &ArenaRef::<ApplicationTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<ApplicationTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::Boolean(term) => std::fmt::Display::fmt(
-                &ArenaRef::<BooleanTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<BooleanTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Builtin(term) => std::fmt::Display::fmt(
-                &ArenaRef::<BuiltinTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<BuiltinTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Cell(term) => std::fmt::Display::fmt(
-                &ArenaRef::<CellTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<CellTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Compiled(term) => std::fmt::Display::fmt(
-                &ArenaRef::<CompiledTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<CompiledTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Condition(term) => std::fmt::Display::fmt(
-                &ArenaRef::<ConditionTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<ConditionTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Constructor(term) => std::fmt::Display::fmt(
-                &ArenaRef::<ConstructorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<ConstructorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::Date(term) => std::fmt::Display::fmt(
-                &ArenaRef::<DateTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<DateTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Effect(term) => std::fmt::Display::fmt(
-                &ArenaRef::<EffectTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<EffectTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Float(term) => std::fmt::Display::fmt(
-                &ArenaRef::<FloatTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<FloatTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Hashmap(term) => std::fmt::Display::fmt(
-                &ArenaRef::<HashmapTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<HashmapTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Hashset(term) => std::fmt::Display::fmt(
-                &ArenaRef::<HashsetTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<HashsetTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Int(term) => std::fmt::Display::fmt(
-                &ArenaRef::<IntTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<IntTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Lambda(term) => std::fmt::Display::fmt(
-                &ArenaRef::<LambdaTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<LambdaTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Let(term) => std::fmt::Display::fmt(
-                &ArenaRef::<LetTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<LetTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::List(term) => std::fmt::Display::fmt(
-                &ArenaRef::<ListTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<ListTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Nil(term) => std::fmt::Display::fmt(
-                &ArenaRef::<NilTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<NilTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Partial(term) => std::fmt::Display::fmt(
-                &ArenaRef::<PartialTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<PartialTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Pointer(term) => std::fmt::Display::fmt(
-                &ArenaRef::<PointerTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<PointerTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Record(term) => std::fmt::Display::fmt(
-                &ArenaRef::<RecordTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<RecordTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Signal(term) => std::fmt::Display::fmt(
-                &ArenaRef::<SignalTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<SignalTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::String(term) => std::fmt::Display::fmt(
-                &ArenaRef::<StringTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<StringTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Symbol(term) => std::fmt::Display::fmt(
-                &ArenaRef::<SymbolTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<SymbolTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Tree(term) => std::fmt::Display::fmt(
-                &ArenaRef::<TreeTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<TreeTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Variable(term) => std::fmt::Display::fmt(
-                &ArenaRef::<VariableTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<VariableTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::EmptyIterator(term) => std::fmt::Display::fmt(
-                &ArenaRef::<EmptyIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<EmptyIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::EvaluateIterator(term) => std::fmt::Display::fmt(
-                &ArenaRef::<EvaluateIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<EvaluateIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::FilterIterator(term) => std::fmt::Display::fmt(
-                &ArenaRef::<FilterIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<FilterIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::FlattenIterator(term) => std::fmt::Display::fmt(
-                &ArenaRef::<FlattenIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<FlattenIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::HashmapKeysIterator(term) => std::fmt::Display::fmt(
                 &ArenaRef::<HashmapKeysIteratorTerm, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(term),
                 ),
                 f,
             ),
             TermType::HashmapValuesIterator(term) => std::fmt::Display::fmt(
                 &ArenaRef::<HashmapValuesIteratorTerm, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(term),
                 ),
                 f,
             ),
             TermType::IntegersIterator(term) => std::fmt::Display::fmt(
-                &ArenaRef::<IntegersIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<IntegersIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::IntersperseIterator(term) => std::fmt::Display::fmt(
                 &ArenaRef::<IntersperseIteratorTerm, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(term),
                 ),
                 f,
             ),
             TermType::MapIterator(term) => std::fmt::Display::fmt(
-                &ArenaRef::<MapIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<MapIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::OnceIterator(term) => std::fmt::Display::fmt(
-                &ArenaRef::<OnceIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<OnceIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::RangeIterator(term) => std::fmt::Display::fmt(
-                &ArenaRef::<RangeIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<RangeIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::RepeatIterator(term) => std::fmt::Display::fmt(
-                &ArenaRef::<RepeatIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<RepeatIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::SkipIterator(term) => std::fmt::Display::fmt(
-                &ArenaRef::<SkipIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<SkipIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::TakeIterator(term) => std::fmt::Display::fmt(
-                &ArenaRef::<TakeIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<TakeIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::ZipIterator(term) => std::fmt::Display::fmt(
-                &ArenaRef::<ZipIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<ZipIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
         }
     }
 }
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, TermType, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<TermType, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.as_value() {
             TermType::Application(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<ApplicationTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<ApplicationTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::Boolean(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<BooleanTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<BooleanTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Builtin(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<BuiltinTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<BuiltinTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Cell(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<CellTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<CellTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Compiled(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<CompiledTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<CompiledTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Condition(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<ConditionTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<ConditionTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Constructor(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<ConstructorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<ConstructorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::Date(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<DateTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<DateTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Effect(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<EffectTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<EffectTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Float(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<FloatTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<FloatTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Hashmap(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<HashmapTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<HashmapTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Hashset(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<HashsetTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<HashsetTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Int(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<IntTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<IntTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Lambda(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<LambdaTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<LambdaTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Let(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<LetTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<LetTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::List(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<ListTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<ListTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Nil(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<NilTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<NilTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Partial(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<PartialTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<PartialTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Pointer(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<PointerTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<PointerTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Record(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<RecordTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<RecordTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Signal(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<SignalTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<SignalTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::String(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<StringTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<StringTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Symbol(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<SymbolTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<SymbolTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Tree(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<TreeTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<TreeTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::Variable(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<VariableTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<VariableTerm, _>::new(self.arena.clone(), self.arena.get_offset(term)),
                 f,
             ),
             TermType::EmptyIterator(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<EmptyIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<EmptyIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::EvaluateIterator(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<EvaluateIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<EvaluateIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::FilterIterator(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<FilterIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<FilterIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::FlattenIterator(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<FlattenIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<FlattenIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::HashmapKeysIterator(term) => std::fmt::Debug::fmt(
                 &ArenaRef::<HashmapKeysIteratorTerm, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(term),
                 ),
                 f,
             ),
             TermType::HashmapValuesIterator(term) => std::fmt::Debug::fmt(
                 &ArenaRef::<HashmapValuesIteratorTerm, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(term),
                 ),
                 f,
             ),
             TermType::IntegersIterator(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<IntegersIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<IntegersIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::IntersperseIterator(term) => std::fmt::Debug::fmt(
                 &ArenaRef::<IntersperseIteratorTerm, _>::new(
-                    self.arena,
+                    self.arena.clone(),
                     self.arena.get_offset(term),
                 ),
                 f,
             ),
             TermType::MapIterator(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<MapIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<MapIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::OnceIterator(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<OnceIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<OnceIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::RangeIterator(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<RangeIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<RangeIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::RepeatIterator(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<RepeatIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<RepeatIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::SkipIterator(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<SkipIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<SkipIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::TakeIterator(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<TakeIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<TakeIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
             TermType::ZipIterator(term) => std::fmt::Debug::fmt(
-                &ArenaRef::<ZipIteratorTerm, _>::new(self.arena, self.arena.get_offset(term)),
+                &ArenaRef::<ZipIteratorTerm, _>::new(
+                    self.arena.clone(),
+                    self.arena.get_offset(term),
+                ),
                 f,
             ),
         }
@@ -3358,81 +3892,73 @@ impl<V> TypedTerm<V> {
     }
 }
 
-impl<'heap, A: ArenaAllocator, V> ArenaRef<'heap, TypedTerm<V>, A> {
-    pub fn as_inner(&self) -> ArenaRef<'heap, V, A> {
+impl<A: ArenaAllocator + Clone, V> ArenaRef<TypedTerm<V>, A> {
+    pub(crate) fn as_inner_value(&self) -> &V {
+        self.as_value().get_inner()
+    }
+    pub fn as_inner(&self) -> ArenaRef<V, A> {
         ArenaRef::<V, _>::new(
-            self.arena,
-            self.arena.get_offset(self.as_value().get_inner()),
+            self.arena.clone(),
+            self.arena.get_offset(self.as_inner_value()),
         )
     }
-    pub(crate) fn as_term(&self) -> &ArenaRef<'heap, Term, A> {
-        unsafe {
-            std::mem::transmute::<&ArenaRef<'heap, TypedTerm<V>, A>, &ArenaRef<'heap, Term, A>>(
-                self,
-            )
-        }
+    pub(crate) fn as_term(&self) -> &ArenaRef<Term, A> {
+        unsafe { std::mem::transmute::<&ArenaRef<TypedTerm<V>, A>, &ArenaRef<Term, A>>(self) }
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, Term, A> {
-    pub(crate) fn as_type<V>(&self) -> &ArenaRef<'heap, TypedTerm<V>, A> {
-        unsafe {
-            std::mem::transmute::<&ArenaRef<'heap, Term, A>, &ArenaRef<'heap, TypedTerm<V>, A>>(
-                self,
-            )
-        }
+impl<A: ArenaAllocator + Clone> ArenaRef<Term, A> {
+    pub(crate) fn as_type<V>(&self) -> &ArenaRef<TypedTerm<V>, A> {
+        unsafe { std::mem::transmute::<&ArenaRef<Term, A>, &ArenaRef<TypedTerm<V>, A>>(self) }
     }
 }
 
-impl<'heap, A: ArenaAllocator, V> GraphNode for ArenaRef<'heap, TypedTerm<V>, A>
+impl<A: ArenaAllocator + Clone, V> GraphNode for ArenaRef<TypedTerm<V>, A>
 where
-    ArenaRef<'heap, V, A>: GraphNode,
+    ArenaRef<V, A>: GraphNode,
 {
     fn size(&self) -> usize {
-        <ArenaRef<'heap, V, A> as GraphNode>::size(&self.as_inner())
+        <ArenaRef<V, A> as GraphNode>::size(&self.as_inner())
     }
     fn capture_depth(&self) -> StackOffset {
-        <ArenaRef<'heap, V, A> as GraphNode>::capture_depth(&self.as_inner())
+        <ArenaRef<V, A> as GraphNode>::capture_depth(&self.as_inner())
     }
     fn free_variables(&self) -> HashSet<StackOffset> {
-        <ArenaRef<'heap, V, A> as GraphNode>::free_variables(&self.as_inner())
+        <ArenaRef<V, A> as GraphNode>::free_variables(&self.as_inner())
     }
     fn count_variable_usages(&self, offset: StackOffset) -> usize {
-        <ArenaRef<'heap, V, A> as GraphNode>::count_variable_usages(&self.as_inner(), offset)
+        <ArenaRef<V, A> as GraphNode>::count_variable_usages(&self.as_inner(), offset)
     }
     fn dynamic_dependencies(&self, deep: bool) -> DependencyList {
-        <ArenaRef<'heap, V, A> as GraphNode>::dynamic_dependencies(&self.as_inner(), deep)
+        <ArenaRef<V, A> as GraphNode>::dynamic_dependencies(&self.as_inner(), deep)
     }
     fn has_dynamic_dependencies(&self, deep: bool) -> bool {
-        <ArenaRef<'heap, V, A> as GraphNode>::has_dynamic_dependencies(&self.as_inner(), deep)
+        <ArenaRef<V, A> as GraphNode>::has_dynamic_dependencies(&self.as_inner(), deep)
     }
     fn is_static(&self) -> bool {
-        <ArenaRef<'heap, V, A> as GraphNode>::is_static(&self.as_inner())
+        <ArenaRef<V, A> as GraphNode>::is_static(&self.as_inner())
     }
     fn is_atomic(&self) -> bool {
-        <ArenaRef<'heap, V, A> as GraphNode>::is_atomic(&self.as_inner())
+        <ArenaRef<V, A> as GraphNode>::is_atomic(&self.as_inner())
     }
     fn is_complex(&self) -> bool {
-        <ArenaRef<'heap, V, A> as GraphNode>::is_complex(&self.as_inner())
+        <ArenaRef<V, A> as GraphNode>::is_complex(&self.as_inner())
     }
 }
 
-impl<'heap, A: ArenaAllocator, V> PartialEq for ArenaRef<'heap, TypedTerm<V>, A>
+impl<A: ArenaAllocator + Clone, V> PartialEq for ArenaRef<TypedTerm<V>, A>
 where
-    ArenaRef<'heap, V, A>: PartialEq,
+    ArenaRef<V, A>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         self.as_term() == other.as_term()
     }
 }
-impl<'heap, A: ArenaAllocator, V> Eq for ArenaRef<'heap, TypedTerm<V>, A> where
-    ArenaRef<'heap, V, A>: Eq
-{
-}
+impl<A: ArenaAllocator + Clone, V> Eq for ArenaRef<TypedTerm<V>, A> where ArenaRef<V, A>: Eq {}
 
-impl<'heap, A: ArenaAllocator, V> std::fmt::Debug for ArenaRef<'heap, TypedTerm<V>, A>
+impl<A: ArenaAllocator + Clone, V> std::fmt::Debug for ArenaRef<TypedTerm<V>, A>
 where
-    ArenaRef<'heap, V, A>: std::fmt::Debug,
+    ArenaRef<V, A>: std::fmt::Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Term")
@@ -3442,12 +3968,12 @@ where
     }
 }
 
-impl<'heap, A: ArenaAllocator, V> std::fmt::Display for ArenaRef<'heap, TypedTerm<V>, A>
+impl<A: ArenaAllocator + Clone, V> std::fmt::Display for ArenaRef<TypedTerm<V>, A>
 where
-    ArenaRef<'heap, V, A>: std::fmt::Display,
+    ArenaRef<V, A>: std::fmt::Display,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        <ArenaRef<'heap, V, A> as std::fmt::Display>::fmt(&self.as_inner(), f)
+        <ArenaRef<V, A> as std::fmt::Display>::fmt(&self.as_inner(), f)
     }
 }
 

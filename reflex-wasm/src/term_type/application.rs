@@ -36,56 +36,56 @@ impl TermHash for ApplicationTerm {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, ApplicationTerm, A> {
-    pub fn target(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::<Term, _>::new(self.arena, self.as_value().target)
+impl<A: ArenaAllocator + Clone> ArenaRef<ApplicationTerm, A> {
+    pub fn target(&self) -> ArenaRef<Term, A> {
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().target)
     }
-    pub fn args(&self) -> ArenaRef<'heap, TypedTerm<ListTerm>, A> {
-        ArenaRef::<TypedTerm<ListTerm>, _>::new(self.arena, self.as_value().args)
+    pub fn args(&self) -> ArenaRef<TypedTerm<ListTerm>, A> {
+        ArenaRef::<TypedTerm<ListTerm>, _>::new(self.arena.clone(), self.as_value().args)
     }
 }
 
-impl<'heap, A: ArenaAllocator> ApplicationTermType<WasmExpression<'heap, A>>
-    for ArenaRef<'heap, ApplicationTerm, A>
+impl<A: ArenaAllocator + Clone> ApplicationTermType<WasmExpression<A>>
+    for ArenaRef<ApplicationTerm, A>
 {
-    fn target<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::ExpressionRef<'a>
+    fn target<'a>(&'a self) -> <WasmExpression<A> as Expression>::ExpressionRef<'a>
     where
-        WasmExpression<'heap, A>: 'a,
+        WasmExpression<A>: 'a,
     {
         self.target().into()
     }
-    fn args<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::ExpressionListRef<'a>
+    fn args<'a>(&'a self) -> <WasmExpression<A> as Expression>::ExpressionListRef<'a>
     where
-        WasmExpression<'heap, A>: 'a,
-        <WasmExpression<'heap, A> as Expression>::ExpressionList: 'a,
+        WasmExpression<A>: 'a,
+        <WasmExpression<A> as Expression>::ExpressionList: 'a,
     {
         self.args().into()
     }
 }
 
-impl<'heap, A: ArenaAllocator> ApplicationTermType<WasmExpression<'heap, A>>
-    for ArenaRef<'heap, TypedTerm<ApplicationTerm>, A>
+impl<A: ArenaAllocator + Clone> ApplicationTermType<WasmExpression<A>>
+    for ArenaRef<TypedTerm<ApplicationTerm>, A>
 {
-    fn target<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::ExpressionRef<'a>
+    fn target<'a>(&'a self) -> <WasmExpression<A> as Expression>::ExpressionRef<'a>
     where
-        WasmExpression<'heap, A>: 'a,
+        WasmExpression<A>: 'a,
     {
-        <ArenaRef<'heap, ApplicationTerm, A> as ApplicationTermType<WasmExpression<'heap, A>>>::target(
+        <ArenaRef<ApplicationTerm, A> as ApplicationTermType<WasmExpression<A>>>::target(
             &self.as_inner(),
         )
     }
-    fn args<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::ExpressionListRef<'a>
+    fn args<'a>(&'a self) -> <WasmExpression<A> as Expression>::ExpressionListRef<'a>
     where
-        WasmExpression<'heap, A>: 'a,
-        <WasmExpression<'heap, A> as Expression>::ExpressionList: 'a,
+        WasmExpression<A>: 'a,
+        <WasmExpression<A> as Expression>::ExpressionList: 'a,
     {
-        <ArenaRef<'heap, ApplicationTerm, A> as ApplicationTermType<WasmExpression<'heap, A>>>::args(
+        <ArenaRef<ApplicationTerm, A> as ApplicationTermType<WasmExpression<A>>>::args(
             &self.as_inner(),
         )
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, ApplicationTerm, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<ApplicationTerm, A> {
     fn size(&self) -> usize {
         1 + self.target().size() + self.args().size()
     }
@@ -115,15 +115,14 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, ApplicationTerm, A>
         if deep {
             target_dependencies.union(self.args().dynamic_dependencies(deep))
         } else {
-            let eager_args = self
-                .target()
-                .arity()
-                .map(|arity| get_eager_args(self.args().as_inner().iter(), &arity));
-            match eager_args {
+            match self.target().arity() {
                 None => target_dependencies,
-                Some(args) => args.fold(target_dependencies, |combined_dependencies, arg| {
-                    combined_dependencies.union(arg.dynamic_dependencies(deep))
-                }),
+                Some(arity) => get_eager_args(self.args().as_inner().iter(), &arity).fold(
+                    target_dependencies,
+                    |combined_dependencies, arg| {
+                        combined_dependencies.union(arg.dynamic_dependencies(deep))
+                    },
+                ),
             }
         }
     }
@@ -132,13 +131,10 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, ApplicationTerm, A>
             || (if deep {
                 self.args().has_dynamic_dependencies(deep)
             } else {
-                let eager_args = self
-                    .target()
-                    .arity()
-                    .map(|arity| get_eager_args(self.args().as_inner().iter(), &arity));
-                match eager_args {
+                match self.target().arity() {
                     None => false,
-                    Some(mut args) => args.any(|arg| arg.has_dynamic_dependencies(deep)),
+                    Some(arity) => get_eager_args(self.args().as_inner().iter(), &arity)
+                        .any(|arg| arg.has_dynamic_dependencies(deep)),
                 }
             })
     }
@@ -153,7 +149,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, ApplicationTerm, A>
     }
 }
 
-impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, ApplicationTerm, A> {
+impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<ApplicationTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -162,20 +158,20 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, ApplicationTerm
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, ApplicationTerm, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<ApplicationTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.target() == other.target() && self.args() == other.args()
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, ApplicationTerm, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<ApplicationTerm, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, ApplicationTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<ApplicationTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, ApplicationTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<ApplicationTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<apply:{}:{}>", self.target(), self.args())
     }

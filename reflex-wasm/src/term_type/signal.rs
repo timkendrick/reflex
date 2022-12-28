@@ -34,39 +34,35 @@ impl TermHash for SignalTerm {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, SignalTerm, A> {
-    fn conditions(&self) -> ArenaRef<'heap, TypedTerm<TreeTerm>, A> {
-        ArenaRef::<TypedTerm<TreeTerm>, _>::new(self.arena, self.as_value().conditions)
+impl<A: ArenaAllocator + Clone> ArenaRef<SignalTerm, A> {
+    fn conditions(&self) -> ArenaRef<TypedTerm<TreeTerm>, A> {
+        ArenaRef::<TypedTerm<TreeTerm>, _>::new(self.arena.clone(), self.as_value().conditions)
     }
 }
 
-impl<'heap, A: ArenaAllocator> SignalTermType<WasmExpression<'heap, A>>
-    for ArenaRef<'heap, SignalTerm, A>
-{
-    fn signals<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::SignalListRef<'a>
+impl<A: ArenaAllocator + Clone> SignalTermType<WasmExpression<A>> for ArenaRef<SignalTerm, A> {
+    fn signals<'a>(&'a self) -> <WasmExpression<A> as Expression>::SignalListRef<'a>
     where
-        <WasmExpression<'heap, A> as Expression>::SignalList: 'a,
-        WasmExpression<'heap, A>: 'a,
+        <WasmExpression<A> as Expression>::SignalList: 'a,
+        WasmExpression<A>: 'a,
     {
         self.conditions().into()
     }
 }
 
-impl<'heap, A: ArenaAllocator> SignalTermType<WasmExpression<'heap, A>>
-    for ArenaRef<'heap, TypedTerm<SignalTerm>, A>
+impl<A: ArenaAllocator + Clone> SignalTermType<WasmExpression<A>>
+    for ArenaRef<TypedTerm<SignalTerm>, A>
 {
-    fn signals<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::SignalListRef<'a>
+    fn signals<'a>(&'a self) -> <WasmExpression<A> as Expression>::SignalListRef<'a>
     where
-        <WasmExpression<'heap, A> as Expression>::SignalList: 'a,
-        WasmExpression<'heap, A>: 'a,
+        <WasmExpression<A> as Expression>::SignalList: 'a,
+        WasmExpression<A>: 'a,
     {
-        <ArenaRef<'heap, SignalTerm, A> as SignalTermType<WasmExpression<'heap, A>>>::signals(
-            &self.as_inner(),
-        )
+        <ArenaRef<SignalTerm, A> as SignalTermType<WasmExpression<A>>>::signals(&self.as_inner())
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, SignalTerm, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<SignalTerm, A> {
     fn size(&self) -> usize {
         1 + (self.conditions().as_inner().len() as usize)
     }
@@ -96,7 +92,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, SignalTerm, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, SignalTerm, A> {
+impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<SignalTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -108,20 +104,20 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, SignalTerm, A> 
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, SignalTerm, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<SignalTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.conditions() == other.conditions()
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, SignalTerm, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<SignalTerm, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, SignalTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<SignalTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, SignalTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<SignalTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,

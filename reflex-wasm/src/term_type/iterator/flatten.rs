@@ -29,13 +29,13 @@ impl TermHash for FlattenIteratorTerm {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, FlattenIteratorTerm, A> {
-    pub fn source(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::<Term, _>::new(self.arena, self.as_value().source)
+impl<A: ArenaAllocator + Clone> ArenaRef<FlattenIteratorTerm, A> {
+    pub fn source(&self) -> ArenaRef<Term, A> {
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().source)
     }
 }
 
-impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, FlattenIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<FlattenIteratorTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -47,26 +47,26 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, FlattenIterator
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, FlattenIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<FlattenIteratorTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.source() == other.source()
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, FlattenIteratorTerm, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<FlattenIteratorTerm, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, FlattenIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<FlattenIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, FlattenIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<FlattenIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "FlattenIterator")
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, FlattenIteratorTerm, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<FlattenIteratorTerm, A> {
     fn size(&self) -> usize {
         1 + self.source().size()
     }

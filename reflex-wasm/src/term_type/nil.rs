@@ -33,23 +33,23 @@ impl TermHash for NilTerm {
     }
 }
 
-impl<'heap, A: ArenaAllocator> NilTermType for ArenaRef<'heap, NilTerm, A> {}
+impl<A: ArenaAllocator + Clone> NilTermType for ArenaRef<NilTerm, A> {}
 
-impl<'heap, A: ArenaAllocator> NilTermType for ArenaRef<'heap, TypedTerm<NilTerm>, A> {}
+impl<A: ArenaAllocator + Clone> NilTermType for ArenaRef<TypedTerm<NilTerm>, A> {}
 
 // FIXME: implement RecursiveTerm
-impl<'heap, A: ArenaAllocator> RecursiveTermType<WasmExpression<'heap, A>>
-    for ArenaRef<'heap, TypedTerm<NilTerm>, A>
+impl<A: ArenaAllocator + Clone> RecursiveTermType<WasmExpression<A>>
+    for ArenaRef<TypedTerm<NilTerm>, A>
 {
-    fn factory<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::ExpressionRef<'a>
+    fn factory<'a>(&'a self) -> <WasmExpression<A> as Expression>::ExpressionRef<'a>
     where
-        WasmExpression<'heap, A>: 'a,
+        WasmExpression<A>: 'a,
     {
         panic!("Recursive terms not current supported")
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, NilTerm, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<NilTerm, A> {
     fn size(&self) -> usize {
         1
     }
@@ -79,7 +79,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, NilTerm, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, NilTerm, A> {
+impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<NilTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Ok(JsonValue::Null)
     }
@@ -88,20 +88,20 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, NilTerm, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, NilTerm, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<NilTerm, A> {
     fn eq(&self, _other: &Self) -> bool {
         true
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, NilTerm, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<NilTerm, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, NilTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<NilTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, NilTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<NilTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "null")
     }

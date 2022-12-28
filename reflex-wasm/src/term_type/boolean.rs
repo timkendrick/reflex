@@ -43,25 +43,25 @@ impl Into<bool> for BooleanTerm {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, BooleanTerm, A> {
+impl<A: ArenaAllocator + Clone> ArenaRef<BooleanTerm, A> {
     pub fn value(&self) -> bool {
         self.as_value().value != 0
     }
 }
 
-impl<'heap, A: ArenaAllocator> BooleanTermType for ArenaRef<'heap, BooleanTerm, A> {
+impl<A: ArenaAllocator + Clone> BooleanTermType for ArenaRef<BooleanTerm, A> {
     fn value(&self) -> bool {
         self.value()
     }
 }
 
-impl<'heap, A: ArenaAllocator> BooleanTermType for ArenaRef<'heap, TypedTerm<BooleanTerm>, A> {
+impl<A: ArenaAllocator + Clone> BooleanTermType for ArenaRef<TypedTerm<BooleanTerm>, A> {
     fn value(&self) -> bool {
-        <ArenaRef<'heap, BooleanTerm, A> as BooleanTermType>::value(&self.as_inner())
+        <ArenaRef<BooleanTerm, A> as BooleanTermType>::value(&self.as_inner())
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, BooleanTerm, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<BooleanTerm, A> {
     fn size(&self) -> usize {
         1
     }
@@ -91,7 +91,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, BooleanTerm, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, BooleanTerm, A> {
+impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<BooleanTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Ok(JsonValue::Bool(self.value()))
     }
@@ -104,20 +104,20 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, BooleanTerm, A>
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, BooleanTerm, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<BooleanTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.value() == other.value()
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, BooleanTerm, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<BooleanTerm, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, BooleanTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<BooleanTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, BooleanTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<BooleanTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", if self.value() { "false" } else { "true" })
     }

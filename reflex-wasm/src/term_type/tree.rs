@@ -48,51 +48,49 @@ impl TermHash for TreeTerm {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, TreeTerm, A> {
-    pub fn left(&self) -> Option<ArenaRef<'heap, Term, A>> {
+impl<A: ArenaAllocator + Clone> ArenaRef<TreeTerm, A> {
+    pub fn left(&self) -> Option<ArenaRef<Term, A>> {
         let pointer = self.as_value().left;
         if pointer == TermPointer::null() {
             None
         } else {
-            Some(ArenaRef::<Term, _>::new(self.arena, pointer))
+            Some(ArenaRef::<Term, _>::new(self.arena.clone(), pointer))
         }
     }
-    pub fn right(&self) -> Option<ArenaRef<'heap, Term, A>> {
+    pub fn right(&self) -> Option<ArenaRef<Term, A>> {
         let pointer = self.as_value().right;
         if pointer == TermPointer::null() {
             None
         } else {
-            Some(ArenaRef::<Term, _>::new(self.arena, pointer))
+            Some(ArenaRef::<Term, _>::new(self.arena.clone(), pointer))
         }
     }
-    pub fn iter<'a>(&'a self) -> TreeIterator<'heap, A> {
-        TreeIterator::new(*self)
+    pub fn iter(&self) -> TreeIterator<'_, A> {
+        TreeIterator::new(&self.arena, self.pointer)
     }
-    pub fn nodes<'a>(&'a self) -> IntoArenaRefIterator<'heap, Term, A, TreeIterator<'a, A>> {
-        IntoArenaRefIterator::new(self.arena, self.iter())
+    pub fn nodes(&self) -> IntoArenaRefIterator<'_, Term, A, TreeIterator<'_, A>> {
+        IntoArenaRefIterator::new(&self.arena, self.iter())
     }
     pub fn len(&self) -> u32 {
         self.as_value().length
     }
 }
 
-impl<'heap, A: ArenaAllocator> ConditionListType<WasmExpression<'heap, A>>
-    for ArenaRef<'heap, TreeTerm, A>
-{
+impl<A: ArenaAllocator + Clone> ConditionListType<WasmExpression<A>> for ArenaRef<TreeTerm, A> {
     type Iterator<'a> = WithExactSizeIterator<MapIntoIterator<
-        MatchConditionTermsIterator<'heap, TreeIterator<'heap, A>, A>,
-        ArenaRef<'heap, TypedTerm<ConditionTerm>, A>,
-        <WasmExpression<'heap, A> as Expression>::SignalRef<'a>
+        MatchConditionTermsIterator<'a, TreeIterator<'a, A>, A>,
+        ArenaRef<TypedTerm<ConditionTerm>, A>,
+        <WasmExpression<A> as Expression>::SignalRef<'a>
     >>
     where
-        <WasmExpression<'heap, A> as Expression>::Signal: 'a,
-        WasmExpression<'heap, A>: 'a,
+        <WasmExpression<A> as Expression>::Signal: 'a,
+        WasmExpression<A>: 'a,
         Self: 'a;
     fn id(&self) -> HashId {
         // FIXME: convert to 64-bit term hashes
         u32::from(
             self.as_value()
-                .hash(TermHasher::default(), self.arena)
+                .hash(TermHasher::default(), &self.arena)
                 .finish(),
         ) as HashId
     }
@@ -101,78 +99,74 @@ impl<'heap, A: ArenaAllocator> ConditionListType<WasmExpression<'heap, A>>
     }
     fn iter<'a>(&'a self) -> Self::Iterator<'a>
     where
-        <WasmExpression<'heap, A> as Expression>::Signal: 'a,
-        WasmExpression<'heap, A>: 'a,
+        <WasmExpression<A> as Expression>::Signal: 'a,
+        WasmExpression<A>: 'a,
     {
         WithExactSizeIterator::new(
             // This assumes every node in the tree is a condition term
             self.len() as usize,
-            MapIntoIterator::new(MatchConditionTermsIterator::new(self.arena, self.iter())),
+            MapIntoIterator::new(MatchConditionTermsIterator::new(&self.arena, self.iter())),
         )
     }
 }
 
-impl<'heap, A: ArenaAllocator> ConditionListType<WasmExpression<'heap, A>>
-    for ArenaRef<'heap, TypedTerm<TreeTerm>, A>
+impl<A: ArenaAllocator + Clone> ConditionListType<WasmExpression<A>>
+    for ArenaRef<TypedTerm<TreeTerm>, A>
 {
-    type Iterator<'a> = <ArenaRef<'heap, TreeTerm, A> as ConditionListType<WasmExpression<'heap, A>>>::Iterator<'a>
+    type Iterator<'a> = <ArenaRef<TreeTerm, A> as ConditionListType<WasmExpression<A>>>::Iterator<'a>
     where
-        <WasmExpression<'heap, A> as Expression>::Signal: 'a,
-        WasmExpression<'heap, A>: 'a,
+        <WasmExpression<A> as Expression>::Signal: 'a,
+        WasmExpression<A>: 'a,
         Self: 'a;
 
     fn id(&self) -> HashId {
-        <ArenaRef<'heap, TreeTerm, A> as ConditionListType<WasmExpression<'heap, A>>>::id(
-            &self.as_inner(),
-        )
+        <ArenaRef<TreeTerm, A> as ConditionListType<WasmExpression<A>>>::id(&self.as_inner())
     }
     fn len(&self) -> usize {
-        <ArenaRef<'heap, TreeTerm, A> as ConditionListType<WasmExpression<'heap, A>>>::len(
-            &self.as_inner(),
-        )
+        <ArenaRef<TreeTerm, A> as ConditionListType<WasmExpression<A>>>::len(&self.as_inner())
     }
     fn iter<'a>(&'a self) -> Self::Iterator<'a>
     where
-        <WasmExpression<'heap, A> as Expression>::Signal: 'a,
-        WasmExpression<'heap, A>: 'a,
+        <WasmExpression<A> as Expression>::Signal: 'a,
+        WasmExpression<A>: 'a,
     {
-        <ArenaRef<'heap, TreeTerm, A> as ConditionListType<WasmExpression<'heap, A>>>::iter(
-            &self.as_inner(),
-        )
+        <ArenaRef<TreeTerm, A> as ConditionListType<WasmExpression<A>>>::iter(&self.as_inner())
     }
 }
 
-pub struct MatchConditionTermsIterator<'heap, T, A>
+pub struct MatchConditionTermsIterator<'a, T, A>
 where
     T: Iterator<Item = TermPointer>,
     A: ArenaAllocator,
 {
     inner: T,
-    arena: &'heap A,
+    arena: &'a A,
 }
-impl<'heap, T, A> MatchConditionTermsIterator<'heap, T, A>
+impl<'a, T, A> MatchConditionTermsIterator<'a, T, A>
 where
     T: Iterator<Item = TermPointer>,
     A: ArenaAllocator,
 {
-    pub fn new(arena: &'heap A, inner: T) -> Self {
+    pub fn new(arena: &'a A, inner: T) -> Self {
         Self { arena, inner }
     }
 }
 
-impl<'heap, T, A> Iterator for MatchConditionTermsIterator<'heap, T, A>
+impl<'a, T, A> Iterator for MatchConditionTermsIterator<'a, T, A>
 where
     T: Iterator<Item = TermPointer>,
-    A: ArenaAllocator,
+    A: ArenaAllocator + Clone,
 {
-    type Item = ArenaRef<'heap, TypedTerm<ConditionTerm>, A>;
+    type Item = ArenaRef<TypedTerm<ConditionTerm>, A>;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next().and_then(|item_pointer| {
-            let item = ArenaRef::<Term, _>::new(self.arena, item_pointer);
+            let item = ArenaRef::<Term, _>::new(self.arena.clone(), item_pointer);
             match item.as_value().type_id() {
                 TermTypeDiscriminants::Condition => {
-                    let condition_term =
-                        ArenaRef::<TypedTerm<ConditionTerm>, _>::new(self.arena, item_pointer);
+                    let condition_term = ArenaRef::<TypedTerm<ConditionTerm>, _>::new(
+                        self.arena.clone(),
+                        item_pointer,
+                    );
                     Some(condition_term)
                 }
                 _ => self.next(),
@@ -184,17 +178,17 @@ where
     }
 }
 
-impl<'heap, T, A> ExactSizeIterator for MatchConditionTermsIterator<'heap, T, A>
+impl<'a, T, A> ExactSizeIterator for MatchConditionTermsIterator<'a, T, A>
 where
     T: Iterator<Item = TermPointer> + ExactSizeIterator,
-    A: ArenaAllocator,
+    A: ArenaAllocator + Clone,
 {
     fn len(&self) -> usize {
         self.inner.len()
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, TreeTerm, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<TreeTerm, A> {
     fn size(&self) -> usize {
         1 + self.left().map(|term| term.size()).unwrap_or(0)
             + self.right().map(|term| term.size()).unwrap_or(0)
@@ -272,7 +266,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, TreeTerm, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, TreeTerm, A> {
+impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<TreeTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -284,22 +278,22 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, TreeTerm, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, TreeTerm, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<TreeTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         // TODO: Clarify PartialEq implementations for container terms
         // This assumes that trees with the same length and hash are almost certainly identical
         self.len() == other.len()
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, TreeTerm, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<TreeTerm, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, TreeTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<TreeTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, TreeTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<TreeTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let left = self.as_value().left;
         let right = self.as_value().right;
@@ -307,26 +301,26 @@ impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, TreeTerm, A
         if TermPointer::is_null(left) {
             write!(f, "NULL")?;
         } else {
-            write!(f, "{}", ArenaRef::<Term, _>::new(self.arena, left))?;
+            write!(f, "{}", ArenaRef::<Term, _>::new(self.arena.clone(), left))?;
         }
         write!(f, " . ")?;
         if TermPointer::is_null(right) {
             write!(f, "NULL")?;
         } else {
-            write!(f, "{}", ArenaRef::<Term, _>::new(self.arena, right))?;
+            write!(f, "{}", ArenaRef::<Term, _>::new(self.arena.clone(), right))?;
         }
         write!(f, ")")
     }
 }
 
-pub struct TreeIterator<'heap, A: ArenaAllocator> {
-    stack: TreeIteratorStack<'heap, A>,
-    arena: &'heap A,
+pub struct TreeIterator<'a, A: ArenaAllocator> {
+    stack: TreeIteratorStack,
+    arena: &'a A,
 }
 impl<'a, A: ArenaAllocator> TreeIterator<'a, A> {
-    fn new(root: ArenaRef<'a, TreeTerm, A>) -> Self {
+    fn new(arena: &'a A, root: TermPointer) -> Self {
         Self {
-            arena: root.arena,
+            arena,
             stack: TreeIteratorStack {
                 cursor: TreeIteratorCursor::Left,
                 items: vec![root],
@@ -334,12 +328,12 @@ impl<'a, A: ArenaAllocator> TreeIterator<'a, A> {
         }
     }
 }
-struct TreeIteratorStack<'a, A: ArenaAllocator> {
+struct TreeIteratorStack {
     cursor: TreeIteratorCursor,
-    items: Vec<ArenaRef<'a, TreeTerm, A>>,
+    items: Vec<TermPointer>,
 }
-impl<'a, A: ArenaAllocator> TreeIteratorStack<'a, A> {
-    fn push(&mut self, item: ArenaRef<'a, TreeTerm, A>) {
+impl TreeIteratorStack {
+    fn push(&mut self, item: TermPointer) {
         match self.cursor {
             TreeIteratorCursor::Left => {
                 // If we were processing the left branch, create a new stack entry so that we can return later to process the right branch
@@ -363,7 +357,7 @@ impl<'a, A: ArenaAllocator> TreeIteratorStack<'a, A> {
             }
         }
     }
-    fn peek(&self) -> Option<&ArenaRef<'a, TreeTerm, A>> {
+    fn peek(&self) -> Option<&TermPointer> {
         if self.items.is_empty() {
             None
         } else {
@@ -371,34 +365,38 @@ impl<'a, A: ArenaAllocator> TreeIteratorStack<'a, A> {
         }
     }
 }
-impl<'heap, A: ArenaAllocator> Iterator for TreeIterator<'heap, A> {
+impl<'a, A: ArenaAllocator + Clone> Iterator for TreeIterator<'a, A> {
     type Item = TermPointer;
     fn next(&mut self) -> Option<Self::Item> {
-        let (cursor, child_pointer, child) = match self.stack.peek() {
+        let (cursor, child_pointer) = match self.stack.peek() {
             None => None,
             Some(tree_term) => {
-                let (child_pointer, child) = match self.stack.cursor {
-                    TreeIteratorCursor::Left => (tree_term.as_value().left, tree_term.left()),
-                    TreeIteratorCursor::Right => (tree_term.as_value().right, tree_term.right()),
+                let child_pointer = {
+                    let tree_term = self.arena.get::<TreeTerm>(*tree_term);
+                    match self.stack.cursor {
+                        TreeIteratorCursor::Left => tree_term.left,
+                        TreeIteratorCursor::Right => tree_term.right,
+                    }
                 };
-                Some((self.stack.cursor, child_pointer, child))
+                Some((self.stack.cursor, child_pointer))
             }
         }?;
         match cursor {
-            TreeIteratorCursor::Left => match child {
-                // If this is the null leaf marker, we need to shift from the left to the right branch
-                None => {
+            TreeIteratorCursor::Left => {
+                if child_pointer.is_null() {
+                    // If this is the null leaf marker, we need to shift from the left to the right branch
                     self.stack.cursor = TreeIteratorCursor::Right;
                     return self.next();
-                }
-                Some(child) => {
+                } else {
                     // Determine whether the current item is itself a cell which needs to be traversed deeper
-                    match child.as_value().type_id() {
+                    match self.arena.get::<Term>(child_pointer).type_id() {
                         // If so, push the cell to the stack and repeat the iteration with the updated stack
                         TermTypeDiscriminants::Tree => {
-                            let tree_term =
-                                ArenaRef::<TypedTerm<TreeTerm>, _>::new(self.arena, child_pointer);
-                            self.stack.push(tree_term.as_inner());
+                            let tree_term = ArenaRef::<TypedTerm<TreeTerm>, _>::new(
+                                self.arena.clone(),
+                                child_pointer,
+                            );
+                            self.stack.push(tree_term.as_inner().as_pointer());
                             return self.next();
                         }
                         // Otherwise emit the value and shift from the left to the right branch
@@ -408,22 +406,23 @@ impl<'heap, A: ArenaAllocator> Iterator for TreeIterator<'heap, A> {
                         }
                     }
                 }
-            },
-            TreeIteratorCursor::Right => match child {
-                // If this is the null leaf marker, we are at the end of a list and need to pop the stack
-                None => {
+            }
+            TreeIteratorCursor::Right => {
+                if child_pointer.is_null() {
+                    // If this is the null leaf marker, we are at the end of a list and need to pop the stack
                     // Pop the current entry from the stack and repeat the iteration with the updated stack
                     self.stack.pop();
                     return self.next();
-                }
-                Some(child) => {
+                } else {
                     // Determine whether the current item is itself a cell which needs to be traversed deeper
-                    match child.as_value().type_id() {
+                    match self.arena.get::<Term>(child_pointer).type_id() {
                         // If so, push the cell to the stack and repeat the iteration with the updated stack
                         TermTypeDiscriminants::Tree => {
-                            let tree_term =
-                                ArenaRef::<TypedTerm<TreeTerm>, _>::new(self.arena, child_pointer);
-                            self.stack.push(tree_term.as_inner());
+                            let tree_term = ArenaRef::<TypedTerm<TreeTerm>, _>::new(
+                                self.arena.clone(),
+                                child_pointer,
+                            );
+                            self.stack.push(tree_term.as_inner().as_pointer());
                             return self.next();
                         }
                         _ => {
@@ -432,7 +431,7 @@ impl<'heap, A: ArenaAllocator> Iterator for TreeIterator<'heap, A> {
                         }
                     }
                 }
-            },
+            }
         }
     }
 }

@@ -37,54 +37,46 @@ impl TermHash for LetTerm {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, LetTerm, A> {
-    pub fn initializer(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::<Term, _>::new(self.arena, self.as_value().initializer)
+impl<A: ArenaAllocator + Clone> ArenaRef<LetTerm, A> {
+    pub fn initializer(&self) -> ArenaRef<Term, A> {
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().initializer)
     }
-    pub fn body(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::<Term, _>::new(self.arena, self.as_value().body)
+    pub fn body(&self) -> ArenaRef<Term, A> {
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().body)
     }
 }
 
-impl<'heap, A: ArenaAllocator> LetTermType<WasmExpression<'heap, A>>
-    for ArenaRef<'heap, LetTerm, A>
-{
-    fn initializer<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::ExpressionRef<'a>
+impl<A: ArenaAllocator + Clone> LetTermType<WasmExpression<A>> for ArenaRef<LetTerm, A> {
+    fn initializer<'a>(&'a self) -> <WasmExpression<A> as Expression>::ExpressionRef<'a>
     where
-        WasmExpression<'heap, A>: 'a,
+        WasmExpression<A>: 'a,
     {
         self.initializer().into()
     }
-    fn body<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::ExpressionRef<'a>
+    fn body<'a>(&'a self) -> <WasmExpression<A> as Expression>::ExpressionRef<'a>
     where
-        WasmExpression<'heap, A>: 'a,
+        WasmExpression<A>: 'a,
     {
         self.body().into()
     }
 }
 
-impl<'heap, A: ArenaAllocator> LetTermType<WasmExpression<'heap, A>>
-    for ArenaRef<'heap, TypedTerm<LetTerm>, A>
-{
-    fn initializer<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::ExpressionRef<'a>
+impl<A: ArenaAllocator + Clone> LetTermType<WasmExpression<A>> for ArenaRef<TypedTerm<LetTerm>, A> {
+    fn initializer<'a>(&'a self) -> <WasmExpression<A> as Expression>::ExpressionRef<'a>
     where
-        WasmExpression<'heap, A>: 'a,
+        WasmExpression<A>: 'a,
     {
-        <ArenaRef<'heap, LetTerm, A> as LetTermType<WasmExpression<'heap, A>>>::initializer(
-            &self.as_inner(),
-        )
+        <ArenaRef<LetTerm, A> as LetTermType<WasmExpression<A>>>::initializer(&self.as_inner())
     }
-    fn body<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::ExpressionRef<'a>
+    fn body<'a>(&'a self) -> <WasmExpression<A> as Expression>::ExpressionRef<'a>
     where
-        WasmExpression<'heap, A>: 'a,
+        WasmExpression<A>: 'a,
     {
-        <ArenaRef<'heap, LetTerm, A> as LetTermType<WasmExpression<'heap, A>>>::body(
-            &self.as_inner(),
-        )
+        <ArenaRef<LetTerm, A> as LetTermType<WasmExpression<A>>>::body(&self.as_inner())
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, LetTerm, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<LetTerm, A> {
     fn size(&self) -> usize {
         1 + self.initializer().size() + self.body().size()
     }
@@ -131,7 +123,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, LetTerm, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, LetTerm, A> {
+impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<LetTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -143,20 +135,20 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, LetTerm, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, LetTerm, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<LetTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.initializer() == other.initializer() && self.body() == other.body()
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, LetTerm, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<LetTerm, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, LetTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<LetTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, LetTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<LetTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<let:{}:{}>", self.initializer(), self.body())
     }

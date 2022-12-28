@@ -32,25 +32,25 @@ impl TermHash for SymbolTerm {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, SymbolTerm, A> {
+impl<A: ArenaAllocator + Clone> ArenaRef<SymbolTerm, A> {
     pub fn id(&self) -> u32 {
         self.as_value().id
     }
 }
 
-impl<'heap, A: ArenaAllocator> SymbolTermType for ArenaRef<'heap, SymbolTerm, A> {
+impl<A: ArenaAllocator + Clone> SymbolTermType for ArenaRef<SymbolTerm, A> {
     fn id(&self) -> SymbolId {
         self.id() as SymbolId
     }
 }
 
-impl<'heap, A: ArenaAllocator> SymbolTermType for ArenaRef<'heap, TypedTerm<SymbolTerm>, A> {
+impl<A: ArenaAllocator + Clone> SymbolTermType for ArenaRef<TypedTerm<SymbolTerm>, A> {
     fn id(&self) -> SymbolId {
-        <ArenaRef<'heap, SymbolTerm, A> as SymbolTermType>::id(&self.as_inner())
+        <ArenaRef<SymbolTerm, A> as SymbolTermType>::id(&self.as_inner())
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, SymbolTerm, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<SymbolTerm, A> {
     fn size(&self) -> usize {
         1
     }
@@ -80,7 +80,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, SymbolTerm, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, SymbolTerm, A> {
+impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<SymbolTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -92,20 +92,20 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, SymbolTerm, A> 
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, SymbolTerm, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<SymbolTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.id() == other.id()
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, SymbolTerm, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<SymbolTerm, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, SymbolTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<SymbolTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, SymbolTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<SymbolTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<symbol:{:#016x}>", self.id())
     }

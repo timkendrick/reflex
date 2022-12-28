@@ -71,7 +71,7 @@ impl TermHash for CompiledTerm {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, CompiledTerm, A> {
+impl<A: ArenaAllocator + Clone> ArenaRef<CompiledTerm, A> {
     pub fn target(&self) -> CompiledFunctionIndex {
         self.as_value().target
     }
@@ -83,7 +83,7 @@ impl<'heap, A: ArenaAllocator> ArenaRef<'heap, CompiledTerm, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> CompiledFunctionTermType for ArenaRef<'heap, CompiledTerm, A> {
+impl<A: ArenaAllocator + Clone> CompiledFunctionTermType for ArenaRef<CompiledTerm, A> {
     fn address(&self) -> InstructionPointer {
         InstructionPointer::new(u32::from(self.target()) as usize)
     }
@@ -100,28 +100,22 @@ impl<'heap, A: ArenaAllocator> CompiledFunctionTermType for ArenaRef<'heap, Comp
     }
 }
 
-impl<'heap, A: ArenaAllocator> CompiledFunctionTermType
-    for ArenaRef<'heap, TypedTerm<CompiledTerm>, A>
-{
+impl<A: ArenaAllocator + Clone> CompiledFunctionTermType for ArenaRef<TypedTerm<CompiledTerm>, A> {
     fn address(&self) -> InstructionPointer {
-        <ArenaRef<'heap, CompiledTerm, A> as CompiledFunctionTermType>::address(&self.as_inner())
+        <ArenaRef<CompiledTerm, A> as CompiledFunctionTermType>::address(&self.as_inner())
     }
     fn hash(&self) -> HashId {
-        <ArenaRef<'heap, CompiledTerm, A> as CompiledFunctionTermType>::hash(&self.as_inner())
+        <ArenaRef<CompiledTerm, A> as CompiledFunctionTermType>::hash(&self.as_inner())
     }
     fn required_args(&self) -> StackOffset {
-        <ArenaRef<'heap, CompiledTerm, A> as CompiledFunctionTermType>::required_args(
-            &self.as_inner(),
-        )
+        <ArenaRef<CompiledTerm, A> as CompiledFunctionTermType>::required_args(&self.as_inner())
     }
     fn optional_args(&self) -> StackOffset {
-        <ArenaRef<'heap, CompiledTerm, A> as CompiledFunctionTermType>::optional_args(
-            &self.as_inner(),
-        )
+        <ArenaRef<CompiledTerm, A> as CompiledFunctionTermType>::optional_args(&self.as_inner())
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, CompiledTerm, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<CompiledTerm, A> {
     fn size(&self) -> usize {
         1
     }
@@ -151,7 +145,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, CompiledTerm, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, CompiledTerm, A> {
+impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<CompiledTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -163,20 +157,20 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, CompiledTerm, A
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, CompiledTerm, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<CompiledTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.address() == other.address() && self.num_args() == other.num_args()
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, CompiledTerm, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<CompiledTerm, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, CompiledTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<CompiledTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, CompiledTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<CompiledTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<compiled:{}>", self.target())
     }

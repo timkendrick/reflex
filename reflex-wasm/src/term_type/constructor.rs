@@ -34,40 +34,42 @@ impl TermHash for ConstructorTerm {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, ConstructorTerm, A> {
-    pub fn keys(&self) -> ArenaRef<'heap, TypedTerm<ListTerm>, A> {
-        ArenaRef::<TypedTerm<ListTerm>, _>::new(self.arena, self.as_value().keys)
+impl<A: ArenaAllocator + Clone> ArenaRef<ConstructorTerm, A> {
+    pub fn keys(&self) -> ArenaRef<TypedTerm<ListTerm>, A> {
+        ArenaRef::<TypedTerm<ListTerm>, _>::new(self.arena.clone(), self.as_value().keys)
     }
     pub fn arity(&self) -> Arity {
         Arity::lazy(self.keys().as_inner().len(), 0, false)
     }
 }
 
-impl<'heap, A: ArenaAllocator> ConstructorTermType<WasmExpression<'heap, A>>
-    for ArenaRef<'heap, ConstructorTerm, A>
+impl<A: ArenaAllocator + Clone> ConstructorTermType<WasmExpression<A>>
+    for ArenaRef<ConstructorTerm, A>
 {
-    fn prototype<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::StructPrototypeRef<'a>
+    fn prototype<'a>(&'a self) -> <WasmExpression<A> as Expression>::StructPrototypeRef<'a>
     where
-        <WasmExpression<'heap, A> as Expression>::StructPrototype: 'a,
-        WasmExpression<'heap, A>: 'a,
+        <WasmExpression<A> as Expression>::StructPrototype: 'a,
+        WasmExpression<A>: 'a,
     {
         self.keys().into()
     }
 }
 
-impl<'heap, A: ArenaAllocator> ConstructorTermType<WasmExpression<'heap, A>>
-    for ArenaRef<'heap, TypedTerm<ConstructorTerm>, A>
+impl<A: ArenaAllocator + Clone> ConstructorTermType<WasmExpression<A>>
+    for ArenaRef<TypedTerm<ConstructorTerm>, A>
 {
-    fn prototype<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::StructPrototypeRef<'a>
+    fn prototype<'a>(&'a self) -> <WasmExpression<A> as Expression>::StructPrototypeRef<'a>
     where
-        <WasmExpression<'heap, A> as Expression>::StructPrototype: 'a,
-        WasmExpression<'heap, A>: 'a,
+        <WasmExpression<A> as Expression>::StructPrototype: 'a,
+        WasmExpression<A>: 'a,
     {
-        <ArenaRef<'heap, ConstructorTerm, A> as ConstructorTermType<WasmExpression<'heap, A>>>::prototype(&self.as_inner())
+        <ArenaRef<ConstructorTerm, A> as ConstructorTermType<WasmExpression<A>>>::prototype(
+            &self.as_inner(),
+        )
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, ConstructorTerm, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<ConstructorTerm, A> {
     fn size(&self) -> usize {
         1
     }
@@ -97,7 +99,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, ConstructorTerm, A>
     }
 }
 
-impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, ConstructorTerm, A> {
+impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<ConstructorTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -109,20 +111,20 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, ConstructorTerm
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, ConstructorTerm, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<ConstructorTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.keys() == other.keys()
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, ConstructorTerm, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<ConstructorTerm, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, ConstructorTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<ConstructorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, ConstructorTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<ConstructorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<constructor:{{{}}}>", self.keys())
     }

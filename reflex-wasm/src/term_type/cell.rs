@@ -51,13 +51,13 @@ impl CellTerm {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, CellTerm, A> {
+impl<A: ArenaAllocator + Clone> ArenaRef<CellTerm, A> {
     pub fn fields(&self) -> impl Iterator<Item = u32> + '_ {
         self.as_value().fields.iter().copied()
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, CellTerm, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<CellTerm, A> {
     fn size(&self) -> usize {
         1
     }
@@ -87,7 +87,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, CellTerm, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, CellTerm, A> {
+impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<CellTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -99,20 +99,20 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, CellTerm, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, CellTerm, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<CellTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         std::ptr::eq(&self.as_value().fields, &other.as_value().fields)
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, CellTerm, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<CellTerm, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, CellTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<CellTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, CellTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<CellTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,

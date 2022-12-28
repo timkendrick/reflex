@@ -34,26 +34,27 @@ impl TermHash for HashsetTerm {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, HashsetTerm, A> {
+impl<A: ArenaAllocator + Clone> ArenaRef<HashsetTerm, A> {
     pub fn num_values(&self) -> u32 {
         self.entries().as_inner().num_entries()
     }
-    pub fn values<'a>(&'a self) -> <ArenaRef<'heap, TypedTerm<HashmapTerm>, A> as HashmapTermType<WasmExpression<'heap, A>>>::KeysIterator<'a>{
+    pub fn values<'a>(
+        &'a self,
+    ) -> <ArenaRef<TypedTerm<HashmapTerm>, A> as HashmapTermType<WasmExpression<A>>>::KeysIterator<'a>
+    {
         self.entries().keys()
     }
-    fn entries(&self) -> ArenaRef<'heap, TypedTerm<HashmapTerm>, A> {
-        ArenaRef::<TypedTerm<HashmapTerm>, _>::new(self.arena, self.as_value().entries)
+    fn entries(&self) -> ArenaRef<TypedTerm<HashmapTerm>, A> {
+        ArenaRef::<TypedTerm<HashmapTerm>, _>::new(self.arena.clone(), self.as_value().entries)
     }
 }
 
-impl<'heap, A: ArenaAllocator> HashsetTermType<WasmExpression<'heap, A>>
-    for ArenaRef<'heap, HashsetTerm, A>
-{
-    type ValuesIterator<'a> = <ArenaRef<'heap, HashmapTerm, A> as HashmapTermType<WasmExpression<'heap, A>>>::KeysIterator<'a>
+impl<A: ArenaAllocator + Clone> HashsetTermType<WasmExpression<A>> for ArenaRef<HashsetTerm, A> {
+    type ValuesIterator<'a> = <ArenaRef<HashmapTerm, A> as HashmapTermType<WasmExpression<A>>>::KeysIterator<'a>
     where
-        WasmExpression<'heap, A>: 'a,
+        WasmExpression<A>: 'a,
         Self: 'a;
-    fn contains<'a>(&'a self, value: &WasmExpression<'heap, A>) -> bool {
+    fn contains<'a>(&'a self, value: &WasmExpression<A>) -> bool {
         self.values().any({
             let value_id = value.as_value().id();
             move |value| {
@@ -67,36 +68,34 @@ impl<'heap, A: ArenaAllocator> HashsetTermType<WasmExpression<'heap, A>>
     }
     fn values<'a>(&'a self) -> Self::ValuesIterator<'a>
     where
-        WasmExpression<'heap, A>: 'a,
+        WasmExpression<A>: 'a,
     {
         self.values()
     }
 }
 
-impl<'heap, A: ArenaAllocator> HashsetTermType<WasmExpression<'heap, A>>
-    for ArenaRef<'heap, TypedTerm<HashsetTerm>, A>
+impl<A: ArenaAllocator + Clone> HashsetTermType<WasmExpression<A>>
+    for ArenaRef<TypedTerm<HashsetTerm>, A>
 {
-    type ValuesIterator<'a> = <ArenaRef<'heap, HashsetTerm, A> as HashsetTermType<WasmExpression<'heap, A>>>::ValuesIterator<'a>
+    type ValuesIterator<'a> = <ArenaRef<HashsetTerm, A> as HashsetTermType<WasmExpression<A>>>::ValuesIterator<'a>
     where
-        WasmExpression<'heap, A>: 'a,
+        WasmExpression<A>: 'a,
         Self: 'a;
-    fn contains<'a>(&'a self, value: &WasmExpression<'heap, A>) -> bool {
-        <ArenaRef<'heap, HashsetTerm, A> as HashsetTermType<WasmExpression<'heap, A>>>::contains(
+    fn contains<'a>(&'a self, value: &WasmExpression<A>) -> bool {
+        <ArenaRef<HashsetTerm, A> as HashsetTermType<WasmExpression<A>>>::contains(
             &self.as_inner(),
             value,
         )
     }
     fn values<'a>(&'a self) -> Self::ValuesIterator<'a>
     where
-        WasmExpression<'heap, A>: 'a,
+        WasmExpression<A>: 'a,
     {
-        <ArenaRef<'heap, HashsetTerm, A> as HashsetTermType<WasmExpression<'heap, A>>>::values(
-            &self.as_inner(),
-        )
+        <ArenaRef<HashsetTerm, A> as HashsetTermType<WasmExpression<A>>>::values(&self.as_inner())
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, HashsetTerm, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<HashsetTerm, A> {
     fn size(&self) -> usize {
         1 + self.entries().size()
     }
@@ -134,7 +133,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, HashsetTerm, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, HashsetTerm, A> {
+impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<HashsetTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -146,20 +145,20 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, HashsetTerm, A>
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, HashsetTerm, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<HashsetTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.entries() == other.entries()
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, HashsetTerm, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<HashsetTerm, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, HashsetTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<HashsetTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, HashsetTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<HashsetTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let max_displayed_values = 10;
         let values = self.values();

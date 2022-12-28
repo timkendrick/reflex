@@ -43,13 +43,13 @@ impl From<DateTerm> for i64 {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, DateTerm, A> {
+impl<A: ArenaAllocator + Clone> ArenaRef<DateTerm, A> {
     pub fn timestamp(&self) -> i64 {
         i64::from(*self.as_value())
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, DateTerm, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<DateTerm, A> {
     fn size(&self) -> usize {
         1
     }
@@ -79,7 +79,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, DateTerm, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, DateTerm, A> {
+impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<DateTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Ok(JsonValue::String(format!("{}", self)))
     }
@@ -92,20 +92,20 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, DateTerm, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, DateTerm, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<DateTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.timestamp() == other.timestamp()
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, DateTerm, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<DateTerm, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, DateTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<DateTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, DateTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<DateTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let timestamp = i64::from(*self.as_value());
         let seconds = timestamp / 1000;

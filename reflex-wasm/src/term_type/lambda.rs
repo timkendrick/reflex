@@ -35,51 +35,45 @@ impl TermHash for LambdaTerm {
     }
 }
 
-impl<'heap, A: ArenaAllocator> ArenaRef<'heap, LambdaTerm, A> {
+impl<A: ArenaAllocator + Clone> ArenaRef<LambdaTerm, A> {
     pub fn num_args(&self) -> u32 {
         self.as_value().num_args
     }
-    pub fn body(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::<Term, _>::new(self.arena, self.as_value().body)
+    pub fn body(&self) -> ArenaRef<Term, A> {
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().body)
     }
     pub fn arity(&self) -> Arity {
         Arity::lazy(self.num_args() as usize, 0, false)
     }
 }
 
-impl<'heap, A: ArenaAllocator> LambdaTermType<WasmExpression<'heap, A>>
-    for ArenaRef<'heap, LambdaTerm, A>
-{
+impl<A: ArenaAllocator + Clone> LambdaTermType<WasmExpression<A>> for ArenaRef<LambdaTerm, A> {
     fn num_args<'a>(&'a self) -> StackOffset {
         self.num_args() as StackOffset
     }
-    fn body<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::ExpressionRef<'a>
+    fn body<'a>(&'a self) -> <WasmExpression<A> as Expression>::ExpressionRef<'a>
     where
-        WasmExpression<'heap, A>: 'a,
+        WasmExpression<A>: 'a,
     {
         self.body().into()
     }
 }
 
-impl<'heap, A: ArenaAllocator> LambdaTermType<WasmExpression<'heap, A>>
-    for ArenaRef<'heap, TypedTerm<LambdaTerm>, A>
+impl<A: ArenaAllocator + Clone> LambdaTermType<WasmExpression<A>>
+    for ArenaRef<TypedTerm<LambdaTerm>, A>
 {
     fn num_args<'a>(&'a self) -> StackOffset {
-        <ArenaRef<'heap, LambdaTerm, A> as LambdaTermType<WasmExpression<'heap, A>>>::num_args(
-            &self.as_inner(),
-        )
+        <ArenaRef<LambdaTerm, A> as LambdaTermType<WasmExpression<A>>>::num_args(&self.as_inner())
     }
-    fn body<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::ExpressionRef<'a>
+    fn body<'a>(&'a self) -> <WasmExpression<A> as Expression>::ExpressionRef<'a>
     where
-        WasmExpression<'heap, A>: 'a,
+        WasmExpression<A>: 'a,
     {
-        <ArenaRef<'heap, LambdaTerm, A> as LambdaTermType<WasmExpression<'heap, A>>>::body(
-            &self.as_inner(),
-        )
+        <ArenaRef<LambdaTerm, A> as LambdaTermType<WasmExpression<A>>>::body(&self.as_inner())
     }
 }
 
-impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, LambdaTerm, A> {
+impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<LambdaTerm, A> {
     fn size(&self) -> usize {
         1 + self.body().size()
     }
@@ -127,7 +121,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, LambdaTerm, A> {
     }
 }
 
-impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, LambdaTerm, A> {
+impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<LambdaTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -139,20 +133,20 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, LambdaTerm, A> 
     }
 }
 
-impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, LambdaTerm, A> {
+impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<LambdaTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.num_args() == other.num_args() && self.body() == other.body()
     }
 }
-impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, LambdaTerm, A> {}
+impl<A: ArenaAllocator + Clone> Eq for ArenaRef<LambdaTerm, A> {}
 
-impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, LambdaTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<LambdaTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
-impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, LambdaTerm, A> {
+impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<LambdaTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<function:{}>", self.num_args())
     }
