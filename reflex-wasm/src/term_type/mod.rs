@@ -3374,6 +3374,16 @@ impl<'heap, A: ArenaAllocator, V> ArenaRef<'heap, TypedTerm<V>, A> {
     }
 }
 
+impl<'heap, A: ArenaAllocator> ArenaRef<'heap, Term, A> {
+    pub(crate) fn as_type<V>(&self) -> &ArenaRef<'heap, TypedTerm<V>, A> {
+        unsafe {
+            std::mem::transmute::<&ArenaRef<'heap, Term, A>, &ArenaRef<'heap, TypedTerm<V>, A>>(
+                self,
+            )
+        }
+    }
+}
+
 impl<'heap, A: ArenaAllocator, V> GraphNode for ArenaRef<'heap, TypedTerm<V>, A>
 where
     ArenaRef<'heap, V, A>: GraphNode,

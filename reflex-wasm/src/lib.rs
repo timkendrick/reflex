@@ -11,6 +11,7 @@ use reflex::{core::RefType, hash::HashId};
 use term_type::*;
 
 pub mod allocator;
+pub mod factory;
 pub mod hash;
 pub mod interpreter;
 pub mod parser;
@@ -40,6 +41,9 @@ impl<'a, T, A: ArenaAllocator> ArenaRef<'a, T, A> {
     }
     pub fn as_value(&self) -> &'a T {
         self.arena.get::<T>(self.pointer)
+    }
+    pub(crate) fn as_pointer(&self) -> TermPointer {
+        self.pointer
     }
 }
 impl<'a, T, A: ArenaAllocator> Copy for ArenaRef<'a, T, A> {}
