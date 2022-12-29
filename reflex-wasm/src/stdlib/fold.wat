@@ -3,7 +3,7 @@
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 (module
   (@builtin $Stdlib_Fold "Fold"
-    (@args (@strict $self) (@strict $iteratee) (@lazy $seed))
+    (@args (@strict $self) (@strict $iteratee) (@strict $seed))
 
     (@impl
       (call $TermType::implements::iterate)

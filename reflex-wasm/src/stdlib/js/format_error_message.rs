@@ -10,7 +10,7 @@ impl FormatErrorMessage {
     const ARITY: FunctionArity<1, 0> = FunctionArity {
         required: [ArgType::Strict],
         optional: [],
-        variadic: Some(ArgType::Lazy),
+        variadic: None,
     };
     pub fn arity(&self) -> Arity {
         Arity::from(&Self::ARITY)

@@ -8,7 +8,7 @@ pub struct Fold;
 impl Fold {
     pub const UUID: Uuid = uuid!("f8312370-a299-457e-b9fb-f902f84f71b2");
     const ARITY: FunctionArity<3, 0> = FunctionArity {
-        required: [ArgType::Strict, ArgType::Strict, ArgType::Lazy],
+        required: [ArgType::Strict, ArgType::Strict, ArgType::Strict],
         optional: [],
         variadic: None,
     };

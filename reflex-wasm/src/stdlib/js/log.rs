@@ -10,7 +10,7 @@ impl Log {
     const ARITY: FunctionArity<1, 0> = FunctionArity {
         required: [ArgType::Eager],
         optional: [],
-        variadic: Some(ArgType::Eager),
+        variadic: None,
     };
     pub fn arity(&self) -> Arity {
         Arity::from(&Self::ARITY)

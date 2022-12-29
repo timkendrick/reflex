@@ -7,8 +7,8 @@ use reflex::core::{uuid, ArgType, Arity, FunctionArity, Uid, Uuid};
 pub struct Iterate;
 impl Iterate {
     pub const UUID: Uuid = uuid!("36ecf042-6895-4e38-8a23-9e6208cbf9cf");
-    const ARITY: FunctionArity<3, 0> = FunctionArity {
-        required: [ArgType::Strict, ArgType::Lazy, ArgType::Lazy],
+    const ARITY: FunctionArity<1, 0> = FunctionArity {
+        required: [ArgType::Strict],
         optional: [],
         variadic: None,
     };
