@@ -130,7 +130,15 @@ impl<A: ArenaAllocator + Clone> ConditionListType<WasmExpression<A>>
         <WasmExpression<A> as Expression>::Signal: 'a,
         WasmExpression<A>: 'a,
     {
-        <ArenaRef<TreeTerm, A> as ConditionListType<WasmExpression<A>>>::iter(&self.as_inner())
+        let inner = self.as_inner();
+        WithExactSizeIterator::new(
+            // This assumes every node in the tree is a condition term
+            inner.len() as usize,
+            MapIntoIterator::new(MatchConditionTermsIterator::new(
+                &self.arena,
+                TreeIterator::new(&self.arena, inner.pointer),
+            )),
+        )
     }
 }
 

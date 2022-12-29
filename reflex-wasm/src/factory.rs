@@ -1,11 +1,7 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use std::{
-    cell::RefCell,
-    ops::{Deref, DerefMut},
-    rc::Rc,
-};
+use std::{cell::RefCell, rc::Rc};
 
 use reflex::{
     core::{
@@ -38,84 +34,28 @@ impl<A: ArenaAllocator> Clone for ArenaFactory<A> {
         }
     }
 }
-impl<'heap, A: ArenaAllocator> ArenaAllocator for &'heap mut A {
-    fn len(&self) -> usize {
-        self.deref().len()
-    }
-    fn allocate<T: TermSize>(&mut self, value: T) -> TermPointer {
-        self.deref_mut().allocate(value)
-    }
-    fn get<T>(&self, offset: TermPointer) -> &T {
-        self.deref().get(offset)
-    }
-    fn get_mut<T>(&mut self, offset: TermPointer) -> &mut T {
-        self.deref_mut().get_mut(offset)
-    }
-    fn get_offset<T>(&self, value: &T) -> TermPointer {
-        self.deref().get_offset(value)
-    }
-    fn slice<T: Sized>(&self, offset: TermPointer, count: usize) -> &[T] {
-        self.deref().slice(offset, count)
-    }
-    fn extend(&mut self, offset: TermPointer, size: usize) {
-        self.deref_mut().extend(offset, size)
-    }
-    fn shrink(&mut self, offset: TermPointer, size: usize) {
-        self.deref_mut().shrink(offset, size)
-    }
-}
-
-impl<A: ArenaAllocator> ArenaAllocator for Rc<RefCell<A>> {
-    fn len(&self) -> usize {
-        self.deref().borrow().len()
-    }
-    fn allocate<T: TermSize>(&mut self, value: T) -> TermPointer {
-        self.deref().borrow_mut().allocate(value)
-    }
-    fn get<T>(&self, offset: TermPointer) -> &T {
-        self.deref().borrow().get::<T>(offset)
-    }
-    fn get_mut<T>(&mut self, offset: TermPointer) -> &mut T {
-        self.deref().borrow_mut().get_mut::<T>(offset)
-    }
-    fn get_offset<T>(&self, value: &T) -> TermPointer {
-        self.deref().borrow().get_offset(value)
-    }
-    fn slice<T: Sized>(&self, offset: TermPointer, count: usize) -> &[T] {
-        self.deref().borrow().slice::<T>(offset, count)
-    }
-    fn extend(&mut self, offset: TermPointer, size: usize) {
-        self.deref().borrow_mut().extend(offset, size)
-    }
-    fn shrink(&mut self, offset: TermPointer, size: usize) {
-        self.deref().borrow_mut().shrink(offset, size)
-    }
-}
 
 impl<A: ArenaAllocator> ArenaAllocator for ArenaFactory<A> {
     fn len(&self) -> usize {
-        self.arena.borrow().len()
+        self.arena.len()
     }
     fn allocate<T: TermSize>(&mut self, value: T) -> TermPointer {
-        self.arena.borrow_mut().allocate(value)
-    }
-    fn get<T>(&self, offset: TermPointer) -> &T {
-        self.arena.borrow().get::<T>(offset)
-    }
-    fn get_mut<T>(&mut self, offset: TermPointer) -> &mut T {
-        self.arena.borrow_mut().get_mut::<T>(offset)
-    }
-    fn get_offset<T>(&self, value: &T) -> TermPointer {
-        self.arena.borrow().get_offset(value)
-    }
-    fn slice<T: Sized>(&self, offset: TermPointer, count: usize) -> &[T] {
-        self.arena.borrow().slice::<T>(offset, count)
+        self.arena.allocate(value)
     }
     fn extend(&mut self, offset: TermPointer, size: usize) {
-        self.arena.borrow_mut().extend(offset, size)
+        self.arena.extend(offset, size)
     }
     fn shrink(&mut self, offset: TermPointer, size: usize) {
-        self.arena.borrow_mut().shrink(offset, size)
+        self.arena.shrink(offset, size)
+    }
+    fn write<T: Sized>(&mut self, offset: TermPointer, value: T) {
+        self.arena.write(offset, value)
+    }
+    fn get<T>(&self, offset: TermPointer) -> &T {
+        self.arena.get::<T>(offset)
+    }
+    fn get_offset<T>(&self, value: &T) -> TermPointer {
+        self.arena.get_offset(value)
     }
 }
 

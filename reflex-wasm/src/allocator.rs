@@ -2,19 +2,71 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
-use std::iter::repeat;
+use std::{
+    cell::RefCell,
+    iter::repeat,
+    ops::{Deref, DerefMut},
+    rc::Rc,
+};
 
 use crate::{hash::TermSize, TermPointer};
 
 pub trait ArenaAllocator: Sized {
     fn len(&self) -> usize;
     fn allocate<T: TermSize>(&mut self, value: T) -> TermPointer;
-    fn get<T>(&self, offset: TermPointer) -> &T;
-    fn get_mut<T>(&mut self, offset: TermPointer) -> &mut T;
-    fn get_offset<T>(&self, value: &T) -> TermPointer;
-    fn slice<T: Sized>(&self, offset: TermPointer, count: usize) -> &[T];
     fn extend(&mut self, offset: TermPointer, size: usize);
     fn shrink(&mut self, offset: TermPointer, size: usize);
+    fn write<T: Sized>(&mut self, offset: TermPointer, value: T);
+    fn get<T>(&self, offset: TermPointer) -> &T;
+    fn get_offset<T>(&self, value: &T) -> TermPointer;
+}
+
+impl<'heap, A: ArenaAllocator> ArenaAllocator for &'heap mut A {
+    fn len(&self) -> usize {
+        self.deref().len()
+    }
+    fn allocate<T: TermSize>(&mut self, value: T) -> TermPointer {
+        self.deref_mut().allocate(value)
+    }
+    fn extend(&mut self, offset: TermPointer, size: usize) {
+        self.deref_mut().extend(offset, size)
+    }
+    fn shrink(&mut self, offset: TermPointer, size: usize) {
+        self.deref_mut().shrink(offset, size)
+    }
+    fn write<T: Sized>(&mut self, offset: TermPointer, value: T) {
+        self.deref_mut().write(offset, value)
+    }
+    fn get<T>(&self, offset: TermPointer) -> &T {
+        self.deref().get(offset)
+    }
+    fn get_offset<T>(&self, value: &T) -> TermPointer {
+        self.deref().get_offset(value)
+    }
+}
+
+impl<A: ArenaAllocator> ArenaAllocator for Rc<RefCell<A>> {
+    fn len(&self) -> usize {
+        self.deref().borrow().len()
+    }
+    fn allocate<T: TermSize>(&mut self, value: T) -> TermPointer {
+        self.deref().borrow_mut().allocate(value)
+    }
+    fn extend(&mut self, offset: TermPointer, size: usize) {
+        self.deref().borrow_mut().extend(offset, size)
+    }
+    fn shrink(&mut self, offset: TermPointer, size: usize) {
+        self.deref().borrow_mut().shrink(offset, size)
+    }
+    fn write<T: Sized>(&mut self, offset: TermPointer, value: T) {
+        self.deref().borrow_mut().write(offset, value)
+    }
+    fn get<T>(&self, offset: TermPointer) -> &T {
+        self.deref().borrow().get::<T>(offset)
+    }
+    fn get_offset<T>(&self, value: &T) -> TermPointer {
+        self.deref().borrow().get_offset(value)
+    }
 }
 
 pub struct VecAllocator(Vec<u32>);
@@ -22,6 +74,12 @@ pub struct VecAllocator(Vec<u32>);
 impl VecAllocator {
     pub fn from_vec_u32(data: Vec<u32>) -> Self {
         Self(data)
+    }
+    pub(crate) fn get_ref<T>(&self, offset: TermPointer) -> &T {
+        let Self(data) = self;
+        let offset = u32::from(offset) as usize;
+        let item = &data[offset / 4];
+        unsafe { std::mem::transmute::<&u32, &T>(item) }
     }
 }
 impl Default for VecAllocator {
@@ -39,34 +97,11 @@ impl ArenaAllocator for VecAllocator {
         let static_size = pad_to_4_byte_offset(std::mem::size_of::<T>());
         let actual_size = pad_to_4_byte_offset(value.size_of());
         self.extend(offset, static_size);
-        let target = self.get_mut(offset);
-        *target = value;
+        self.write(offset, value);
         if actual_size < static_size {
             self.shrink(offset.offset(static_size as u32), static_size - actual_size);
         }
         TermPointer::from(offset)
-    }
-    fn get<T>(&self, offset: TermPointer) -> &T {
-        let Self(data) = self;
-        let offset = u32::from(offset) as usize;
-        let item = &data[offset / 4];
-        unsafe { std::mem::transmute::<&u32, &T>(item) }
-    }
-    fn get_mut<T>(&mut self, offset: TermPointer) -> &mut T {
-        let Self(data) = self;
-        let offset = u32::from(offset) as usize;
-        let item = &mut data[offset / 4];
-        unsafe { std::mem::transmute::<&mut u32, &mut T>(item) }
-    }
-    fn get_offset<T>(&self, value: &T) -> TermPointer {
-        let Self(data) = self;
-        let offset = (value as *const T as usize) - (&data[0] as *const u32 as usize);
-        TermPointer::from(offset as u32)
-    }
-    fn slice<T: Sized>(&self, offset: TermPointer, count: usize) -> &[T] {
-        let Self(data) = self;
-        let offset = u32::from(offset) as usize;
-        unsafe { std::slice::from_raw_parts((&data[offset / 4]) as *const u32 as *const T, count) }
     }
     fn extend(&mut self, offset: TermPointer, size: usize) {
         let offset = u32::from(offset);
@@ -85,6 +120,27 @@ impl ArenaAllocator for VecAllocator {
             let Self(data) = self;
             data.truncate((offset as u32 as usize - pad_to_4_byte_offset(size)) / 4);
         }
+    }
+    fn write<T: Sized>(&mut self, offset: TermPointer, value: T) {
+        let Self(data) = self;
+        let offset = u32::from(offset) as usize;
+        if (offset % 4 != 0) || (offset + std::mem::size_of::<T>() > data.len()) {
+            panic!("Invalid allocator offset");
+        }
+        let item = &mut data[offset / 4];
+        let item_ref = unsafe { std::mem::transmute::<&mut u32, &mut T>(item) };
+        *item_ref = value
+    }
+    fn get<T>(&self, offset: TermPointer) -> &T {
+        let Self(data) = self;
+        let offset = u32::from(offset) as usize;
+        let item = &data[offset / 4];
+        unsafe { std::mem::transmute::<&u32, &T>(item) }
+    }
+    fn get_offset<T>(&self, value: &T) -> TermPointer {
+        let Self(data) = self;
+        let offset = (value as *const T as usize) - (&data[0] as *const u32 as usize);
+        TermPointer::from(offset as u32)
     }
 }
 impl VecAllocator {
@@ -107,69 +163,6 @@ impl Into<Vec<u8>> for VecAllocator {
     fn into(self) -> Vec<u8> {
         let Self(data) = self;
         unsafe { std::mem::transmute::<Vec<u32>, Vec<u8>>(data) }
-    }
-}
-
-pub struct SliceAllocator<'a>(&'a mut [u32]);
-impl<'a> ArenaAllocator for SliceAllocator<'a> {
-    fn len(&self) -> usize {
-        self.data()[0] as usize
-    }
-    fn allocate<T: TermSize>(&mut self, value: T) -> TermPointer {
-        let offset = TermPointer(self.len() as u32);
-        self.extend(offset, value.size_of());
-        let target = self.get_mut(offset);
-        *target = value;
-        TermPointer::from(offset)
-    }
-    fn get<T>(&self, offset: TermPointer) -> &'a T {
-        let pointer = self.get_pointer(offset.into());
-        unsafe { std::mem::transmute::<*const T, &T>(pointer) }
-    }
-    fn get_mut<T>(&mut self, offset: TermPointer) -> &'a mut T {
-        let pointer = self.get_pointer(offset.into());
-        unsafe { std::mem::transmute::<*const T, &mut T>(pointer) }
-    }
-    fn get_offset<T>(&self, value: &T) -> TermPointer {
-        let offset = (value as *const T as usize) - (self.data()[0] as *const u32 as usize);
-        TermPointer::from(offset as u32)
-    }
-    fn slice<T: Sized>(&self, offset: TermPointer, count: usize) -> &[T] {
-        let pointer = self.get_pointer(offset.into());
-        unsafe { std::slice::from_raw_parts::<T>(pointer, count) }
-    }
-    fn extend(&mut self, offset: TermPointer, size: usize) {
-        let offset = u32::from(offset);
-        if offset != self.len() as u32 {
-            panic!("Invalid allocator offset");
-        } else {
-            self.set_len(offset as usize + size);
-            // FIXME: Implement SliceAllocator::extend
-            panic!("Unable to extend slice allocator");
-        }
-    }
-    fn shrink(&mut self, offset: TermPointer, size: usize) {
-        let offset = u32::from(offset);
-        if offset != self.len() as u32 {
-            panic!("Invalid allocator offset");
-        } else {
-            self.set_len(offset as usize - size);
-        }
-    }
-}
-impl<'a> SliceAllocator<'a> {
-    fn get_pointer<T>(&self, offset: u32) -> *const T {
-        let Self(allocator_offset) = self;
-        let allocator_offset = *allocator_offset as *const [u32] as *const u32 as u32;
-        (allocator_offset + offset) as *const T
-    }
-    fn set_len(&mut self, value: usize) {
-        let Self(data) = self;
-        data[0] = value as u32;
-    }
-    fn data(&'a self) -> &'a [u32] {
-        let Self(data) = self;
-        data
     }
 }
 

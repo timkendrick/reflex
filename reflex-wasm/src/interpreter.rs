@@ -7,6 +7,7 @@ use wasmtime_wasi::{sync::WasiCtxBuilder, WasiCtx};
 
 use crate::{
     allocator::ArenaAllocator,
+    hash::TermSize,
     pad_to_4_byte_offset,
     term_type::{TreeTerm, TypedTerm},
     ArenaRef, Term, TermPointer,
@@ -142,11 +143,100 @@ pub struct WasmContext {
     memory: Memory,
 }
 
+impl WasmContext {
+    fn data(&self) -> &[u8] {
+        self.memory.data(&self.store)
+    }
+
+    fn data_mut(&mut self) -> &mut [u8] {
+        self.memory.data_mut(&mut self.store)
+    }
+
+    fn get<T>(&self, offset: TermPointer) -> &T {
+        let data = self.data();
+        let offset = u32::from(offset) as usize;
+        let item = &data[offset];
+        unsafe { std::mem::transmute::<&u8, &T>(item) }
+    }
+
+    fn get_mut<T>(&mut self, offset: TermPointer) -> &mut T {
+        let data = self.data_mut();
+        let offset = u32::from(offset) as usize;
+        let item = &mut data[offset];
+        unsafe { std::mem::transmute::<&mut u8, &mut T>(item) }
+    }
+
+    fn get_offset<T>(&self, value: &T) -> TermPointer {
+        let data = self.data();
+        let offset = (value as *const T as usize) - (&data[0] as *const u8 as usize);
+        TermPointer::from(offset as u32)
+    }
+}
+
 pub struct WasmInterpreter(WasmContext);
 
 impl From<WasmContext> for WasmInterpreter {
     fn from(value: WasmContext) -> Self {
         Self(value)
+    }
+}
+
+impl ArenaAllocator for WasmContext {
+    fn len(&self) -> usize {
+        *self.get::<u32>(0.into()) as usize
+    }
+
+    fn allocate<T: TermSize>(&mut self, value: T) -> TermPointer {
+        let offset = TermPointer(self.len() as u32);
+        let static_size = pad_to_4_byte_offset(std::mem::size_of::<T>());
+        let actual_size = pad_to_4_byte_offset(value.size_of());
+        self.extend(offset, static_size);
+        self.write(offset, value);
+        if actual_size < static_size {
+            self.shrink(offset.offset(static_size as u32), static_size - actual_size);
+        }
+        TermPointer::from(offset)
+    }
+
+    fn extend(&mut self, offset: TermPointer, size: usize) {
+        let offset = u32::from(offset);
+
+        if offset != self.len() as u32 {
+            panic!("Invalid allocator offset");
+        } else {
+            let curr_data_len = self.len();
+
+            let pages_to_allocate = (curr_data_len + size) / WASM_PAGE_SIZE as usize
+                - curr_data_len / WASM_PAGE_SIZE as usize;
+            if pages_to_allocate > 0 {
+                self.memory
+                    .grow(&mut self.store, pages_to_allocate as u64)
+                    .expect("Could not reallocate linear memory for Wasm context");
+            }
+
+            *self.get_mut::<u32>(0.into()) += size as u32;
+        }
+    }
+
+    fn shrink(&mut self, offset: TermPointer, size: usize) {
+        let offset = u32::from(offset);
+        if offset != self.len() as u32 {
+            panic!("Invalid allocator offset");
+        } else {
+            *self.get_mut::<u32>(0.into()) -= pad_to_4_byte_offset(size) as u32;
+        }
+    }
+
+    fn get<T>(&self, offset: TermPointer) -> &T {
+        self.get(offset)
+    }
+
+    fn write<T: Sized>(&mut self, offset: TermPointer, value: T) {
+        *self.get_mut(offset) = value
+    }
+
+    fn get_offset<T>(&self, value: &T) -> TermPointer {
+        self.get_offset(value)
     }
 }
 
@@ -175,115 +265,35 @@ impl WasmInterpreter {
 
 impl ArenaAllocator for WasmInterpreter {
     fn len(&self) -> usize {
-        self.0.len()
+        <WasmContext as ArenaAllocator>::len(&self.0)
     }
-
-    fn allocate<T: crate::hash::TermSize>(&mut self, value: T) -> TermPointer {
-        self.0.allocate(value)
+    fn allocate<T: TermSize>(&mut self, value: T) -> TermPointer {
+        <WasmContext as ArenaAllocator>::allocate(&mut self.0, value)
     }
-
-    fn get<T>(&self, offset: TermPointer) -> &T {
-        self.0.get(offset)
-    }
-
-    fn get_mut<T>(&mut self, offset: TermPointer) -> &mut T {
-        self.0.get_mut(offset)
-    }
-
-    fn get_offset<T>(&self, value: &T) -> TermPointer {
-        self.0.get_offset(value)
-    }
-
-    fn slice<T: Sized>(&self, offset: TermPointer, count: usize) -> &[T] {
-        self.0.slice(offset, count)
-    }
-
     fn extend(&mut self, offset: TermPointer, size: usize) {
-        self.0.extend(offset, size)
+        <WasmContext as ArenaAllocator>::extend(&mut self.0, offset, size)
     }
-
     fn shrink(&mut self, offset: TermPointer, size: usize) {
-        self.0.shrink(offset, size)
+        <WasmContext as ArenaAllocator>::shrink(&mut self.0, offset, size)
     }
-}
-
-impl ArenaAllocator for WasmContext {
-    fn len(&self) -> usize {
-        *self.get::<u32>(0.into()) as usize
+    fn write<T: Sized>(&mut self, offset: TermPointer, value: T) {
+        <WasmContext as ArenaAllocator>::write(&mut self.0, offset, value)
     }
-
-    fn allocate<T: crate::hash::TermSize>(&mut self, value: T) -> crate::TermPointer {
-        let offset = TermPointer(self.len() as u32);
-        let static_size = pad_to_4_byte_offset(std::mem::size_of::<T>());
-        let actual_size = pad_to_4_byte_offset(value.size_of());
-        self.extend(offset, static_size);
-        let target = self.get_mut(offset);
-        *target = value;
-        if actual_size < static_size {
-            self.shrink(offset.offset(static_size as u32), static_size - actual_size);
-        }
-        TermPointer::from(offset)
+    fn get<T>(&self, offset: TermPointer) -> &T {
+        <WasmContext as ArenaAllocator>::get(&self.0, offset)
     }
-
-    fn get<T>(&self, offset: crate::TermPointer) -> &T {
-        let data = self.memory.data(&self.store);
-        let offset = u32::from(offset) as usize;
-        let item = &data[offset];
-        unsafe { std::mem::transmute::<&u8, &T>(item) }
-    }
-
-    fn get_mut<T>(&mut self, offset: crate::TermPointer) -> &mut T {
-        let data = self.memory.data_mut(&mut self.store);
-        let offset = u32::from(offset) as usize;
-        let item = &mut data[offset];
-        unsafe { std::mem::transmute::<&mut u8, &mut T>(item) }
-    }
-
     fn get_offset<T>(&self, value: &T) -> TermPointer {
-        let data = self.memory.data(&self.store);
-        let offset = (value as *const T as usize) - (&data[0] as *const u8 as usize);
-        TermPointer::from(offset as u32)
-    }
-
-    fn slice<T: Sized>(&self, offset: crate::TermPointer, count: usize) -> &[T] {
-        let data = self.memory.data(&self.store);
-        let offset = u32::from(offset) as usize;
-        unsafe { std::slice::from_raw_parts((&data[offset]) as *const u8 as *const T, count) }
-    }
-
-    fn extend(&mut self, offset: crate::TermPointer, size: usize) {
-        let offset = u32::from(offset);
-
-        if offset != self.len() as u32 {
-            panic!("Invalid allocator offset");
-        } else {
-            let curr_data_len = self.len();
-
-            let pages_to_allocate = (curr_data_len + size) / WASM_PAGE_SIZE as usize
-                - curr_data_len / WASM_PAGE_SIZE as usize;
-            if pages_to_allocate > 0 {
-                self.memory
-                    .grow(&mut self.store, pages_to_allocate as u64)
-                    .expect("Could not reallocate linear memory for Wasm context");
-            }
-
-            *self.get_mut::<u32>(0.into()) += size as u32;
-        }
-    }
-
-    fn shrink(&mut self, offset: crate::TermPointer, size: usize) {
-        let offset = u32::from(offset);
-        if offset != self.len() as u32 {
-            panic!("Invalid allocator offset");
-        } else {
-            *self.get_mut::<u32>(0.into()) -= pad_to_4_byte_offset(size) as u32;
-        }
+        <WasmContext as ArenaAllocator>::get_offset(&self.0, value)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::ops::Rem;
+    use std::{
+        cell::RefCell,
+        ops::{Deref, DerefMut, Rem},
+        rc::Rc,
+    };
 
     use crate::{
         allocator::ArenaAllocator,
@@ -291,7 +301,7 @@ mod tests {
         stdlib::{Add, Stdlib},
         term_type::{
             ApplicationTerm, BuiltinTerm, ConditionTerm, CustomCondition, EffectTerm, HashmapTerm,
-            IntTerm, ListTerm, NilTerm, SignalTerm, SymbolTerm, TermType, TreeTerm,
+            IntTerm, ListTerm, NilTerm, SignalTerm, SymbolTerm, TermType, TreeTerm, TypedTerm,
         },
         ArenaRef, Term, TermPointer,
     };
@@ -323,7 +333,7 @@ mod tests {
         let interpreter_result = interpreter
             .interpret(term_pointer.into(), state.into())
             .unwrap()
-            .bind(&interpreter);
+            .bind(Rc::new(RefCell::new(interpreter)));
 
         assert!(matches!(
             interpreter_result.result().as_value().as_value(),
@@ -361,7 +371,7 @@ mod tests {
         let interpreter_result = interpreter
             .interpret(application.into(), state.into())
             .unwrap()
-            .bind(&interpreter);
+            .bind(Rc::new(RefCell::new(interpreter)));
 
         let result = interpreter_result.result();
 
@@ -447,45 +457,70 @@ mod tests {
         );
         let expected_result = interpreter.allocate(expected_result);
 
+        let interpreter = Rc::new(RefCell::new(interpreter));
+
         let interpreter_result = interpreter
+            .deref()
+            .borrow_mut()
+            .deref_mut()
             .interpret(input.into(), state.into())
             .unwrap()
-            .bind(&interpreter);
+            .bind(Rc::clone(&interpreter));
+
         assert_eq!(
             interpreter_result.result(),
-            ArenaRef::new(&interpreter, expected_result)
+            ArenaRef::<Term, _>::new(Rc::clone(&interpreter), expected_result)
         );
 
-        let refer = interpreter_result.dependencies();
+        let result_dependencies = interpreter_result.dependencies();
         assert_eq!(
-            refer,
-            Some(ArenaRef::new(&interpreter, expected_dependencies)),
+            result_dependencies,
+            Some(ArenaRef::<TypedTerm<TreeTerm>, _>::new(
+                Rc::clone(&interpreter),
+                expected_dependencies
+            )),
         );
 
-        let stateful_value =
-            interpreter.allocate(Term::new(TermType::Int(IntTerm { value: 3 }), &interpreter));
+        let stateful_value = interpreter
+            .deref()
+            .borrow_mut()
+            .deref_mut()
+            .allocate(Term::new(TermType::Int(IntTerm { value: 3 }), &interpreter));
 
-        let updated_state = HashmapTerm::allocate([(condition, stateful_value)], &mut interpreter);
+        let updated_state = HashmapTerm::allocate(
+            [(condition, stateful_value)],
+            interpreter.deref().borrow_mut().deref_mut(),
+        );
 
         let expected_result = Term::new(TermType::Int(IntTerm { value: 2 + 3 }), &interpreter);
-        let expected_result = interpreter.allocate(expected_result);
+        let expected_result = interpreter
+            .deref()
+            .borrow_mut()
+            .deref_mut()
+            .allocate(expected_result);
 
         let interpreter_result = interpreter
+            .deref()
+            .borrow_mut()
+            .deref_mut()
             .interpret(input.into(), updated_state.into())
             .unwrap()
-            .bind(&interpreter);
+            .bind(Rc::clone(&interpreter));
 
         assert_eq!(
             interpreter_result.result(),
-            ArenaRef::new(&interpreter, expected_result)
+            ArenaRef::<Term, _>::new(Rc::clone(&interpreter), expected_result)
         );
 
         assert!(interpreter_result.dependencies().is_some());
 
-        let refer = interpreter_result.dependencies();
+        let result_dependencies = interpreter_result.dependencies();
         assert_eq!(
-            refer,
-            Some(ArenaRef::new(&interpreter, expected_dependencies)),
+            result_dependencies,
+            Some(ArenaRef::<TypedTerm<TreeTerm>, _>::new(
+                Rc::clone(&interpreter),
+                expected_dependencies
+            )),
         );
     }
 }

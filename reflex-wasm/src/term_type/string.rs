@@ -64,7 +64,7 @@ impl StringTerm {
                 .hash(Default::default(), arena)
                 .finish()
         };
-        arena.get_mut::<Term>(instance).set_hash(hash);
+        arena.write::<u32>(Term::get_hash_pointer(instance), u32::from(hash));
         instance
     }
     pub fn as_str(&self) -> &str {

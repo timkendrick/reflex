@@ -7,16 +7,17 @@ use std::{collections::HashSet, iter::once};
 use reflex::core::{
     DependencyList, GraphNode, HashmapTermType, HashsetTermType, SerializeJson, StackOffset,
 };
+use reflex_utils::MapIntoIterator;
 use serde_json::Value as JsonValue;
 
 use crate::{
     allocator::ArenaAllocator,
     hash::{TermHash, TermHasher, TermSize},
     term_type::TypedTerm,
-    ArenaRef, TermPointer,
+    ArenaRef, IntoArenaRefIterator, TermPointer,
 };
 
-use super::{HashmapTerm, WasmExpression};
+use super::{HashmapBucketKeysIterator, HashmapBucketsIterator, HashmapTerm, WasmExpression};
 
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
@@ -38,11 +39,25 @@ impl<A: ArenaAllocator + Clone> ArenaRef<HashsetTerm, A> {
     pub fn num_values(&self) -> u32 {
         self.entries().as_inner().num_entries()
     }
-    pub fn values<'a>(
-        &'a self,
-    ) -> <ArenaRef<TypedTerm<HashmapTerm>, A> as HashmapTermType<WasmExpression<A>>>::KeysIterator<'a>
+    pub fn values(
+        &self,
+    ) -> <ArenaRef<TypedTerm<HashmapTerm>, A> as HashmapTermType<WasmExpression<A>>>::KeysIterator<'_>
     {
-        self.entries().keys()
+        let FIXME = "FIXME: prevent copying list header in hashset";
+        let entries = self
+            .arena
+            // FIXME: This will only copy the list header
+            .get::<TypedTerm<HashmapTerm>>(self.as_value().entries);
+        let inner_value = entries.get_inner();
+        let buckets = HashmapBucketsIterator::new(
+            inner_value.num_entries as usize,
+            // FIXME: this will be an empty list
+            inner_value.buckets.iter(&self.arena),
+        );
+        MapIntoIterator::new(IntoArenaRefIterator::new(
+            &self.arena,
+            HashmapBucketKeysIterator::new(buckets),
+        ))
     }
     fn entries(&self) -> ArenaRef<TypedTerm<HashmapTerm>, A> {
         ArenaRef::<TypedTerm<HashmapTerm>, _>::new(self.arena.clone(), self.as_value().entries)
@@ -91,7 +106,21 @@ impl<A: ArenaAllocator + Clone> HashsetTermType<WasmExpression<A>>
     where
         WasmExpression<A>: 'a,
     {
-        <ArenaRef<HashsetTerm, A> as HashsetTermType<WasmExpression<A>>>::values(&self.as_inner())
+        let FIXME = "FIXME: prevent copying list header in hashset";
+        let entries = self
+            .arena
+            // FIXME: This will only copy the list header
+            .get::<TypedTerm<HashmapTerm>>(self.as_inner_value().entries);
+        let inner_value = entries.get_inner();
+        let buckets = HashmapBucketsIterator::new(
+            inner_value.num_entries as usize,
+            // FIXME: this will be an empty list
+            inner_value.buckets.iter(&self.arena),
+        );
+        MapIntoIterator::new(IntoArenaRefIterator::new(
+            &self.arena,
+            HashmapBucketKeysIterator::new(buckets),
+        ))
     }
 }
 

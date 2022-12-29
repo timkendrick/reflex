@@ -58,6 +58,7 @@ impl TermHash for f64 {
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug, Hash)]
+#[repr(transparent)]
 pub struct TermHashState(u32);
 impl From<TermHashState> for u32 {
     fn from(value: TermHashState) -> Self {

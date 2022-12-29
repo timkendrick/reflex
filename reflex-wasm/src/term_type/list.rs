@@ -2,10 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
-use std::{
-    collections::HashSet,
-    iter::{once, Copied},
-};
+use std::{collections::HashSet, iter::once};
 
 use reflex::{
     core::{
@@ -68,7 +65,7 @@ impl ListTerm {
                 .hash(Default::default(), arena)
                 .finish()
         };
-        arena.get_mut::<Term>(instance).set_hash(hash);
+        arena.write::<u32>(Term::get_hash_pointer(instance), u32::from(hash));
         instance
     }
 }
@@ -80,8 +77,8 @@ impl<A: ArenaAllocator + Clone> ArenaRef<ListTerm, A> {
             self.arena.get_offset(&self.as_value().items),
         )
     }
-    pub fn iter(&self) -> IntoArenaRefIterator<'_, Term, A, Copied<ArrayIter<'_, TermPointer>>> {
-        IntoArenaRefIterator::new(&self.arena, self.items().iter().copied())
+    pub fn iter(&self) -> IntoArenaRefIterator<'_, Term, A, ArrayIter<'_, TermPointer, A>> {
+        IntoArenaRefIterator::new(&self.arena, self.as_value().items.iter(&self.arena))
     }
     pub fn len(&self) -> usize {
         self.items().len()
@@ -161,7 +158,7 @@ impl<A: ArenaAllocator + Clone> ExpressionListType<WasmExpression<A>>
     for ArenaRef<TypedTerm<ListTerm>, A>
 {
     type Iterator<'a> = MapIntoIterator<
-        IntoArenaRefIterator<'a, Term, A, Copied<ArrayIter<'a, TermPointer>>>,
+        IntoArenaRefIterator<'a, Term, A, ArrayIter<'a, TermPointer, A>>,
         ArenaRef<Term, A>,
         <WasmExpression<A> as Expression>::ExpressionRef<'a>,
     >
@@ -191,7 +188,10 @@ impl<A: ArenaAllocator + Clone> ExpressionListType<WasmExpression<A>>
     where
         WasmExpression<A>: 'a,
     {
-        MapIntoIterator::new(self.as_inner().iter())
+        MapIntoIterator::new(IntoArenaRefIterator::new(
+            &self.arena,
+            self.as_inner_value().items.iter(&self.arena),
+        ))
     }
 }
 

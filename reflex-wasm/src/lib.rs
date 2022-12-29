@@ -137,6 +137,9 @@ impl Term {
         // FIXME: 64-bit term hash
         u32::from(self.header.hash) as HashId
     }
+    pub fn get_hash_pointer(term: TermPointer) -> TermPointer {
+        term.offset(0)
+    }
     pub fn get_value_pointer(term: TermPointer) -> TermPointer {
         term.offset(std::mem::size_of::<TermHeader>() as u32)
     }
@@ -174,7 +177,7 @@ impl<A: ArenaAllocator> TermHash for ArenaRef<Term, A> {
 }
 
 #[derive(Clone, Copy, Debug)]
-#[repr(C)]
+#[repr(transparent)]
 pub struct TermHeader {
     hash: TermHashState,
 }
@@ -222,7 +225,7 @@ impl From<u32> for TermPointer {
 }
 impl TermHash for TermPointer {
     fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
-        let target: &Term = arena.get(*self);
+        let target = arena.get::<Term>(*self);
         target.hash(hasher, arena)
     }
 }
@@ -248,52 +251,6 @@ impl<T> Default for Array<T> {
         }
     }
 }
-impl<T> Array<T>
-where
-    T: Sized,
-{
-    pub fn extend(
-        list: TermPointer,
-        items: impl IntoIterator<Item = T, IntoIter = impl ExactSizeIterator<Item = T>>,
-        arena: &mut impl ArenaAllocator,
-    ) {
-        let items = items.into_iter();
-        let num_items = items.len();
-        let capacity = num_items as u32;
-        let length = num_items as u32;
-        let items_offset = list.offset(std::mem::size_of::<Array<T>>() as u32);
-        *arena.get_mut::<u32>(list) = capacity;
-        *arena.get_mut::<u32>(list.offset(std::mem::size_of::<u32>() as u32)) = length;
-        arena.extend(items_offset, num_items * std::mem::size_of::<T>());
-        let array_offset = u32::from(items_offset);
-        for (index, item) in items.enumerate() {
-            *arena.get_mut(TermPointer::from(
-                array_offset + ((index * std::mem::size_of::<T>()) as u32),
-            )) = item;
-        }
-    }
-    pub fn len(&self) -> usize {
-        self.length as usize
-    }
-    pub fn iter(&self) -> ArrayIter<T> {
-        ArrayIter::new(self)
-    }
-    pub fn get(&self, index: usize) -> Option<&T> {
-        if index < self.len() {
-            Some(unsafe { self.get_unchecked(index) })
-        } else {
-            None
-        }
-    }
-    pub unsafe fn get_unchecked(&self, index: usize) -> &T {
-        let offset = &self.items as *const [T; 0] as usize;
-        let pointer = (offset + (index * 4)) as *const T;
-        std::mem::transmute::<*const T, &T>(pointer)
-    }
-    pub fn get_item_offset(list: TermPointer, index: usize) -> TermPointer {
-        list.offset((std::mem::size_of::<Array<T>>() + (index * std::mem::size_of::<T>())) as u32)
-    }
-}
 impl<T> TermSize for Array<T>
 where
     T: Sized,
@@ -307,10 +264,68 @@ where
     T: Copy + TermHash,
 {
     fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
-        self.iter()
+        self.iter(arena)
             .fold(hasher.write_u32(self.length), |hasher, item| {
                 item.hash(hasher, arena)
             })
+    }
+}
+
+impl<T> Array<T>
+where
+    T: Sized,
+{
+    pub fn len(&self) -> usize {
+        self.length as usize
+    }
+    pub fn extend(
+        list: TermPointer,
+        items: impl IntoIterator<Item = T, IntoIter = impl ExactSizeIterator<Item = T>>,
+        arena: &mut impl ArenaAllocator,
+    ) {
+        let items = items.into_iter();
+        let num_items = items.len();
+        let capacity = num_items as u32;
+        let length = num_items as u32;
+        let capacity_offset = list;
+        let length_offset = list.offset(std::mem::size_of::<u32>() as u32);
+        let items_offset = list.offset(std::mem::size_of::<Array<T>>() as u32);
+        arena.write::<u32>(capacity_offset, capacity);
+        arena.write::<u32>(length_offset, length);
+        arena.extend(items_offset, num_items * std::mem::size_of::<T>());
+        let array_offset = u32::from(items_offset);
+        for (index, item) in items.enumerate() {
+            arena.write(
+                TermPointer::from(array_offset + ((index * std::mem::size_of::<T>()) as u32)),
+                item,
+            );
+        }
+    }
+    pub fn get(&self, index: usize) -> Option<&T> {
+        if index < self.len() {
+            Some(unsafe { self.get_unchecked(index) })
+        } else {
+            None
+        }
+    }
+    pub unsafe fn get_unchecked(&self, index: usize) -> &T {
+        let offset = &self.items[0] as *const T as usize;
+        let pointer = (offset + (index * 4)) as *const T;
+        std::mem::transmute::<*const T, &T>(pointer)
+    }
+    pub fn get_item_offset(list: TermPointer, index: usize) -> TermPointer {
+        list.offset((std::mem::size_of::<Array<T>>() + (index * std::mem::size_of::<T>())) as u32)
+    }
+    pub fn iter<'a, A: ArenaAllocator>(&self, arena: &'a A) -> ArrayIter<'a, T, A>
+    where
+        T: Copy,
+    {
+        ArrayIter {
+            length: self.length as usize,
+            offset: arena.get_offset(&self.items[0]),
+            arena,
+            _item: PhantomData,
+        }
     }
 }
 
@@ -318,40 +333,34 @@ impl<T, A: ArenaAllocator> ArenaRef<Array<T>, A> {
     pub fn len(&self) -> usize {
         self.as_value().len()
     }
-    pub fn iter(&self) -> ArrayIter<'_, T> {
-        self.as_value().iter()
-    }
     pub fn get(&self, index: usize) -> Option<&T> {
         self.as_value().get(index)
     }
-}
-
-pub struct ArrayIter<'a, T: Sized> {
-    array: &'a Array<T>,
-    length: usize,
-    index: usize,
-}
-impl<'a, T: Sized> ArrayIter<'a, T> {
-    fn new(items: &'a Array<T>) -> Self {
-        Self {
-            length: items.len(),
-            array: items,
-            index: 0,
-        }
+    pub fn iter<'a>(&'a self) -> ArrayIter<'a, T, A>
+    where
+        T: Copy,
+    {
+        self.as_value().iter(&self.arena)
     }
 }
-impl<'a, T> Iterator for ArrayIter<'a, T>
-where
-    T: Sized,
-{
-    type Item = &'a T;
+
+struct ArrayIter<'a, T: Sized + Copy, A: ArenaAllocator> {
+    length: usize,
+    offset: TermPointer,
+    arena: &'a A,
+    _item: PhantomData<T>,
+}
+
+impl<'a, T: Sized + Copy, A: ArenaAllocator> Iterator for ArrayIter<'a, T, A> {
+    type Item = T;
     fn next(&mut self) -> Option<Self::Item> {
-        if self.index >= self.length {
+        if self.length == 0 {
             None
         } else {
-            let index = self.index;
-            self.index += 1;
-            Some(unsafe { self.array.get_unchecked(index) })
+            let item = self.arena.get::<T>(self.offset);
+            self.offset = self.offset.offset(std::mem::size_of::<T>() as u32);
+            self.length -= 1;
+            Some(*item)
         }
     }
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -364,14 +373,7 @@ where
         self.length
     }
 }
-impl<'a, T> ExactSizeIterator for ArrayIter<'a, T>
-where
-    T: Sized,
-{
-    fn len(&self) -> usize {
-        self.length - self.index
-    }
-}
+impl<'a, T: Sized + Copy, A: ArenaAllocator> ExactSizeIterator for ArrayIter<'a, T, A> {}
 
 pub fn pad_to_4_byte_offset(value: usize) -> usize {
     if value == 0 {

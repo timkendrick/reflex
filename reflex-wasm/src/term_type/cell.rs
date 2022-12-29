@@ -46,14 +46,14 @@ impl CellTerm {
         let list = instance.offset((term_size - std::mem::size_of::<Array<u32>>()) as u32);
         Array::<u32>::extend(list, values, arena);
         let hash = TermHashState::from(u32::from(instance));
-        arena.get_mut::<Term>(instance).set_hash(hash);
+        arena.write::<u32>(Term::get_hash_pointer(instance), u32::from(hash));
         instance
     }
 }
 
 impl<A: ArenaAllocator + Clone> ArenaRef<CellTerm, A> {
     pub fn fields(&self) -> impl Iterator<Item = u32> + '_ {
-        self.as_value().fields.iter().copied()
+        self.as_value().fields.iter(&self.arena)
     }
 }
 
@@ -147,7 +147,7 @@ mod tests {
         {
             let entries = [12345, 67890];
             let instance = CellTerm::allocate(entries, &mut allocator);
-            let result = allocator.get::<Term>(instance).as_bytes();
+            let result = allocator.get_ref::<Term>(instance).as_bytes();
             let hash = result[0];
             let discriminant = result[1];
             let data_length = result[2];
