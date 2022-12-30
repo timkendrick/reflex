@@ -34,10 +34,10 @@ impl TermHash for IntersperseIteratorTerm {
 
 impl<A: ArenaAllocator + Clone> ArenaRef<IntersperseIteratorTerm, A> {
     pub fn source(&self) -> ArenaRef<Term, A> {
-        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().source)
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|term| term.source))
     }
     pub fn separator(&self) -> ArenaRef<Term, A> {
-        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().separator)
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|term| term.separator))
     }
 }
 
@@ -62,7 +62,7 @@ impl<A: ArenaAllocator + Clone> Eq for ArenaRef<IntersperseIteratorTerm, A> {}
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<IntersperseIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 

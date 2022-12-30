@@ -14,10 +14,12 @@ use crate::{
     allocator::ArenaAllocator,
     hash::{TermHash, TermHasher, TermSize},
     term_type::TypedTerm,
-    ArenaRef, IntoArenaRefIterator, TermPointer,
+    ArenaRef, Array, IntoArenaRefIterator, TermPointer,
 };
 
-use super::{HashmapBucketKeysIterator, HashmapBucketsIterator, HashmapTerm, WasmExpression};
+use super::{
+    HashmapBucket, HashmapBucketKeysIterator, HashmapBucketsIterator, HashmapTerm, WasmExpression,
+};
 
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
@@ -36,31 +38,29 @@ impl TermHash for HashsetTerm {
 }
 
 impl<A: ArenaAllocator + Clone> ArenaRef<HashsetTerm, A> {
-    pub fn num_values(&self) -> u32 {
+    fn entries(&self) -> ArenaRef<TypedTerm<HashmapTerm>, A> {
+        ArenaRef::<TypedTerm<HashmapTerm>, _>::new(
+            self.arena.clone(),
+            self.read_value(|value| value.entries),
+        )
+    }
+    pub fn num_values(&self) -> usize {
         self.entries().as_inner().num_entries()
     }
     pub fn values(
         &self,
     ) -> <ArenaRef<TypedTerm<HashmapTerm>, A> as HashmapTermType<WasmExpression<A>>>::KeysIterator<'_>
     {
-        let FIXME = "FIXME: prevent copying list header in hashset";
-        let entries = self
-            .arena
-            // FIXME: This will only copy the list header
-            .get::<TypedTerm<HashmapTerm>>(self.as_value().entries);
-        let inner_value = entries.get_inner();
+        let entries = self.entries().as_inner();
+        let buckets_pointer = entries.buckets_pointer();
         let buckets = HashmapBucketsIterator::new(
-            inner_value.num_entries as usize,
-            // FIXME: this will be an empty list
-            inner_value.buckets.iter(&self.arena),
+            entries.num_entries() as usize,
+            Array::<HashmapBucket>::iter(buckets_pointer, &self.arena),
         );
         MapIntoIterator::new(IntoArenaRefIterator::new(
             &self.arena,
             HashmapBucketKeysIterator::new(buckets),
         ))
-    }
-    fn entries(&self) -> ArenaRef<TypedTerm<HashmapTerm>, A> {
-        ArenaRef::<TypedTerm<HashmapTerm>, _>::new(self.arena.clone(), self.as_value().entries)
     }
 }
 
@@ -71,9 +71,9 @@ impl<A: ArenaAllocator + Clone> HashsetTermType<WasmExpression<A>> for ArenaRef<
         Self: 'a;
     fn contains<'a>(&'a self, value: &WasmExpression<A>) -> bool {
         self.values().any({
-            let value_id = value.as_value().id();
-            move |value| {
-                if value.as_value().id() == value_id {
+            let value_id = value.read_value(|term| term.id());
+            move |item| {
+                if item.read_value(|term| term.id()) == value_id {
                     true
                 } else {
                     false
@@ -106,16 +106,11 @@ impl<A: ArenaAllocator + Clone> HashsetTermType<WasmExpression<A>>
     where
         WasmExpression<A>: 'a,
     {
-        let FIXME = "FIXME: prevent copying list header in hashset";
-        let entries = self
-            .arena
-            // FIXME: This will only copy the list header
-            .get::<TypedTerm<HashmapTerm>>(self.as_inner_value().entries);
-        let inner_value = entries.get_inner();
+        let entries = self.as_inner().entries().as_inner();
+        let buckets_pointer = entries.buckets_pointer();
         let buckets = HashmapBucketsIterator::new(
-            inner_value.num_entries as usize,
-            // FIXME: this will be an empty list
-            inner_value.buckets.iter(&self.arena),
+            entries.num_entries() as usize,
+            Array::<HashmapBucket>::iter(buckets_pointer, &self.arena),
         );
         MapIntoIterator::new(IntoArenaRefIterator::new(
             &self.arena,
@@ -183,7 +178,7 @@ impl<A: ArenaAllocator + Clone> Eq for ArenaRef<HashsetTerm, A> {}
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<HashsetTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 

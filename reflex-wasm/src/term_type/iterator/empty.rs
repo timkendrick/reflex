@@ -48,7 +48,7 @@ impl<A: ArenaAllocator + Clone> Eq for ArenaRef<EmptyIteratorTerm, A> {}
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<EmptyIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 

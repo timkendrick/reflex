@@ -39,10 +39,10 @@ impl TermHash for LetTerm {
 
 impl<A: ArenaAllocator + Clone> ArenaRef<LetTerm, A> {
     pub fn initializer(&self) -> ArenaRef<Term, A> {
-        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().initializer)
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|term| term.initializer))
     }
     pub fn body(&self) -> ArenaRef<Term, A> {
-        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().body)
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|term| term.body))
     }
 }
 
@@ -144,7 +144,7 @@ impl<A: ArenaAllocator + Clone> Eq for ArenaRef<LetTerm, A> {}
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<LetTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 

@@ -152,7 +152,7 @@ impl WasmContext {
         self.memory.data_mut(&mut self.store)
     }
 
-    fn get<T>(&self, offset: TermPointer) -> &T {
+    fn get_ref<T>(&self, offset: TermPointer) -> &T {
         let data = self.data();
         let offset = u32::from(offset) as usize;
         let item = &data[offset];
@@ -164,12 +164,6 @@ impl WasmContext {
         let offset = u32::from(offset) as usize;
         let item = &mut data[offset];
         unsafe { std::mem::transmute::<&mut u8, &mut T>(item) }
-    }
-
-    fn get_offset<T>(&self, value: &T) -> TermPointer {
-        let data = self.data();
-        let offset = (value as *const T as usize) - (&data[0] as *const u8 as usize);
-        TermPointer::from(offset as u32)
     }
 }
 
@@ -183,7 +177,7 @@ impl From<WasmContext> for WasmInterpreter {
 
 impl ArenaAllocator for WasmContext {
     fn len(&self) -> usize {
-        *self.get::<u32>(0.into()) as usize
+        *self.get_ref::<u32>(0.into()) as usize
     }
 
     fn allocate<T: TermSize>(&mut self, value: T) -> TermPointer {
@@ -227,16 +221,23 @@ impl ArenaAllocator for WasmContext {
         }
     }
 
-    fn get<T>(&self, offset: TermPointer) -> &T {
-        self.get(offset)
-    }
-
     fn write<T: Sized>(&mut self, offset: TermPointer, value: T) {
         *self.get_mut(offset) = value
     }
 
-    fn get_offset<T>(&self, value: &T) -> TermPointer {
-        self.get_offset(value)
+    fn read_value<T, V>(&self, offset: TermPointer, selector: impl FnOnce(&T) -> V) -> V {
+        selector(self.get_ref(offset))
+    }
+
+    fn inner_pointer<T, V>(
+        &self,
+        offset: TermPointer,
+        selector: impl FnOnce(&T) -> &V,
+    ) -> TermPointer {
+        let target = self.get_ref(offset);
+        let outer_pointer = target as *const T as usize;
+        let inner_pointer = selector(target) as *const V as usize;
+        offset.offset((inner_pointer - outer_pointer) as u32)
     }
 }
 
@@ -279,11 +280,15 @@ impl ArenaAllocator for WasmInterpreter {
     fn write<T: Sized>(&mut self, offset: TermPointer, value: T) {
         <WasmContext as ArenaAllocator>::write(&mut self.0, offset, value)
     }
-    fn get<T>(&self, offset: TermPointer) -> &T {
-        <WasmContext as ArenaAllocator>::get(&self.0, offset)
+    fn read_value<T, V>(&self, offset: TermPointer, selector: impl FnOnce(&T) -> V) -> V {
+        <WasmContext as ArenaAllocator>::read_value::<T, V>(&self.0, offset, selector)
     }
-    fn get_offset<T>(&self, value: &T) -> TermPointer {
-        <WasmContext as ArenaAllocator>::get_offset(&self.0, value)
+    fn inner_pointer<T, V>(
+        &self,
+        offset: TermPointer,
+        selector: impl FnOnce(&T) -> &V,
+    ) -> TermPointer {
+        <WasmContext as ArenaAllocator>::inner_pointer::<T, V>(&self.0, offset, selector)
     }
 }
 
@@ -324,22 +329,30 @@ mod tests {
     fn atomic_expressions() {
         let mut interpreter: WasmInterpreter = create_mock_wasm_context().unwrap().into();
 
-        let term = Term::new(TermType::Int(IntTerm::from(3)), &interpreter);
+        let input = interpreter.allocate(Term::new(TermType::Int(IntTerm::from(3)), &interpreter));
 
         let state = HashmapTerm::allocate(std::iter::empty(), &mut interpreter);
 
-        let term_pointer = interpreter.allocate(term);
+        let interpreter = Rc::new(RefCell::new(interpreter));
 
         let interpreter_result = interpreter
-            .interpret(term_pointer.into(), state.into())
+            .deref()
+            .borrow_mut()
+            .deref_mut()
+            .interpret(input.into(), state.into())
             .unwrap()
-            .bind(Rc::new(RefCell::new(interpreter)));
+            .bind(Rc::clone(&interpreter));
 
-        assert!(matches!(
-            interpreter_result.result().as_value().as_value(),
-            TermType::Int(IntTerm { value: 3 })
-        ));
+        let expected_result = ArenaRef::<Term, _>::new(
+            Rc::clone(&interpreter),
+            interpreter
+                .deref()
+                .borrow_mut()
+                .deref_mut()
+                .allocate(TermType::Int(IntTerm { value: 3 })),
+        );
 
+        assert_eq!(interpreter_result.result(), expected_result);
         assert!(interpreter_result.dependencies().is_none());
     }
 
@@ -347,39 +360,51 @@ mod tests {
     fn evaluated_expressions() {
         let mut interpreter: WasmInterpreter = create_mock_wasm_context().unwrap().into();
 
-        let int3 = interpreter.allocate(Term::new(TermType::Int(IntTerm::from(3)), &interpreter));
+        let input = {
+            let int3 =
+                interpreter.allocate(Term::new(TermType::Int(IntTerm::from(3)), &interpreter));
 
-        let int2 = interpreter.allocate(Term::new(TermType::Int(IntTerm::from(2)), &interpreter));
+            let int2 =
+                interpreter.allocate(Term::new(TermType::Int(IntTerm::from(2)), &interpreter));
 
-        let add = interpreter.allocate(Term::new(
-            TermType::Builtin(BuiltinTerm::from(Stdlib::from(Add))),
-            &interpreter,
-        ));
+            let add = interpreter.allocate(Term::new(
+                TermType::Builtin(BuiltinTerm::from(Stdlib::from(Add))),
+                &interpreter,
+            ));
 
-        let list = ListTerm::allocate([int3, int2], &mut interpreter);
+            let arg_list = ListTerm::allocate([int3, int2], &mut interpreter);
 
-        let application = interpreter.allocate(Term::new(
-            TermType::Application(ApplicationTerm {
-                target: add,
-                args: list,
-            }),
-            &interpreter,
-        ));
+            interpreter.allocate(Term::new(
+                TermType::Application(ApplicationTerm {
+                    target: add,
+                    args: arg_list,
+                }),
+                &interpreter,
+            ))
+        };
 
         let state = HashmapTerm::allocate(std::iter::empty(), &mut interpreter);
 
+        let interpreter = Rc::new(RefCell::new(interpreter));
+
         let interpreter_result = interpreter
-            .interpret(application.into(), state.into())
+            .deref()
+            .borrow_mut()
+            .deref_mut()
+            .interpret(input.into(), state.into())
             .unwrap()
-            .bind(Rc::new(RefCell::new(interpreter)));
+            .bind(Rc::clone(&interpreter));
 
-        let result = interpreter_result.result();
+        let expected_result = ArenaRef::<Term, _>::new(
+            Rc::clone(&interpreter),
+            interpreter
+                .deref()
+                .borrow_mut()
+                .deref_mut()
+                .allocate(TermType::Int(IntTerm { value: 5 })),
+        );
 
-        assert!(matches!(
-            result.as_value().as_value(),
-            TermType::Int(IntTerm { value: 5 })
-        ));
-
+        assert_eq!(interpreter_result.result(), expected_result);
         assert!(interpreter_result.dependencies().is_none());
     }
 

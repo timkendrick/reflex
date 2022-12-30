@@ -17,8 +17,12 @@ pub trait ArenaAllocator: Sized {
     fn extend(&mut self, offset: TermPointer, size: usize);
     fn shrink(&mut self, offset: TermPointer, size: usize);
     fn write<T: Sized>(&mut self, offset: TermPointer, value: T);
-    fn get<T>(&self, offset: TermPointer) -> &T;
-    fn get_offset<T>(&self, value: &T) -> TermPointer;
+    fn read_value<T, V>(&self, offset: TermPointer, selector: impl FnOnce(&T) -> V) -> V;
+    fn inner_pointer<T, V>(
+        &self,
+        offset: TermPointer,
+        selector: impl FnOnce(&T) -> &V,
+    ) -> TermPointer;
 }
 
 impl<'heap, A: ArenaAllocator> ArenaAllocator for &'heap mut A {
@@ -37,11 +41,15 @@ impl<'heap, A: ArenaAllocator> ArenaAllocator for &'heap mut A {
     fn write<T: Sized>(&mut self, offset: TermPointer, value: T) {
         self.deref_mut().write(offset, value)
     }
-    fn get<T>(&self, offset: TermPointer) -> &T {
-        self.deref().get(offset)
+    fn read_value<T, V>(&self, offset: TermPointer, selector: impl FnOnce(&T) -> V) -> V {
+        self.deref().read_value::<T, V>(offset, selector)
     }
-    fn get_offset<T>(&self, value: &T) -> TermPointer {
-        self.deref().get_offset(value)
+    fn inner_pointer<T, V>(
+        &self,
+        offset: TermPointer,
+        selector: impl FnOnce(&T) -> &V,
+    ) -> TermPointer {
+        self.deref().inner_pointer::<T, V>(offset, selector)
     }
 }
 
@@ -61,11 +69,17 @@ impl<A: ArenaAllocator> ArenaAllocator for Rc<RefCell<A>> {
     fn write<T: Sized>(&mut self, offset: TermPointer, value: T) {
         self.deref().borrow_mut().write(offset, value)
     }
-    fn get<T>(&self, offset: TermPointer) -> &T {
-        self.deref().borrow().get::<T>(offset)
+    fn read_value<T, V>(&self, offset: TermPointer, selector: impl FnOnce(&T) -> V) -> V {
+        self.deref().borrow().read_value::<T, V>(offset, selector)
     }
-    fn get_offset<T>(&self, value: &T) -> TermPointer {
-        self.deref().borrow().get_offset(value)
+    fn inner_pointer<T, V>(
+        &self,
+        offset: TermPointer,
+        selector: impl FnOnce(&T) -> &V,
+    ) -> TermPointer {
+        self.deref()
+            .borrow()
+            .inner_pointer::<T, V>(offset, selector)
     }
 }
 
@@ -131,16 +145,18 @@ impl ArenaAllocator for VecAllocator {
         let item_ref = unsafe { std::mem::transmute::<&mut u32, &mut T>(item) };
         *item_ref = value
     }
-    fn get<T>(&self, offset: TermPointer) -> &T {
-        let Self(data) = self;
-        let offset = u32::from(offset) as usize;
-        let item = &data[offset / 4];
-        unsafe { std::mem::transmute::<&u32, &T>(item) }
+    fn read_value<T, V>(&self, offset: TermPointer, selector: impl FnOnce(&T) -> V) -> V {
+        selector(self.get_ref(offset))
     }
-    fn get_offset<T>(&self, value: &T) -> TermPointer {
-        let Self(data) = self;
-        let offset = (value as *const T as usize) - (&data[0] as *const u32 as usize);
-        TermPointer::from(offset as u32)
+    fn inner_pointer<T, V>(
+        &self,
+        offset: TermPointer,
+        selector: impl FnOnce(&T) -> &V,
+    ) -> TermPointer {
+        let target = self.get_ref(offset);
+        let outer_pointer = target as *const T as usize;
+        let inner_pointer = selector(target) as *const V as usize;
+        offset.offset((inner_pointer - outer_pointer) as u32)
     }
 }
 impl VecAllocator {

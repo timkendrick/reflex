@@ -45,7 +45,7 @@ impl From<DateTerm> for i64 {
 
 impl<A: ArenaAllocator + Clone> ArenaRef<DateTerm, A> {
     pub fn timestamp(&self) -> i64 {
-        i64::from(*self.as_value())
+        self.read_value(|term| i64::from(*term))
     }
 }
 
@@ -101,13 +101,13 @@ impl<A: ArenaAllocator + Clone> Eq for ArenaRef<DateTerm, A> {}
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<DateTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
 impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<DateTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let timestamp = i64::from(*self.as_value());
+        let timestamp = self.timestamp();
         let seconds = timestamp / 1000;
         let millis = timestamp % 10;
         let nanos = millis * 1000;

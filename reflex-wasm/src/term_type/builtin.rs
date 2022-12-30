@@ -74,7 +74,7 @@ impl From<Stdlib> for BuiltinTerm {
 
 impl<A: ArenaAllocator + Clone> ArenaRef<BuiltinTerm, A> {
     pub fn target(&self) -> FunctionIndex {
-        self.as_value().uid
+        self.read_value(|term| term.uid)
     }
     pub fn arity(&self) -> Option<Arity> {
         Stdlib::try_from(u32::from(self.target()))
@@ -161,7 +161,7 @@ impl<A: ArenaAllocator + Clone> Eq for ArenaRef<BuiltinTerm, A> {}
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<BuiltinTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 

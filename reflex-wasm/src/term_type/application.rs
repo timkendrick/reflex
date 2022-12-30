@@ -38,10 +38,13 @@ impl TermHash for ApplicationTerm {
 
 impl<A: ArenaAllocator + Clone> ArenaRef<ApplicationTerm, A> {
     pub fn target(&self) -> ArenaRef<Term, A> {
-        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().target)
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|value| value.target))
     }
     pub fn args(&self) -> ArenaRef<TypedTerm<ListTerm>, A> {
-        ArenaRef::<TypedTerm<ListTerm>, _>::new(self.arena.clone(), self.as_value().args)
+        ArenaRef::<TypedTerm<ListTerm>, _>::new(
+            self.arena.clone(),
+            self.read_value(|value| value.args),
+        )
     }
 }
 
@@ -167,7 +170,7 @@ impl<A: ArenaAllocator + Clone> Eq for ArenaRef<ApplicationTerm, A> {}
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<ApplicationTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 

@@ -32,10 +32,10 @@ impl TermHash for RangeIteratorTerm {
 
 impl<A: ArenaAllocator + Clone> ArenaRef<RangeIteratorTerm, A> {
     pub fn offset(&self) -> i32 {
-        self.as_value().offset
+        self.read_value(|term| term.offset)
     }
     pub fn length(&self) -> u32 {
-        self.as_value().length
+        self.read_value(|term| term.length)
     }
 }
 
@@ -60,7 +60,7 @@ impl<A: ArenaAllocator + Clone> Eq for ArenaRef<RangeIteratorTerm, A> {}
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<RangeIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 

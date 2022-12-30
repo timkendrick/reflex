@@ -70,7 +70,7 @@ fn chunks_to_f64(value: [u32; 2]) -> f64 {
 
 impl<A: ArenaAllocator + Clone> ArenaRef<FloatTerm, A> {
     pub fn value(&self) -> f64 {
-        chunks_to_f64(self.as_value().value)
+        chunks_to_f64(self.read_value(|term| term.value))
     }
 }
 
@@ -144,7 +144,7 @@ impl<A: ArenaAllocator + Clone> Eq for ArenaRef<FloatTerm, A> {}
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<FloatTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 

@@ -13,9 +13,9 @@ use serde_json::Value as JsonValue;
 
 use crate::{
     allocator::ArenaAllocator,
-    hash::{TermHash, TermHasher, TermSize},
+    hash::{TermHash, TermHashState, TermHasher, TermSize},
     term_type::{TermType, TypedTerm},
-    ArenaRef, Array, ArrayIter, IntoArenaRefIterator, Term, TermPointer,
+    ArenaArrayIter, ArenaRef, Array, IntoArenaRefIterator, Term, TermPointer,
 };
 
 use super::WasmExpression;
@@ -34,12 +34,10 @@ impl TermSize for HashmapTerm {
 }
 impl TermHash for HashmapTerm {
     fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+        let hasher = hasher.hash(&self.num_entries, arena);
         self.buckets
-            .iter(arena)
-            .filter(|bucket| !bucket.key.is_uninitialized())
-            .fold(hasher.hash(&self.num_entries, arena), |hasher, bucket| {
-                hasher.hash(&bucket, arena)
-            })
+            .items()
+            .fold(hasher, |hasher, item| item.hash(hasher, arena))
     }
 }
 impl HashmapTerm {
@@ -60,37 +58,33 @@ impl HashmapTerm {
             }),
             arena,
         );
-        let term_size = term.size_of();
         let instance = arena.allocate(term);
-        let list =
-            instance.offset((term_size - std::mem::size_of::<Array<HashmapBucket>>()) as u32);
+        let list = instance.offset(
+            (std::mem::size_of::<TypedTerm<HashmapTerm>>()
+                - std::mem::size_of::<Array<HashmapBucket>>()) as u32,
+        );
         let empty_buckets = (0..capacity).map(|_| HashmapBucket {
             key: TermPointer::uninitialized(),
             value: TermPointer::uninitialized(),
         });
         Array::<HashmapBucket>::extend(list, empty_buckets, arena);
         for (key, value) in entries {
-            let hash = TermHasher::default()
-                .hash::<Term, _>(arena.get(key), arena)
-                .finish();
-            let mut bucket_index = (u32::from(hash) as usize) % capacity;
-            while !TermPointer::is_uninitialized(
-                *arena.get::<TermPointer>(Array::<HashmapBucket>::get_item_offset(
-                    list,
-                    bucket_index,
-                )),
-            ) {
+            let key_hash = arena.read_value::<Term, TermHashState>(key, |term| {
+                TermHasher::default().hash(term, arena).finish()
+            });
+            let mut bucket_index = (u32::from(key_hash) as usize) % capacity;
+            while !TermPointer::is_uninitialized(arena.read_value::<HashmapBucket, TermPointer>(
+                Array::<HashmapBucket>::get_item_offset(list, bucket_index),
+                |bucket| bucket.key,
+            )) {
                 bucket_index = (bucket_index + 1) % capacity;
             }
             let bucket_offset = Array::<HashmapBucket>::get_item_offset(list, bucket_index);
             arena.write::<HashmapBucket>(bucket_offset, HashmapBucket { key, value });
         }
-        let hash = {
-            arena
-                .get::<Term>(instance)
-                .hash(Default::default(), arena)
-                .finish()
-        };
+        let hash = arena.read_value::<Term, _>(instance, |term| {
+            TermHasher::default().hash(term, arena).finish()
+        });
         arena.write::<u32>(Term::get_hash_pointer(instance), u32::from(hash));
         instance
     }
@@ -121,25 +115,29 @@ impl TermHash for HashmapBucket {
 }
 
 impl<A: ArenaAllocator + Clone> ArenaRef<HashmapTerm, A> {
-    pub fn num_entries(&self) -> u32 {
-        self.as_value().num_entries
+    pub(crate) fn buckets_pointer(&self) -> TermPointer {
+        self.inner_pointer(|value| &value.buckets)
+    }
+    pub fn num_entries(&self) -> usize {
+        self.read_value(|term| term.num_entries as usize)
     }
     pub fn buckets(&self) -> ArenaRef<Array<HashmapBucket>, A> {
-        ArenaRef::<Array<HashmapBucket>, _>::new(
-            self.arena.clone(),
-            self.arena.get_offset(&self.as_value().buckets),
-        )
+        ArenaRef::<Array<HashmapBucket>, _>::new(self.arena.clone(), self.buckets_pointer())
     }
-    pub fn entries(&self) -> HashmapBucketsIterator<ArrayIter<'_, HashmapBucket, A>> {
+    pub fn entries(&self) -> HashmapBucketsIterator<ArenaArrayIter<'_, HashmapBucket, A>> {
         HashmapBucketsIterator::new(
-            self.num_entries() as usize,
-            self.as_value().buckets.iter(&self.arena),
+            self.num_entries(),
+            Array::<HashmapBucket>::iter(self.buckets_pointer(), &self.arena),
         )
     }
     pub fn keys(
         &self,
-    ) -> IntoArenaRefIterator<'_, Term, A, HashmapBucketKeysIterator<ArrayIter<'_, HashmapBucket, A>>>
-    {
+    ) -> IntoArenaRefIterator<
+        '_,
+        Term,
+        A,
+        HashmapBucketKeysIterator<ArenaArrayIter<'_, HashmapBucket, A>>,
+    > {
         IntoArenaRefIterator::new(&self.arena, HashmapBucketKeysIterator::new(self.entries()))
     }
     pub fn values(
@@ -148,7 +146,7 @@ impl<A: ArenaAllocator + Clone> ArenaRef<HashmapTerm, A> {
         '_,
         Term,
         A,
-        HashmapBucketValuesIterator<ArrayIter<'_, HashmapBucket, A>>,
+        HashmapBucketValuesIterator<ArenaArrayIter<'_, HashmapBucket, A>>,
     > {
         IntoArenaRefIterator::new(
             &self.arena,
@@ -157,9 +155,15 @@ impl<A: ArenaAllocator + Clone> ArenaRef<HashmapTerm, A> {
     }
 }
 
+impl<A: ArenaAllocator + Clone> ArenaRef<TypedTerm<HashmapTerm>, A> {
+    fn buckets_pointer(&self) -> TermPointer {
+        self.inner_pointer(|term| &term.get_inner().buckets)
+    }
+}
+
 impl<A: ArenaAllocator + Clone> HashmapTermType<WasmExpression<A>> for ArenaRef<HashmapTerm, A> {
     type KeysIterator<'a> = MapIntoIterator<
-        IntoArenaRefIterator<'a, Term, A, HashmapBucketKeysIterator<ArrayIter<'a, HashmapBucket, A>>>,
+        IntoArenaRefIterator<'a, Term, A, HashmapBucketKeysIterator<ArenaArrayIter<'a, HashmapBucket, A>>>,
         ArenaRef<Term, A>,
         <WasmExpression<A> as Expression>::ExpressionRef<'a>
     >
@@ -167,7 +171,7 @@ impl<A: ArenaAllocator + Clone> HashmapTermType<WasmExpression<A>> for ArenaRef<
         WasmExpression<A>: 'a,
         Self: 'a;
     type ValuesIterator<'a> = MapIntoIterator<
-        IntoArenaRefIterator<'a, Term, A, HashmapBucketValuesIterator<ArrayIter<'a, HashmapBucket, A>>>,
+        IntoArenaRefIterator<'a, Term, A, HashmapBucketValuesIterator<ArenaArrayIter<'a, HashmapBucket, A>>>,
         ArenaRef<Term, A>,
         <WasmExpression<A> as Expression>::ExpressionRef<'a>
     >
@@ -240,13 +244,13 @@ impl<A: ArenaAllocator + Clone> HashmapTermType<WasmExpression<A>>
         WasmExpression<A>: 'a,
     {
         let inner = self.as_inner();
-        let entries = HashmapBucketsIterator::new(
-            inner.num_entries() as usize,
-            self.as_inner_value().buckets.iter(&self.arena),
+        let buckets = HashmapBucketsIterator::new(
+            inner.num_entries(),
+            Array::<HashmapBucket>::iter(self.buckets_pointer(), &self.arena),
         );
         MapIntoIterator::new(IntoArenaRefIterator::new(
             &self.arena,
-            HashmapBucketKeysIterator::new(entries),
+            HashmapBucketKeysIterator::new(buckets),
         ))
     }
     fn values<'a>(&'a self) -> Self::ValuesIterator<'a>
@@ -254,13 +258,13 @@ impl<A: ArenaAllocator + Clone> HashmapTermType<WasmExpression<A>>
         WasmExpression<A>: 'a,
     {
         let inner = self.as_inner();
-        let entries = HashmapBucketsIterator::new(
-            inner.num_entries() as usize,
-            self.as_inner_value().buckets.iter(&self.arena),
+        let buckets = HashmapBucketsIterator::new(
+            inner.num_entries(),
+            Array::<HashmapBucket>::iter(self.buckets_pointer(), &self.arena),
         );
         MapIntoIterator::new(IntoArenaRefIterator::new(
             &self.arena,
-            HashmapBucketValuesIterator::new(entries),
+            HashmapBucketValuesIterator::new(buckets),
         ))
     }
 }
@@ -274,9 +278,9 @@ impl<A: ArenaAllocator + Clone> HashsetTermType<WasmExpression<A>>
         Self: 'a;
     fn contains(&self, value: &WasmExpression<A>) -> bool {
         <Self as HashsetTermType<WasmExpression<A>>>::values(self).any({
-            let value_id = value.as_value().id();
-            move |value| {
-                if value.as_value().id() == value_id {
+            let value_id = value.read_value(|term| term.id());
+            move |item| {
+                if item.read_value(|term| term.id()) == value_id {
                     true
                 } else {
                     false
@@ -289,14 +293,14 @@ impl<A: ArenaAllocator + Clone> HashsetTermType<WasmExpression<A>>
         WasmExpression<A>: 'a,
     {
         let inner = self.as_inner();
-        let entries = HashmapBucketsIterator::new(
-            inner.num_entries() as usize,
-            self.as_inner_value().buckets.iter(&self.arena),
+        let buckets = HashmapBucketsIterator::new(
+            inner.num_entries(),
+            Array::<HashmapBucket>::iter(self.buckets_pointer(), &self.arena),
         );
         MapIntoIterator::new(IntoArenaRefIterator::new(
             &self.arena,
             // Hashset values are stored as keys, with values set to null
-            HashmapBucketKeysIterator::new(entries),
+            HashmapBucketKeysIterator::new(buckets),
         ))
     }
 }
@@ -390,7 +394,7 @@ impl<A: ArenaAllocator + Clone> Eq for ArenaRef<HashmapTerm, A> {}
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<HashmapTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 

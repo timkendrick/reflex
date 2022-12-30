@@ -43,7 +43,7 @@ impl Into<i32> for IntTerm {
 
 impl<A: ArenaAllocator + Clone> ArenaRef<IntTerm, A> {
     pub fn value(&self) -> i32 {
-        self.as_value().value
+        self.read_value(|term| term.value)
     }
 }
 
@@ -111,7 +111,7 @@ impl<A: ArenaAllocator + Clone> Eq for ArenaRef<IntTerm, A> {}
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<IntTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 

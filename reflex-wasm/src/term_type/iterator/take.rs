@@ -32,10 +32,10 @@ impl TermHash for TakeIteratorTerm {
 
 impl<A: ArenaAllocator + Clone> ArenaRef<TakeIteratorTerm, A> {
     pub fn source(&self) -> ArenaRef<Term, A> {
-        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().source)
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|term| term.source))
     }
     pub fn count(&self) -> u32 {
-        self.as_value().count
+        self.read_value(|term| term.count)
     }
 }
 
@@ -60,7 +60,7 @@ impl<A: ArenaAllocator + Clone> Eq for ArenaRef<TakeIteratorTerm, A> {}
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<TakeIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 

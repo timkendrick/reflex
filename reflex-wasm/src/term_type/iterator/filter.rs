@@ -34,10 +34,10 @@ impl TermHash for FilterIteratorTerm {
 
 impl<A: ArenaAllocator + Clone> ArenaRef<FilterIteratorTerm, A> {
     pub fn source(&self) -> ArenaRef<Term, A> {
-        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().source)
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|term| term.source))
     }
     pub fn predicate(&self) -> ArenaRef<Term, A> {
-        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().predicate)
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|term| term.predicate))
     }
 }
 
@@ -62,7 +62,7 @@ impl<A: ArenaAllocator + Clone> Eq for ArenaRef<FilterIteratorTerm, A> {}
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<FilterIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 

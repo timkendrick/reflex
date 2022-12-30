@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
-use std::collections::HashSet;
+use std::{collections::HashSet, marker::PhantomData};
 
 use reflex::core::{
     ConditionType, DependencyList, Expression, GraphNode, SerializeJson, SignalType, StackOffset,
@@ -31,6 +31,11 @@ pub enum ConditionTerm {
     InvalidFunctionArgs(InvalidFunctionArgsCondition),
     InvalidPointer(InvalidPointerCondition),
 }
+impl ConditionTerm {
+    fn condition_type(&self) -> ConditionTermDiscriminants {
+        ConditionTermDiscriminants::from(self)
+    }
+}
 impl TermSize for ConditionTerm {
     fn size_of(&self) -> usize {
         let discriminant_size = std::mem::size_of::<u32>();
@@ -48,7 +53,7 @@ impl TermSize for ConditionTerm {
 }
 impl TermHash for ConditionTerm {
     fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
-        let hasher = hasher.write_u8(ConditionTermDiscriminants::from(self) as u8);
+        let hasher = hasher.write_u8(self.condition_type() as u8);
         match self {
             Self::Custom(condition) => condition.hash(hasher, arena),
             Self::Pending(condition) => condition.hash(hasher, arena),
@@ -63,50 +68,87 @@ impl TermHash for ConditionTerm {
 
 impl<A: ArenaAllocator + Clone> ArenaRef<ConditionTerm, A> {
     pub fn signal_type(&self) -> SignalType {
-        match self.as_value() {
-            ConditionTerm::Custom(condition) => ArenaRef::<CustomCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(condition),
-            )
-            .signal_type(),
-            ConditionTerm::Pending(_) => SignalType::Pending,
-            ConditionTerm::Error(_) => SignalType::Error,
-            ConditionTerm::TypeError(_) => SignalType::Error,
-            ConditionTerm::InvalidFunctionTarget(_) => SignalType::Error,
-            ConditionTerm::InvalidFunctionArgs(_) => SignalType::Error,
-            ConditionTerm::InvalidPointer(_) => SignalType::Error,
+        match self.read_value(|term| term.condition_type()) {
+            ConditionTermDiscriminants::Custom => self
+                .as_typed_condition::<CustomCondition>()
+                .as_inner()
+                .signal_type(),
+            ConditionTermDiscriminants::Pending => SignalType::Pending,
+            ConditionTermDiscriminants::Error => SignalType::Error,
+            ConditionTermDiscriminants::TypeError => SignalType::Error,
+            ConditionTermDiscriminants::InvalidFunctionTarget => SignalType::Error,
+            ConditionTermDiscriminants::InvalidFunctionArgs => SignalType::Error,
+            ConditionTermDiscriminants::InvalidPointer => SignalType::Error,
         }
     }
     pub fn payload(&self) -> Option<ArenaRef<Term, A>> {
-        match self.as_value() {
-            ConditionTerm::Custom(inner) => Some(
-                ArenaRef::<CustomCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                )
-                .payload(),
+        match self.read_value(|term| term.condition_type()) {
+            ConditionTermDiscriminants::Custom => Some(
+                self.as_typed_condition::<CustomCondition>()
+                    .as_inner()
+                    .payload(),
             ),
-            ConditionTerm::Error(inner) => Some(
-                ArenaRef::<ErrorCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                )
-                .payload(),
+            ConditionTermDiscriminants::Error => Some(
+                self.as_typed_condition::<ErrorCondition>()
+                    .as_inner()
+                    .payload(),
             ),
             _ => None,
         }
     }
     pub fn token(&self) -> Option<ArenaRef<Term, A>> {
-        match self.as_value() {
-            ConditionTerm::Custom(inner) => Some(
-                ArenaRef::<CustomCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                )
-                .token(),
+        match self.read_value(|term| term.condition_type()) {
+            ConditionTermDiscriminants::Custom => Some(
+                self.as_typed_condition::<CustomCondition>()
+                    .as_inner()
+                    .token(),
             ),
             _ => None,
         }
+    }
+    fn as_typed_condition<V>(&self) -> &ArenaRef<TypedCondition<V>, A> {
+        unsafe {
+            std::mem::transmute::<&ArenaRef<ConditionTerm, A>, &ArenaRef<TypedCondition<V>, A>>(
+                self,
+            )
+        }
+    }
+}
+
+#[repr(transparent)]
+struct TypedCondition<V> {
+    condition: ConditionTerm,
+    _type: PhantomData<V>,
+}
+impl<V> TypedCondition<V> {
+    pub(crate) fn get_inner(&self) -> &V {
+        unsafe {
+            match &self.condition {
+                ConditionTerm::Custom(inner) => std::mem::transmute::<&CustomCondition, &V>(inner),
+                ConditionTerm::Pending(inner) => {
+                    std::mem::transmute::<&PendingCondition, &V>(inner)
+                }
+                ConditionTerm::Error(inner) => std::mem::transmute::<&ErrorCondition, &V>(inner),
+                ConditionTerm::TypeError(inner) => {
+                    std::mem::transmute::<&TypeErrorCondition, &V>(inner)
+                }
+                ConditionTerm::InvalidFunctionTarget(inner) => {
+                    std::mem::transmute::<&InvalidFunctionTargetCondition, &V>(inner)
+                }
+                ConditionTerm::InvalidFunctionArgs(inner) => {
+                    std::mem::transmute::<&InvalidFunctionArgsCondition, &V>(inner)
+                }
+                ConditionTerm::InvalidPointer(inner) => {
+                    std::mem::transmute::<&InvalidPointerCondition, &V>(inner)
+                }
+            }
+        }
+    }
+}
+
+impl<A: ArenaAllocator + Clone, V> ArenaRef<TypedCondition<V>, A> {
+    fn as_inner(&self) -> ArenaRef<V, A> {
+        self.inner_ref(|condition| condition.get_inner())
     }
 }
 
@@ -114,7 +156,7 @@ impl<A: ArenaAllocator + Clone> ConditionType<WasmExpression<A>>
     for ArenaRef<TypedTerm<ConditionTerm>, A>
 {
     fn id(&self) -> StateToken {
-        self.as_value().id()
+        self.read_value(|term| term.id())
     }
     fn signal_type(&self) -> SignalType {
         self.as_inner().signal_type()
@@ -135,381 +177,291 @@ impl<A: ArenaAllocator + Clone> ConditionType<WasmExpression<A>>
 
 impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<ConditionTerm, A> {
     fn size(&self) -> usize {
-        match self.as_value() {
-            ConditionTerm::Custom(inner) => ArenaRef::<CustomCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .size(),
-            ConditionTerm::Pending(inner) => ArenaRef::<PendingCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .size(),
-            ConditionTerm::Error(inner) => {
-                ArenaRef::<ErrorCondition, _>::new(self.arena.clone(), self.arena.get_offset(inner))
-                    .size()
-            }
-            ConditionTerm::TypeError(inner) => ArenaRef::<TypeErrorCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .size(),
-            ConditionTerm::InvalidFunctionTarget(inner) => {
-                ArenaRef::<InvalidFunctionTargetCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                )
-                .size()
-            }
-            ConditionTerm::InvalidFunctionArgs(inner) => {
-                ArenaRef::<InvalidFunctionArgsCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                )
-                .size()
-            }
-            ConditionTerm::InvalidPointer(inner) => ArenaRef::<InvalidPointerCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .size(),
+        match self.read_value(|term| term.condition_type()) {
+            ConditionTermDiscriminants::Custom => self
+                .as_typed_condition::<CustomCondition>()
+                .as_inner()
+                .size(),
+            ConditionTermDiscriminants::Pending => self
+                .as_typed_condition::<PendingCondition>()
+                .as_inner()
+                .size(),
+            ConditionTermDiscriminants::Error => self
+                .as_typed_condition::<ErrorCondition>()
+                .as_inner()
+                .size(),
+            ConditionTermDiscriminants::TypeError => self
+                .as_typed_condition::<TypeErrorCondition>()
+                .as_inner()
+                .size(),
+            ConditionTermDiscriminants::InvalidFunctionTarget => self
+                .as_typed_condition::<InvalidFunctionTargetCondition>()
+                .as_inner()
+                .size(),
+            ConditionTermDiscriminants::InvalidFunctionArgs => self
+                .as_typed_condition::<InvalidFunctionArgsCondition>()
+                .as_inner()
+                .size(),
+            ConditionTermDiscriminants::InvalidPointer => self
+                .as_typed_condition::<InvalidPointerCondition>()
+                .as_inner()
+                .size(),
         }
     }
     fn capture_depth(&self) -> StackOffset {
-        match self.as_value() {
-            ConditionTerm::Custom(inner) => ArenaRef::<CustomCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .capture_depth(),
-            ConditionTerm::Pending(inner) => ArenaRef::<PendingCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .capture_depth(),
-            ConditionTerm::Error(inner) => {
-                ArenaRef::<ErrorCondition, _>::new(self.arena.clone(), self.arena.get_offset(inner))
-                    .capture_depth()
-            }
-            ConditionTerm::TypeError(inner) => ArenaRef::<TypeErrorCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .capture_depth(),
-            ConditionTerm::InvalidFunctionTarget(inner) => {
-                ArenaRef::<InvalidFunctionTargetCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                )
-                .capture_depth()
-            }
-            ConditionTerm::InvalidFunctionArgs(inner) => {
-                ArenaRef::<InvalidFunctionArgsCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                )
-                .capture_depth()
-            }
-            ConditionTerm::InvalidPointer(inner) => ArenaRef::<InvalidPointerCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .capture_depth(),
+        match self.read_value(|term| term.condition_type()) {
+            ConditionTermDiscriminants::Custom => self
+                .as_typed_condition::<CustomCondition>()
+                .as_inner()
+                .capture_depth(),
+            ConditionTermDiscriminants::Pending => self
+                .as_typed_condition::<PendingCondition>()
+                .as_inner()
+                .capture_depth(),
+            ConditionTermDiscriminants::Error => self
+                .as_typed_condition::<ErrorCondition>()
+                .as_inner()
+                .capture_depth(),
+            ConditionTermDiscriminants::TypeError => self
+                .as_typed_condition::<TypeErrorCondition>()
+                .as_inner()
+                .capture_depth(),
+            ConditionTermDiscriminants::InvalidFunctionTarget => self
+                .as_typed_condition::<InvalidFunctionTargetCondition>()
+                .as_inner()
+                .capture_depth(),
+            ConditionTermDiscriminants::InvalidFunctionArgs => self
+                .as_typed_condition::<InvalidFunctionArgsCondition>()
+                .as_inner()
+                .capture_depth(),
+            ConditionTermDiscriminants::InvalidPointer => self
+                .as_typed_condition::<InvalidPointerCondition>()
+                .as_inner()
+                .capture_depth(),
         }
     }
     fn free_variables(&self) -> HashSet<StackOffset> {
-        match self.as_value() {
-            ConditionTerm::Custom(inner) => ArenaRef::<CustomCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .free_variables(),
-            ConditionTerm::Pending(inner) => ArenaRef::<PendingCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .free_variables(),
-            ConditionTerm::Error(inner) => {
-                ArenaRef::<ErrorCondition, _>::new(self.arena.clone(), self.arena.get_offset(inner))
-                    .free_variables()
-            }
-            ConditionTerm::TypeError(inner) => ArenaRef::<TypeErrorCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .free_variables(),
-            ConditionTerm::InvalidFunctionTarget(inner) => {
-                ArenaRef::<InvalidFunctionTargetCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                )
-                .free_variables()
-            }
-            ConditionTerm::InvalidFunctionArgs(inner) => {
-                ArenaRef::<InvalidFunctionArgsCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                )
-                .free_variables()
-            }
-            ConditionTerm::InvalidPointer(inner) => ArenaRef::<InvalidPointerCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .free_variables(),
+        match self.read_value(|term| term.condition_type()) {
+            ConditionTermDiscriminants::Custom => self
+                .as_typed_condition::<CustomCondition>()
+                .as_inner()
+                .free_variables(),
+            ConditionTermDiscriminants::Pending => self
+                .as_typed_condition::<PendingCondition>()
+                .as_inner()
+                .free_variables(),
+            ConditionTermDiscriminants::Error => self
+                .as_typed_condition::<ErrorCondition>()
+                .as_inner()
+                .free_variables(),
+            ConditionTermDiscriminants::TypeError => self
+                .as_typed_condition::<TypeErrorCondition>()
+                .as_inner()
+                .free_variables(),
+            ConditionTermDiscriminants::InvalidFunctionTarget => self
+                .as_typed_condition::<InvalidFunctionTargetCondition>()
+                .as_inner()
+                .free_variables(),
+            ConditionTermDiscriminants::InvalidFunctionArgs => self
+                .as_typed_condition::<InvalidFunctionArgsCondition>()
+                .as_inner()
+                .free_variables(),
+            ConditionTermDiscriminants::InvalidPointer => self
+                .as_typed_condition::<InvalidPointerCondition>()
+                .as_inner()
+                .free_variables(),
         }
     }
     fn count_variable_usages(&self, offset: StackOffset) -> usize {
-        match self.as_value() {
-            ConditionTerm::Custom(inner) => ArenaRef::<CustomCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .count_variable_usages(offset),
-            ConditionTerm::Pending(inner) => ArenaRef::<PendingCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .count_variable_usages(offset),
-            ConditionTerm::Error(inner) => {
-                ArenaRef::<ErrorCondition, _>::new(self.arena.clone(), self.arena.get_offset(inner))
-                    .count_variable_usages(offset)
-            }
-            ConditionTerm::TypeError(inner) => ArenaRef::<TypeErrorCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .count_variable_usages(offset),
-            ConditionTerm::InvalidFunctionTarget(inner) => {
-                ArenaRef::<InvalidFunctionTargetCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                )
-                .count_variable_usages(offset)
-            }
-            ConditionTerm::InvalidFunctionArgs(inner) => {
-                ArenaRef::<InvalidFunctionArgsCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                )
-                .count_variable_usages(offset)
-            }
-            ConditionTerm::InvalidPointer(inner) => ArenaRef::<InvalidPointerCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .count_variable_usages(offset),
+        match self.read_value(|term| term.condition_type()) {
+            ConditionTermDiscriminants::Custom => self
+                .as_typed_condition::<CustomCondition>()
+                .as_inner()
+                .count_variable_usages(offset),
+            ConditionTermDiscriminants::Pending => self
+                .as_typed_condition::<PendingCondition>()
+                .as_inner()
+                .count_variable_usages(offset),
+            ConditionTermDiscriminants::Error => self
+                .as_typed_condition::<ErrorCondition>()
+                .as_inner()
+                .count_variable_usages(offset),
+            ConditionTermDiscriminants::TypeError => self
+                .as_typed_condition::<TypeErrorCondition>()
+                .as_inner()
+                .count_variable_usages(offset),
+            ConditionTermDiscriminants::InvalidFunctionTarget => self
+                .as_typed_condition::<InvalidFunctionTargetCondition>()
+                .as_inner()
+                .count_variable_usages(offset),
+            ConditionTermDiscriminants::InvalidFunctionArgs => self
+                .as_typed_condition::<InvalidFunctionArgsCondition>()
+                .as_inner()
+                .count_variable_usages(offset),
+            ConditionTermDiscriminants::InvalidPointer => self
+                .as_typed_condition::<InvalidPointerCondition>()
+                .as_inner()
+                .count_variable_usages(offset),
         }
     }
     fn dynamic_dependencies(&self, deep: bool) -> DependencyList {
-        match self.as_value() {
-            ConditionTerm::Custom(inner) => ArenaRef::<CustomCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .dynamic_dependencies(deep),
-            ConditionTerm::Pending(inner) => ArenaRef::<PendingCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .dynamic_dependencies(deep),
-            ConditionTerm::Error(inner) => {
-                ArenaRef::<ErrorCondition, _>::new(self.arena.clone(), self.arena.get_offset(inner))
-                    .dynamic_dependencies(deep)
-            }
-            ConditionTerm::TypeError(inner) => ArenaRef::<TypeErrorCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .dynamic_dependencies(deep),
-            ConditionTerm::InvalidFunctionTarget(inner) => {
-                ArenaRef::<InvalidFunctionTargetCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                )
-                .dynamic_dependencies(deep)
-            }
-            ConditionTerm::InvalidFunctionArgs(inner) => {
-                ArenaRef::<InvalidFunctionArgsCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                )
-                .dynamic_dependencies(deep)
-            }
-            ConditionTerm::InvalidPointer(inner) => ArenaRef::<InvalidPointerCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .dynamic_dependencies(deep),
+        match self.read_value(|term| term.condition_type()) {
+            ConditionTermDiscriminants::Custom => self
+                .as_typed_condition::<CustomCondition>()
+                .as_inner()
+                .dynamic_dependencies(deep),
+            ConditionTermDiscriminants::Pending => self
+                .as_typed_condition::<PendingCondition>()
+                .as_inner()
+                .dynamic_dependencies(deep),
+            ConditionTermDiscriminants::Error => self
+                .as_typed_condition::<ErrorCondition>()
+                .as_inner()
+                .dynamic_dependencies(deep),
+            ConditionTermDiscriminants::TypeError => self
+                .as_typed_condition::<TypeErrorCondition>()
+                .as_inner()
+                .dynamic_dependencies(deep),
+            ConditionTermDiscriminants::InvalidFunctionTarget => self
+                .as_typed_condition::<InvalidFunctionTargetCondition>()
+                .as_inner()
+                .dynamic_dependencies(deep),
+            ConditionTermDiscriminants::InvalidFunctionArgs => self
+                .as_typed_condition::<InvalidFunctionArgsCondition>()
+                .as_inner()
+                .dynamic_dependencies(deep),
+            ConditionTermDiscriminants::InvalidPointer => self
+                .as_typed_condition::<InvalidPointerCondition>()
+                .as_inner()
+                .dynamic_dependencies(deep),
         }
     }
     fn has_dynamic_dependencies(&self, deep: bool) -> bool {
-        match self.as_value() {
-            ConditionTerm::Custom(inner) => ArenaRef::<CustomCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .has_dynamic_dependencies(deep),
-            ConditionTerm::Pending(inner) => ArenaRef::<PendingCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .has_dynamic_dependencies(deep),
-            ConditionTerm::Error(inner) => {
-                ArenaRef::<ErrorCondition, _>::new(self.arena.clone(), self.arena.get_offset(inner))
-                    .has_dynamic_dependencies(deep)
-            }
-            ConditionTerm::TypeError(inner) => ArenaRef::<TypeErrorCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .has_dynamic_dependencies(deep),
-            ConditionTerm::InvalidFunctionTarget(inner) => {
-                ArenaRef::<InvalidFunctionTargetCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                )
-                .has_dynamic_dependencies(deep)
-            }
-            ConditionTerm::InvalidFunctionArgs(inner) => {
-                ArenaRef::<InvalidFunctionArgsCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                )
-                .has_dynamic_dependencies(deep)
-            }
-            ConditionTerm::InvalidPointer(inner) => ArenaRef::<InvalidPointerCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .has_dynamic_dependencies(deep),
+        match self.read_value(|term| term.condition_type()) {
+            ConditionTermDiscriminants::Custom => self
+                .as_typed_condition::<CustomCondition>()
+                .as_inner()
+                .has_dynamic_dependencies(deep),
+            ConditionTermDiscriminants::Pending => self
+                .as_typed_condition::<PendingCondition>()
+                .as_inner()
+                .has_dynamic_dependencies(deep),
+            ConditionTermDiscriminants::Error => self
+                .as_typed_condition::<ErrorCondition>()
+                .as_inner()
+                .has_dynamic_dependencies(deep),
+            ConditionTermDiscriminants::TypeError => self
+                .as_typed_condition::<TypeErrorCondition>()
+                .as_inner()
+                .has_dynamic_dependencies(deep),
+            ConditionTermDiscriminants::InvalidFunctionTarget => self
+                .as_typed_condition::<InvalidFunctionTargetCondition>()
+                .as_inner()
+                .has_dynamic_dependencies(deep),
+            ConditionTermDiscriminants::InvalidFunctionArgs => self
+                .as_typed_condition::<InvalidFunctionArgsCondition>()
+                .as_inner()
+                .has_dynamic_dependencies(deep),
+            ConditionTermDiscriminants::InvalidPointer => self
+                .as_typed_condition::<InvalidPointerCondition>()
+                .as_inner()
+                .has_dynamic_dependencies(deep),
         }
     }
     fn is_static(&self) -> bool {
-        match self.as_value() {
-            ConditionTerm::Custom(inner) => ArenaRef::<CustomCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .is_static(),
-            ConditionTerm::Pending(inner) => ArenaRef::<PendingCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .is_static(),
-            ConditionTerm::Error(inner) => {
-                ArenaRef::<ErrorCondition, _>::new(self.arena.clone(), self.arena.get_offset(inner))
-                    .is_static()
-            }
-            ConditionTerm::TypeError(inner) => ArenaRef::<TypeErrorCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .is_static(),
-            ConditionTerm::InvalidFunctionTarget(inner) => {
-                ArenaRef::<InvalidFunctionTargetCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                )
-                .is_static()
-            }
-            ConditionTerm::InvalidFunctionArgs(inner) => {
-                ArenaRef::<InvalidFunctionArgsCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                )
-                .is_static()
-            }
-            ConditionTerm::InvalidPointer(inner) => ArenaRef::<InvalidPointerCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .is_static(),
+        match self.read_value(|term| term.condition_type()) {
+            ConditionTermDiscriminants::Custom => self
+                .as_typed_condition::<CustomCondition>()
+                .as_inner()
+                .is_static(),
+            ConditionTermDiscriminants::Pending => self
+                .as_typed_condition::<PendingCondition>()
+                .as_inner()
+                .is_static(),
+            ConditionTermDiscriminants::Error => self
+                .as_typed_condition::<ErrorCondition>()
+                .as_inner()
+                .is_static(),
+            ConditionTermDiscriminants::TypeError => self
+                .as_typed_condition::<TypeErrorCondition>()
+                .as_inner()
+                .is_static(),
+            ConditionTermDiscriminants::InvalidFunctionTarget => self
+                .as_typed_condition::<InvalidFunctionTargetCondition>()
+                .as_inner()
+                .is_static(),
+            ConditionTermDiscriminants::InvalidFunctionArgs => self
+                .as_typed_condition::<InvalidFunctionArgsCondition>()
+                .as_inner()
+                .is_static(),
+            ConditionTermDiscriminants::InvalidPointer => self
+                .as_typed_condition::<InvalidPointerCondition>()
+                .as_inner()
+                .is_static(),
         }
     }
     fn is_atomic(&self) -> bool {
-        match self.as_value() {
-            ConditionTerm::Custom(inner) => ArenaRef::<CustomCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .is_atomic(),
-            ConditionTerm::Pending(inner) => ArenaRef::<PendingCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .is_atomic(),
-            ConditionTerm::Error(inner) => {
-                ArenaRef::<ErrorCondition, _>::new(self.arena.clone(), self.arena.get_offset(inner))
-                    .is_atomic()
-            }
-            ConditionTerm::TypeError(inner) => ArenaRef::<TypeErrorCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .is_atomic(),
-            ConditionTerm::InvalidFunctionTarget(inner) => {
-                ArenaRef::<InvalidFunctionTargetCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                )
-                .is_atomic()
-            }
-            ConditionTerm::InvalidFunctionArgs(inner) => {
-                ArenaRef::<InvalidFunctionArgsCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                )
-                .is_atomic()
-            }
-            ConditionTerm::InvalidPointer(inner) => ArenaRef::<InvalidPointerCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .is_atomic(),
+        match self.read_value(|term| term.condition_type()) {
+            ConditionTermDiscriminants::Custom => self
+                .as_typed_condition::<CustomCondition>()
+                .as_inner()
+                .is_atomic(),
+            ConditionTermDiscriminants::Pending => self
+                .as_typed_condition::<PendingCondition>()
+                .as_inner()
+                .is_atomic(),
+            ConditionTermDiscriminants::Error => self
+                .as_typed_condition::<ErrorCondition>()
+                .as_inner()
+                .is_atomic(),
+            ConditionTermDiscriminants::TypeError => self
+                .as_typed_condition::<TypeErrorCondition>()
+                .as_inner()
+                .is_atomic(),
+            ConditionTermDiscriminants::InvalidFunctionTarget => self
+                .as_typed_condition::<InvalidFunctionTargetCondition>()
+                .as_inner()
+                .is_atomic(),
+            ConditionTermDiscriminants::InvalidFunctionArgs => self
+                .as_typed_condition::<InvalidFunctionArgsCondition>()
+                .as_inner()
+                .is_atomic(),
+            ConditionTermDiscriminants::InvalidPointer => self
+                .as_typed_condition::<InvalidPointerCondition>()
+                .as_inner()
+                .is_atomic(),
         }
     }
     fn is_complex(&self) -> bool {
-        match self.as_value() {
-            ConditionTerm::Custom(inner) => ArenaRef::<CustomCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .is_complex(),
-            ConditionTerm::Pending(inner) => ArenaRef::<PendingCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .is_complex(),
-            ConditionTerm::Error(inner) => {
-                ArenaRef::<ErrorCondition, _>::new(self.arena.clone(), self.arena.get_offset(inner))
-                    .is_complex()
-            }
-            ConditionTerm::TypeError(inner) => ArenaRef::<TypeErrorCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .is_complex(),
-            ConditionTerm::InvalidFunctionTarget(inner) => {
-                ArenaRef::<InvalidFunctionTargetCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                )
-                .is_complex()
-            }
-            ConditionTerm::InvalidFunctionArgs(inner) => {
-                ArenaRef::<InvalidFunctionArgsCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                )
-                .is_complex()
-            }
-            ConditionTerm::InvalidPointer(inner) => ArenaRef::<InvalidPointerCondition, _>::new(
-                self.arena.clone(),
-                self.arena.get_offset(inner),
-            )
-            .is_complex(),
+        match self.read_value(|term| term.condition_type()) {
+            ConditionTermDiscriminants::Custom => self
+                .as_typed_condition::<CustomCondition>()
+                .as_inner()
+                .is_complex(),
+            ConditionTermDiscriminants::Pending => self
+                .as_typed_condition::<PendingCondition>()
+                .as_inner()
+                .is_complex(),
+            ConditionTermDiscriminants::Error => self
+                .as_typed_condition::<ErrorCondition>()
+                .as_inner()
+                .is_complex(),
+            ConditionTermDiscriminants::TypeError => self
+                .as_typed_condition::<TypeErrorCondition>()
+                .as_inner()
+                .is_complex(),
+            ConditionTermDiscriminants::InvalidFunctionTarget => self
+                .as_typed_condition::<InvalidFunctionTargetCondition>()
+                .as_inner()
+                .is_complex(),
+            ConditionTermDiscriminants::InvalidFunctionArgs => self
+                .as_typed_condition::<InvalidFunctionArgsCondition>()
+                .as_inner()
+                .is_complex(),
+            ConditionTermDiscriminants::InvalidPointer => self
+                .as_typed_condition::<InvalidPointerCondition>()
+                .as_inner()
+                .is_complex(),
         }
     }
 }
@@ -528,73 +480,55 @@ impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<ConditionTerm, A> {
 
 impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<ConditionTerm, A> {
     fn eq(&self, other: &Self) -> bool {
-        match (self.as_value(), other.as_value()) {
-            (ConditionTerm::Custom(inner), ConditionTerm::Custom(other)) => {
-                ArenaRef::<CustomCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                ) == ArenaRef::<CustomCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(other),
-                )
+        match (
+            self.read_value(|term| term.condition_type()),
+            other.read_value(|term| term.condition_type()),
+        ) {
+            (ConditionTermDiscriminants::Custom, ConditionTermDiscriminants::Custom) => {
+                self.as_typed_condition::<CustomCondition>().as_inner()
+                    == other.as_typed_condition::<CustomCondition>().as_inner()
             }
-            (ConditionTerm::Pending(inner), ConditionTerm::Pending(other)) => {
-                ArenaRef::<PendingCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                ) == ArenaRef::<PendingCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(other),
-                )
+            (ConditionTermDiscriminants::Pending, ConditionTermDiscriminants::Pending) => {
+                self.as_typed_condition::<PendingCondition>().as_inner()
+                    == other.as_typed_condition::<PendingCondition>().as_inner()
             }
-            (ConditionTerm::Error(inner), ConditionTerm::Error(other)) => {
-                ArenaRef::<ErrorCondition, _>::new(self.arena.clone(), self.arena.get_offset(inner))
-                    == ArenaRef::<ErrorCondition, _>::new(
-                        self.arena.clone(),
-                        self.arena.get_offset(other),
-                    )
+            (ConditionTermDiscriminants::Error, ConditionTermDiscriminants::Error) => {
+                self.as_typed_condition::<ErrorCondition>().as_inner()
+                    == other.as_typed_condition::<ErrorCondition>().as_inner()
             }
-            (ConditionTerm::TypeError(inner), ConditionTerm::TypeError(other)) => {
-                ArenaRef::<TypeErrorCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                ) == ArenaRef::<TypeErrorCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(other),
-                )
+            (ConditionTermDiscriminants::TypeError, ConditionTermDiscriminants::TypeError) => {
+                self.as_typed_condition::<TypeErrorCondition>().as_inner()
+                    == other.as_typed_condition::<TypeErrorCondition>().as_inner()
             }
             (
-                ConditionTerm::InvalidFunctionTarget(inner),
-                ConditionTerm::InvalidFunctionTarget(other),
+                ConditionTermDiscriminants::InvalidFunctionTarget,
+                ConditionTermDiscriminants::InvalidFunctionTarget,
             ) => {
-                ArenaRef::<InvalidFunctionTargetCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                ) == ArenaRef::<InvalidFunctionTargetCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(other),
-                )
+                self.as_typed_condition::<InvalidFunctionTargetCondition>()
+                    .as_inner()
+                    == other
+                        .as_typed_condition::<InvalidFunctionTargetCondition>()
+                        .as_inner()
             }
             (
-                ConditionTerm::InvalidFunctionArgs(inner),
-                ConditionTerm::InvalidFunctionArgs(other),
+                ConditionTermDiscriminants::InvalidFunctionArgs,
+                ConditionTermDiscriminants::InvalidFunctionArgs,
             ) => {
-                ArenaRef::<InvalidFunctionArgsCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                ) == ArenaRef::<InvalidFunctionArgsCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(other),
-                )
+                self.as_typed_condition::<InvalidFunctionArgsCondition>()
+                    .as_inner()
+                    == other
+                        .as_typed_condition::<InvalidFunctionArgsCondition>()
+                        .as_inner()
             }
-            (ConditionTerm::InvalidPointer(inner), ConditionTerm::InvalidPointer(other)) => {
-                ArenaRef::<InvalidPointerCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                ) == ArenaRef::<InvalidPointerCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(other),
-                )
+            (
+                ConditionTermDiscriminants::InvalidPointer,
+                ConditionTermDiscriminants::InvalidPointer,
+            ) => {
+                self.as_typed_condition::<InvalidPointerCondition>()
+                    .as_inner()
+                    == other
+                        .as_typed_condition::<InvalidPointerCondition>()
+                        .as_inner()
             }
             _ => false,
         }
@@ -604,54 +538,36 @@ impl<A: ArenaAllocator + Clone> Eq for ArenaRef<ConditionTerm, A> {}
 
 impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<ConditionTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.as_value() {
-            ConditionTerm::Custom(inner) => std::fmt::Display::fmt(
-                &ArenaRef::<CustomCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                ),
+        match self.read_value(|term| term.condition_type()) {
+            ConditionTermDiscriminants::Custom => {
+                std::fmt::Display::fmt(&self.as_typed_condition::<CustomCondition>().as_inner(), f)
+            }
+            ConditionTermDiscriminants::Pending => {
+                std::fmt::Display::fmt(&self.as_typed_condition::<PendingCondition>().as_inner(), f)
+            }
+            ConditionTermDiscriminants::Error => {
+                std::fmt::Display::fmt(&self.as_typed_condition::<ErrorCondition>().as_inner(), f)
+            }
+            ConditionTermDiscriminants::TypeError => std::fmt::Display::fmt(
+                &self.as_typed_condition::<TypeErrorCondition>().as_inner(),
                 f,
             ),
-            ConditionTerm::Pending(inner) => std::fmt::Display::fmt(
-                &ArenaRef::<PendingCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                ),
+            ConditionTermDiscriminants::InvalidFunctionTarget => std::fmt::Display::fmt(
+                &self
+                    .as_typed_condition::<InvalidFunctionTargetCondition>()
+                    .as_inner(),
                 f,
             ),
-            ConditionTerm::Error(inner) => std::fmt::Display::fmt(
-                &ArenaRef::<ErrorCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                ),
+            ConditionTermDiscriminants::InvalidFunctionArgs => std::fmt::Display::fmt(
+                &self
+                    .as_typed_condition::<InvalidFunctionArgsCondition>()
+                    .as_inner(),
                 f,
             ),
-            ConditionTerm::TypeError(inner) => std::fmt::Display::fmt(
-                &ArenaRef::<TypeErrorCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                ),
-                f,
-            ),
-            ConditionTerm::InvalidFunctionTarget(inner) => std::fmt::Display::fmt(
-                &ArenaRef::<InvalidFunctionTargetCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                ),
-                f,
-            ),
-            ConditionTerm::InvalidFunctionArgs(inner) => std::fmt::Display::fmt(
-                &ArenaRef::<InvalidFunctionArgsCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                ),
-                f,
-            ),
-            ConditionTerm::InvalidPointer(inner) => std::fmt::Display::fmt(
-                &ArenaRef::<InvalidPointerCondition, _>::new(
-                    self.arena.clone(),
-                    self.arena.get_offset(inner),
-                ),
+            ConditionTermDiscriminants::InvalidPointer => std::fmt::Display::fmt(
+                &self
+                    .as_typed_condition::<InvalidPointerCondition>()
+                    .as_inner(),
                 f,
             ),
         }
@@ -659,7 +575,7 @@ impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<ConditionTerm, A>
 }
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<ConditionTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
@@ -678,9 +594,9 @@ impl TermSize for CustomCondition {
 impl TermHash for CustomCondition {
     fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
         hasher
-            .hash(arena.get::<Term>(self.effect_type), arena)
-            .hash(arena.get::<Term>(self.payload), arena)
-            .hash(arena.get::<Term>(self.token), arena)
+            .hash(&self.effect_type, arena)
+            .hash(&self.payload, arena)
+            .hash(&self.token, arena)
     }
 }
 
@@ -688,14 +604,13 @@ impl<A: ArenaAllocator + Clone> ArenaRef<CustomCondition, A> {
     pub fn signal_type(&self) -> SignalType {
         let effect_type = self.effect_type();
         // FIXME: Allow arbitrary expressions as condition types
-        let custom_effect_type = match effect_type.as_value().type_id() {
-            TermTypeDiscriminants::String => {
-                let string_term = ArenaRef::<TypedTerm<StringTerm>, _>::new(
-                    self.arena.clone(),
-                    self.as_value().effect_type,
-                );
-                String::from(string_term.as_inner().as_value().as_str())
-            }
+        let custom_effect_type = match effect_type.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::String => String::from(
+                effect_type
+                    .as_typed_term::<StringTerm>()
+                    .as_inner()
+                    .as_str(),
+            ),
             _ => format!("{}", effect_type),
         };
         SignalType::Custom(custom_effect_type)
@@ -704,13 +619,13 @@ impl<A: ArenaAllocator + Clone> ArenaRef<CustomCondition, A> {
 
 impl<A: ArenaAllocator + Clone> ArenaRef<CustomCondition, A> {
     pub fn effect_type(&self) -> ArenaRef<Term, A> {
-        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().effect_type)
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|term| term.effect_type))
     }
     pub fn payload(&self) -> ArenaRef<Term, A> {
-        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().payload)
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|term| term.payload))
     }
     pub fn token(&self) -> ArenaRef<Term, A> {
-        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().token)
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|term| term.token))
     }
 }
 
@@ -772,7 +687,7 @@ impl<A: ArenaAllocator + Clone> Eq for ArenaRef<CustomCondition, A> {}
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<CustomCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
@@ -841,7 +756,7 @@ impl<A: ArenaAllocator + Clone> Eq for ArenaRef<PendingCondition, A> {}
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<PendingCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
@@ -869,7 +784,7 @@ impl TermHash for ErrorCondition {
 
 impl<A: ArenaAllocator + Clone> ArenaRef<ErrorCondition, A> {
     pub fn payload(&self) -> ArenaRef<Term, A> {
-        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().payload)
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|term| term.payload))
     }
 }
 
@@ -920,7 +835,7 @@ impl<A: ArenaAllocator + Clone> Eq for ArenaRef<ErrorCondition, A> {}
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<ErrorCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
@@ -951,10 +866,10 @@ impl TermHash for TypeErrorCondition {
 
 impl<A: ArenaAllocator + Clone> ArenaRef<TypeErrorCondition, A> {
     pub fn expected(&self) -> Option<TermTypeDiscriminants> {
-        TermTypeDiscriminants::try_from(self.as_value().expected).ok()
+        TermTypeDiscriminants::try_from(self.read_value(|term| term.expected)).ok()
     }
     pub fn payload(&self) -> ArenaRef<Term, A> {
-        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().payload)
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|term| term.payload))
     }
 }
 
@@ -998,14 +913,15 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<TypeErrorCondition, A> {
 
 impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<TypeErrorCondition, A> {
     fn eq(&self, other: &Self) -> bool {
-        self.as_value().expected == other.as_value().expected && self.payload() == other.payload()
+        self.read_value(|term| term.expected) == other.read_value(|term| term.expected)
+            && self.payload() == other.payload()
     }
 }
 impl<A: ArenaAllocator + Clone> Eq for ArenaRef<TypeErrorCondition, A> {}
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<TypeErrorCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
@@ -1037,7 +953,7 @@ impl TermHash for InvalidFunctionTargetCondition {
 
 impl<A: ArenaAllocator + Clone> ArenaRef<InvalidFunctionTargetCondition, A> {
     pub fn target(&self) -> ArenaRef<Term, A> {
-        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().target)
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|term| term.target))
     }
 }
 
@@ -1088,7 +1004,7 @@ impl<A: ArenaAllocator + Clone> Eq for ArenaRef<InvalidFunctionTargetCondition, 
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<InvalidFunctionTargetCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
@@ -1117,10 +1033,13 @@ impl TermHash for InvalidFunctionArgsCondition {
 
 impl<A: ArenaAllocator + Clone> ArenaRef<InvalidFunctionArgsCondition, A> {
     pub fn target(&self) -> ArenaRef<Term, A> {
-        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().target)
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|term| term.target))
     }
     pub fn args(&self) -> ArenaRef<TypedTerm<ListTerm>, A> {
-        ArenaRef::<TypedTerm<ListTerm>, _>::new(self.arena.clone(), self.as_value().args)
+        ArenaRef::<TypedTerm<ListTerm>, _>::new(
+            self.arena.clone(),
+            self.read_value(|term| term.args),
+        )
     }
 }
 
@@ -1180,7 +1099,7 @@ impl<A: ArenaAllocator + Clone> Eq for ArenaRef<InvalidFunctionArgsCondition, A>
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<InvalidFunctionArgsCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
@@ -1243,7 +1162,7 @@ impl<A: ArenaAllocator + Clone> Eq for ArenaRef<InvalidPointerCondition, A> {}
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<InvalidPointerCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 

@@ -36,7 +36,10 @@ impl TermHash for ConstructorTerm {
 
 impl<A: ArenaAllocator + Clone> ArenaRef<ConstructorTerm, A> {
     pub fn keys(&self) -> ArenaRef<TypedTerm<ListTerm>, A> {
-        ArenaRef::<TypedTerm<ListTerm>, _>::new(self.arena.clone(), self.as_value().keys)
+        ArenaRef::<TypedTerm<ListTerm>, _>::new(
+            self.arena.clone(),
+            self.read_value(|term| term.keys),
+        )
     }
     pub fn arity(&self) -> Arity {
         Arity::lazy(self.keys().as_inner().len(), 0, false)
@@ -120,7 +123,7 @@ impl<A: ArenaAllocator + Clone> Eq for ArenaRef<ConstructorTerm, A> {}
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<ConstructorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 

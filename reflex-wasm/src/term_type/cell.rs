@@ -53,7 +53,7 @@ impl CellTerm {
 
 impl<A: ArenaAllocator + Clone> ArenaRef<CellTerm, A> {
     pub fn fields(&self) -> impl Iterator<Item = u32> + '_ {
-        self.as_value().fields.iter(&self.arena)
+        Array::<u32>::iter(self.inner_pointer(|value| &value.fields), &self.arena)
     }
 }
 
@@ -101,14 +101,14 @@ impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<CellTerm, A> {
 
 impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<CellTerm, A> {
     fn eq(&self, other: &Self) -> bool {
-        std::ptr::eq(&self.as_value().fields, &other.as_value().fields)
+        std::ptr::eq(&self.arena, &other.arena) && self.pointer == other.pointer
     }
 }
 impl<A: ArenaAllocator + Clone> Eq for ArenaRef<CellTerm, A> {}
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<CellTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 

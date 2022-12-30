@@ -45,7 +45,7 @@ impl Into<bool> for BooleanTerm {
 
 impl<A: ArenaAllocator + Clone> ArenaRef<BooleanTerm, A> {
     pub fn value(&self) -> bool {
-        self.as_value().value != 0
+        self.read_value(|term| term.value) != 0
     }
 }
 
@@ -113,7 +113,7 @@ impl<A: ArenaAllocator + Clone> Eq for ArenaRef<BooleanTerm, A> {}
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<BooleanTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 

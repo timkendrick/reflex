@@ -36,7 +36,10 @@ impl TermHash for EffectTerm {
 
 impl<A: ArenaAllocator + Clone> ArenaRef<EffectTerm, A> {
     pub fn condition(&self) -> ArenaRef<TypedTerm<ConditionTerm>, A> {
-        ArenaRef::<TypedTerm<ConditionTerm>, _>::new(self.arena.clone(), self.as_value().condition)
+        ArenaRef::<TypedTerm<ConditionTerm>, _>::new(
+            self.arena.clone(),
+            self.read_value(|term| term.condition),
+        )
     }
 }
 
@@ -76,7 +79,7 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<EffectTerm, A> {
         0
     }
     fn dynamic_dependencies(&self, _deep: bool) -> DependencyList {
-        DependencyList::of(self.condition().as_value().id())
+        DependencyList::of(self.condition().read_value(|condition| condition.id()))
     }
     fn has_dynamic_dependencies(&self, _deep: bool) -> bool {
         true
@@ -113,7 +116,7 @@ impl<A: ArenaAllocator + Clone> Eq for ArenaRef<EffectTerm, A> {}
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<EffectTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 

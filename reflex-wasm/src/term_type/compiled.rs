@@ -73,10 +73,10 @@ impl TermHash for CompiledTerm {
 
 impl<A: ArenaAllocator + Clone> ArenaRef<CompiledTerm, A> {
     pub fn target(&self) -> CompiledFunctionIndex {
-        self.as_value().target
+        self.read_value(|term| term.target)
     }
     pub fn num_args(&self) -> u32 {
-        self.as_value().num_args
+        self.read_value(|term| term.num_args)
     }
     pub fn arity(&self) -> Arity {
         Arity::lazy(self.num_args() as usize, 0, false)
@@ -166,7 +166,7 @@ impl<A: ArenaAllocator + Clone> Eq for ArenaRef<CompiledTerm, A> {}
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<CompiledTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 

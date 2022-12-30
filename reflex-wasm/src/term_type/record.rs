@@ -39,10 +39,16 @@ impl TermHash for RecordTerm {
 
 impl<A: ArenaAllocator + Clone> ArenaRef<RecordTerm, A> {
     fn keys(&self) -> ArenaRef<TypedTerm<ListTerm>, A> {
-        ArenaRef::<TypedTerm<ListTerm>, _>::new(self.arena.clone(), self.as_value().keys)
+        ArenaRef::<TypedTerm<ListTerm>, _>::new(
+            self.arena.clone(),
+            self.read_value(|term| term.keys),
+        )
     }
     fn values(&self) -> ArenaRef<TypedTerm<ListTerm>, A> {
-        ArenaRef::<TypedTerm<ListTerm>, _>::new(self.arena.clone(), self.as_value().values)
+        ArenaRef::<TypedTerm<ListTerm>, _>::new(
+            self.arena.clone(),
+            self.read_value(|term| term.values),
+        )
     }
     fn get<T: Expression>(&self, key: &T) -> Option<ArenaRef<Term, A>> {
         self.keys()
@@ -55,7 +61,6 @@ impl<A: ArenaAllocator + Clone> ArenaRef<RecordTerm, A> {
                     .as_inner()
                     .items()
                     .get(index)
-                    .copied()
                     .map(|pointer| ArenaRef::<Term, _>::new(self.arena.clone(), pointer))
             })
     }
@@ -224,7 +229,7 @@ impl<A: ArenaAllocator + Clone> Eq for ArenaRef<RecordTerm, A> {}
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<RecordTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 

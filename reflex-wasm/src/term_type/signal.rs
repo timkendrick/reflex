@@ -36,7 +36,10 @@ impl TermHash for SignalTerm {
 
 impl<A: ArenaAllocator + Clone> ArenaRef<SignalTerm, A> {
     fn conditions(&self) -> ArenaRef<TypedTerm<TreeTerm>, A> {
-        ArenaRef::<TypedTerm<TreeTerm>, _>::new(self.arena.clone(), self.as_value().conditions)
+        ArenaRef::<TypedTerm<TreeTerm>, _>::new(
+            self.arena.clone(),
+            self.read_value(|term| term.conditions),
+        )
     }
 }
 
@@ -113,7 +116,7 @@ impl<A: ArenaAllocator + Clone> Eq for ArenaRef<SignalTerm, A> {}
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<SignalTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 

@@ -31,14 +31,14 @@ impl TermHash for VariableTerm {
 }
 
 impl<A: ArenaAllocator + Clone> ArenaRef<VariableTerm, A> {
-    pub fn stack_offset(&self) -> u32 {
-        self.as_value().stack_offset
+    pub fn stack_offset(&self) -> StackOffset {
+        self.read_value(|term| term.stack_offset as StackOffset)
     }
 }
 
 impl<A: ArenaAllocator + Clone> VariableTermType for ArenaRef<VariableTerm, A> {
     fn offset(&self) -> StackOffset {
-        self.stack_offset() as StackOffset
+        self.stack_offset()
     }
 }
 
@@ -53,13 +53,13 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<VariableTerm, A> {
         1
     }
     fn capture_depth(&self) -> StackOffset {
-        (self.stack_offset() as StackOffset) + 1
+        (self.stack_offset()) + 1
     }
     fn free_variables(&self) -> HashSet<StackOffset> {
-        HashSet::from_iter(once(self.stack_offset() as StackOffset))
+        HashSet::from_iter(once(self.stack_offset()))
     }
     fn count_variable_usages(&self, offset: StackOffset) -> usize {
-        if offset == (self.stack_offset() as StackOffset) {
+        if offset == (self.stack_offset()) {
             1
         } else {
             0
@@ -103,7 +103,7 @@ impl<A: ArenaAllocator + Clone> Eq for ArenaRef<VariableTerm, A> {}
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<VariableTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 

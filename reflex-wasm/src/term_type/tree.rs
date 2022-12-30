@@ -37,12 +37,12 @@ impl TermHash for TreeTerm {
         let hasher = if self.left.is_null() {
             hasher.write_bool(false)
         } else {
-            hasher.hash(arena.get::<Term>(self.left), arena)
+            arena.read_value::<Term, _>(self.left, |term| hasher.hash(term, arena))
         };
         let hasher = if self.right.is_null() {
             hasher.write_bool(false)
         } else {
-            hasher.hash(arena.get::<Term>(self.right), arena)
+            arena.read_value::<Term, _>(self.right, |term| hasher.hash(term, arena))
         };
         hasher.hash(&self.length, arena)
     }
@@ -50,7 +50,7 @@ impl TermHash for TreeTerm {
 
 impl<A: ArenaAllocator + Clone> ArenaRef<TreeTerm, A> {
     pub fn left(&self) -> Option<ArenaRef<Term, A>> {
-        let pointer = self.as_value().left;
+        let pointer = self.read_value(|term| term.left);
         if pointer == TermPointer::null() {
             None
         } else {
@@ -58,7 +58,7 @@ impl<A: ArenaAllocator + Clone> ArenaRef<TreeTerm, A> {
         }
     }
     pub fn right(&self) -> Option<ArenaRef<Term, A>> {
-        let pointer = self.as_value().right;
+        let pointer = self.read_value(|term| term.right);
         if pointer == TermPointer::null() {
             None
         } else {
@@ -72,7 +72,7 @@ impl<A: ArenaAllocator + Clone> ArenaRef<TreeTerm, A> {
         IntoArenaRefIterator::new(&self.arena, self.iter())
     }
     pub fn len(&self) -> u32 {
-        self.as_value().length
+        self.read_value(|term| term.length)
     }
 }
 
@@ -87,12 +87,10 @@ impl<A: ArenaAllocator + Clone> ConditionListType<WasmExpression<A>> for ArenaRe
         WasmExpression<A>: 'a,
         Self: 'a;
     fn id(&self) -> HashId {
-        // FIXME: convert to 64-bit term hashes
-        u32::from(
-            self.as_value()
-                .hash(TermHasher::default(), &self.arena)
-                .finish(),
-        ) as HashId
+        self.read_value(|term| {
+            // FIXME: convert to 64-bit term hashes
+            u32::from(term.hash(TermHasher::default(), &self.arena).finish()) as HashId
+        })
     }
     fn len(&self) -> usize {
         self.iter().count()
@@ -169,7 +167,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next().and_then(|item_pointer| {
             let item = ArenaRef::<Term, _>::new(self.arena.clone(), item_pointer);
-            match item.as_value().type_id() {
+            match item.read_value(|term| term.type_id()) {
                 TermTypeDiscriminants::Condition => {
                     let condition_term = ArenaRef::<TypedTerm<ConditionTerm>, _>::new(
                         self.arena.clone(),
@@ -297,14 +295,14 @@ impl<A: ArenaAllocator + Clone> Eq for ArenaRef<TreeTerm, A> {}
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<TreeTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
 impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<TreeTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let left = self.as_value().left;
-        let right = self.as_value().right;
+        let left = self.read_value(|term| term.left);
+        let right = self.read_value(|term| term.right);
         write!(f, "(")?;
         if TermPointer::is_null(left) {
             write!(f, "NULL")?;
@@ -376,14 +374,17 @@ impl TreeIteratorStack {
 impl<'a, A: ArenaAllocator + Clone> Iterator for TreeIterator<'a, A> {
     type Item = TermPointer;
     fn next(&mut self) -> Option<Self::Item> {
-        let (cursor, child_pointer) = match self.stack.peek() {
+        let (cursor, child_pointer) = match self.stack.peek().copied() {
             None => None,
             Some(tree_term) => {
                 let child_pointer = {
-                    let tree_term = self.arena.get::<TreeTerm>(*tree_term);
                     match self.stack.cursor {
-                        TreeIteratorCursor::Left => tree_term.left,
-                        TreeIteratorCursor::Right => tree_term.right,
+                        TreeIteratorCursor::Left => self
+                            .arena
+                            .read_value::<TreeTerm, _>(tree_term, |tree| tree.left),
+                        TreeIteratorCursor::Right => self
+                            .arena
+                            .read_value::<TreeTerm, _>(tree_term, |tree| tree.right),
                     }
                 };
                 Some((self.stack.cursor, child_pointer))
@@ -397,7 +398,10 @@ impl<'a, A: ArenaAllocator + Clone> Iterator for TreeIterator<'a, A> {
                     return self.next();
                 } else {
                     // Determine whether the current item is itself a cell which needs to be traversed deeper
-                    match self.arena.get::<Term>(child_pointer).type_id() {
+                    match self
+                        .arena
+                        .read_value::<Term, _>(child_pointer, |term| term.type_id())
+                    {
                         // If so, push the cell to the stack and repeat the iteration with the updated stack
                         TermTypeDiscriminants::Tree => {
                             let tree_term = ArenaRef::<TypedTerm<TreeTerm>, _>::new(
@@ -423,7 +427,10 @@ impl<'a, A: ArenaAllocator + Clone> Iterator for TreeIterator<'a, A> {
                     return self.next();
                 } else {
                     // Determine whether the current item is itself a cell which needs to be traversed deeper
-                    match self.arena.get::<Term>(child_pointer).type_id() {
+                    match self
+                        .arena
+                        .read_value::<Term, _>(child_pointer, |term| term.type_id())
+                    {
                         // If so, push the cell to the stack and repeat the iteration with the updated stack
                         TermTypeDiscriminants::Tree => {
                             let tree_term = ArenaRef::<TypedTerm<TreeTerm>, _>::new(

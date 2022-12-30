@@ -19,7 +19,7 @@ use crate::{
     hash::{TermHash, TermHasher, TermSize},
     term_type::TermType,
     term_type::TypedTerm,
-    ArenaRef, Array, ArrayIter, IntoArenaRefIterator, Term, TermPointer,
+    ArenaArrayIter, ArenaRef, Array, IntoArenaRefIterator, Term, TermPointer,
 };
 
 use super::WasmExpression;
@@ -59,26 +59,26 @@ impl ListTerm {
         let instance = arena.allocate(term);
         let list = instance.offset((term_size - std::mem::size_of::<Array<TermPointer>>()) as u32);
         Array::<TermPointer>::extend(list, values, arena);
-        let hash = {
-            arena
-                .get::<Term>(instance)
-                .hash(Default::default(), arena)
-                .finish()
-        };
+        let hash = arena.read_value::<Term, _>(instance, |term| {
+            TermHasher::default().hash(term, arena).finish()
+        });
         arena.write::<u32>(Term::get_hash_pointer(instance), u32::from(hash));
         instance
     }
 }
 
 impl<A: ArenaAllocator + Clone> ArenaRef<ListTerm, A> {
-    pub fn items(&self) -> ArenaRef<Array<TermPointer>, A> {
-        ArenaRef::<Array<TermPointer>, _>::new(
-            self.arena.clone(),
-            self.arena.get_offset(&self.as_value().items),
-        )
+    fn items_pointer(&self) -> TermPointer {
+        self.inner_pointer(|value| &value.items)
     }
-    pub fn iter(&self) -> IntoArenaRefIterator<'_, Term, A, ArrayIter<'_, TermPointer, A>> {
-        IntoArenaRefIterator::new(&self.arena, self.as_value().items.iter(&self.arena))
+    pub fn items(&self) -> ArenaRef<Array<TermPointer>, A> {
+        ArenaRef::<Array<TermPointer>, _>::new(self.arena.clone(), self.items_pointer())
+    }
+    pub fn iter(&self) -> IntoArenaRefIterator<'_, Term, A, ArenaArrayIter<'_, TermPointer, A>> {
+        IntoArenaRefIterator::new(
+            &self.arena,
+            Array::<TermPointer>::iter(self.items_pointer(), &self.arena),
+        )
     }
     pub fn len(&self) -> usize {
         self.items().len()
@@ -158,7 +158,7 @@ impl<A: ArenaAllocator + Clone> ExpressionListType<WasmExpression<A>>
     for ArenaRef<TypedTerm<ListTerm>, A>
 {
     type Iterator<'a> = MapIntoIterator<
-        IntoArenaRefIterator<'a, Term, A, ArrayIter<'a, TermPointer, A>>,
+        IntoArenaRefIterator<'a, Term, A, ArenaArrayIter<'a, TermPointer, A>>,
         ArenaRef<Term, A>,
         <WasmExpression<A> as Expression>::ExpressionRef<'a>,
     >
@@ -166,7 +166,7 @@ impl<A: ArenaAllocator + Clone> ExpressionListType<WasmExpression<A>>
         WasmExpression<A>: 'a,
         Self: 'a;
     fn id(&self) -> HashId {
-        self.as_value().id()
+        self.read_value(|term| term.id())
     }
     fn len(&self) -> usize {
         self.as_inner().items().len()
@@ -181,7 +181,6 @@ impl<A: ArenaAllocator + Clone> ExpressionListType<WasmExpression<A>>
         self.as_inner()
             .items()
             .get(index)
-            .copied()
             .map(|pointer| ArenaRef::<Term, _>::new(self.arena.clone(), pointer).into())
     }
     fn iter<'a>(&'a self) -> Self::Iterator<'a>
@@ -190,7 +189,7 @@ impl<A: ArenaAllocator + Clone> ExpressionListType<WasmExpression<A>>
     {
         MapIntoIterator::new(IntoArenaRefIterator::new(
             &self.arena,
-            self.as_inner_value().items.iter(&self.arena),
+            Array::<TermPointer>::iter(self.as_inner().items_pointer(), &self.arena),
         ))
     }
 }
@@ -244,7 +243,7 @@ impl<A: ArenaAllocator + Clone> Eq for ArenaRef<ListTerm, A> {}
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<ListTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
@@ -298,7 +297,7 @@ mod tests {
         {
             let entries = [TermPointer(12345), TermPointer(67890)];
             let instance = ListTerm::allocate(entries, &mut allocator);
-            let result = allocator.get::<Term>(instance).as_bytes();
+            let result = allocator.get_ref::<Term>(instance).as_bytes();
             // TODO: Test term hashing
             let _hash = result[0];
             let discriminant = result[1];

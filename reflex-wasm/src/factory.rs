@@ -18,7 +18,8 @@ use crate::{
         ApplicationTerm, BooleanTerm, BuiltinTerm, CompiledFunctionIndex, CompiledTerm,
         ConditionTerm, ConstructorTerm, EffectTerm, ErrorCondition, FloatTerm, HashmapTerm,
         HashsetTerm, IntTerm, LambdaTerm, LetTerm, ListTerm, NilTerm, PartialTerm, RecordTerm,
-        SignalTerm, StringTerm, SymbolTerm, TermType, TreeTerm, TypedTerm, VariableTerm,
+        SignalTerm, StringTerm, SymbolTerm, TermType, TermTypeDiscriminants, TreeTerm, TypedTerm,
+        VariableTerm,
     },
     ArenaRef, Term, TermPointer,
 };
@@ -51,11 +52,15 @@ impl<A: ArenaAllocator> ArenaAllocator for ArenaFactory<A> {
     fn write<T: Sized>(&mut self, offset: TermPointer, value: T) {
         self.arena.write(offset, value)
     }
-    fn get<T>(&self, offset: TermPointer) -> &T {
-        self.arena.get::<T>(offset)
+    fn read_value<T, V>(&self, offset: TermPointer, selector: impl FnOnce(&T) -> V) -> V {
+        self.arena.read_value::<T, V>(offset, selector)
     }
-    fn get_offset<T>(&self, value: &T) -> TermPointer {
-        self.arena.get_offset(value)
+    fn inner_pointer<T, V>(
+        &self,
+        offset: TermPointer,
+        selector: impl FnOnce(&T) -> &V,
+    ) -> TermPointer {
+        self.arena.inner_pointer::<T, V>(offset, selector)
     }
 }
 
@@ -387,8 +392,8 @@ impl<A: ArenaAllocator + Clone> ExpressionFactory<ArenaRef<Term, Self>> for Aren
         &self,
         expression: &'a ArenaRef<Term, Self>,
     ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::NilTerm> {
-        match &expression.as_value().value {
-            TermType::Nil(_) => Some(expression.as_type::<NilTerm>()),
+        match expression.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Nil => Some(expression.as_typed_term::<NilTerm>()),
             _ => None,
         }
     }
@@ -397,8 +402,8 @@ impl<A: ArenaAllocator + Clone> ExpressionFactory<ArenaRef<Term, Self>> for Aren
         &self,
         expression: &'a ArenaRef<Term, Self>,
     ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::BooleanTerm> {
-        match &expression.as_value().value {
-            TermType::Boolean(_) => Some(expression.as_type::<BooleanTerm>()),
+        match expression.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Boolean => Some(expression.as_typed_term::<BooleanTerm>()),
             _ => None,
         }
     }
@@ -407,8 +412,8 @@ impl<A: ArenaAllocator + Clone> ExpressionFactory<ArenaRef<Term, Self>> for Aren
         &self,
         expression: &'a ArenaRef<Term, Self>,
     ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::IntTerm> {
-        match &expression.as_value().value {
-            TermType::Int(_) => Some(expression.as_type::<IntTerm>()),
+        match expression.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Int => Some(expression.as_typed_term::<IntTerm>()),
             _ => None,
         }
     }
@@ -417,8 +422,8 @@ impl<A: ArenaAllocator + Clone> ExpressionFactory<ArenaRef<Term, Self>> for Aren
         &self,
         expression: &'a ArenaRef<Term, Self>,
     ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::FloatTerm> {
-        match &expression.as_value().value {
-            TermType::Float(_) => Some(expression.as_type::<FloatTerm>()),
+        match expression.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Float => Some(expression.as_typed_term::<FloatTerm>()),
             _ => None,
         }
     }
@@ -427,8 +432,8 @@ impl<A: ArenaAllocator + Clone> ExpressionFactory<ArenaRef<Term, Self>> for Aren
         &self,
         expression: &'a ArenaRef<Term, Self>,
     ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::StringTerm> {
-        match &expression.as_value().value {
-            TermType::String(_) => Some(expression.as_type::<StringTerm>()),
+        match expression.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::String => Some(expression.as_typed_term::<StringTerm>()),
             _ => None,
         }
     }
@@ -437,8 +442,8 @@ impl<A: ArenaAllocator + Clone> ExpressionFactory<ArenaRef<Term, Self>> for Aren
         &self,
         expression: &'a ArenaRef<Term, Self>,
     ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::SymbolTerm> {
-        match &expression.as_value().value {
-            TermType::Symbol(_) => Some(expression.as_type::<SymbolTerm>()),
+        match expression.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Symbol => Some(expression.as_typed_term::<SymbolTerm>()),
             _ => None,
         }
     }
@@ -447,8 +452,8 @@ impl<A: ArenaAllocator + Clone> ExpressionFactory<ArenaRef<Term, Self>> for Aren
         &self,
         expression: &'a ArenaRef<Term, Self>,
     ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::VariableTerm> {
-        match &expression.as_value().value {
-            TermType::Variable(_) => Some(expression.as_type::<VariableTerm>()),
+        match expression.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Variable => Some(expression.as_typed_term::<VariableTerm>()),
             _ => None,
         }
     }
@@ -457,8 +462,8 @@ impl<A: ArenaAllocator + Clone> ExpressionFactory<ArenaRef<Term, Self>> for Aren
         &self,
         expression: &'a ArenaRef<Term, Self>,
     ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::EffectTerm> {
-        match &expression.as_value().value {
-            TermType::Effect(_) => Some(expression.as_type::<EffectTerm>()),
+        match expression.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Effect => Some(expression.as_typed_term::<EffectTerm>()),
             _ => None,
         }
     }
@@ -467,8 +472,8 @@ impl<A: ArenaAllocator + Clone> ExpressionFactory<ArenaRef<Term, Self>> for Aren
         &self,
         expression: &'a ArenaRef<Term, Self>,
     ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::LetTerm> {
-        match &expression.as_value().value {
-            TermType::Let(_) => Some(expression.as_type::<LetTerm>()),
+        match expression.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Let => Some(expression.as_typed_term::<LetTerm>()),
             _ => None,
         }
     }
@@ -477,8 +482,8 @@ impl<A: ArenaAllocator + Clone> ExpressionFactory<ArenaRef<Term, Self>> for Aren
         &self,
         expression: &'a ArenaRef<Term, Self>,
     ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::LambdaTerm> {
-        match &expression.as_value().value {
-            TermType::Lambda(_) => Some(expression.as_type::<LambdaTerm>()),
+        match expression.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Lambda => Some(expression.as_typed_term::<LambdaTerm>()),
             _ => None,
         }
     }
@@ -487,8 +492,10 @@ impl<A: ArenaAllocator + Clone> ExpressionFactory<ArenaRef<Term, Self>> for Aren
         &self,
         expression: &'a ArenaRef<Term, Self>,
     ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::ApplicationTerm> {
-        match &expression.as_value().value {
-            TermType::Application(_) => Some(expression.as_type::<ApplicationTerm>()),
+        match expression.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Application => {
+                Some(expression.as_typed_term::<ApplicationTerm>())
+            }
             _ => None,
         }
     }
@@ -497,8 +504,8 @@ impl<A: ArenaAllocator + Clone> ExpressionFactory<ArenaRef<Term, Self>> for Aren
         &self,
         expression: &'a ArenaRef<Term, Self>,
     ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::PartialApplicationTerm> {
-        match &expression.as_value().value {
-            TermType::Partial(_) => Some(expression.as_type::<PartialTerm>()),
+        match expression.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Partial => Some(expression.as_typed_term::<PartialTerm>()),
             _ => None,
         }
     }
@@ -507,8 +514,8 @@ impl<A: ArenaAllocator + Clone> ExpressionFactory<ArenaRef<Term, Self>> for Aren
         &self,
         expression: &'a ArenaRef<Term, Self>,
     ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::RecursiveTerm> {
-        match &expression.as_value().value {
-            // TODO: Implement WASM recursive term
+        match expression.read_value(|term| term.type_id()) {
+            //Discriminants TODO: Implement WASM recursive term
             _ => None,
         }
     }
@@ -517,8 +524,8 @@ impl<A: ArenaAllocator + Clone> ExpressionFactory<ArenaRef<Term, Self>> for Aren
         &self,
         expression: &'a ArenaRef<Term, Self>,
     ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::BuiltinTerm> {
-        match &expression.as_value().value {
-            TermType::Builtin(_) => Some(expression.as_type::<BuiltinTerm>()),
+        match expression.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Builtin => Some(expression.as_typed_term::<BuiltinTerm>()),
             _ => None,
         }
     }
@@ -527,8 +534,8 @@ impl<A: ArenaAllocator + Clone> ExpressionFactory<ArenaRef<Term, Self>> for Aren
         &self,
         expression: &'a ArenaRef<Term, Self>,
     ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::CompiledFunctionTerm> {
-        match &expression.as_value().value {
-            TermType::Compiled(_) => Some(expression.as_type::<CompiledTerm>()),
+        match expression.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Compiled => Some(expression.as_typed_term::<CompiledTerm>()),
             _ => None,
         }
     }
@@ -537,8 +544,8 @@ impl<A: ArenaAllocator + Clone> ExpressionFactory<ArenaRef<Term, Self>> for Aren
         &self,
         expression: &'a ArenaRef<Term, Self>,
     ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::RecordTerm> {
-        match &expression.as_value().value {
-            TermType::Record(_) => Some(expression.as_type::<RecordTerm>()),
+        match expression.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Record => Some(expression.as_typed_term::<RecordTerm>()),
             _ => None,
         }
     }
@@ -547,8 +554,10 @@ impl<A: ArenaAllocator + Clone> ExpressionFactory<ArenaRef<Term, Self>> for Aren
         &self,
         expression: &'a ArenaRef<Term, Self>,
     ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::ConstructorTerm> {
-        match &expression.as_value().value {
-            TermType::Constructor(_) => Some(expression.as_type::<ConstructorTerm>()),
+        match expression.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Constructor => {
+                Some(expression.as_typed_term::<ConstructorTerm>())
+            }
             _ => None,
         }
     }
@@ -557,8 +566,8 @@ impl<A: ArenaAllocator + Clone> ExpressionFactory<ArenaRef<Term, Self>> for Aren
         &self,
         expression: &'a ArenaRef<Term, Self>,
     ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::ListTerm> {
-        match &expression.as_value().value {
-            TermType::List(_) => Some(expression.as_type::<ListTerm>()),
+        match expression.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::List => Some(expression.as_typed_term::<ListTerm>()),
             _ => None,
         }
     }
@@ -567,8 +576,8 @@ impl<A: ArenaAllocator + Clone> ExpressionFactory<ArenaRef<Term, Self>> for Aren
         &self,
         expression: &'a ArenaRef<Term, Self>,
     ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::HashmapTerm> {
-        match &expression.as_value().value {
-            TermType::Hashmap(_) => Some(expression.as_type::<HashmapTerm>()),
+        match expression.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Hashmap => Some(expression.as_typed_term::<HashmapTerm>()),
             _ => None,
         }
     }
@@ -577,8 +586,8 @@ impl<A: ArenaAllocator + Clone> ExpressionFactory<ArenaRef<Term, Self>> for Aren
         &self,
         expression: &'a ArenaRef<Term, Self>,
     ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::HashsetTerm> {
-        match &expression.as_value().value {
-            TermType::Hashset(_) => Some(expression.as_type::<HashsetTerm>()),
+        match expression.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Hashset => Some(expression.as_typed_term::<HashsetTerm>()),
             _ => None,
         }
     }
@@ -587,8 +596,8 @@ impl<A: ArenaAllocator + Clone> ExpressionFactory<ArenaRef<Term, Self>> for Aren
         &self,
         expression: &'a ArenaRef<Term, Self>,
     ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::SignalTerm> {
-        match &expression.as_value().value {
-            TermType::Signal(_) => Some(expression.as_type::<SignalTerm>()),
+        match expression.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Signal => Some(expression.as_typed_term::<SignalTerm>()),
             _ => None,
         }
     }

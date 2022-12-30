@@ -28,7 +28,7 @@ where
     T: Hash,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.as_value().hash(state)
+        self.read_value(|value| value.hash(state))
     }
 }
 impl<T, A: ArenaAllocator> ArenaRef<T, A> {
@@ -39,11 +39,23 @@ impl<T, A: ArenaAllocator> ArenaRef<T, A> {
             _type: PhantomData,
         }
     }
-    pub fn as_value(&self) -> &T {
-        self.arena.get::<T>(self.pointer)
+    pub fn read_value<V>(&self, selector: impl FnOnce(&T) -> V) -> V {
+        self.arena.read_value::<T, V>(self.pointer, selector)
+    }
+    pub fn inner_pointer<V>(&self, selector: impl FnOnce(&T) -> &V) -> TermPointer {
+        self.arena.inner_pointer::<T, V>(self.pointer, selector)
     }
     pub(crate) fn as_pointer(&self) -> TermPointer {
         self.pointer
+    }
+    pub fn inner_ref<V>(&self, selector: impl FnOnce(&T) -> &V) -> ArenaRef<V, A>
+    where
+        A: Clone,
+    {
+        ArenaRef::new(
+            self.arena.clone(),
+            self.arena.inner_pointer::<T, V>(self.pointer, selector),
+        )
     }
 }
 impl<T, A: ArenaAllocator> Copy for ArenaRef<T, A> where A: Copy {}
@@ -153,8 +165,8 @@ impl Term {
     pub(crate) fn as_value(&self) -> &TermType {
         &self.value
     }
-    pub(crate) fn set_hash(&mut self, value: TermHashState) {
-        self.header.hash = value;
+    pub(crate) fn get_hash(&self) -> TermHashState {
+        self.header.hash
     }
 }
 impl TermSize for Term {
@@ -170,9 +182,18 @@ impl TermHash for Term {
     }
 }
 
+impl<A: ArenaAllocator> ArenaRef<Term, A> {
+    pub(crate) fn get_value_pointer(&self) -> TermPointer {
+        Term::get_value_pointer(self.pointer)
+    }
+    pub(crate) fn read_hash(&self) -> TermHashState {
+        self.read_value(|term| term.get_hash())
+    }
+}
+
 impl<A: ArenaAllocator> TermHash for ArenaRef<Term, A> {
     fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
-        TermHash::hash(self.as_value(), hasher, arena)
+        self.read_value(move |value| TermHash::hash(value, hasher, arena))
     }
 }
 
@@ -225,8 +246,7 @@ impl From<u32> for TermPointer {
 }
 impl TermHash for TermPointer {
     fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
-        let target = arena.get::<Term>(*self);
-        target.hash(hasher, arena)
+        arena.read_value::<Term, _>(*self, |term| term.hash(hasher, arena))
     }
 }
 impl std::fmt::Debug for TermPointer {
@@ -238,9 +258,9 @@ impl std::fmt::Debug for TermPointer {
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct Array<T> {
-    capacity: u32,
-    length: u32,
-    items: [T; 0],
+    pub capacity: u32,
+    pub length: u32,
+    pub items: [T; 0],
 }
 impl<T> Default for Array<T> {
     fn default() -> Self {
@@ -261,13 +281,12 @@ where
 }
 impl<T> TermHash for Array<T>
 where
-    T: Copy + TermHash,
+    T: TermHash,
 {
     fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
-        self.iter(arena)
-            .fold(hasher.write_u32(self.length), |hasher, item| {
-                item.hash(hasher, arena)
-            })
+        let hasher = hasher.write_u32(self.length);
+        self.items()
+            .fold(hasher, |hasher, item| item.hash(hasher, arena))
     }
 }
 
@@ -313,16 +332,19 @@ where
         let pointer = (offset + (index * 4)) as *const T;
         std::mem::transmute::<*const T, &T>(pointer)
     }
+    pub fn items(&self) -> ArrayIter<'_, T> {
+        ArrayIter::new(self)
+    }
     pub fn get_item_offset(list: TermPointer, index: usize) -> TermPointer {
         list.offset((std::mem::size_of::<Array<T>>() + (index * std::mem::size_of::<T>())) as u32)
     }
-    pub fn iter<'a, A: ArenaAllocator>(&self, arena: &'a A) -> ArrayIter<'a, T, A>
+    pub fn iter<'a, A: ArenaAllocator>(list: TermPointer, arena: &'a A) -> ArenaArrayIter<'a, T, A>
     where
         T: Copy,
     {
-        ArrayIter {
-            length: self.length as usize,
-            offset: arena.get_offset(&self.items[0]),
+        ArenaArrayIter {
+            length: arena.read_value::<Array<T>, _>(list, |value| value.length as usize),
+            offset: Self::get_item_offset(list, 0),
             arena,
             _item: PhantomData,
         }
@@ -331,36 +353,66 @@ where
 
 impl<T, A: ArenaAllocator> ArenaRef<Array<T>, A> {
     pub fn len(&self) -> usize {
-        self.as_value().len()
+        self.arena
+            .read_value::<Array<T>, u32>(self.pointer, |value| value.length) as usize
     }
-    pub fn get(&self, index: usize) -> Option<&T> {
-        self.as_value().get(index)
-    }
-    pub fn iter<'a>(&'a self) -> ArrayIter<'a, T, A>
+    pub fn get(&self, index: usize) -> Option<T>
     where
         T: Copy,
     {
-        self.as_value().iter(&self.arena)
+        self.read_value(|items| items.get(index).copied())
+    }
+    pub fn iter<'a>(&'a self) -> ArenaArrayIter<'a, T, A>
+    where
+        T: Copy,
+    {
+        Array::<T>::iter(self.pointer, &self.arena)
     }
 }
 
-struct ArrayIter<'a, T: Sized + Copy, A: ArenaAllocator> {
+pub struct ArrayIter<'a, T> {
+    array: &'a Array<T>,
+    offset: usize,
+}
+impl<'a, T> ArrayIter<'a, T> {
+    fn new(array: &'a Array<T>) -> Self {
+        Self { array, offset: 0 }
+    }
+}
+impl<'a, T: Sized> Iterator for ArrayIter<'a, T> {
+    type Item = &'a T;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.array.get(self.offset) {
+            None => None,
+            Some(value) => {
+                self.offset += 1;
+                Some(value)
+            }
+        }
+    }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let length = self.array.len() - self.offset;
+        (length, Some(length))
+    }
+}
+
+pub struct ArenaArrayIter<'a, T: Sized + Copy, A: ArenaAllocator> {
     length: usize,
     offset: TermPointer,
     arena: &'a A,
     _item: PhantomData<T>,
 }
 
-impl<'a, T: Sized + Copy, A: ArenaAllocator> Iterator for ArrayIter<'a, T, A> {
+impl<'a, T: Sized + Copy, A: ArenaAllocator> Iterator for ArenaArrayIter<'a, T, A> {
     type Item = T;
     fn next(&mut self) -> Option<Self::Item> {
         if self.length == 0 {
             None
         } else {
-            let item = self.arena.get::<T>(self.offset);
+            let item = self.arena.read_value::<T, T>(self.offset, |term| *term);
             self.offset = self.offset.offset(std::mem::size_of::<T>() as u32);
             self.length -= 1;
-            Some(*item)
+            Some(item)
         }
     }
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -373,7 +425,7 @@ impl<'a, T: Sized + Copy, A: ArenaAllocator> Iterator for ArrayIter<'a, T, A> {
         self.length
     }
 }
-impl<'a, T: Sized + Copy, A: ArenaAllocator> ExactSizeIterator for ArrayIter<'a, T, A> {}
+impl<'a, T: Sized + Copy, A: ArenaAllocator> ExactSizeIterator for ArenaArrayIter<'a, T, A> {}
 
 pub fn pad_to_4_byte_offset(value: usize) -> usize {
     if value == 0 {

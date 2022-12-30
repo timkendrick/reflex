@@ -32,10 +32,10 @@ impl TermHash for ZipIteratorTerm {
 
 impl<A: ArenaAllocator + Clone> ArenaRef<ZipIteratorTerm, A> {
     pub fn left(&self) -> ArenaRef<Term, A> {
-        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().left)
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|term| term.left))
     }
     pub fn right(&self) -> ArenaRef<Term, A> {
-        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().right)
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|term| term.right))
     }
 }
 
@@ -60,7 +60,7 @@ impl<A: ArenaAllocator + Clone> Eq for ArenaRef<ZipIteratorTerm, A> {}
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<ZipIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 

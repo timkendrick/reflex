@@ -37,10 +37,10 @@ impl TermHash for LambdaTerm {
 
 impl<A: ArenaAllocator + Clone> ArenaRef<LambdaTerm, A> {
     pub fn num_args(&self) -> u32 {
-        self.as_value().num_args
+        self.read_value(|term| term.num_args)
     }
     pub fn body(&self) -> ArenaRef<Term, A> {
-        ArenaRef::<Term, _>::new(self.arena.clone(), self.as_value().body)
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|term| term.body))
     }
     pub fn arity(&self) -> Arity {
         Arity::lazy(self.num_args() as usize, 0, false)
@@ -142,7 +142,7 @@ impl<A: ArenaAllocator + Clone> Eq for ArenaRef<LambdaTerm, A> {}
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<LambdaTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 

@@ -34,7 +34,7 @@ impl TermHash for SymbolTerm {
 
 impl<A: ArenaAllocator + Clone> ArenaRef<SymbolTerm, A> {
     pub fn id(&self) -> u32 {
-        self.as_value().id
+        self.read_value(|term| term.id)
     }
 }
 
@@ -101,7 +101,7 @@ impl<A: ArenaAllocator + Clone> Eq for ArenaRef<SymbolTerm, A> {}
 
 impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<SymbolTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_value(), f)
+        self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
