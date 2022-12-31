@@ -58,11 +58,10 @@ impl HashmapTerm {
             }),
             arena,
         );
+        let term_size = term.size_of();
         let instance = arena.allocate(term);
-        let list = instance.offset(
-            (std::mem::size_of::<TypedTerm<HashmapTerm>>()
-                - std::mem::size_of::<Array<HashmapBucket>>()) as u32,
-        );
+        let list =
+            instance.offset((term_size - std::mem::size_of::<Array<HashmapBucket>>()) as u32);
         let empty_buckets = (0..capacity).map(|_| HashmapBucket {
             key: TermPointer::uninitialized(),
             value: TermPointer::uninitialized(),

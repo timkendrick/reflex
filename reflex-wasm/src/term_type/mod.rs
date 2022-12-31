@@ -72,6 +72,8 @@ use crate::{
     ArenaRef, Term, TermPointer,
 };
 
+const TERM_TYPE_DISCRIMINANT_SIZE: usize = std::mem::size_of::<u32>();
+
 #[derive(Clone, Copy, Debug, EnumDiscriminants)]
 #[repr(C)]
 pub enum TermType {
@@ -166,7 +168,7 @@ impl TryFrom<u32> for TermTypeDiscriminants {
 }
 impl TermSize for TermType {
     fn size_of(&self) -> usize {
-        let discriminant_size = std::mem::size_of::<u32>();
+        let discriminant_size = TERM_TYPE_DISCRIMINANT_SIZE;
         let value_size = match self {
             Self::Application(term) => term.size_of(),
             Self::Boolean(term) => term.size_of(),
@@ -686,7 +688,7 @@ impl<A: ArenaAllocator + Clone> ArenaRef<Term, A> {
 impl<A: ArenaAllocator + Clone> Eq for ArenaRef<Term, A> {}
 impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<Term, A> {
     fn eq(&self, other: &Self) -> bool {
-        if self.read_hash() != other.read_hash() {
+        if self.read_value(|term| term.header.hash) != other.read_value(|term| term.header.hash) {
             return false;
         }
         match (
@@ -2888,7 +2890,7 @@ impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<TermType, A> {
 
 #[cfg(test)]
 impl TermType {
-    fn as_bytes(&self) -> &[u32] {
+    pub(crate) fn as_bytes(&self) -> &[u32] {
         let num_words = crate::pad_to_4_byte_offset(self.size_of() as usize) / 4;
         unsafe { std::slice::from_raw_parts(self as *const Self as *const u32, num_words) }
     }
@@ -2979,7 +2981,11 @@ impl<V> TypedTerm<V> {
 
 impl<A: ArenaAllocator + Clone, V> ArenaRef<TypedTerm<V>, A> {
     pub fn as_inner(&self) -> ArenaRef<V, A> {
-        ArenaRef::<V, _>::new(self.arena.clone(), self.get_value_pointer())
+        ArenaRef::<V, _>::new(
+            self.arena.clone(),
+            self.get_value_pointer()
+                .offset(TERM_TYPE_DISCRIMINANT_SIZE as u32),
+        )
     }
     pub(crate) fn as_term(&self) -> &ArenaRef<Term, A> {
         unsafe { std::mem::transmute::<&ArenaRef<TypedTerm<V>, A>, &ArenaRef<Term, A>>(self) }

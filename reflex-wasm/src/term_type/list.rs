@@ -279,7 +279,7 @@ impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<ListTerm, A> {
 mod tests {
     use crate::{
         allocator::VecAllocator,
-        term_type::{TermType, TermTypeDiscriminants},
+        term_type::{IntTerm, TermType, TermTypeDiscriminants},
     };
 
     use super::*;
@@ -295,7 +295,11 @@ mod tests {
         );
         let mut allocator = VecAllocator::default();
         {
-            let entries = [TermPointer(12345), TermPointer(67890)];
+            let first_item =
+                allocator.allocate(Term::new(TermType::Int(IntTerm::from(3)), &allocator));
+            let second_item =
+                allocator.allocate(Term::new(TermType::Int(IntTerm::from(4)), &allocator));
+            let entries = [first_item, second_item];
             let instance = ListTerm::allocate(entries, &mut allocator);
             let result = allocator.get_ref::<Term>(instance).as_bytes();
             // TODO: Test term hashing
@@ -307,7 +311,7 @@ mod tests {
             assert_eq!(discriminant, TermTypeDiscriminants::List as u32);
             assert_eq!(data_length, entries.len() as u32);
             assert_eq!(data_capacity, entries.len() as u32);
-            assert_eq!(data, [12345, 67890]);
+            assert_eq!(data, [u32::from(first_item), u32::from(second_item)]);
         }
     }
 }

@@ -85,10 +85,8 @@ impl WasmContextBuilder {
 
         wasmtime_wasi::add_to_linker(&mut linker, |s| s).map_err(InterpreterError::Linking)?;
 
-        let module = unsafe {
-            Module::deserialize(store.engine(), program_bytes)
-                .map_err(InterpreterError::ModuleCreation)?
-        };
+        let module = Module::from_binary(store.engine(), program_bytes)
+            .map_err(InterpreterError::ModuleCreation)?;
 
         Ok(Self {
             store,
@@ -335,7 +333,7 @@ mod tests {
 
     use super::{InterpreterError, WasmContextBuilder};
 
-    const RUNTIME_BYTES: &'static [u8] = include_bytes!("../build/runtime.cwasm");
+    const RUNTIME_BYTES: &'static [u8] = include_bytes!("../build/runtime.wasm");
 
     fn create_mock_wasm_context() -> Result<WasmContext, InterpreterError> {
         WasmContextBuilder::new(RUNTIME_BYTES)?
@@ -371,7 +369,7 @@ mod tests {
                 .deref()
                 .borrow_mut()
                 .deref_mut()
-                .allocate(TermType::Int(IntTerm { value: 3 })),
+                .allocate(Term::new(TermType::Int(IntTerm { value: 3 }), &interpreter)),
         );
 
         assert_eq!(interpreter_result.result(), expected_result);
@@ -423,7 +421,7 @@ mod tests {
                 .deref()
                 .borrow_mut()
                 .deref_mut()
-                .allocate(TermType::Int(IntTerm { value: 5 })),
+                .allocate(Term::new(TermType::Int(IntTerm { value: 5 }), &interpreter)),
         );
 
         assert_eq!(interpreter_result.result(), expected_result);
@@ -516,7 +514,7 @@ mod tests {
 
         assert_eq!(
             interpreter_result.result(),
-            ArenaRef::<Term, _>::new(Rc::clone(&interpreter), expected_result)
+            ArenaRef::<Term, _>::new(Rc::clone(&interpreter), expected_result),
         );
 
         let result_dependencies = interpreter_result.dependencies();

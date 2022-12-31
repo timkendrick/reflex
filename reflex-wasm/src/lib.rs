@@ -165,9 +165,6 @@ impl Term {
     pub(crate) fn as_value(&self) -> &TermType {
         &self.value
     }
-    pub(crate) fn get_hash(&self) -> TermHashState {
-        self.header.hash
-    }
 }
 impl TermSize for Term {
     fn size_of(&self) -> usize {
@@ -186,9 +183,6 @@ impl<A: ArenaAllocator> ArenaRef<Term, A> {
     pub(crate) fn get_value_pointer(&self) -> TermPointer {
         Term::get_value_pointer(self.pointer)
     }
-    pub(crate) fn read_hash(&self) -> TermHashState {
-        self.read_value(|term| term.get_hash())
-    }
 }
 
 impl<A: ArenaAllocator> TermHash for ArenaRef<Term, A> {
@@ -198,7 +192,7 @@ impl<A: ArenaAllocator> TermHash for ArenaRef<Term, A> {
 }
 
 #[derive(Clone, Copy, Debug)]
-#[repr(transparent)]
+#[repr(C)]
 pub struct TermHeader {
     hash: TermHashState,
 }
@@ -308,7 +302,8 @@ where
         let length = num_items as u32;
         let capacity_offset = list;
         let length_offset = list.offset(std::mem::size_of::<u32>() as u32);
-        let items_offset = list.offset(std::mem::size_of::<Array<T>>() as u32);
+        let items_offset =
+            list.offset((std::mem::size_of::<Self>() - std::mem::size_of::<[T; 0]>()) as u32);
         arena.write::<u32>(capacity_offset, capacity);
         arena.write::<u32>(length_offset, length);
         arena.extend(items_offset, num_items * std::mem::size_of::<T>());
@@ -328,7 +323,7 @@ where
         }
     }
     pub unsafe fn get_unchecked(&self, index: usize) -> &T {
-        let offset = &self.items[0] as *const T as usize;
+        let offset = &self.items as *const T as usize;
         let pointer = (offset + (index * 4)) as *const T;
         std::mem::transmute::<*const T, &T>(pointer)
     }

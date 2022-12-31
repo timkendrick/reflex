@@ -35,7 +35,7 @@ impl TermHash for SignalTerm {
 }
 
 impl<A: ArenaAllocator + Clone> ArenaRef<SignalTerm, A> {
-    fn conditions(&self) -> ArenaRef<TypedTerm<TreeTerm>, A> {
+    pub fn conditions(&self) -> ArenaRef<TypedTerm<TreeTerm>, A> {
         ArenaRef::<TypedTerm<TreeTerm>, _>::new(
             self.arena.clone(),
             self.read_value(|term| term.conditions),

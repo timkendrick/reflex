@@ -115,20 +115,28 @@ impl VecAllocator {
         Self(data)
     }
     pub(crate) fn get_ref<T>(&self, offset: TermPointer) -> &T {
-        let Self(data) = self;
         let offset = u32::from(offset) as usize;
-        if (offset % 4 != 0) || (offset + std::mem::size_of::<T>() > data.len()) {
-            panic!("Invalid allocator offset");
+        if (offset % 4 != 0) || (offset >= <Self as ArenaAllocator>::len(self)) {
+            panic!(
+                "Invalid allocator offset: {} (length: {})",
+                offset,
+                <Self as ArenaAllocator>::len(self)
+            );
         }
+        let Self(data) = self;
         let item = &data[offset / 4];
         unsafe { std::mem::transmute::<&u32, &T>(item) }
     }
     pub(crate) fn get_mut<T>(&mut self, offset: TermPointer) -> &mut T {
-        let Self(data) = self;
         let offset = u32::from(offset) as usize;
-        if (offset % 4 != 0) || (offset + std::mem::size_of::<T>() > data.len()) {
-            panic!("Invalid allocator offset");
+        if (offset % 4 != 0) || (offset >= <Self as ArenaAllocator>::len(self)) {
+            panic!(
+                "Invalid allocator offset: {} (length: {})",
+                offset,
+                <Self as ArenaAllocator>::len(self)
+            );
         }
+        let Self(data) = self;
         let item = &mut data[offset / 4];
         unsafe { std::mem::transmute::<&mut u32, &mut T>(item) }
     }
@@ -150,7 +158,7 @@ impl ArenaAllocator for VecAllocator {
         let offset = TermPointer(self.len() as u32);
         let static_size = pad_to_4_byte_offset(std::mem::size_of::<T>());
         let actual_size = pad_to_4_byte_offset(value.size_of());
-        self.extend(offset, static_size);
+        self.extend(offset, static_size.max(actual_size));
         self.write(offset, value);
         if actual_size < static_size {
             self.shrink(offset.offset(static_size as u32), static_size - actual_size);
@@ -160,7 +168,11 @@ impl ArenaAllocator for VecAllocator {
     fn extend(&mut self, offset: TermPointer, size: usize) {
         let offset = u32::from(offset);
         if offset != self.len() as u32 {
-            panic!("Invalid allocator offset");
+            panic!(
+                "Invalid allocator extend offset: {} (length: {})",
+                u32::from(offset),
+                self.len()
+            );
         } else {
             let Self(data) = self;
             data.extend(repeat(0).take(pad_to_4_byte_offset(size) / 4));
@@ -169,14 +181,18 @@ impl ArenaAllocator for VecAllocator {
     fn shrink(&mut self, offset: TermPointer, size: usize) {
         let offset = u32::from(offset);
         if offset != self.len() as u32 {
-            panic!("Invalid allocator offset");
+            panic!(
+                "Invalid allocator shrink offset: {} (length: {})",
+                u32::from(offset),
+                self.len()
+            );
         } else {
             let Self(data) = self;
             data.truncate((offset as u32 as usize - pad_to_4_byte_offset(size)) / 4);
         }
     }
     fn write<T: Sized>(&mut self, offset: TermPointer, value: T) {
-        *self.get_mut(offset) = value
+        *self.get_mut::<T>(offset) = value
     }
     fn read_value<T, V>(&self, offset: TermPointer, selector: impl FnOnce(&T) -> V) -> V {
         selector(self.get_ref::<T>(offset))
