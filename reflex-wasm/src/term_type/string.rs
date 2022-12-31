@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
-use std::{collections::HashSet, slice};
+use std::{collections::HashSet, ops::Deref, slice, str::from_utf8_unchecked};
 
 use reflex::{
     core::{
@@ -64,7 +64,8 @@ impl StringTerm {
         // First, we build a &[u8]...
         let slice = unsafe { slice::from_raw_parts(start_pointer, num_bytes) };
         // ... and then convert that slice into a string slice
-        std::str::from_utf8(slice).unwrap()
+        // FIXME: Prevent panic on invalid UTF-8 bytes
+        std::str::from_utf8(slice).expect("Invalid UTF-8 bytes")
     }
 }
 
@@ -109,19 +110,36 @@ impl<A: ArenaAllocator + Clone> ArenaRef<StringTerm, A> {
             u32::from(term.hash(TermHasher::default(), &self.arena).finish()) as HashId
         })
     }
-    pub fn as_str(&self) -> &str {
-        let _FIXME = "FIXME: implement StringValue::as_str()";
-        ""
+    fn offset(&self) -> TermPointer {
+        self.inner_pointer(|term| &term.data.items[0])
+    }
+    fn as_utf8<'a>(&'a self) -> Utf8Bytes<A::Slice<'a>> {
+        Utf8Bytes(self.arena.as_slice(self.offset(), self.len()))
+    }
+}
+
+pub struct Utf8Bytes<T: Deref<Target = [u8]>>(T);
+impl<T: Deref<Target = [u8]>> Deref for Utf8Bytes<T> {
+    type Target = str;
+    fn deref(&self) -> &Self::Target {
+        unsafe { from_utf8_unchecked(self.0.deref()) }
+    }
+}
+impl<T: Deref<Target = [u8]>> From<Utf8Bytes<T>> for String {
+    fn from(value: Utf8Bytes<T>) -> Self {
+        String::from(value.deref())
     }
 }
 
 impl<A: ArenaAllocator + Clone> StringValue for ArenaRef<StringTerm, A> {
+    type StringRef<'a> = Utf8Bytes<A::Slice<'a>>
+        where
+            Self: 'a;
     fn id(&self) -> HashId {
         self.string_hash()
     }
-    fn as_str(&self) -> &str {
-        let _FIXME = "FIXME: implement StringValue::as_str()";
-        ""
+    fn as_str<'a>(&'a self) -> Self::StringRef<'a> {
+        self.as_utf8()
     }
     fn from_static(_self: Option<Self>, _value: &'static str) -> Option<Self> {
         // FIXME: Implement StringValue::from_static() for WASM StringTerm type
@@ -130,12 +148,15 @@ impl<A: ArenaAllocator + Clone> StringValue for ArenaRef<StringTerm, A> {
 }
 
 impl<A: ArenaAllocator + Clone> StringValue for ArenaRef<TypedTerm<StringTerm>, A> {
+    type StringRef<'a> = Utf8Bytes<A::Slice<'a>>
+        where
+            Self: 'a;
     fn id(&self) -> HashId {
         <ArenaRef<StringTerm, A> as StringValue>::id(&self.as_inner())
     }
-    fn as_str(&self) -> &str {
-        let _FIXME = "FIXME: implement StringValue::as_str()";
-        ""
+    fn as_str<'a>(&'a self) -> Self::StringRef<'a> {
+        let inner = self.as_inner();
+        Utf8Bytes(self.arena.as_slice(inner.offset(), inner.len()))
     }
     fn from_static(_self: Option<Self>, _value: &'static str) -> Option<Self> {
         // FIXME: Implement StringValue::from_static() for WASM StringTerm type
@@ -187,10 +208,10 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<StringTerm, A> {
 
 impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<StringTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
-        Ok(JsonValue::String(String::from(self.as_str())))
+        Ok(JsonValue::String(String::from(self.as_utf8())))
     }
     fn patch(&self, target: &Self) -> Result<Option<JsonValue>, String> {
-        if self.as_str() == target.as_str() {
+        if self.as_str().deref() == target.as_str().deref() {
             Ok(None)
         } else {
             target.to_json().map(Some)

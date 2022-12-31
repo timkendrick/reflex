@@ -3,7 +3,7 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use std::{
-    cell::RefCell,
+    cell::{Ref, RefCell},
     iter::repeat,
     ops::{Deref, DerefMut},
     rc::Rc,
@@ -12,6 +12,9 @@ use std::{
 use crate::{hash::TermSize, TermPointer};
 
 pub trait ArenaAllocator: Sized {
+    type Slice<'a>: Deref<Target = [u8]>
+    where
+        Self: 'a;
     fn len(&self) -> usize;
     fn allocate<T: TermSize>(&mut self, value: T) -> TermPointer;
     fn extend(&mut self, offset: TermPointer, size: usize);
@@ -23,9 +26,15 @@ pub trait ArenaAllocator: Sized {
         offset: TermPointer,
         selector: impl FnOnce(&T) -> &V,
     ) -> TermPointer;
+    fn as_slice<'a>(&'a self, offset: TermPointer, length: usize) -> Self::Slice<'a>
+    where
+        Self::Slice<'a>: 'a;
 }
 
 impl<'heap, A: ArenaAllocator> ArenaAllocator for &'heap mut A {
+    type Slice<'a> = A::Slice<'a>
+    where
+        Self: 'a;
     fn len(&self) -> usize {
         self.deref().len()
     }
@@ -51,9 +60,18 @@ impl<'heap, A: ArenaAllocator> ArenaAllocator for &'heap mut A {
     ) -> TermPointer {
         self.deref().inner_pointer::<T, V>(offset, selector)
     }
+    fn as_slice<'a>(&'a self, offset: TermPointer, length: usize) -> Self::Slice<'a>
+    where
+        Self::Slice<'a>: 'a,
+    {
+        self.deref().as_slice(offset, length)
+    }
 }
 
-impl<A: ArenaAllocator> ArenaAllocator for Rc<RefCell<A>> {
+impl<A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static> ArenaAllocator for Rc<RefCell<A>> {
+    type Slice<'a> = Ref<'a, [u8]>
+        where
+            Self: 'a;
     fn len(&self) -> usize {
         self.deref().borrow().len()
     }
@@ -81,10 +99,17 @@ impl<A: ArenaAllocator> ArenaAllocator for Rc<RefCell<A>> {
             .borrow()
             .inner_pointer::<T, V>(offset, selector)
     }
+    fn as_slice<'a>(&'a self, offset: TermPointer, length: usize) -> Self::Slice<'a>
+    where
+        Self::Slice<'a>: 'a,
+    {
+        Ref::map(self.deref().borrow(), |arena| {
+            arena.as_slice(offset, length)
+        })
+    }
 }
 
 pub struct VecAllocator(Vec<u32>);
-
 impl VecAllocator {
     pub fn from_vec_u32(data: Vec<u32>) -> Self {
         Self(data)
@@ -92,8 +117,20 @@ impl VecAllocator {
     pub(crate) fn get_ref<T>(&self, offset: TermPointer) -> &T {
         let Self(data) = self;
         let offset = u32::from(offset) as usize;
+        if (offset % 4 != 0) || (offset + std::mem::size_of::<T>() > data.len()) {
+            panic!("Invalid allocator offset");
+        }
         let item = &data[offset / 4];
         unsafe { std::mem::transmute::<&u32, &T>(item) }
+    }
+    pub(crate) fn get_mut<T>(&mut self, offset: TermPointer) -> &mut T {
+        let Self(data) = self;
+        let offset = u32::from(offset) as usize;
+        if (offset % 4 != 0) || (offset + std::mem::size_of::<T>() > data.len()) {
+            panic!("Invalid allocator offset");
+        }
+        let item = &mut data[offset / 4];
+        unsafe { std::mem::transmute::<&mut u32, &mut T>(item) }
     }
 }
 impl Default for VecAllocator {
@@ -102,6 +139,9 @@ impl Default for VecAllocator {
     }
 }
 impl ArenaAllocator for VecAllocator {
+    type Slice<'a> = &'a [u8]
+        where
+            Self: 'a;
     fn len(&self) -> usize {
         let Self(data) = self;
         data.len() * 4
@@ -136,49 +176,45 @@ impl ArenaAllocator for VecAllocator {
         }
     }
     fn write<T: Sized>(&mut self, offset: TermPointer, value: T) {
-        let Self(data) = self;
-        let offset = u32::from(offset) as usize;
-        if (offset % 4 != 0) || (offset + std::mem::size_of::<T>() > data.len()) {
-            panic!("Invalid allocator offset");
-        }
-        let item = &mut data[offset / 4];
-        let item_ref = unsafe { std::mem::transmute::<&mut u32, &mut T>(item) };
-        *item_ref = value
+        *self.get_mut(offset) = value
     }
     fn read_value<T, V>(&self, offset: TermPointer, selector: impl FnOnce(&T) -> V) -> V {
-        selector(self.get_ref(offset))
+        selector(self.get_ref::<T>(offset))
     }
     fn inner_pointer<T, V>(
         &self,
         offset: TermPointer,
         selector: impl FnOnce(&T) -> &V,
     ) -> TermPointer {
-        let target = self.get_ref(offset);
+        let target = self.get_ref::<T>(offset);
         let outer_pointer = target as *const T as usize;
         let inner_pointer = selector(target) as *const V as usize;
         offset.offset((inner_pointer - outer_pointer) as u32)
     }
+    fn as_slice<'a>(&'a self, offset: TermPointer, length: usize) -> Self::Slice<'a>
+    where
+        Self::Slice<'a>: 'a,
+    {
+        let offset = u32::from(offset) as usize;
+        &self.as_bytes()[offset..(offset + length)]
+    }
 }
 impl VecAllocator {
-    pub fn as_slice(&self) -> &[u32] {
+    pub fn as_words(&self) -> &[u32] {
         let Self(data) = self;
         data
     }
     pub fn as_bytes(&self) -> &[u8] {
         let Self(data) = self;
-        unsafe { std::mem::transmute::<&[u32], &[u8]>(data) }
+        unsafe {
+            std::slice::from_raw_parts::<u8>(&data[0] as *const u32 as *const u8, data.len() * 4)
+        }
     }
 }
 impl Into<Vec<u32>> for VecAllocator {
     fn into(self) -> Vec<u32> {
         let Self(data) = self;
         data
-    }
-}
-impl Into<Vec<u8>> for VecAllocator {
-    fn into(self) -> Vec<u8> {
-        let Self(data) = self;
-        unsafe { std::mem::transmute::<Vec<u32>, Vec<u8>>(data) }
     }
 }
 

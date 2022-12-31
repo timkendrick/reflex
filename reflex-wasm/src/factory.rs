@@ -1,7 +1,10 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::{Ref, RefCell},
+    rc::Rc,
+};
 
 use reflex::{
     core::{
@@ -36,7 +39,10 @@ impl<A: ArenaAllocator> Clone for ArenaFactory<A> {
     }
 }
 
-impl<A: ArenaAllocator> ArenaAllocator for ArenaFactory<A> {
+impl<A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static> ArenaAllocator for ArenaFactory<A> {
+    type Slice<'a> = Ref<'a, [u8]>
+    where
+        Self: 'a;
     fn len(&self) -> usize {
         self.arena.len()
     }
@@ -62,9 +68,17 @@ impl<A: ArenaAllocator> ArenaAllocator for ArenaFactory<A> {
     ) -> TermPointer {
         self.arena.inner_pointer::<T, V>(offset, selector)
     }
+    fn as_slice<'a>(&'a self, offset: TermPointer, length: usize) -> Self::Slice<'a>
+    where
+        Self::Slice<'a>: 'a,
+    {
+        self.arena.as_slice(offset, length)
+    }
 }
 
-impl<A: ArenaAllocator + Clone> ExpressionFactory<ArenaRef<Term, Self>> for ArenaFactory<A> {
+impl<A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static + Clone>
+    ExpressionFactory<ArenaRef<Term, Self>> for ArenaFactory<A>
+{
     fn create_nil_term(&self) -> ArenaRef<Term, Self> {
         let term = Term::new(TermType::Nil(NilTerm), &*self.arena.borrow());
         let pointer = self.arena.borrow_mut().allocate(term);

@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
+// SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 use std::ops::Rem;
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
@@ -29,12 +30,10 @@ fn simple_addition_benchmark(c: &mut Criterion) {
         b.iter_batched(
             || {
                 let mut interpreter = initialize_interpreter_context(RUNTIME_BYTES).unwrap();
-                let (app, state) = generate_3_plus_5_wasm(&mut interpreter);
-                (interpreter, app, state)
+                let (input, state) = generate_3_plus_5_wasm(&mut interpreter);
+                (interpreter, input, state)
             },
-            |(mut i, a, s)| {
-                i.interpret(a, s).unwrap().bind(&i);
-            },
+            |(mut interpreter, input, state)| interpreter.interpret(input, state),
             criterion::BatchSize::PerIteration,
         );
     });
@@ -54,12 +53,10 @@ fn deep_addition_benchmark(c: &mut Criterion) {
             b.iter_batched(
                 || {
                     let mut interpreter = initialize_interpreter_context(RUNTIME_BYTES).unwrap();
-                    let (app, state) = generate_deep_add_wasm(&mut interpreter, *i);
-                    (interpreter, app, state)
+                    let (input, state) = generate_deep_add_wasm(&mut interpreter, *i);
+                    (interpreter, input, state)
                 },
-                |(mut int, a, s)| {
-                    int.interpret(a, s).unwrap().bind(&int);
-                },
+                |(mut interpreter, input, state)| interpreter.interpret(input, state),
                 criterion::BatchSize::PerIteration,
             );
         });
@@ -70,13 +67,11 @@ fn deep_addition_benchmark(c: &mut Criterion) {
                     let mut factory = SharedTermFactory::<reflex_stdlib::Stdlib>::default();
                     let mut allocator = DefaultAllocator::default();
                     let cache = SubstitutionCache::new();
-                    let (expression, state) =
-                        generate_deep_add_rust(&mut factory, &mut allocator, *i);
-
-                    (expression, state, factory, allocator, cache)
+                    let (input, state) = generate_deep_add_rust(&mut factory, &mut allocator, *i);
+                    (input, state, factory, allocator, cache)
                 },
-                |(e, s, factory, allocator, mut cache)| {
-                    evaluate(&e, &s, &factory, &allocator, &mut cache)
+                |(input, state, factory, allocator, mut cache)| {
+                    evaluate(&input, &state, &factory, &allocator, &mut cache)
                 },
                 criterion::BatchSize::PerIteration,
             )

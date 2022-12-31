@@ -176,6 +176,10 @@ impl From<WasmContext> for WasmInterpreter {
 }
 
 impl ArenaAllocator for WasmContext {
+    type Slice<'a> = &'a [u8]
+        where
+            Self: 'a;
+
     fn len(&self) -> usize {
         *self.get_ref::<u32>(0.into()) as usize
     }
@@ -239,6 +243,15 @@ impl ArenaAllocator for WasmContext {
         let inner_pointer = selector(target) as *const V as usize;
         offset.offset((inner_pointer - outer_pointer) as u32)
     }
+
+    fn as_slice<'a>(&'a self, offset: TermPointer, length: usize) -> Self::Slice<'a>
+    where
+        Self::Slice<'a>: 'a,
+    {
+        let data = self.data();
+        let offset = u32::from(offset) as usize;
+        &data[offset..(offset + length)]
+    }
 }
 
 impl WasmInterpreter {
@@ -265,6 +278,9 @@ impl WasmInterpreter {
 }
 
 impl ArenaAllocator for WasmInterpreter {
+    type Slice<'a> = &'a [u8]
+        where
+            Self: 'a;
     fn len(&self) -> usize {
         <WasmContext as ArenaAllocator>::len(&self.0)
     }
@@ -289,6 +305,12 @@ impl ArenaAllocator for WasmInterpreter {
         selector: impl FnOnce(&T) -> &V,
     ) -> TermPointer {
         <WasmContext as ArenaAllocator>::inner_pointer::<T, V>(&self.0, offset, selector)
+    }
+    fn as_slice<'a>(&'a self, offset: TermPointer, length: usize) -> Self::Slice<'a>
+    where
+        Self::Slice<'a>: 'a,
+    {
+        <WasmContext as ArenaAllocator>::as_slice(&self.0, offset, length)
     }
 }
 

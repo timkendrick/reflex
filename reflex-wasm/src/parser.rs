@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use std::{collections::HashMap, iter::once, path::Path};
+use std::{collections::HashMap, iter::once, ops::Deref, path::Path};
 
 use reflex::core::{
     as_integer, create_record, Builtin, Expression, ExpressionFactory, FloatTermType,
@@ -773,7 +773,7 @@ where
         PropName::Computed(key) => {
             let dynamic_key = parse_expression(&key.expr, scope, env, factory, allocator)?;
             if let Some(term) = factory.match_string_term(&dynamic_key) {
-                Ok(String::from(term.value().as_deref().as_str()))
+                Ok(String::from(term.value().as_deref().as_str().deref()))
             } else if let Some(_) = factory.match_nil_term(&dynamic_key) {
                 Ok(format!("{}", dynamic_key))
             } else if let Some(_) = factory.match_boolean_term(&dynamic_key) {
