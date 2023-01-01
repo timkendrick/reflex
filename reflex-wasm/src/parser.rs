@@ -1224,20 +1224,25 @@ where
         }
     }
 
-    let item_sets = elements.into_iter().map(|properties| match properties {
+    let mut item_sets = elements.into_iter().map(|properties| match properties {
         ArrayLiteralFields::Spread(value) => value,
         ArrayLiteralFields::Items(items) => factory.create_list_term(allocator.create_list(items)),
     });
-    Ok(if item_sets.len() >= 2 {
-        factory.create_application_term(
-            factory.create_builtin_term(Chain),
-            allocator.create_list(item_sets),
-        )
-    } else {
-        match item_sets.into_iter().next() {
-            Some(value) => value,
-            None => factory.create_list_term(allocator.create_empty_list()),
+    Ok(match (item_sets.next(), item_sets.next(), item_sets) {
+        (Some(first), Some(second), remaining) => {
+            let result = factory.create_application_term(
+                factory.create_builtin_term(Chain),
+                allocator.create_pair(first, second),
+            );
+            remaining.fold(result, |acc, next| {
+                factory.create_application_term(
+                    factory.create_builtin_term(Chain),
+                    allocator.create_pair(acc, next),
+                )
+            })
         }
+        (Some(value), _, _) => value,
+        (None, _, _) => factory.create_list_term(allocator.create_empty_list()),
     })
 }
 
