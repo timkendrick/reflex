@@ -19,7 +19,7 @@ use swc_ecma_ast::{
 use swc_ecma_parser::{lexer::Lexer, Parser, StringInput, Syntax};
 
 use crate::stdlib::{
-    Accessor, Add, And, Apply, Chain, CollectList, CollectString, Construct, Divide, Eq,
+    Accessor, Add, And, Apply, Chain, CollectList, CollectString, Construct, Divide, Eq, Flatten,
     FormatErrorMessage, Gt, Gte, Has, If, IfError, Lt, Lte, Merge, Multiply, Not, Or, Pow, Push,
     PushFront, Remainder, ResolveDeep, Subtract, Throw, ToString,
 };
@@ -53,36 +53,37 @@ pub type ParserError = String;
 blanket_trait!(
     pub trait WasmParserBuiltin:
         Builtin
-        + From<Throw>
-        + From<ResolveDeep>
-        + From<ToString>
-        + From<CollectString>
-        + From<Merge>
-        + From<Push>
-        + From<PushFront>
-        + From<Chain>
-        + From<Subtract>
+        + From<Accessor>
         + From<Add>
-        + From<Not>
-        + From<Multiply>
-        + From<Divide>
-        + From<Remainder>
-        + From<Pow>
-        + From<Lt>
-        + From<Gt>
-        + From<Lte>
-        + From<Gte>
-        + From<Eq>
         + From<And>
-        + From<Or>
+        + From<Apply>
+        + From<Chain>
+        + From<CollectList>
+        + From<CollectString>
+        + From<Construct>
+        + From<Divide>
+        + From<Eq>
+        + From<Flatten>
+        + From<FormatErrorMessage>
+        + From<Gt>
+        + From<Gte>
         + From<Has>
         + From<If>
         + From<IfError>
-        + From<FormatErrorMessage>
-        + From<CollectList>
-        + From<Accessor>
-        + From<Apply>
-        + From<Construct>
+        + From<Lt>
+        + From<Lte>
+        + From<Merge>
+        + From<Multiply>
+        + From<Not>
+        + From<Or>
+        + From<Pow>
+        + From<Push>
+        + From<PushFront>
+        + From<Remainder>
+        + From<ResolveDeep>
+        + From<Subtract>
+        + From<Throw>
+        + From<ToString>
     {
     }
 );
@@ -1228,22 +1229,36 @@ where
         ArrayLiteralFields::Spread(value) => value,
         ArrayLiteralFields::Items(items) => factory.create_list_term(allocator.create_list(items)),
     });
-    Ok(match (item_sets.next(), item_sets.next(), item_sets) {
-        (Some(first), Some(second), remaining) => {
-            let result = factory.create_application_term(
-                factory.create_builtin_term(Chain),
-                allocator.create_pair(first, second),
-            );
-            remaining.fold(result, |acc, next| {
-                factory.create_application_term(
+    Ok(
+        match (
+            item_sets.next(),
+            item_sets.next(),
+            item_sets.next(),
+            item_sets,
+        ) {
+            (Some(first), Some(second), Some(third), remaining) => factory.create_application_term(
+                factory.create_builtin_term(CollectList),
+                allocator.create_unit_list(factory.create_application_term(
+                    factory.create_builtin_term(Flatten),
+                    allocator.create_unit_list(factory.create_list_term(
+                        allocator.create_sized_list(
+                            3 + remaining.len(),
+                            [first, second, third].into_iter().chain(remaining),
+                        ),
+                    )),
+                )),
+            ),
+            (Some(first), Some(second), _, _) => factory.create_application_term(
+                factory.create_builtin_term(CollectList),
+                allocator.create_unit_list(factory.create_application_term(
                     factory.create_builtin_term(Chain),
-                    allocator.create_pair(acc, next),
-                )
-            })
-        }
-        (Some(value), _, _) => value,
-        (None, _, _) => factory.create_list_term(allocator.create_empty_list()),
-    })
+                    allocator.create_pair(first, second),
+                )),
+            ),
+            (Some(value), _, _, _) => value,
+            (None, _, _, _) => factory.create_list_term(allocator.create_empty_list()),
+        },
+    )
 }
 
 fn parse_unary_expression<T: Expression>(
