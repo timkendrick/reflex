@@ -27,6 +27,7 @@ pub mod effect;
 pub mod ends_with;
 pub mod eq;
 pub mod equal;
+pub mod flatten;
 pub mod floor;
 pub mod fold;
 pub mod get;
@@ -93,6 +94,7 @@ pub use effect::*;
 pub use ends_with::*;
 pub use eq::*;
 pub use equal::*;
+pub use flatten::*;
 pub use floor::*;
 pub use fold::*;
 pub use format_error_message::*;
@@ -168,6 +170,7 @@ pub enum Stdlib {
     EndsWith(EndsWith),
     Eq(Eq),
     Equal(Equal),
+    Flatten(Flatten),
     Floor(Floor),
     Fold(Fold),
     FormatErrorMessage(FormatErrorMessage),
@@ -268,6 +271,7 @@ impl From<Stdlib> for u32 {
             Stdlib::EndsWith(_) => StdlibDiscriminants::EndsWith as u32,
             Stdlib::Eq(_) => StdlibDiscriminants::Eq as u32,
             Stdlib::Equal(_) => StdlibDiscriminants::Equal as u32,
+            Stdlib::Flatten(_) => StdlibDiscriminants::Flatten as u32,
             Stdlib::Floor(_) => StdlibDiscriminants::Floor as u32,
             Stdlib::Fold(_) => StdlibDiscriminants::Fold as u32,
             Stdlib::FormatErrorMessage(_) => StdlibDiscriminants::FormatErrorMessage as u32,
@@ -372,6 +376,7 @@ impl TryFrom<u32> for Stdlib {
             value if value == StdlibDiscriminants::EndsWith as u32 => Ok(Self::EndsWith(EndsWith)),
             value if value == StdlibDiscriminants::Eq as u32 => Ok(Self::Eq(Eq)),
             value if value == StdlibDiscriminants::Equal as u32 => Ok(Self::Equal(Equal)),
+            value if value == StdlibDiscriminants::Flatten as u32 => Ok(Self::Flatten(Flatten)),
             value if value == StdlibDiscriminants::Floor as u32 => Ok(Self::Floor(Floor)),
             value if value == StdlibDiscriminants::Fold as u32 => Ok(Self::Fold(Fold)),
             value if value == StdlibDiscriminants::FormatErrorMessage as u32 => {
@@ -502,6 +507,7 @@ impl Stdlib {
             Self::EndsWith(inner) => inner.arity(),
             Self::Eq(inner) => inner.arity(),
             Self::Equal(inner) => inner.arity(),
+            Self::Flatten(inner) => inner.arity(),
             Self::Floor(inner) => inner.arity(),
             Self::Fold(inner) => inner.arity(),
             Self::FormatErrorMessage(inner) => inner.arity(),
@@ -589,6 +595,7 @@ impl Stdlib {
             Self::EndsWith(inner) => inner.uid(),
             Self::Eq(inner) => inner.uid(),
             Self::Equal(inner) => inner.uid(),
+            Self::Flatten(inner) => inner.uid(),
             Self::Floor(inner) => inner.uid(),
             Self::Fold(inner) => inner.uid(),
             Self::FormatErrorMessage(inner) => inner.uid(),
@@ -709,6 +716,7 @@ impl TryFrom<Uuid> for Stdlib {
             EndsWith::UUID => Ok(Self::EndsWith(EndsWith)),
             Eq::UUID => Ok(Self::Eq(Eq)),
             Equal::UUID => Ok(Self::Equal(Equal)),
+            Flatten::UUID => Ok(Self::Flatten(Flatten)),
             Floor::UUID => Ok(Self::Floor(Floor)),
             Fold::UUID => Ok(Self::Fold(Fold)),
             FormatErrorMessage::UUID => Ok(Self::FormatErrorMessage(FormatErrorMessage)),

@@ -21,6 +21,7 @@
   (@include "./ends_with.wat")
   (@include "./eq.wat")
   (@include "./equal.wat")
+  (@include "./flatten.wat")
   (@include "./floor.wat")
   (@include "./fold.wat")
   (@include "./get.wat")
@@ -108,6 +109,7 @@
       $Stdlib_EndsWith
       $Stdlib_Eq
       $Stdlib_Equal
+      $Stdlib_Flatten
       $Stdlib_Floor
       $Stdlib_Fold
       $Stdlib_FormatErrorMessage

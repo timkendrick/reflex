@@ -92,6 +92,7 @@ function createStdlib(runtime) {
     EndsWith: runtime.Stdlib_EndsWith.value,
     Eq: runtime.Stdlib_Eq.value,
     Equal: runtime.Stdlib_Equal.value,
+    Flatten: runtime.Stdlib_Flatten.value,
     Floor: runtime.Stdlib_Floor.value,
     Fold: runtime.Stdlib_Fold.value,
     FormatErrorMessage: runtime.Stdlib_FormatErrorMessage.value,
