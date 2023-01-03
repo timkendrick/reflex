@@ -16,12 +16,13 @@ use crate::{
     term_type::TypedTerm,
     ArenaRef, Array, IntoArenaRefIterator, TermPointer,
 };
+use reflex_macros::PointerIter;
 
 use super::{
     HashmapBucket, HashmapBucketKeysIterator, HashmapBucketsIterator, HashmapTerm, WasmExpression,
 };
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct HashsetTerm {
     pub entries: TermPointer,

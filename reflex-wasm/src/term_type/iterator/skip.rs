@@ -13,7 +13,9 @@ use crate::{
     ArenaRef, Term, TermPointer,
 };
 
-#[derive(Clone, Copy, Debug)]
+use reflex_macros::PointerIter;
+
+#[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct SkipIteratorTerm {
     pub source: TermPointer,

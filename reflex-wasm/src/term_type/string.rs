@@ -13,16 +13,16 @@ use reflex::{
 };
 use serde_json::Value as JsonValue;
 
+use super::WasmExpression;
 use crate::{
     allocator::ArenaAllocator,
     hash::{TermHash, TermHasher, TermSize},
     term_type::{TermType, TypedTerm},
     ArenaRef, Array, Term, TermPointer,
 };
+use reflex_macros::PointerIter;
 
-use super::WasmExpression;
-
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PointerIter)]
 #[repr(C)]
 pub struct StringTerm {
     pub length: u32,

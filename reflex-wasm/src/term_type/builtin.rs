@@ -16,8 +16,9 @@ use crate::{
     term_type::TypedTerm,
     ArenaRef,
 };
+use reflex_macros::PointerIter;
 
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct FunctionIndex(u32);
 impl TermSize for FunctionIndex {
@@ -51,7 +52,7 @@ impl std::fmt::Display for FunctionIndex {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct BuiltinTerm {
     pub uid: FunctionIndex,

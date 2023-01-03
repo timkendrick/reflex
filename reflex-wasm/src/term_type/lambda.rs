@@ -16,9 +16,11 @@ use crate::{
     ArenaRef, Term, TermPointer,
 };
 
+use reflex_macros::PointerIter;
+
 use super::WasmExpression;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct LambdaTerm {
     pub num_args: u32,

@@ -13,8 +13,9 @@ use crate::{
     term_type::TypedTerm,
     ArenaRef,
 };
+use reflex_macros::PointerIter;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct BooleanTerm {
     pub value: u32,

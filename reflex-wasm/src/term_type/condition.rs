@@ -11,14 +11,14 @@ use reflex::core::{
 use serde_json::Value as JsonValue;
 use strum_macros::EnumDiscriminants;
 
+use super::{ListTerm, StringTerm, WasmExpression};
 use crate::{
     allocator::ArenaAllocator,
     hash::{TermHash, TermHasher, TermSize},
     term_type::{TermTypeDiscriminants, TypedTerm},
-    ArenaRef, Term, TermPointer,
+    ArenaRef, PointerIter, Term, TermPointer,
 };
-
-use super::{ListTerm, StringTerm, WasmExpression};
+use reflex_macros::PointerIter;
 
 #[derive(Clone, Copy, Debug, EnumDiscriminants)]
 #[repr(C)]
@@ -31,6 +31,83 @@ pub enum ConditionTerm {
     InvalidFunctionArgs(InvalidFunctionArgsCondition),
     InvalidPointer(InvalidPointerCondition),
 }
+
+pub enum ConditionIterator {
+    Custom(CustomConditionPointerIter),
+    Pending(PendingConditionPointerIter),
+    Error(ErrorConditionPointerIter),
+    TypeError(TypeErrorConditionPointerIter),
+    InvalidFunctionTarget(InvalidFunctionTargetConditionPointerIter),
+    InvalidFunctionArgs(InvalidFunctionArgsConditionPointerIter),
+    InvalidPointer(InvalidPointerConditionPointerIter),
+}
+
+impl Iterator for ConditionIterator {
+    type Item = TermPointer;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            ConditionIterator::Custom(inner) => inner.next(),
+            ConditionIterator::Pending(inner) => inner.next(),
+            ConditionIterator::Error(inner) => inner.next(),
+            ConditionIterator::TypeError(inner) => inner.next(),
+            ConditionIterator::InvalidFunctionTarget(inner) => inner.next(),
+            ConditionIterator::InvalidFunctionArgs(inner) => inner.next(),
+            ConditionIterator::InvalidPointer(inner) => inner.next(),
+        }
+    }
+}
+
+impl<A: ArenaAllocator + Clone> PointerIter for ArenaRef<ConditionTerm, A> {
+    type Iter<'a> = ConditionIterator
+    where
+        Self: 'a;
+
+    fn iter(&self) -> Self::Iter<'_> {
+        match self.read_value(|term| term.condition_type()) {
+            ConditionTermDiscriminants::Custom => ConditionIterator::Custom(
+                self.as_typed_condition::<CustomCondition>()
+                    .as_inner()
+                    .iter(),
+            ),
+            ConditionTermDiscriminants::Error => ConditionIterator::Error(
+                self.as_typed_condition::<ErrorCondition>()
+                    .as_inner()
+                    .iter(),
+            ),
+            ConditionTermDiscriminants::Pending => ConditionIterator::Pending(
+                self.as_typed_condition::<PendingCondition>()
+                    .as_inner()
+                    .iter(),
+            ),
+            ConditionTermDiscriminants::TypeError => ConditionIterator::TypeError(
+                self.as_typed_condition::<TypeErrorCondition>()
+                    .as_inner()
+                    .iter(),
+            ),
+            ConditionTermDiscriminants::InvalidFunctionTarget => {
+                ConditionIterator::InvalidFunctionTarget(
+                    self.as_typed_condition::<InvalidFunctionTargetCondition>()
+                        .as_inner()
+                        .iter(),
+                )
+            }
+            ConditionTermDiscriminants::InvalidFunctionArgs => {
+                ConditionIterator::InvalidFunctionArgs(
+                    self.as_typed_condition::<InvalidFunctionArgsCondition>()
+                        .as_inner()
+                        .iter(),
+                )
+            }
+            ConditionTermDiscriminants::InvalidPointer => ConditionIterator::InvalidPointer(
+                self.as_typed_condition::<InvalidPointerCondition>()
+                    .as_inner()
+                    .iter(),
+            ),
+        }
+    }
+}
+
 impl ConditionTerm {
     fn condition_type(&self) -> ConditionTermDiscriminants {
         ConditionTermDiscriminants::from(self)
@@ -579,7 +656,7 @@ impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<ConditionTerm, A> {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct CustomCondition {
     pub effect_type: TermPointer,
@@ -703,7 +780,7 @@ impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<CustomCondition, 
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct PendingCondition;
 impl TermSize for PendingCondition {
@@ -766,7 +843,7 @@ impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<PendingCondition,
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct ErrorCondition {
     pub payload: TermPointer,
@@ -845,7 +922,7 @@ impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<ErrorCondition, A
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct TypeErrorCondition {
     pub expected: u32,
@@ -935,7 +1012,7 @@ impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<TypeErrorConditio
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct InvalidFunctionTargetCondition {
     pub target: TermPointer,
@@ -1014,7 +1091,7 @@ impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<InvalidFunctionTa
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct InvalidFunctionArgsCondition {
     pub target: TermPointer,
@@ -1109,7 +1186,7 @@ impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<InvalidFunctionAr
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct InvalidPointerCondition;
 impl TermSize for InvalidPointerCondition {

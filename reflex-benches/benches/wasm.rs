@@ -6,8 +6,12 @@ use std::ops::Rem;
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use reflex::cache::SubstitutionCache;
-use reflex::core::{evaluate, StateCache};
+use reflex::core::{evaluate, InstructionPointer, StateCache};
 
+use reflex_interpreter::compiler::{
+    hash_compiled_program, Compiler, CompilerMode, CompilerOptions,
+};
+use reflex_interpreter::{DefaultInterpreterCache, InterpreterOptions};
 use reflex_lang::allocator::DefaultAllocator;
 use reflex_lang::{self, CachedSharedTerm, ExpressionList, SharedTermFactory};
 use reflex_lisp::parse;
@@ -60,8 +64,7 @@ fn deep_addition_benchmark(c: &mut Criterion) {
                 criterion::BatchSize::PerIteration,
             );
         });
-
-        group.bench_with_input(BenchmarkId::new("Rust", i), &i, |b, i| {
+        group.bench_with_input(BenchmarkId::new("Rust interpreted", i), &i, |b, i| {
             b.iter_batched(
                 || {
                     let mut factory = SharedTermFactory::<reflex_stdlib::Stdlib>::default();
@@ -72,6 +75,55 @@ fn deep_addition_benchmark(c: &mut Criterion) {
                 },
                 |(input, state, factory, allocator, mut cache)| {
                     evaluate(&input, &state, &factory, &allocator, &mut cache)
+                },
+                criterion::BatchSize::PerIteration,
+            );
+        });
+
+        group.bench_with_input(BenchmarkId::new("Rust bytecode", i), &i, |b, i| {
+            b.iter_batched(
+                || {
+                    let mut factory = SharedTermFactory::<reflex_stdlib::Stdlib>::default();
+                    let mut allocator = DefaultAllocator::default();
+                    let (expression, state) =
+                        generate_deep_add_rust(&mut factory, &mut allocator, *i);
+
+                    let program = Compiler::new(
+                        CompilerOptions {
+                            debug: false,
+                            hoist_free_variables: false,
+                            inline_static_data: false,
+                            normalize: false,
+                        },
+                        None,
+                    )
+                    .compile(&expression, CompilerMode::Expression, &factory, &allocator)
+                    .unwrap();
+                    let state_id = 0;
+                    let options = InterpreterOptions {
+                        debug_instructions: false,
+                        debug_stack: false,
+                        call_stack_size: None,
+                        variable_stack_size: None,
+                    };
+
+                    (program, state, factory, allocator, state_id, options)
+                },
+                |(program, state, factory, allocator, state_id, options)| {
+                    let mut cache = DefaultInterpreterCache::default();
+                    let entry_point = InstructionPointer::default();
+                    let cache_key = hash_compiled_program(&program, &entry_point);
+                    reflex_interpreter::execute(
+                        cache_key,
+                        &program,
+                        entry_point,
+                        state_id,
+                        &state,
+                        &factory,
+                        &allocator,
+                        &options,
+                        &mut cache,
+                    )
                 },
                 criterion::BatchSize::PerIteration,
             )
@@ -192,7 +244,7 @@ fn generate_3_plus_5_rust(
 }
 
 fn initialize_interpreter_context(wasm: &[u8]) -> Result<WasmInterpreter, InterpreterError> {
-    WasmContextBuilder::new(wasm)?
+    WasmContextBuilder::from_cwasm(wasm)?
         .add_import("Math", "remainder", |a: f64, b: f64| a.rem(b))?
         .add_import("Math", "pow", |a: f64, b: f64| a.powf(b))?
         .add_import("Date", "parse", |_: u32, _: u32| 0u64)?

@@ -17,14 +17,17 @@ use crate::{
     ArenaRef, Term, TermPointer,
 };
 
+use reflex_macros::PointerIter;
+
 use super::{ListTerm, WasmExpression};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct ApplicationTerm {
     pub target: TermPointer,
     pub args: TermPointer,
 }
+
 impl TermSize for ApplicationTerm {
     fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()

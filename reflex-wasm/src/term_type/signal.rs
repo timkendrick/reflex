@@ -9,16 +9,16 @@ use reflex::core::{
 };
 use serde_json::Value as JsonValue;
 
+use super::{TreeTerm, WasmExpression};
 use crate::{
     allocator::ArenaAllocator,
     hash::{TermHash, TermHasher, TermSize},
     term_type::TypedTerm,
     ArenaRef, TermPointer,
 };
+use reflex_macros::PointerIter;
 
-use super::{TreeTerm, WasmExpression};
-
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct SignalTerm {
     pub conditions: TermPointer,

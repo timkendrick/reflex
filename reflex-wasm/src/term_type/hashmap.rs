@@ -15,7 +15,7 @@ use crate::{
     allocator::ArenaAllocator,
     hash::{TermHash, TermHashState, TermHasher, TermSize},
     term_type::{TermType, TypedTerm},
-    ArenaArrayIter, ArenaRef, Array, IntoArenaRefIterator, Term, TermPointer,
+    ArenaArrayIter, ArenaRef, Array, IntoArenaRefIterator, PointerIter, Term, TermPointer,
 };
 
 use super::WasmExpression;
@@ -26,6 +26,33 @@ pub struct HashmapTerm {
     pub num_entries: u32,
     pub buckets: Array<HashmapBucket>,
 }
+
+impl<A: ArenaAllocator> PointerIter for ArenaRef<HashmapTerm, A> {
+    type Iter<'a> = std::vec::IntoIter<TermPointer>
+    where
+        Self: 'a;
+
+    fn iter(&self) -> Self::Iter<'_> {
+        self.read_value(|term| {
+            let ptr = term as *const HashmapTerm as u32;
+
+            term.buckets
+                .items()
+                .filter(|bucket| !bucket.key.is_uninitialized())
+                .flat_map(|bucket| {
+                    [
+                        self.pointer
+                            .offset(&bucket.key as *const TermPointer as u32 - ptr),
+                        self.pointer
+                            .offset(&bucket.value as *const TermPointer as u32 - ptr),
+                    ]
+                })
+                .collect::<Vec<_>>()
+        })
+        .into_iter()
+    }
+}
+
 impl TermSize for HashmapTerm {
     fn size_of(&self) -> usize {
         std::mem::size_of::<Self>() - std::mem::size_of::<Array<HashmapBucket>>()

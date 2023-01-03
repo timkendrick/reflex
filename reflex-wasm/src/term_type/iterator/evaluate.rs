@@ -12,8 +12,9 @@ use crate::{
     hash::{TermHash, TermHasher, TermSize},
     ArenaRef, Term, TermPointer,
 };
+use reflex_macros::PointerIter;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct EvaluateIteratorTerm {
     pub source: TermPointer,

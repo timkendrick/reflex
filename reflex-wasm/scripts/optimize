@@ -1,0 +1,9 @@
+#/usr/bin/env bash
+set -e
+
+INPUT_PATH="$1"
+OUTPUT_PATH="$2"
+
+
+wasm-opt --enable-bulk-memory --enable-multivalue -O4 --debuginfo --output "$OUTPUT_PATH" "$INPUT_PATH"
+wasmtime compile -o "$OUTPUT_PATH.cwasm" "$OUTPUT_PATH"

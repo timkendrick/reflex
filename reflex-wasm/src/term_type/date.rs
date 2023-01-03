@@ -13,8 +13,9 @@ use crate::{
     hash::{TermHash, TermHasher, TermSize},
     ArenaRef,
 };
+use reflex_macros::PointerIter;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct DateTerm {
     pub timestamp: [u32; 2],

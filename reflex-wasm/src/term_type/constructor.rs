@@ -15,10 +15,11 @@ use crate::{
     term_type::TypedTerm,
     ArenaRef, TermPointer,
 };
+use reflex_macros::PointerIter;
 
 use super::{ListTerm, WasmExpression};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct ConstructorTerm {
     pub keys: TermPointer,

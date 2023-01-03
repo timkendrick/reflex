@@ -12,8 +12,9 @@ use crate::{
     hash::{TermHash, TermHasher, TermSize},
     ArenaRef,
 };
+use reflex_macros::PointerIter;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct RangeIteratorTerm {
     pub offset: i32,

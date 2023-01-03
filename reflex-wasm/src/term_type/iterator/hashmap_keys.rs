@@ -13,11 +13,14 @@ use crate::{
     ArenaRef, Term, TermPointer,
 };
 
-#[derive(Clone, Copy, Debug)]
+use reflex_macros::PointerIter;
+
+#[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct HashmapKeysIteratorTerm {
     pub source: TermPointer,
 }
+
 impl TermSize for HashmapKeysIteratorTerm {
     fn size_of(&self) -> usize {
         std::mem::size_of::<Self>()

@@ -17,10 +17,11 @@ use crate::{
     term_type::{TermTypeDiscriminants, TypedTerm},
     ArenaRef, IntoArenaRefIterator, Term, TermPointer,
 };
+use reflex_macros::PointerIter;
 
 use super::{ConditionTerm, WasmExpression};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct TreeTerm {
     pub left: TermPointer,

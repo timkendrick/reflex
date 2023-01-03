@@ -15,10 +15,11 @@ use crate::{
     term_type::TypedTerm,
     ArenaRef, TermPointer,
 };
+use reflex_macros::PointerIter;
 
 use super::{ConditionTerm, WasmExpression};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct EffectTerm {
     pub condition: TermPointer,

@@ -19,7 +19,7 @@ use crate::{
     hash::{TermHash, TermHasher, TermSize},
     term_type::TermType,
     term_type::TypedTerm,
-    ArenaArrayIter, ArenaRef, Array, IntoArenaRefIterator, Term, TermPointer,
+    ArenaArrayIter, ArenaRef, Array, IntoArenaRefIterator, PointerIter, Term, TermPointer,
 };
 
 use super::WasmExpression;
@@ -29,6 +29,25 @@ use super::WasmExpression;
 pub struct ListTerm {
     pub items: Array<TermPointer>,
 }
+
+impl<A: ArenaAllocator> PointerIter for ArenaRef<ListTerm, A> {
+    type Iter<'a> = std::vec::IntoIter<TermPointer>
+    where
+        Self: 'a;
+
+    fn iter(&self) -> Self::Iter<'_> {
+        self.read_value(|term| {
+            let ptr = term as *const ListTerm as u32;
+
+            term.items
+                .items()
+                .map(|item| self.pointer.offset(item as *const TermPointer as u32 - ptr))
+                .collect::<Vec<_>>()
+        })
+        .into_iter()
+    }
+}
+
 impl TermSize for ListTerm {
     fn size_of(&self) -> usize {
         std::mem::size_of::<Self>() - std::mem::size_of::<Array<TermPointer>>()

@@ -1,6 +1,7 @@
 ;; SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 ;; SPDX-License-Identifier: Apache-2.0
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
+;; SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 (module
   (@let $List
     (@struct $List
@@ -12,7 +13,6 @@
     (@export $List (@get $List)))
 
   (export "isList" (func $Term::List::is))
-  (export "getListLength" (func $Term::List::get::items::length))
 
   (@const $Term::List::EMPTY i32 (call $Term::TermType::List::new))
 
@@ -476,7 +476,7 @@
             ;; Instantiate the list term
             (call $Term::List::init (i32.add (local.get $length_self) (local.get $length_other))))))))
 
-  (func $Term::List::get_length (param $self i32) (result i32)
+  (func $Term::List::get_length (export "getListLength") (param $self i32) (result i32)
     (call $Term::List::get::items::length (local.get $self)))
 
   (func $Term::List::get_items (export "getListItems") (param $self i32) (result i32)
@@ -485,7 +485,7 @@
   (func $Term::List::get_item (export "getListItem") (param $self i32) (param $index i32) (result i32)
     (call $Term::List::get::items::value (local.get $self) (local.get $index)))
 
-  (func $Term::List::set_item (param $self i32) (param $index i32) (param $value i32)
+  (func $Term::List::set_item (export "setListItem") (param $self i32) (param $index i32) (param $value i32)
     (call $Term::List::set::items::value (local.get $self) (local.get $index) (local.get $value)))
 
   (func $Term::List::update_index (param $self i32) (param $index i32) (param $value i32) (result i32)

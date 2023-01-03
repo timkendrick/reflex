@@ -13,8 +13,9 @@ use crate::{
     term_type::TermType,
     ArenaRef, Array, Term, TermPointer,
 };
+use reflex_macros::PointerIter;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct CellTerm {
     pub fields: Array<u32>,

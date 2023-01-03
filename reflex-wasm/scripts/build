@@ -4,10 +4,9 @@ set -e
 # Clear screen
 echo "\x1b[2J\x1b[3J\x1b[H"
 
-TARGET=runtime
+RUNTIME=runtime
 OUTPUT_DIR=./build
 
-node ./scripts/compile.mjs "./src/$TARGET.wat" > "$OUTPUT_DIR/$TARGET.build.wat"
-wat2wasm "$OUTPUT_DIR/$TARGET.build.wat" --debug-names --output "$OUTPUT_DIR/$TARGET.debug.wasm"
-wasm-opt --enable-bulk-memory --enable-multivalue -O4 --debuginfo --output "$OUTPUT_DIR/$TARGET.wasm" "$OUTPUT_DIR/$TARGET.debug.wasm"
-echo "Compiled $OUTPUT_DIR/$TARGET.wasm"
+node ./scripts/compile.mjs "./src/$RUNTIME.wat" > "$OUTPUT_DIR/$RUNTIME.build.wat"
+wat2wasm "$OUTPUT_DIR/$RUNTIME.build.wat" --debug-names --output "$OUTPUT_DIR/$RUNTIME.wasm"
+echo "Compiled $OUTPUT_DIR/$RUNTIME.wasm"

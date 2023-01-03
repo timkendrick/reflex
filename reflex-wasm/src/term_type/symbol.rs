@@ -15,8 +15,9 @@ use crate::{
     term_type::TypedTerm,
     ArenaRef,
 };
+use reflex_macros::PointerIter;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct SymbolTerm {
     pub id: u32,

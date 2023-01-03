@@ -1,12 +1,17 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
-// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use wasmtime::{Engine, ExternType, Instance, IntoFunc, Linker, Memory, Module, Store};
+// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
+use std::path::Path;
+
+use wasmtime::{
+    Engine, ExternType, Instance, IntoFunc, Linker, Memory, Module, Store, WasmParams, WasmResults,
+};
 use wasmtime_wasi::{sync::WasiCtxBuilder, WasiCtx};
 
 use crate::{
     allocator::ArenaAllocator,
+    compiler::RuntimeBuiltin,
     hash::TermSize,
     pad_to_4_byte_offset,
     term_type::{TreeTerm, TypedTerm},
@@ -51,13 +56,39 @@ impl<A: ArenaAllocator + Clone> InterpreterEvaluationResult<A> {
 
 #[derive(Debug)]
 pub enum InterpreterError {
-    ImportNotFound((String, String, ExternType)),
+    ImportNotFound {
+        module: String,
+        name: String,
+        ty: ExternType,
+    },
     FunctionNotFound(anyhow::Error),
     WasiContexBuild(wasi_common::StringArrayError),
     Linking(anyhow::Error),
     ModuleCreation(anyhow::Error),
-    LinearMemoryNotFound,
+    LinearMemoryNotFound(String),
     FunctionEvaluation(anyhow::Error),
+}
+
+impl std::error::Error for InterpreterError {}
+
+impl std::fmt::Display for InterpreterError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            InterpreterError::ImportNotFound { module, name, ty } => write!(
+                f,
+                "Import {name} from module {module} of type {ty:?} not found"
+            ),
+            InterpreterError::WasiContexBuild(err) => std::fmt::Display::fmt(err, f),
+
+            InterpreterError::Linking(err)
+            | InterpreterError::FunctionEvaluation(err)
+            | InterpreterError::FunctionNotFound(err)
+            | InterpreterError::ModuleCreation(err) => std::fmt::Display::fmt(err, f),
+            InterpreterError::LinearMemoryNotFound(memory_name) => {
+                write!(f, "Could not find memory by name {memory_name}")
+            }
+        }
+    }
 }
 
 impl From<wasi_common::StringArrayError> for InterpreterError {
@@ -70,10 +101,47 @@ pub struct WasmContextBuilder {
     store: Store<WasiCtx>,
     linker: Linker<WasiCtx>,
     module: Module,
+    memory_name: String,
 }
 
 impl WasmContextBuilder {
-    pub fn new(program_bytes: &[u8]) -> Result<Self, InterpreterError> {
+    pub fn from_cwasm(
+        program_bytes: &[u8],
+        memory_name: impl Into<String>,
+    ) -> Result<Self, InterpreterError> {
+        Self::from_module_factory(
+            |engine| {
+                unsafe { Module::deserialize(engine, program_bytes) }
+                    .map_err(InterpreterError::ModuleCreation)
+            },
+            memory_name.into(),
+        )
+    }
+
+    pub fn from_wasm(
+        bytes: &[u8],
+        memory_name: impl Into<String>,
+    ) -> Result<Self, InterpreterError> {
+        Self::from_module_factory(
+            |e| Module::from_binary(e, bytes).map_err(InterpreterError::ModuleCreation),
+            memory_name.into(),
+        )
+    }
+
+    pub fn from_path(
+        path: impl AsRef<Path>,
+        memory_name: impl Into<String>,
+    ) -> Result<Self, InterpreterError> {
+        Self::from_module_factory(
+            |engine| Module::from_file(engine, path).map_err(InterpreterError::ModuleCreation),
+            memory_name.into(),
+        )
+    }
+
+    fn from_module_factory(
+        builder: impl FnOnce(&Engine) -> Result<Module, InterpreterError>,
+        memory_name: String,
+    ) -> Result<Self, InterpreterError> {
         let wasi = WasiCtxBuilder::new()
             .inherit_stdio()
             .inherit_args()?
@@ -82,16 +150,15 @@ impl WasmContextBuilder {
         let engine = Engine::default();
         let store = Store::new(&engine, wasi);
         let mut linker = Linker::new(store.engine());
+        let module = builder(store.engine())?;
 
         wasmtime_wasi::add_to_linker(&mut linker, |s| s).map_err(InterpreterError::Linking)?;
-
-        let module = Module::from_binary(store.engine(), program_bytes)
-            .map_err(InterpreterError::ModuleCreation)?;
 
         Ok(Self {
             store,
             linker,
             module,
+            memory_name,
         })
     }
 
@@ -124,8 +191,10 @@ impl WasmContextBuilder {
             .map_err(InterpreterError::FunctionEvaluation)?;
 
         let memory = instance
-            .get_memory(&mut self.store, "memory")
-            .ok_or(InterpreterError::LinearMemoryNotFound)?;
+            .get_memory(&mut self.store, &self.memory_name)
+            .ok_or(InterpreterError::LinearMemoryNotFound(
+                self.memory_name.clone(),
+            ))?;
 
         Ok(WasmContext {
             store: self.store,
@@ -162,6 +231,53 @@ impl WasmContext {
         let offset = u32::from(offset) as usize;
         let item = &mut data[offset];
         unsafe { std::mem::transmute::<&mut u8, &mut T>(item) }
+    }
+}
+
+impl WasmInterpreter {
+    pub fn interpret(
+        &mut self,
+        input: TermPointer,
+        state: TermPointer,
+    ) -> Result<UnboundEvaluationResult, InterpreterError> {
+        let (result, dependencies) = self.call::<(u32, u32), (u32, u32)>(
+            RuntimeBuiltin::Evaluate.name(),
+            (input.into(), state.into()),
+        )?;
+        Ok(UnboundEvaluationResult {
+            result_pointer: result.into(),
+            dependencies_pointer: TermPointer::from(dependencies).as_non_null(),
+        })
+    }
+
+    pub fn execute(
+        &mut self,
+        export_name: &str,
+        state: TermPointer,
+    ) -> Result<UnboundEvaluationResult, InterpreterError> {
+        let (result, dependencies) = self.call::<u32, (u32, u32)>(export_name, state.into())?;
+        Ok(UnboundEvaluationResult {
+            result_pointer: result.into(),
+            dependencies_pointer: TermPointer::from(dependencies).as_non_null(),
+        })
+    }
+
+    pub fn call<I: WasmParams, O: WasmResults>(
+        &mut self,
+        export_name: &str,
+        args: I,
+    ) -> Result<O, InterpreterError> {
+        let target = self
+            .0
+            .program
+            .get_typed_func::<I, O>(&mut self.0.store, export_name)
+            .map_err(InterpreterError::FunctionNotFound)?;
+
+        let output = target
+            .call(&mut self.0.store, args)
+            .map_err(InterpreterError::FunctionEvaluation)?;
+
+        Ok(output)
     }
 }
 
@@ -252,29 +368,6 @@ impl ArenaAllocator for WasmContext {
     }
 }
 
-impl WasmInterpreter {
-    pub fn interpret<'a>(
-        &'a mut self,
-        input: TermPointer,
-        state: TermPointer,
-    ) -> Result<UnboundEvaluationResult, InterpreterError> {
-        let eval_func = self
-            .0
-            .program
-            .get_typed_func::<(u32, u32), (u32, u32)>(&mut self.0.store, "evaluate")
-            .map_err(InterpreterError::FunctionNotFound)?;
-
-        let (result, dependencies) = eval_func
-            .call(&mut self.0.store, (input.into(), state.into()))
-            .map_err(InterpreterError::FunctionEvaluation)?;
-
-        Ok(UnboundEvaluationResult {
-            result_pointer: result.into(),
-            dependencies_pointer: TermPointer::from(dependencies).as_non_null(),
-        })
-    }
-}
-
 impl ArenaAllocator for WasmInterpreter {
     type Slice<'a> = &'a [u8]
         where
@@ -312,14 +405,46 @@ impl ArenaAllocator for WasmInterpreter {
     }
 }
 
+pub mod mocks {
+
+    use super::{InterpreterError, WasmContextBuilder};
+
+    pub fn add_import_stubs(
+        builder: WasmContextBuilder,
+    ) -> Result<WasmContextBuilder, InterpreterError> {
+        builder
+            .add_import("Date", "parse", |_: u32, _: u32| 0u64)?
+            .add_import("Date", "toISOString", |_: u64, _: u32| 0u32)?
+            .add_import("Number", "toString", |_: f64, _: u32| 0u32)?
+            .add_import("Math", "remainder", |_: f64, _: f64| 0f64)?
+            .add_import("Math", "acos", |_: f64| 0f64)?
+            .add_import("Math", "acosh", |_: f64| 0f64)?
+            .add_import("Math", "asin", |_: f64| 0f64)?
+            .add_import("Math", "asinh", |_: f64| 0f64)?
+            .add_import("Math", "atan", |_: f64| 0f64)?
+            .add_import("Math", "atan2", |_: f64, _: f64| 0f64)?
+            .add_import("Math", "atanh", |_: f64| 0f64)?
+            .add_import("Math", "cbrt", |_: f64| 0f64)?
+            .add_import("Math", "cos", |_: f64| 0f64)?
+            .add_import("Math", "cosh", |_: f64| 0f64)?
+            .add_import("Math", "exp", |_: f64| 0f64)?
+            .add_import("Math", "expm1", |_: f64| 0f64)?
+            .add_import("Math", "hypot", |_: f64, _: f64| 0f64)?
+            .add_import("Math", "log", |_: f64| 0f64)?
+            .add_import("Math", "log2", |_: f64| 0f64)?
+            .add_import("Math", "log10", |_: f64| 0f64)?
+            .add_import("Math", "log1p", |_: f64| 0f64)?
+            .add_import("Math", "pow", |_: f64, _: f64| 0f64)?
+            .add_import("Math", "sin", |_: f64| 0f64)?
+            .add_import("Math", "sinh", |_: f64| 0f64)?
+            .add_import("Math", "sqrt", |_: f64| 0f64)?
+            .add_import("Math", "tan", |_: f64, _: f64| 0f64)?
+            .add_import("Math", "tanh", |_: f64, _: f64| 0f64)
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use std::{
-        cell::RefCell,
-        ops::{Deref, DerefMut, Rem},
-        rc::Rc,
-    };
-
     use crate::{
         allocator::ArenaAllocator,
         interpreter::{WasmContext, WasmInterpreter},
@@ -330,19 +455,18 @@ mod tests {
         },
         ArenaRef, Term, TermPointer,
     };
+    use std::{
+        cell::RefCell,
+        ops::{Deref, DerefMut},
+        rc::Rc,
+    };
 
-    use super::{InterpreterError, WasmContextBuilder};
+    use super::{mocks::add_import_stubs, InterpreterError, WasmContextBuilder};
 
     const RUNTIME_BYTES: &'static [u8] = include_bytes!("../build/runtime.wasm");
 
     fn create_mock_wasm_context() -> Result<WasmContext, InterpreterError> {
-        WasmContextBuilder::new(RUNTIME_BYTES)?
-            .add_import("Math", "remainder", |a: f64, b: f64| a.rem(b))?
-            .add_import("Math", "pow", |a: f64, b: f64| a.powf(b))?
-            .add_import("Date", "parse", |_: u32, _: u32| 0u64)?
-            .add_import("Date", "toISOString", |_: u64, _: u32| 0u32)?
-            .add_import("Number", "toString", |_: f64, _: u32| 0u32)?
-            .build()
+        add_import_stubs(WasmContextBuilder::from_wasm(RUNTIME_BYTES, "memory")?)?.build()
     }
 
     #[test]

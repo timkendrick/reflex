@@ -17,3 +17,4 @@ proc-macro2 = "1.0"
 reflex-dispatcher = { path = "../reflex-dispatcher" }
 pin-project = "1.0"
 futures = "0.3"
+reflex-wasm = { path = "../reflex-wasm" }

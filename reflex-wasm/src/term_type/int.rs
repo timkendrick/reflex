@@ -14,7 +14,9 @@ use crate::{
     ArenaRef,
 };
 
-#[derive(Clone, Copy, Debug)]
+use reflex_macros::PointerIter;
+
+#[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct IntTerm {
     pub value: i32,

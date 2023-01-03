@@ -16,10 +16,11 @@ use crate::{
     term_type::TypedTerm,
     ArenaRef,
 };
+use reflex_macros::PointerIter;
 
 use super::WasmExpression;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct NilTerm;
 impl TermSize for NilTerm {
