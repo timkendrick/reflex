@@ -3,35 +3,38 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 use std::{
     cell::{Ref, RefCell},
+    iter::{empty, once},
+    ops::{Deref, DerefMut},
     rc::Rc,
 };
 
 use reflex::{
     core::{
-        Expression, ExpressionFactory, FloatValue, InstructionPointer, IntValue, StackOffset,
-        SymbolId,
+        Expression, ExpressionFactory, FloatValue, HeapAllocator, InstructionPointer, IntValue,
+        SignalType, StackOffset, SymbolId,
     },
     hash::HashId,
 };
+use reflex_utils::WithExactSizeIterator;
 
 use crate::{
     allocator::ArenaAllocator,
     hash::TermSize,
     term_type::{
         ApplicationTerm, BooleanTerm, BuiltinTerm, CompiledFunctionIndex, CompiledTerm,
-        ConditionTerm, ConstructorTerm, EffectTerm, ErrorCondition, FloatTerm, HashmapTerm,
-        HashsetTerm, IntTerm, LambdaTerm, LetTerm, ListTerm, NilTerm, PartialTerm, RecordTerm,
-        SignalTerm, StringTerm, SymbolTerm, TermType, TermTypeDiscriminants, TreeTerm, TypedTerm,
-        VariableTerm,
+        ConditionTerm, ConstructorTerm, CustomCondition, EffectTerm, ErrorCondition, FloatTerm,
+        HashmapTerm, HashsetTerm, IntTerm, LambdaTerm, LetTerm, ListTerm, NilTerm, PartialTerm,
+        PendingCondition, RecordTerm, SignalTerm, StringTerm, SymbolTerm, TermType,
+        TermTypeDiscriminants, TreeTerm, TypedTerm, VariableTerm,
     },
     ArenaRef, Term, TermPointer,
 };
 
 #[derive(Debug)]
-struct ArenaFactory<A: ArenaAllocator> {
+struct WasmTermFactory<A: ArenaAllocator> {
     arena: Rc<RefCell<A>>,
 }
-impl<A: ArenaAllocator> Clone for ArenaFactory<A> {
+impl<A: ArenaAllocator> Clone for WasmTermFactory<A> {
     fn clone(&self) -> Self {
         Self {
             arena: Rc::clone(&self.arena),
@@ -39,7 +42,9 @@ impl<A: ArenaAllocator> Clone for ArenaFactory<A> {
     }
 }
 
-impl<A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static> ArenaAllocator for ArenaFactory<A> {
+impl<A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static> ArenaAllocator
+    for WasmTermFactory<A>
+{
     type Slice<'a> = Ref<'a, [u8]>
     where
         Self: 'a;
@@ -77,7 +82,209 @@ impl<A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static> ArenaAllocator f
 }
 
 impl<A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static + Clone>
-    ExpressionFactory<ArenaRef<Term, Self>> for ArenaFactory<A>
+    HeapAllocator<ArenaRef<Term, Self>> for WasmTermFactory<A>
+{
+    fn create_list(
+        &self,
+        expressions: impl IntoIterator<
+            Item = ArenaRef<Term, Self>,
+            IntoIter = impl ExactSizeIterator<Item = ArenaRef<Term, Self>>,
+        >,
+    ) -> <ArenaRef<Term, Self> as Expression>::ExpressionList {
+        let pointer = ListTerm::allocate(
+            expressions.into_iter().map(|term| {
+                debug_assert!(std::ptr::eq(
+                    term.arena.arena.deref().borrow().deref(),
+                    self.arena.deref().borrow().deref()
+                ));
+                term.pointer
+            }),
+            self.arena.deref().borrow_mut().deref_mut(),
+        );
+        ArenaRef::<TypedTerm<ListTerm>, Self>::new(self.clone(), pointer)
+    }
+
+    fn create_unsized_list(
+        &self,
+        expressions: impl IntoIterator<Item = ArenaRef<Term, Self>>,
+    ) -> <ArenaRef<Term, Self> as Expression>::ExpressionList {
+        self.create_list(expressions.into_iter().collect::<Vec<_>>())
+    }
+
+    fn create_sized_list(
+        &self,
+        size: usize,
+        expressions: impl IntoIterator<Item = ArenaRef<Term, Self>>,
+    ) -> <ArenaRef<Term, Self> as Expression>::ExpressionList {
+        self.create_list(WithExactSizeIterator::new(size, expressions.into_iter()))
+    }
+
+    fn create_empty_list(&self) -> <ArenaRef<Term, Self> as Expression>::ExpressionList {
+        self.create_list(empty())
+    }
+
+    fn create_unit_list(
+        &self,
+        value: ArenaRef<Term, Self>,
+    ) -> <ArenaRef<Term, Self> as Expression>::ExpressionList {
+        self.create_list(once(value))
+    }
+
+    fn create_pair(
+        &self,
+        left: ArenaRef<Term, Self>,
+        right: ArenaRef<Term, Self>,
+    ) -> <ArenaRef<Term, Self> as Expression>::ExpressionList {
+        self.create_list([left, right])
+    }
+
+    fn create_triple(
+        &self,
+        first: ArenaRef<Term, Self>,
+        second: ArenaRef<Term, Self>,
+        third: ArenaRef<Term, Self>,
+    ) -> <ArenaRef<Term, Self> as Expression>::ExpressionList {
+        self.create_list([first, second, third])
+    }
+
+    fn clone_list<'a>(
+        &self,
+        expressions: <ArenaRef<Term, Self> as Expression>::ExpressionListRef<'a>,
+    ) -> <ArenaRef<Term, Self> as Expression>::ExpressionList {
+        expressions
+    }
+
+    fn create_signal_list(
+        &self,
+        signals: impl IntoIterator<Item = <ArenaRef<Term, Self> as Expression>::Signal>,
+    ) -> <ArenaRef<Term, Self> as Expression>::SignalList {
+        let mut children = signals.into_iter().map(|condition| {
+            debug_assert!(std::ptr::eq(
+                condition.arena.arena.deref().borrow().deref(),
+                self.arena.deref().borrow().deref()
+            ));
+            condition.pointer
+        });
+        let first = children.next();
+        let second = children.next();
+        let remaining = children;
+
+        let root_size = first.as_ref().into_iter().chain(second.as_ref()).count();
+        let root_term = Term::new(
+            TermType::Tree(TreeTerm {
+                left: second.unwrap_or(TermPointer::null()),
+                right: first.unwrap_or(TermPointer::null()),
+                length: root_size as u32,
+            }),
+            self.arena.deref().borrow().deref(),
+        );
+        let root_pointer = self
+            .arena
+            .deref()
+            .borrow_mut()
+            .deref_mut()
+            .allocate(root_term);
+
+        let pointer = remaining
+            .enumerate()
+            .fold(root_pointer, move |acc, (index, condition)| {
+                let length = root_size + index + 1;
+                let term = Term::new(
+                    TermType::Tree(TreeTerm {
+                        left: condition,
+                        right: acc,
+                        length: length as u32,
+                    }),
+                    self.arena.deref().borrow().deref(),
+                );
+                self.arena.deref().borrow_mut().deref_mut().allocate(term)
+            });
+        ArenaRef::<TypedTerm<TreeTerm>, Self>::new(self.clone(), pointer)
+    }
+
+    fn create_struct_prototype(
+        &self,
+        keys: <ArenaRef<Term, Self> as Expression>::ExpressionList,
+    ) -> <ArenaRef<Term, Self> as Expression>::StructPrototype {
+        keys
+    }
+
+    fn clone_struct_prototype<'a>(
+        &self,
+        prototype: <ArenaRef<Term, Self> as Expression>::StructPrototypeRef<'a>,
+    ) -> <ArenaRef<Term, Self> as Expression>::StructPrototype {
+        prototype
+    }
+
+    fn create_signal(
+        &self,
+        effect_type: SignalType,
+        payload: ArenaRef<Term, Self>,
+        token: ArenaRef<Term, Self>,
+    ) -> <ArenaRef<Term, Self> as Expression>::Signal {
+        debug_assert!(
+            std::ptr::eq(
+                payload.arena.arena.deref().borrow().deref(),
+                self.arena.deref().borrow().deref(),
+            ) && std::ptr::eq(
+                token.arena.arena.deref().borrow().deref(),
+                self.arena.deref().borrow().deref(),
+            )
+        );
+        let term = Term::new(
+            TermType::Condition(match effect_type {
+                SignalType::Error => ConditionTerm::Error(ErrorCondition {
+                    payload: payload.pointer,
+                }),
+                SignalType::Pending => ConditionTerm::Pending(PendingCondition),
+                SignalType::Custom(effect_type) => {
+                    let effect_type = self.create_string(effect_type);
+                    ConditionTerm::Custom(CustomCondition {
+                        effect_type: effect_type.pointer,
+                        payload: payload.pointer,
+                        token: token.pointer,
+                    })
+                }
+            }),
+            self.arena.deref().borrow().deref(),
+        );
+        let pointer = self.arena.deref().borrow_mut().deref_mut().allocate(term);
+        ArenaRef::<TypedTerm<ConditionTerm>, Self>::new(self.clone(), pointer)
+    }
+
+    fn clone_signal<'a>(
+        &self,
+        signal: <ArenaRef<Term, Self> as Expression>::SignalRef<'a>,
+    ) -> <ArenaRef<Term, Self> as Expression>::Signal {
+        signal
+    }
+
+    fn create_string(
+        &self,
+        value: impl Into<String>,
+    ) -> <ArenaRef<Term, Self> as Expression>::String {
+        let pointer =
+            StringTerm::allocate(&value.into(), self.arena.deref().borrow_mut().deref_mut());
+        ArenaRef::<TypedTerm<StringTerm>, Self>::new(self.clone(), pointer)
+    }
+
+    fn create_static_string(
+        &self,
+        value: &'static str,
+    ) -> <ArenaRef<Term, Self> as Expression>::String {
+        self.create_string(value)
+    }
+
+    fn clone_string<'a>(
+        &self,
+        value: <ArenaRef<Term, Self> as Expression>::StringRef<'a>,
+    ) -> <ArenaRef<Term, Self> as Expression>::String {
+        value
+    }
+}
+
+impl<A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static + Clone>
+    ExpressionFactory<ArenaRef<Term, Self>> for WasmTermFactory<A>
 {
     fn create_nil_term(&self) -> ArenaRef<Term, Self> {
         let term = Term::new(TermType::Nil(NilTerm), &*self.arena.borrow());
