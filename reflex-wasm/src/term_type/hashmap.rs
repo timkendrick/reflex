@@ -5,8 +5,8 @@
 use std::{collections::HashSet, iter::once, marker::PhantomData};
 
 use reflex::core::{
-    DependencyList, Expression, GraphNode, HashmapTermType, HashsetTermType, NodeId, RefType,
-    SerializeJson, StackOffset,
+    DependencyList, Eagerness, Expression, GraphNode, HashmapTermType, HashsetTermType, Internable,
+    NodeId, RefType, SerializeJson, StackOffset,
 };
 use reflex_utils::MapIntoIterator;
 use serde_json::Value as JsonValue;
@@ -15,7 +15,7 @@ use crate::{
     allocator::ArenaAllocator,
     hash::{TermHash, TermHashState, TermHasher, TermSize},
     term_type::{TermType, TypedTerm},
-    ArenaArrayIter, ArenaRef, Array, IntoArenaRefIterator, PointerIter, Term, TermPointer,
+    ArenaArrayIter, ArenaRef, Array, IntoArenaRefIter, PointerIter, Term, TermPointer,
 };
 
 use super::WasmExpression;
@@ -27,8 +27,10 @@ pub struct HashmapTerm {
     pub buckets: Array<HashmapBucket>,
 }
 
+pub type HashmapTermPointerIter = std::vec::IntoIter<TermPointer>;
+
 impl<A: ArenaAllocator> PointerIter for ArenaRef<HashmapTerm, A> {
-    type Iter<'a> = std::vec::IntoIter<TermPointer>
+    type Iter<'a> = HashmapTermPointerIter
     where
         Self: 'a;
 
@@ -158,23 +160,23 @@ impl<A: ArenaAllocator + Clone> ArenaRef<HashmapTerm, A> {
     }
     pub fn keys(
         &self,
-    ) -> IntoArenaRefIterator<
+    ) -> IntoArenaRefIter<
         '_,
         Term,
         A,
         HashmapBucketKeysIterator<ArenaArrayIter<'_, HashmapBucket, A>>,
     > {
-        IntoArenaRefIterator::new(&self.arena, HashmapBucketKeysIterator::new(self.entries()))
+        IntoArenaRefIter::new(&self.arena, HashmapBucketKeysIterator::new(self.entries()))
     }
     pub fn values(
         &self,
-    ) -> IntoArenaRefIterator<
+    ) -> IntoArenaRefIter<
         '_,
         Term,
         A,
         HashmapBucketValuesIterator<ArenaArrayIter<'_, HashmapBucket, A>>,
     > {
-        IntoArenaRefIterator::new(
+        IntoArenaRefIter::new(
             &self.arena,
             HashmapBucketValuesIterator::new(self.entries()),
         )
@@ -189,7 +191,7 @@ impl<A: ArenaAllocator + Clone> ArenaRef<TypedTerm<HashmapTerm>, A> {
 
 impl<A: ArenaAllocator + Clone> HashmapTermType<WasmExpression<A>> for ArenaRef<HashmapTerm, A> {
     type KeysIterator<'a> = MapIntoIterator<
-        IntoArenaRefIterator<'a, Term, A, HashmapBucketKeysIterator<ArenaArrayIter<'a, HashmapBucket, A>>>,
+        IntoArenaRefIter<'a, Term, A, HashmapBucketKeysIterator<ArenaArrayIter<'a, HashmapBucket, A>>>,
         ArenaRef<Term, A>,
         <WasmExpression<A> as Expression>::ExpressionRef<'a>
     >
@@ -197,7 +199,7 @@ impl<A: ArenaAllocator + Clone> HashmapTermType<WasmExpression<A>> for ArenaRef<
         WasmExpression<A>: 'a,
         Self: 'a;
     type ValuesIterator<'a> = MapIntoIterator<
-        IntoArenaRefIterator<'a, Term, A, HashmapBucketValuesIterator<ArenaArrayIter<'a, HashmapBucket, A>>>,
+        IntoArenaRefIter<'a, Term, A, HashmapBucketValuesIterator<ArenaArrayIter<'a, HashmapBucket, A>>>,
         ArenaRef<Term, A>,
         <WasmExpression<A> as Expression>::ExpressionRef<'a>
     >
@@ -274,7 +276,7 @@ impl<A: ArenaAllocator + Clone> HashmapTermType<WasmExpression<A>>
             inner.num_entries(),
             Array::<HashmapBucket>::iter(self.buckets_pointer(), &self.arena),
         );
-        MapIntoIterator::new(IntoArenaRefIterator::new(
+        MapIntoIterator::new(IntoArenaRefIter::new(
             &self.arena,
             HashmapBucketKeysIterator::new(buckets),
         ))
@@ -288,7 +290,7 @@ impl<A: ArenaAllocator + Clone> HashmapTermType<WasmExpression<A>>
             inner.num_entries(),
             Array::<HashmapBucket>::iter(self.buckets_pointer(), &self.arena),
         );
-        MapIntoIterator::new(IntoArenaRefIterator::new(
+        MapIntoIterator::new(IntoArenaRefIter::new(
             &self.arena,
             HashmapBucketValuesIterator::new(buckets),
         ))
@@ -323,7 +325,7 @@ impl<A: ArenaAllocator + Clone> HashsetTermType<WasmExpression<A>>
             inner.num_entries(),
             Array::<HashmapBucket>::iter(self.buckets_pointer(), &self.arena),
         );
-        MapIntoIterator::new(IntoArenaRefIterator::new(
+        MapIntoIterator::new(IntoArenaRefIter::new(
             &self.arena,
             // Hashset values are stored as keys, with values set to null
             HashmapBucketKeysIterator::new(buckets),
@@ -555,6 +557,12 @@ impl<TInner: Iterator<Item = HashmapBucket>> Iterator for HashmapBucketsIterator
 impl<TInner: Iterator<Item = HashmapBucket>> ExactSizeIterator for HashmapBucketsIterator<TInner> where
     TInner: ExactSizeIterator
 {
+}
+
+impl<A: ArenaAllocator + Clone> Internable for ArenaRef<HashmapTerm, A> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        self.capture_depth() == 0
+    }
 }
 
 #[cfg(test)]

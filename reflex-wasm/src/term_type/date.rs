@@ -5,7 +5,7 @@
 use std::collections::HashSet;
 
 use chrono::{DateTime, NaiveDateTime, SecondsFormat, Utc};
-use reflex::core::{DependencyList, GraphNode, SerializeJson, StackOffset};
+use reflex::core::{DependencyList, Eagerness, GraphNode, Internable, SerializeJson, StackOffset};
 use serde_json::Value as JsonValue;
 
 use crate::{
@@ -145,6 +145,12 @@ fn chunks_to_i64(value: [u32; 2]) -> i64 {
         high_bytes[2],
         high_bytes[3],
     ])
+}
+
+impl<A: ArenaAllocator + Clone> Internable for ArenaRef<DateTerm, A> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        self.capture_depth() == 0
+    }
 }
 
 #[cfg(test)]

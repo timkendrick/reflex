@@ -9,8 +9,8 @@ use std::{
 
 use reflex::{
     core::{
-        Arity, CompiledFunctionTermType, DependencyList, GraphNode, InstructionPointer,
-        SerializeJson, StackOffset,
+        Arity, CompiledFunctionTermType, DependencyList, Eagerness, GraphNode, InstructionPointer,
+        Internable, SerializeJson, StackOffset,
     },
     hash::HashId,
 };
@@ -174,6 +174,12 @@ impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<CompiledTerm, A> {
 impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<CompiledTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<compiled:{}>", self.target())
+    }
+}
+
+impl<A: ArenaAllocator + Clone> Internable for ArenaRef<CompiledTerm, A> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        self.capture_depth() == 0
     }
 }
 

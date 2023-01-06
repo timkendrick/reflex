@@ -21,7 +21,7 @@ pub mod term_type;
 
 pub struct ArenaRef<T, A: ArenaAllocator> {
     pub(crate) arena: A,
-    pointer: TermPointer,
+    pub pointer: TermPointer,
     _type: PhantomData<T>,
 }
 impl<T, A: ArenaAllocator> std::hash::Hash for ArenaRef<T, A>
@@ -88,14 +88,13 @@ impl<T, A: ArenaAllocator> RefType<Self> for ArenaRef<T, A> {
     }
 }
 
-pub struct IntoArenaRefIterator<'a, T: 'a, A: ArenaAllocator, TInner: Iterator<Item = TermPointer>>
-{
+pub struct IntoArenaRefIter<'a, T: 'a, A: ArenaAllocator, TInner: Iterator<Item = TermPointer>> {
     arena: &'a A,
     inner: TInner,
     _item: PhantomData<T>,
 }
 impl<'a, T: 'a, A: ArenaAllocator, TInner: Iterator<Item = TermPointer>>
-    IntoArenaRefIterator<'a, T, A, TInner>
+    IntoArenaRefIter<'a, T, A, TInner>
 {
     fn new(arena: &'a A, inner: TInner) -> Self {
         Self {
@@ -105,8 +104,25 @@ impl<'a, T: 'a, A: ArenaAllocator, TInner: Iterator<Item = TermPointer>>
         }
     }
 }
+
+pub trait IntoArenaRefIterator<'a, T: 'a, A: ArenaAllocator>
+where
+    Self: Iterator<Item = TermPointer> + Sized,
+{
+    fn as_arena_ref(self, arena: &'a A) -> IntoArenaRefIter<'a, T, A, Self>;
+}
+
+impl<'a, _Self, T: 'a, A: ArenaAllocator> IntoArenaRefIterator<'a, T, A> for _Self
+where
+    Self: Iterator<Item = TermPointer> + Sized,
+{
+    fn as_arena_ref(self, arena: &'a A) -> IntoArenaRefIter<'a, T, A, Self> {
+        IntoArenaRefIter::new(arena, self)
+    }
+}
+
 impl<'a, T: 'a, A: ArenaAllocator + Clone, TInner: Iterator<Item = TermPointer>> Iterator
-    for IntoArenaRefIterator<'a, T, A, TInner>
+    for IntoArenaRefIter<'a, T, A, TInner>
 {
     type Item = ArenaRef<T, A>;
     fn next(&mut self) -> Option<Self::Item> {
@@ -119,7 +135,7 @@ impl<'a, T: 'a, A: ArenaAllocator + Clone, TInner: Iterator<Item = TermPointer>>
     }
 }
 impl<'a, T: 'a, A: ArenaAllocator + Clone, TInner: Iterator<Item = TermPointer>> ExactSizeIterator
-    for IntoArenaRefIterator<'a, T, A, TInner>
+    for IntoArenaRefIter<'a, T, A, TInner>
 where
     TInner: ExactSizeIterator,
 {
@@ -494,6 +510,12 @@ mod tests {
     impl NodeId for TreeNode {
         fn id(&self) -> HashId {
             self.id
+        }
+    }
+
+    impl<A: ArenaAllocator + Clone> NodeId for ArenaRef<TreeNode, A> {
+        fn id(&self) -> HashId {
+            self.read_value(|term| term.id)
         }
     }
 

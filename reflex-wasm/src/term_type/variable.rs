@@ -4,7 +4,9 @@
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use std::{collections::HashSet, iter::once};
 
-use reflex::core::{DependencyList, GraphNode, SerializeJson, StackOffset, VariableTermType};
+use reflex::core::{
+    DependencyList, Eagerness, GraphNode, Internable, SerializeJson, StackOffset, VariableTermType,
+};
 use serde_json::Value as JsonValue;
 
 use crate::{
@@ -111,6 +113,12 @@ impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<VariableTerm, A> {
 impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<VariableTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<variable:{}>", self.stack_offset())
+    }
+}
+
+impl<A: ArenaAllocator + Clone> Internable for ArenaRef<VariableTerm, A> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        self.capture_depth() == 0
     }
 }
 

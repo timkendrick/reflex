@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
-use std::path::Path;
+use std::{marker::PhantomData, path::Path};
 
+use reflex::core::GraphNode;
 use wasmtime::{
     Engine, ExternType, Instance, IntoFunc, Linker, Memory, Module, Store, WasmParams, WasmResults,
 };
@@ -12,9 +13,9 @@ use wasmtime_wasi::{sync::WasiCtxBuilder, WasiCtx};
 use crate::{
     allocator::ArenaAllocator,
     compiler::RuntimeBuiltin,
-    hash::TermSize,
+    hash::{TermHash, TermSize},
     pad_to_4_byte_offset,
-    term_type::{TreeTerm, TypedTerm},
+    term_type::{TermType, TreeTerm, TypedTerm},
     ArenaRef, Term, TermPointer,
 };
 
@@ -235,6 +236,10 @@ impl WasmContext {
 }
 
 impl WasmInterpreter {
+    pub fn data(&self) -> &[u8] {
+        self.0.data()
+    }
+
     pub fn interpret(
         &mut self,
         input: TermPointer,

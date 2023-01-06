@@ -5,7 +5,8 @@
 use std::collections::HashSet;
 
 use reflex::core::{
-    DependencyList, Expression, GraphNode, NodeId, RecordTermType, SerializeJson, StackOffset,
+    DependencyList, Eagerness, Expression, GraphNode, Internable, NodeId, RecordTermType,
+    SerializeJson, StackOffset,
 };
 use reflex_utils::json::is_empty_json_object;
 use serde_json::{Map as JsonMap, Value as JsonValue};
@@ -248,6 +249,12 @@ impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<RecordTerm, A> {
                     .join(", "),
             ),
         }
+    }
+}
+
+impl<A: ArenaAllocator + Clone> Internable for ArenaRef<RecordTerm, A> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        self.capture_depth() == 0
     }
 }
 

@@ -7,7 +7,7 @@ use std::collections::{
 };
 
 use reflex::{
-    core::{Eagerness, NodeId},
+    core::{Eagerness, Internable, NodeId},
     hash::{HashId, IntMap},
 };
 use strum::IntoEnumIterator;
@@ -52,6 +52,7 @@ pub enum RuntimeBuiltin {
     AllocateList,
     SetListItem,
     InitList,
+    Initialize,
 }
 
 impl RuntimeBuiltin {
@@ -66,6 +67,7 @@ impl RuntimeBuiltin {
             RuntimeBuiltin::AllocateList => "allocateList",
             RuntimeBuiltin::SetListItem => "setListItem",
             RuntimeBuiltin::InitList => "initList",
+            RuntimeBuiltin::Initialize => "_initialize",
         }
     }
 }
@@ -189,24 +191,39 @@ impl<'a> IntoIterator for &'a CompiledExpression {
 }
 
 #[derive(Default)]
-pub struct CompilerState {}
+pub struct CompilerState<DestA: ArenaAllocator> {
+    pub serializer_state: SerializerState,
+    pub destination_arena: DestA,
+}
 
-pub trait CompileWasm {
+pub trait CompileWasm<DestA: ArenaAllocator> {
     fn compile(
         &self,
         eager: Eagerness,
-        state: &mut CompilerState,
+        state: &mut CompilerState<DestA>,
         options: &CompilerOptions,
     ) -> CompilerResult;
 }
 
-impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<Term, A> {
+impl<A: ArenaAllocator + Clone, DestA: ArenaAllocator> CompileWasm<DestA> for ArenaRef<Term, A> {
     fn compile(
         &self,
         eager: Eagerness,
-        state: &mut CompilerState,
+        state: &mut CompilerState<DestA>,
         options: &CompilerOptions,
     ) -> CompilerResult {
+        if self.should_intern(eager) {
+            let ptr = Serialize::serialize(
+                self,
+                &mut state.destination_arena,
+                &mut state.serializer_state,
+            );
+            return Ok(CompiledExpression::from_iter([CompiledInstruction::Wasm(
+                Instr::Const(Const {
+                    value: Value::I32(u32::from(ptr) as i32),
+                }),
+            )]));
+        }
         match self.read_value(|term| term.type_id()) {
             TermTypeDiscriminants::Application => self
                 .as_typed_term::<ApplicationTerm>()
@@ -374,11 +391,11 @@ impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<Term, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<IntTerm, A> {
+impl<A: ArenaAllocator + Clone, DestA: ArenaAllocator> CompileWasm<DestA> for ArenaRef<IntTerm, A> {
     fn compile(
         &self,
         _eager: Eagerness,
-        _state: &mut CompilerState,
+        _state: &mut CompilerState<DestA>,
         _options: &CompilerOptions,
     ) -> CompilerResult {
         let mut instructions = CompiledExpression::default();
@@ -395,11 +412,13 @@ impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<IntTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<FloatTerm, A> {
+impl<A: ArenaAllocator + Clone, DestA: ArenaAllocator> CompileWasm<DestA>
+    for ArenaRef<FloatTerm, A>
+{
     fn compile(
         &self,
         _eager: Eagerness,
-        _state: &mut CompilerState,
+        _state: &mut CompilerState<DestA>,
         _options: &CompilerOptions,
     ) -> CompilerResult {
         let mut instructions = CompiledExpression::default();
@@ -416,11 +435,13 @@ impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<FloatTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<BooleanTerm, A> {
+impl<A: ArenaAllocator + Clone, DestA: ArenaAllocator> CompileWasm<DestA>
+    for ArenaRef<BooleanTerm, A>
+{
     fn compile(
         &self,
         _eager: Eagerness,
-        _state: &mut CompilerState,
+        _state: &mut CompilerState<DestA>,
         _options: &CompilerOptions,
     ) -> CompilerResult {
         let mut instructions = CompiledExpression::default();
@@ -437,11 +458,13 @@ impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<BooleanTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<ListTerm, A> {
+impl<A: ArenaAllocator + Clone, DestA: ArenaAllocator> CompileWasm<DestA>
+    for ArenaRef<ListTerm, A>
+{
     fn compile(
         &self,
         eager: Eagerness,
-        state: &mut CompilerState,
+        state: &mut CompilerState<DestA>,
         options: &CompilerOptions,
     ) -> CompilerResult {
         let mut instructions = CompiledExpression::default();
@@ -486,11 +509,13 @@ impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<ListTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<BuiltinTerm, A> {
+impl<A: ArenaAllocator + Clone, DestA: ArenaAllocator> CompileWasm<DestA>
+    for ArenaRef<BuiltinTerm, A>
+{
     fn compile(
         &self,
         _eager: Eagerness,
-        _state: &mut CompilerState,
+        _state: &mut CompilerState<DestA>,
         _options: &CompilerOptions,
     ) -> CompilerResult {
         let mut instructions = CompiledExpression::default();
@@ -509,11 +534,13 @@ impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<BuiltinTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<ApplicationTerm, A> {
+impl<A: ArenaAllocator + Clone, DestA: ArenaAllocator> CompileWasm<DestA>
+    for ArenaRef<ApplicationTerm, A>
+{
     fn compile(
         &self,
         eager: Eagerness,
-        state: &mut CompilerState,
+        state: &mut CompilerState<DestA>,
         options: &CompilerOptions,
     ) -> CompilerResult {
         let mut instructions = CompiledExpression::default();
@@ -535,7 +562,7 @@ impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<ApplicationTerm, A> {
 
 #[derive(Default)]
 pub struct SerializerState {
-    allocated_terms: IntMap<HashId, TermPointer>,
+    pub allocated_terms: IntMap<HashId, TermPointer>,
 }
 
 pub trait Serialize {
@@ -546,10 +573,9 @@ pub trait Serialize {
     ) -> TermPointer;
 }
 
-impl<ASource: ArenaAllocator + Clone, T: NodeId + TermSize + Clone> Serialize
-    for ArenaRef<T, ASource>
+impl<ASource: ArenaAllocator + Clone, T: Clone + TermSize> Serialize for ArenaRef<T, ASource>
 where
-    ArenaRef<T, ASource>: PointerIter,
+    ArenaRef<T, ASource>: PointerIter + NodeId,
 {
     fn serialize<ADest: ArenaAllocator>(
         &self,
@@ -557,9 +583,7 @@ where
         state: &mut SerializerState,
     ) -> TermPointer {
         // Check if we have already serialized this before
-        let cached_result = state
-            .allocated_terms
-            .get(&self.read_value(|term| term.id()));
+        let cached_result = state.allocated_terms.get(&self.id());
         if let Some(existing) = cached_result {
             return *existing;
         }
@@ -590,58 +614,56 @@ where
             destination.write(new_term.offset(delta), child_pointer)
         }
 
-        state
-            .allocated_terms
-            .insert(self.read_value(|term| term.id()), new_term);
+        state.allocated_terms.insert(self.id(), new_term);
 
         new_term
     }
 }
 
-pub enum TermPointerIterator<'a, A: ArenaAllocator + Clone + 'a> {
-    Application(<ArenaRef<ApplicationTerm, A> as PointerIter>::Iter<'a>),
-    Boolean(<ArenaRef<BooleanTerm, A> as PointerIter>::Iter<'a>),
-    Builtin(<ArenaRef<BuiltinTerm, A> as PointerIter>::Iter<'a>),
-    Cell(<ArenaRef<CellTerm, A> as PointerIter>::Iter<'a>),
-    Compiled(<ArenaRef<CompiledTerm, A> as PointerIter>::Iter<'a>),
-    Condition(<ArenaRef<ConditionTerm, A> as PointerIter>::Iter<'a>),
-    Constructor(<ArenaRef<ConstructorTerm, A> as PointerIter>::Iter<'a>),
-    Date(<ArenaRef<DateTerm, A> as PointerIter>::Iter<'a>),
-    Effect(<ArenaRef<EffectTerm, A> as PointerIter>::Iter<'a>),
-    Float(<ArenaRef<FloatTerm, A> as PointerIter>::Iter<'a>),
-    Hashmap(<ArenaRef<HashmapTerm, A> as PointerIter>::Iter<'a>),
-    Hashset(<ArenaRef<HashsetTerm, A> as PointerIter>::Iter<'a>),
-    Int(<ArenaRef<IntTerm, A> as PointerIter>::Iter<'a>),
-    Lambda(<ArenaRef<LambdaTerm, A> as PointerIter>::Iter<'a>),
-    Let(<ArenaRef<LetTerm, A> as PointerIter>::Iter<'a>),
-    List(<ArenaRef<ListTerm, A> as PointerIter>::Iter<'a>),
-    Nil(<ArenaRef<NilTerm, A> as PointerIter>::Iter<'a>),
-    Partial(<ArenaRef<PartialTerm, A> as PointerIter>::Iter<'a>),
-    Pointer(<ArenaRef<PointerTerm, A> as PointerIter>::Iter<'a>),
-    Record(<ArenaRef<RecordTerm, A> as PointerIter>::Iter<'a>),
-    Signal(<ArenaRef<SignalTerm, A> as PointerIter>::Iter<'a>),
-    String(<ArenaRef<StringTerm, A> as PointerIter>::Iter<'a>),
-    Symbol(<ArenaRef<SymbolTerm, A> as PointerIter>::Iter<'a>),
-    Tree(<ArenaRef<TreeTerm, A> as PointerIter>::Iter<'a>),
-    Variable(<ArenaRef<VariableTerm, A> as PointerIter>::Iter<'a>),
-    EmptyIterator(<ArenaRef<EmptyIteratorTerm, A> as PointerIter>::Iter<'a>),
-    EvaluateIterator(<ArenaRef<EvaluateIteratorTerm, A> as PointerIter>::Iter<'a>),
-    FilterIterator(<ArenaRef<FilterIteratorTerm, A> as PointerIter>::Iter<'a>),
-    FlattenIterator(<ArenaRef<FlattenIteratorTerm, A> as PointerIter>::Iter<'a>),
-    HashmapKeysIterator(<ArenaRef<HashmapKeysIteratorTerm, A> as PointerIter>::Iter<'a>),
-    HashmapValuesIterator(<ArenaRef<HashmapValuesIteratorTerm, A> as PointerIter>::Iter<'a>),
-    IntegersIterator(<ArenaRef<IntegersIteratorTerm, A> as PointerIter>::Iter<'a>),
-    IntersperseIterator(<ArenaRef<IntersperseIteratorTerm, A> as PointerIter>::Iter<'a>),
-    MapIterator(<ArenaRef<MapIteratorTerm, A> as PointerIter>::Iter<'a>),
-    OnceIterator(<ArenaRef<OnceIteratorTerm, A> as PointerIter>::Iter<'a>),
-    RangeIterator(<ArenaRef<RangeIteratorTerm, A> as PointerIter>::Iter<'a>),
-    RepeatIterator(<ArenaRef<RepeatIteratorTerm, A> as PointerIter>::Iter<'a>),
-    SkipIterator(<ArenaRef<SkipIteratorTerm, A> as PointerIter>::Iter<'a>),
-    TakeIterator(<ArenaRef<TakeIteratorTerm, A> as PointerIter>::Iter<'a>),
-    ZipIterator(<ArenaRef<ZipIteratorTerm, A> as PointerIter>::Iter<'a>),
+pub enum TermPointerIterator {
+    Application(ApplicationTermPointerIter),
+    Boolean(BooleanTermPointerIter),
+    Builtin(BuiltinTermPointerIter),
+    Cell(CellTermPointerIter),
+    Compiled(CompiledTermPointerIter),
+    Condition(ConditionTermPointerIter),
+    Constructor(ConstructorTermPointerIter),
+    Date(DateTermPointerIter),
+    Effect(EffectTermPointerIter),
+    Float(FloatTermPointerIter),
+    Hashmap(HashmapTermPointerIter),
+    Hashset(HashsetTermPointerIter),
+    Int(IntTermPointerIter),
+    Lambda(LambdaTermPointerIter),
+    Let(LetTermPointerIter),
+    List(ListTermPointerIter),
+    Nil(NilTermPointerIter),
+    Partial(PartialTermPointerIter),
+    Pointer(PointerTermPointerIter),
+    Record(RecordTermPointerIter),
+    Signal(SignalTermPointerIter),
+    String(StringTermPointerIter),
+    Symbol(SymbolTermPointerIter),
+    Tree(TreeTermPointerIter),
+    Variable(VariableTermPointerIter),
+    EmptyIterator(EmptyIteratorTermPointerIter),
+    EvaluateIterator(EvaluateIteratorTermPointerIter),
+    FilterIterator(FilterIteratorTermPointerIter),
+    FlattenIterator(FlattenIteratorTermPointerIter),
+    HashmapKeysIterator(HashmapKeysIteratorTermPointerIter),
+    HashmapValuesIterator(HashmapValuesIteratorTermPointerIter),
+    IntegersIterator(IntegersIteratorTermPointerIter),
+    IntersperseIterator(IntersperseIteratorTermPointerIter),
+    MapIterator(MapIteratorTermPointerIter),
+    OnceIterator(OnceIteratorTermPointerIter),
+    RangeIterator(RangeIteratorTermPointerIter),
+    RepeatIterator(RepeatIteratorTermPointerIter),
+    SkipIterator(SkipIteratorTermPointerIter),
+    TakeIterator(TakeIteratorTermPointerIter),
+    ZipIterator(ZipIteratorTermPointerIter),
 }
 
-impl<'a, A: ArenaAllocator + Clone> Iterator for TermPointerIterator<'a, A> {
+impl Iterator for TermPointerIterator {
     type Item = TermPointer;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -691,7 +713,7 @@ impl<'a, A: ArenaAllocator + Clone> Iterator for TermPointerIterator<'a, A> {
 }
 
 impl<A: ArenaAllocator + Clone> PointerIter for ArenaRef<Term, A> {
-    type Iter<'a> = TermPointerIterator<'a, A>
+    type Iter<'a> = TermPointerIterator
     where
         Self: 'a;
 
@@ -831,6 +853,173 @@ impl<A: ArenaAllocator + Clone> PointerIter for ArenaRef<Term, A> {
             TermTypeDiscriminants::ZipIterator => TermPointerIterator::ZipIterator(
                 self.as_typed_term::<ZipIteratorTerm>().as_inner().iter(),
             ),
+        }
+    }
+}
+
+impl<A: ArenaAllocator + Clone> Internable for ArenaRef<Term, A> {
+    fn should_intern(&self, eager: Eagerness) -> bool {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Application => self
+                .as_typed_term::<ApplicationTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::Boolean => self
+                .as_typed_term::<BooleanTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::Builtin => self
+                .as_typed_term::<BuiltinTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::Cell => self
+                .as_typed_term::<CellTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::Compiled => self
+                .as_typed_term::<CompiledTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::Condition => self
+                .as_typed_term::<ConditionTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::Constructor => self
+                .as_typed_term::<ConstructorTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::Date => self
+                .as_typed_term::<DateTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::Effect => self
+                .as_typed_term::<EffectTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::Float => self
+                .as_typed_term::<FloatTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::Hashmap => self
+                .as_typed_term::<HashmapTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::Hashset => self
+                .as_typed_term::<HashsetTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::Int => self
+                .as_typed_term::<IntTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::Lambda => self
+                .as_typed_term::<LambdaTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::Let => self
+                .as_typed_term::<LetTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::List => self
+                .as_typed_term::<ListTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::Nil => self
+                .as_typed_term::<NilTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::Partial => self
+                .as_typed_term::<PartialTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::Pointer => self
+                .as_typed_term::<PointerTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::Record => self
+                .as_typed_term::<RecordTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::Signal => self
+                .as_typed_term::<SignalTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::String => self
+                .as_typed_term::<StringTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::Symbol => self
+                .as_typed_term::<SymbolTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::Tree => self
+                .as_typed_term::<TreeTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::Variable => self
+                .as_typed_term::<VariableTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::EmptyIterator => self
+                .as_typed_term::<EmptyIteratorTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::EvaluateIterator => self
+                .as_typed_term::<EvaluateIteratorTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::FilterIterator => self
+                .as_typed_term::<FilterIteratorTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::FlattenIterator => self
+                .as_typed_term::<FlattenIteratorTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::HashmapKeysIterator => self
+                .as_typed_term::<HashmapKeysIteratorTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::HashmapValuesIterator => self
+                .as_typed_term::<HashmapValuesIteratorTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::IntegersIterator => self
+                .as_typed_term::<IntegersIteratorTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::IntersperseIterator => self
+                .as_typed_term::<IntersperseIteratorTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::MapIterator => self
+                .as_typed_term::<MapIteratorTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::OnceIterator => self
+                .as_typed_term::<OnceIteratorTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::RangeIterator => self
+                .as_typed_term::<RangeIteratorTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::RepeatIterator => self
+                .as_typed_term::<RepeatIteratorTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::SkipIterator => self
+                .as_typed_term::<SkipIteratorTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::TakeIterator => self
+                .as_typed_term::<TakeIteratorTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::ZipIterator => self
+                .as_typed_term::<ZipIteratorTerm>()
+                .as_inner()
+                .should_intern(eager),
         }
     }
 }

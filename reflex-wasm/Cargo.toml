@@ -14,7 +14,6 @@ path = "src/bin/compile.rs"
 anyhow = "1.0"
 chrono = "0.4"
 clap = { version = "4.0.32", features = ["derive"] }
-phf = { version = "0.11.1", features = ["macros"] }
 reflex = { path = "../reflex" }
 reflex-macros = { path = "../reflex-macros" }
 reflex-utils = { path = "../reflex-utils" }

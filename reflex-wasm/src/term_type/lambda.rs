@@ -5,7 +5,8 @@
 use std::collections::HashSet;
 
 use reflex::core::{
-    Arity, DependencyList, Expression, GraphNode, LambdaTermType, SerializeJson, StackOffset,
+    Arity, DependencyList, Eagerness, Expression, GraphNode, Internable, LambdaTermType,
+    SerializeJson, StackOffset,
 };
 use serde_json::Value as JsonValue;
 
@@ -151,6 +152,12 @@ impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<LambdaTerm, A> {
 impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<LambdaTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<function:{}>", self.num_args())
+    }
+}
+
+impl<A: ArenaAllocator + Clone> Internable for ArenaRef<LambdaTerm, A> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        self.capture_depth() == 0 // FIXME: Should be compiled into raw WASM
     }
 }
 

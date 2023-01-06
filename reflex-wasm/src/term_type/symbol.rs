@@ -5,7 +5,8 @@
 use std::collections::HashSet;
 
 use reflex::core::{
-    DependencyList, GraphNode, SerializeJson, StackOffset, SymbolId, SymbolTermType,
+    DependencyList, Eagerness, GraphNode, Internable, SerializeJson, StackOffset, SymbolId,
+    SymbolTermType,
 };
 use serde_json::Value as JsonValue;
 
@@ -109,6 +110,12 @@ impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<SymbolTerm, A> {
 impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<SymbolTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<symbol:{:#016x}>", self.id())
+    }
+}
+
+impl<A: ArenaAllocator + Clone> Internable for ArenaRef<SymbolTerm, A> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        self.capture_depth() == 0
     }
 }
 

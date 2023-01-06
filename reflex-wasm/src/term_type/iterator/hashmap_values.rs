@@ -4,7 +4,7 @@
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use std::collections::HashSet;
 
-use reflex::core::{DependencyList, GraphNode, SerializeJson, StackOffset};
+use reflex::core::{DependencyList, Eagerness, GraphNode, Internable, SerializeJson, StackOffset};
 use serde_json::Value as JsonValue;
 
 use crate::{
@@ -102,6 +102,12 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<HashmapValuesIteratorTerm
     }
     fn is_complex(&self) -> bool {
         true
+    }
+}
+
+impl<A: ArenaAllocator + Clone> Internable for ArenaRef<HashmapValuesIteratorTerm, A> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        self.capture_depth() == 0
     }
 }
 

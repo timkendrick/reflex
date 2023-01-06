@@ -5,7 +5,8 @@
 use std::collections::HashSet;
 
 use reflex::core::{
-    DependencyList, FloatTermType, FloatValue, GraphNode, SerializeJson, StackOffset,
+    DependencyList, Eagerness, FloatTermType, FloatValue, GraphNode, Internable, SerializeJson,
+    StackOffset,
 };
 use serde_json::Value as JsonValue;
 
@@ -152,6 +153,12 @@ impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<FloatTerm, A> {
 impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<FloatTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.value())
+    }
+}
+
+impl<A: ArenaAllocator + Clone> Internable for ArenaRef<FloatTerm, A> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        self.capture_depth() == 0
     }
 }
 

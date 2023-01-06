@@ -5,11 +5,12 @@
 use std::{
     cell::{Ref, RefCell},
     iter::repeat,
+    marker::PhantomData,
     ops::{Deref, DerefMut},
     rc::Rc,
 };
 
-use crate::{hash::TermSize, TermPointer};
+use crate::{hash::TermSize, ArenaRef, TermPointer};
 
 pub trait ArenaAllocator: Sized {
     type Slice<'a>: Deref<Target = [u8]>
@@ -239,5 +240,60 @@ fn pad_to_4_byte_offset(value: usize) -> usize {
         0
     } else {
         (((value - 1) / 4) + 1) * 4
+    }
+}
+
+pub struct ArenaIterator<A: ArenaAllocator, T: TermSize> {
+    arena: A,
+    current_head: TermPointer,
+    _value: PhantomData<T>,
+}
+
+impl<A: ArenaAllocator, T: TermSize> ArenaIterator<A, T> {
+    pub fn new(arena: A, start_point: TermPointer) -> Self {
+        ArenaIterator {
+            arena: arena,
+            current_head: start_point,
+            _value: Default::default(),
+        }
+    }
+}
+
+impl<A: ArenaAllocator + Clone, T: TermSize> Iterator for ArenaIterator<A, T>
+where
+    T: std::fmt::Debug,
+    for<'a> A::Slice<'a>: Deref<Target = [u8]>,
+{
+    type Item = TermPointer;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        println!("{} vs {}", self.arena.len(), u32::from(self.current_head));
+        if self.arena.len() == u32::from(self.current_head) as usize {
+            None
+        } else {
+            let current_head = self.current_head;
+
+            let term_size = self
+                .arena
+                .read_value::<T, _>(current_head, |value| value.size_of());
+
+            let previous_head = current_head;
+
+            // FIXME: Internal Wasm allocator needs to shrink the data afterwards
+            let term_size = (term_size).max(24);
+
+            self.current_head = previous_head.offset(term_size as u32);
+
+            self.arena
+                .read_value::<T, _>(current_head, |value| println!("{:?}", value));
+
+            println!(
+                "({} bytes: {:?})",
+                term_size,
+                self.arena.as_slice(previous_head, term_size).deref()
+            );
+
+            Some(previous_head)
+        }
     }
 }

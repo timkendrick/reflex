@@ -5,8 +5,8 @@
 use std::{collections::HashSet, marker::PhantomData};
 
 use reflex::core::{
-    ConditionType, DependencyList, Expression, GraphNode, SerializeJson, SignalType, StackOffset,
-    StateToken, StringValue,
+    ConditionType, DependencyList, Eagerness, Expression, GraphNode, Internable, SerializeJson,
+    SignalType, StackOffset, StateToken, StringValue,
 };
 use serde_json::Value as JsonValue;
 use strum_macros::EnumDiscriminants;
@@ -32,7 +32,7 @@ pub enum ConditionTerm {
     InvalidPointer(InvalidPointerCondition),
 }
 
-pub enum ConditionIterator {
+pub enum ConditionTermPointerIter {
     Custom(CustomConditionPointerIter),
     Pending(PendingConditionPointerIter),
     Error(ErrorConditionPointerIter),
@@ -42,64 +42,64 @@ pub enum ConditionIterator {
     InvalidPointer(InvalidPointerConditionPointerIter),
 }
 
-impl Iterator for ConditionIterator {
+impl Iterator for ConditionTermPointerIter {
     type Item = TermPointer;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            ConditionIterator::Custom(inner) => inner.next(),
-            ConditionIterator::Pending(inner) => inner.next(),
-            ConditionIterator::Error(inner) => inner.next(),
-            ConditionIterator::TypeError(inner) => inner.next(),
-            ConditionIterator::InvalidFunctionTarget(inner) => inner.next(),
-            ConditionIterator::InvalidFunctionArgs(inner) => inner.next(),
-            ConditionIterator::InvalidPointer(inner) => inner.next(),
+            Self::Custom(inner) => inner.next(),
+            Self::Pending(inner) => inner.next(),
+            Self::Error(inner) => inner.next(),
+            Self::TypeError(inner) => inner.next(),
+            Self::InvalidFunctionTarget(inner) => inner.next(),
+            Self::InvalidFunctionArgs(inner) => inner.next(),
+            Self::InvalidPointer(inner) => inner.next(),
         }
     }
 }
 
 impl<A: ArenaAllocator + Clone> PointerIter for ArenaRef<ConditionTerm, A> {
-    type Iter<'a> = ConditionIterator
+    type Iter<'a> = ConditionTermPointerIter
     where
         Self: 'a;
 
     fn iter(&self) -> Self::Iter<'_> {
         match self.read_value(|term| term.condition_type()) {
-            ConditionTermDiscriminants::Custom => ConditionIterator::Custom(
+            ConditionTermDiscriminants::Custom => ConditionTermPointerIter::Custom(
                 self.as_typed_condition::<CustomCondition>()
                     .as_inner()
                     .iter(),
             ),
-            ConditionTermDiscriminants::Error => ConditionIterator::Error(
+            ConditionTermDiscriminants::Error => ConditionTermPointerIter::Error(
                 self.as_typed_condition::<ErrorCondition>()
                     .as_inner()
                     .iter(),
             ),
-            ConditionTermDiscriminants::Pending => ConditionIterator::Pending(
+            ConditionTermDiscriminants::Pending => ConditionTermPointerIter::Pending(
                 self.as_typed_condition::<PendingCondition>()
                     .as_inner()
                     .iter(),
             ),
-            ConditionTermDiscriminants::TypeError => ConditionIterator::TypeError(
+            ConditionTermDiscriminants::TypeError => ConditionTermPointerIter::TypeError(
                 self.as_typed_condition::<TypeErrorCondition>()
                     .as_inner()
                     .iter(),
             ),
             ConditionTermDiscriminants::InvalidFunctionTarget => {
-                ConditionIterator::InvalidFunctionTarget(
+                ConditionTermPointerIter::InvalidFunctionTarget(
                     self.as_typed_condition::<InvalidFunctionTargetCondition>()
                         .as_inner()
                         .iter(),
                 )
             }
             ConditionTermDiscriminants::InvalidFunctionArgs => {
-                ConditionIterator::InvalidFunctionArgs(
+                ConditionTermPointerIter::InvalidFunctionArgs(
                     self.as_typed_condition::<InvalidFunctionArgsCondition>()
                         .as_inner()
                         .iter(),
                 )
             }
-            ConditionTermDiscriminants::InvalidPointer => ConditionIterator::InvalidPointer(
+            ConditionTermDiscriminants::InvalidPointer => ConditionTermPointerIter::InvalidPointer(
                 self.as_typed_condition::<InvalidPointerCondition>()
                     .as_inner()
                     .iter(),
@@ -1246,6 +1246,12 @@ impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<InvalidPointerCondi
 impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<InvalidPointerCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "InvalidPointer")
+    }
+}
+
+impl<A: ArenaAllocator + Clone> Internable for ArenaRef<ConditionTerm, A> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        self.capture_depth() == 0
     }
 }
 

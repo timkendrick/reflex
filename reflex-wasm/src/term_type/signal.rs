@@ -5,7 +5,8 @@
 use std::collections::HashSet;
 
 use reflex::core::{
-    DependencyList, Expression, GraphNode, SerializeJson, SignalTermType, StackOffset,
+    DependencyList, Eagerness, Expression, GraphNode, Internable, SerializeJson, SignalTermType,
+    StackOffset,
 };
 use serde_json::Value as JsonValue;
 
@@ -132,6 +133,12 @@ impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<SignalTerm, A> {
                 .collect::<Vec<_>>()
                 .join(",")
         )
+    }
+}
+
+impl<A: ArenaAllocator + Clone> Internable for ArenaRef<SignalTerm, A> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        self.capture_depth() == 0
     }
 }
 

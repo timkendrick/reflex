@@ -5,7 +5,10 @@
 use std::collections::HashSet;
 
 use reflex::{
-    core::{ConditionListType, DependencyList, Expression, GraphNode, SerializeJson, StackOffset},
+    core::{
+        ConditionListType, DependencyList, Eagerness, Expression, GraphNode, Internable,
+        SerializeJson, StackOffset,
+    },
     hash::HashId,
 };
 use reflex_utils::{MapIntoIterator, WithExactSizeIterator};
@@ -15,7 +18,7 @@ use crate::{
     allocator::ArenaAllocator,
     hash::{TermHash, TermHasher, TermSize},
     term_type::{TermTypeDiscriminants, TypedTerm},
-    ArenaRef, IntoArenaRefIterator, Term, TermPointer,
+    ArenaRef, IntoArenaRefIter, Term, TermPointer,
 };
 use reflex_macros::PointerIter;
 
@@ -69,8 +72,8 @@ impl<A: ArenaAllocator + Clone> ArenaRef<TreeTerm, A> {
     pub fn iter(&self) -> TreeIterator<'_, A> {
         TreeIterator::new(&self.arena, self.pointer)
     }
-    pub fn nodes(&self) -> IntoArenaRefIterator<'_, Term, A, TreeIterator<'_, A>> {
-        IntoArenaRefIterator::new(&self.arena, self.iter())
+    pub fn nodes(&self) -> IntoArenaRefIter<'_, Term, A, TreeIterator<'_, A>> {
+        IntoArenaRefIter::new(&self.arena, self.iter())
     }
     pub fn len(&self) -> u32 {
         self.read_value(|term| term.length)
@@ -456,6 +459,12 @@ impl<'a, A: ArenaAllocator + Clone> Iterator for TreeIterator<'a, A> {
 enum TreeIteratorCursor {
     Left,
     Right,
+}
+
+impl<A: ArenaAllocator + Clone> Internable for ArenaRef<TreeTerm, A> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        self.capture_depth() == 0
+    }
 }
 
 #[cfg(test)]

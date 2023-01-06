@@ -6,8 +6,8 @@ use std::{collections::HashSet, iter::once};
 
 use reflex::{
     core::{
-        DependencyList, Expression, ExpressionListType, GraphNode, ListTermType, SerializeJson,
-        StackOffset, StructPrototypeType,
+        DependencyList, Eagerness, Expression, ExpressionListType, GraphNode, Internable,
+        ListTermType, SerializeJson, StackOffset, StructPrototypeType,
     },
     hash::HashId,
 };
@@ -19,7 +19,7 @@ use crate::{
     hash::{TermHash, TermHasher, TermSize},
     term_type::TermType,
     term_type::TypedTerm,
-    ArenaArrayIter, ArenaRef, Array, IntoArenaRefIterator, PointerIter, Term, TermPointer,
+    ArenaArrayIter, ArenaRef, Array, IntoArenaRefIter, PointerIter, Term, TermPointer,
 };
 
 use super::WasmExpression;
@@ -30,8 +30,10 @@ pub struct ListTerm {
     pub items: Array<TermPointer>,
 }
 
+pub type ListTermPointerIter = std::vec::IntoIter<TermPointer>;
+
 impl<A: ArenaAllocator> PointerIter for ArenaRef<ListTerm, A> {
-    type Iter<'a> = std::vec::IntoIter<TermPointer>
+    type Iter<'a> = ListTermPointerIter
     where
         Self: 'a;
 
@@ -93,8 +95,8 @@ impl<A: ArenaAllocator + Clone> ArenaRef<ListTerm, A> {
     pub fn items(&self) -> ArenaRef<Array<TermPointer>, A> {
         ArenaRef::<Array<TermPointer>, _>::new(self.arena.clone(), self.items_pointer())
     }
-    pub fn iter(&self) -> IntoArenaRefIterator<'_, Term, A, ArenaArrayIter<'_, TermPointer, A>> {
-        IntoArenaRefIterator::new(
+    pub fn iter(&self) -> IntoArenaRefIter<'_, Term, A, ArenaArrayIter<'_, TermPointer, A>> {
+        IntoArenaRefIter::new(
             &self.arena,
             Array::<TermPointer>::iter(self.items_pointer(), &self.arena),
         )
@@ -177,7 +179,7 @@ impl<A: ArenaAllocator + Clone> ExpressionListType<WasmExpression<A>>
     for ArenaRef<TypedTerm<ListTerm>, A>
 {
     type Iterator<'a> = MapIntoIterator<
-        IntoArenaRefIterator<'a, Term, A, ArenaArrayIter<'a, TermPointer, A>>,
+        IntoArenaRefIter<'a, Term, A, ArenaArrayIter<'a, TermPointer, A>>,
         ArenaRef<Term, A>,
         <WasmExpression<A> as Expression>::ExpressionRef<'a>,
     >
@@ -206,7 +208,7 @@ impl<A: ArenaAllocator + Clone> ExpressionListType<WasmExpression<A>>
     where
         WasmExpression<A>: 'a,
     {
-        MapIntoIterator::new(IntoArenaRefIterator::new(
+        MapIntoIterator::new(IntoArenaRefIter::new(
             &self.arena,
             Array::<TermPointer>::iter(self.as_inner().items_pointer(), &self.arena),
         ))
@@ -291,6 +293,12 @@ impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<ListTerm, A> {
                     .join(", ")
             }
         )
+    }
+}
+
+impl<A: ArenaAllocator + Clone> Internable for ArenaRef<ListTerm, A> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        self.capture_depth() == 0
     }
 }
 

@@ -4,7 +4,9 @@
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use std::collections::HashSet;
 
-use reflex::core::{BooleanTermType, DependencyList, GraphNode, SerializeJson, StackOffset};
+use reflex::core::{
+    BooleanTermType, DependencyList, Eagerness, GraphNode, Internable, SerializeJson, StackOffset,
+};
 use serde_json::Value as JsonValue;
 
 use crate::{
@@ -124,9 +126,19 @@ impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<BooleanTerm, A> {
     }
 }
 
+impl<A: ArenaAllocator + Clone> Internable for ArenaRef<BooleanTerm, A> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        self.capture_depth() == 0
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::term_type::{TermType, TermTypeDiscriminants};
+    use crate::{
+        allocator::VecAllocator,
+        term_type::{TermType, TermTypeDiscriminants},
+        Term,
+    };
 
     use super::*;
 
@@ -139,6 +151,20 @@ mod tests {
         assert_eq!(
             TermType::Boolean(BooleanTerm::from(true)).as_bytes(),
             [TermTypeDiscriminants::Boolean as u32, 1],
+        );
+    }
+
+    #[test]
+    fn size() {
+        assert_eq!(BooleanTerm { value: 0 }.size_of(), 4);
+        assert_eq!(TermType::Boolean(BooleanTerm::from(true)).size_of(), 8);
+        assert_eq!(
+            Term::new(
+                TermType::Boolean(BooleanTerm::from(true)),
+                &VecAllocator::default()
+            )
+            .size_of(),
+            12
         );
     }
 }

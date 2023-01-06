@@ -5,8 +5,8 @@
 use std::collections::HashSet;
 
 use reflex::core::{
-    ArgType, Arity, DependencyList, Expression, GraphNode, PartialApplicationTermType,
-    SerializeJson, StackOffset,
+    ArgType, Arity, DependencyList, Eagerness, Expression, GraphNode, Internable,
+    PartialApplicationTermType, SerializeJson, StackOffset,
 };
 use serde_json::Value as JsonValue;
 
@@ -202,6 +202,12 @@ fn get_eager_args<T>(args: impl IntoIterator<Item = T>, arity: &Arity) -> impl I
             ArgType::Strict | ArgType::Eager => Some(arg),
             ArgType::Lazy => None,
         })
+}
+
+impl<A: ArenaAllocator + Clone> Internable for ArenaRef<PartialTerm, A> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        self.capture_depth() == 0
+    }
 }
 
 #[cfg(test)]

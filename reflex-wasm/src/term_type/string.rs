@@ -6,8 +6,8 @@ use std::{collections::HashSet, ops::Deref, slice, str::from_utf8_unchecked};
 
 use reflex::{
     core::{
-        DependencyList, Expression, GraphNode, SerializeJson, StackOffset, StringTermType,
-        StringValue,
+        DependencyList, Eagerness, Expression, GraphNode, Internable, SerializeJson, StackOffset,
+        StringTermType, StringValue,
     },
     hash::HashId,
 };
@@ -60,12 +60,17 @@ impl StringTerm {
     }
     pub fn as_str(&self) -> &str {
         let start_pointer = self.data.items.as_ptr() as *const u8;
-        let num_bytes = self.data.size_of();
+        let num_bytes = self.length as usize;
         // First, we build a &[u8]...
         let slice = unsafe { slice::from_raw_parts(start_pointer, num_bytes) };
         // ... and then convert that slice into a string slice
         // FIXME: Prevent panic on invalid UTF-8 bytes
-        std::str::from_utf8(slice).expect("Invalid UTF-8 bytes")
+        std::str::from_utf8(slice)
+            .map_err(|e| {
+                println!("{slice:?}");
+                e
+            })
+            .expect("Invalid UTF-8 bytes")
     }
 }
 
@@ -273,6 +278,12 @@ fn get_string_chunks(value: &str) -> Vec<u32> {
                 | (chunk.get(3).copied().unwrap_or(0) as u32) << 24
         })
         .collect::<Vec<_>>()
+}
+
+impl<A: ArenaAllocator + Clone> Internable for ArenaRef<StringTerm, A> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        self.capture_depth() == 0
+    }
 }
 
 #[cfg(test)]

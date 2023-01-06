@@ -4,7 +4,7 @@
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use std::collections::HashSet;
 
-use reflex::core::{DependencyList, GraphNode, SerializeJson, StackOffset};
+use reflex::core::{DependencyList, Eagerness, GraphNode, Internable, SerializeJson, StackOffset};
 use serde_json::Value as JsonValue;
 
 use crate::{
@@ -98,6 +98,12 @@ impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<PointerTerm, A> {
             "Pointer({:#x})",
             self.read_value(|term| u32::from(term.target))
         )
+    }
+}
+
+impl<A: ArenaAllocator + Clone> Internable for ArenaRef<PointerTerm, A> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        false
     }
 }
 

@@ -5,7 +5,8 @@
 use std::{collections::HashSet, iter::once};
 
 use reflex::core::{
-    DependencyList, GraphNode, HashmapTermType, HashsetTermType, SerializeJson, StackOffset,
+    DependencyList, Eagerness, GraphNode, HashmapTermType, HashsetTermType, Internable,
+    SerializeJson, StackOffset,
 };
 use reflex_utils::MapIntoIterator;
 use serde_json::Value as JsonValue;
@@ -14,7 +15,7 @@ use crate::{
     allocator::ArenaAllocator,
     hash::{TermHash, TermHasher, TermSize},
     term_type::TypedTerm,
-    ArenaRef, Array, IntoArenaRefIterator, TermPointer,
+    ArenaRef, Array, IntoArenaRefIter, TermPointer,
 };
 use reflex_macros::PointerIter;
 
@@ -58,7 +59,7 @@ impl<A: ArenaAllocator + Clone> ArenaRef<HashsetTerm, A> {
             entries.num_entries() as usize,
             Array::<HashmapBucket>::iter(buckets_pointer, &self.arena),
         );
-        MapIntoIterator::new(IntoArenaRefIterator::new(
+        MapIntoIterator::new(IntoArenaRefIter::new(
             &self.arena,
             HashmapBucketKeysIterator::new(buckets),
         ))
@@ -113,7 +114,7 @@ impl<A: ArenaAllocator + Clone> HashsetTermType<WasmExpression<A>>
             entries.num_entries() as usize,
             Array::<HashmapBucket>::iter(buckets_pointer, &self.arena),
         );
-        MapIntoIterator::new(IntoArenaRefIterator::new(
+        MapIntoIterator::new(IntoArenaRefIter::new(
             &self.arena,
             HashmapBucketKeysIterator::new(buckets),
         ))
@@ -208,6 +209,12 @@ impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<HashsetTerm, A> {
                     .join(", ")
             }
         )
+    }
+}
+
+impl<A: ArenaAllocator + Clone> Internable for ArenaRef<HashsetTerm, A> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        self.capture_depth() == 0
     }
 }
 
