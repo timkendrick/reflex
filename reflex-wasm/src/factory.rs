@@ -10,8 +10,13 @@ use std::{
 
 use reflex::{
     core::{
-        Expression, ExpressionFactory, FloatValue, HeapAllocator, InstructionPointer, IntValue,
-        SignalType, StackOffset, SymbolId,
+        ApplicationTermType, BooleanTermType, BuiltinTermType, CompiledFunctionTermType,
+        ConditionListType, ConditionType, ConstructorTermType, EffectTermType, Expression,
+        ExpressionFactory, ExpressionListType, FloatTermType, FloatValue, HashmapTermType,
+        HashsetTermType, HeapAllocator, InstructionPointer, IntTermType, IntValue, LambdaTermType,
+        LetTermType, ListTermType, PartialApplicationTermType, RecordTermType, RecursiveTermType,
+        RefType, SignalTermType, SignalType, StackOffset, StringTermType, StringValue,
+        StructPrototypeType, SymbolId, SymbolTermType, VariableTermType,
     },
     hash::HashId,
 };
@@ -20,19 +25,177 @@ use reflex_utils::WithExactSizeIterator;
 use crate::{
     allocator::ArenaAllocator,
     hash::TermSize,
+    stdlib::Stdlib,
     term_type::{
         ApplicationTerm, BooleanTerm, BuiltinTerm, CompiledFunctionIndex, CompiledTerm,
         ConditionTerm, ConstructorTerm, CustomCondition, EffectTerm, ErrorCondition, FloatTerm,
         HashmapTerm, HashsetTerm, IntTerm, LambdaTerm, LetTerm, ListTerm, NilTerm, PartialTerm,
         PendingCondition, RecordTerm, SignalTerm, StringTerm, SymbolTerm, TermType,
-        TermTypeDiscriminants, TreeTerm, TypedTerm, VariableTerm,
+        TermTypeDiscriminants, TreeTerm, TypedTerm, VariableTerm, WasmExpression,
     },
     ArenaRef, Term, TermPointer,
 };
 
 #[derive(Debug)]
-struct WasmTermFactory<A: ArenaAllocator> {
+pub struct WasmTermFactory<A: ArenaAllocator> {
     arena: Rc<RefCell<A>>,
+}
+impl<A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static + Clone> WasmTermFactory<A> {
+    pub fn import<T: Expression>(
+        &self,
+        expression: &T,
+        factory: &impl ExpressionFactory<T>,
+    ) -> Result<WasmExpression<Self>, T>
+    where
+        T::Builtin: Into<Stdlib>,
+    {
+        if let Some(_) = factory.match_nil_term(expression) {
+            Ok(self.create_nil_term())
+        } else if let Some(term) = factory.match_boolean_term(expression) {
+            Ok(self.create_boolean_term(term.value()))
+        } else if let Some(term) = factory.match_int_term(expression) {
+            Ok(self.create_int_term(term.value()))
+        } else if let Some(term) = factory.match_float_term(expression) {
+            Ok(self.create_float_term(term.value()))
+        } else if let Some(term) = factory.match_string_term(expression) {
+            let value = self.create_string(term.value().as_deref().as_str());
+            Ok(self.create_string_term(value))
+        } else if let Some(term) = factory.match_symbol_term(expression) {
+            Ok(self.create_symbol_term(term.id()))
+        } else if let Some(term) = factory.match_variable_term(expression) {
+            Ok(self.create_variable_term(term.offset()))
+        } else if let Some(term) = factory.match_effect_term(expression) {
+            let condition = {
+                let condition = term.condition();
+                let condition = condition.as_deref();
+                let signal_type = condition.signal_type();
+                let payload = self.import(condition.payload().as_deref(), factory)?;
+                let token = self.import(condition.token().as_deref(), factory)?;
+                self.create_signal(signal_type, payload, token)
+            };
+            Ok(self.create_effect_term(condition))
+        } else if let Some(term) = factory.match_let_term(expression) {
+            let initializer = self.import(term.initializer().as_deref(), factory)?;
+            let body = self.import(term.body().as_deref(), factory)?;
+            Ok(self.create_let_term(initializer, body))
+        } else if let Some(term) = factory.match_lambda_term(expression) {
+            let num_args = term.num_args();
+            let body = self.import(term.body().as_deref(), factory)?;
+            Ok(self.create_lambda_term(num_args, body))
+        } else if let Some(term) = factory.match_application_term(expression) {
+            let target = self.import(term.target().as_deref(), factory)?;
+            let args = term
+                .args()
+                .as_deref()
+                .iter()
+                .map(|arg| self.import(arg.as_deref(), factory))
+                .collect::<Result<Vec<_>, _>>()?;
+            let args = self.create_list(args);
+            Ok(self.create_application_term(target, args))
+        } else if let Some(term) = factory.match_partial_application_term(expression) {
+            let target = self.import(term.target().as_deref(), factory)?;
+            let args = term
+                .args()
+                .as_deref()
+                .iter()
+                .map(|arg| self.import(arg.as_deref(), factory))
+                .collect::<Result<Vec<_>, _>>()?;
+            let args = self.create_list(args);
+            Ok(self.create_partial_application_term(target, args))
+        } else if let Some(term) = factory.match_recursive_term(expression) {
+            let body = self.import(term.factory().as_deref(), factory)?;
+            Ok(self.create_recursive_term(body))
+        } else if let Some(term) = factory.match_builtin_term(expression) {
+            let target: Stdlib = term.target().into();
+            Ok(self.create_builtin_term(target))
+        } else if let Some(term) = factory.match_compiled_function_term(expression) {
+            let term = term.as_deref();
+            let address = term.address();
+            let hash = term.hash();
+            let required_args = term.required_args();
+            let optional_args = term.optional_args();
+            Ok(self.create_compiled_function_term(address, hash, required_args, optional_args))
+        } else if let Some(term) = factory.match_record_term(expression) {
+            let keys = term
+                .prototype()
+                .as_deref()
+                .keys()
+                .as_deref()
+                .iter()
+                .map(|key| self.import(key.as_deref(), factory))
+                .collect::<Result<Vec<_>, _>>()?;
+            let keys = self.create_list(keys);
+            let prototype = self.create_struct_prototype(keys);
+            let values = term
+                .values()
+                .as_deref()
+                .iter()
+                .map(|key| self.import(key.as_deref(), factory))
+                .collect::<Result<Vec<_>, _>>()?;
+            let values = self.create_list(values);
+            Ok(self.create_record_term(prototype, values))
+        } else if let Some(term) = factory.match_constructor_term(expression) {
+            let keys = term
+                .prototype()
+                .as_deref()
+                .keys()
+                .as_deref()
+                .iter()
+                .map(|key| self.import(key.as_deref(), factory))
+                .collect::<Result<Vec<_>, _>>()?;
+            let keys = self.create_list(keys);
+            let prototype = self.create_struct_prototype(keys);
+            Ok(self.create_constructor_term(prototype))
+        } else if let Some(term) = factory.match_list_term(expression) {
+            let items = term
+                .items()
+                .as_deref()
+                .iter()
+                .map(|key| self.import(key.as_deref(), factory))
+                .collect::<Result<Vec<_>, _>>()?;
+            let items = self.create_list(items);
+            Ok(self.create_list_term(items))
+        } else if let Some(term) = factory.match_hashmap_term(expression) {
+            let keys = term
+                .keys()
+                .map(|term| self.import(term.as_deref(), factory));
+            let values = term
+                .values()
+                .map(|term| self.import(term.as_deref(), factory));
+            let entries = keys
+                .zip(values)
+                .map(|(key, value)| {
+                    let key = key?;
+                    let value = value?;
+                    Ok((key, value))
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(self.create_hashmap_term(entries))
+        } else if let Some(term) = factory.match_hashset_term(expression) {
+            let values = term
+                .values()
+                .map(|term| self.import(term.as_deref(), factory))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(self.create_hashset_term(values))
+        } else if let Some(term) = factory.match_signal_term(expression) {
+            let conditions = term
+                .signals()
+                .as_deref()
+                .iter()
+                .map(|condition| {
+                    let condition = condition.as_deref();
+                    let effect_type = condition.signal_type();
+                    let payload = self.import(condition.payload().as_deref(), factory)?;
+                    let token = self.import(condition.token().as_deref(), factory)?;
+                    Ok(self.create_signal(effect_type, payload, token))
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let conditions = self.create_signal_list(conditions);
+            Ok(self.create_signal_term(conditions))
+        } else {
+            Err(expression.clone())
+        }
+    }
 }
 impl<A: ArenaAllocator> Clone for WasmTermFactory<A> {
     fn clone(&self) -> Self {
