@@ -2,11 +2,10 @@
 ;; SPDX-License-Identifier: Apache-2.0
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 (module
-  (export "memory" (memory $Allocator::heap))
   ;; Initialize linear memory for the heap with an initial page size of 1
   ;; (additional pages will be allocated during runtime if necessary)
   ;; https://webassembly.github.io/spec/core/exec/runtime.html#page-size
-  (memory $Allocator::heap 1)
+  (memory $Allocator::heap (export "memory") 1)
   (global $Allocator::PAGE_SIZE i32 (i32.const 65536))
 
   ;; Every time heap data is requested, it will be allocated at the current bump allocator offset address,

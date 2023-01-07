@@ -160,10 +160,15 @@
 
   (func $Term::redirect (param $self i32) (param $target i32)
     ;; This function overwrites an existing term with new contents, so take care not to call it on shared global objects
-    ;; TODO: When overwriting cell with redirect pointer, somehow mark truncated fields as elibible for GC
-    (call $Term::set::hash (local.get $self) (call $Term::get::hash (local.get $target)))
-    ;; This assumes that the previous term had at least one field (singleton instances should be created for zero-field terms)
-    (call $Term::Pointer::set::target (call $Term::pointer::value (local.get $self)) (local.get $target)))
+    ;; The existing term must have at least one field (singleton instances should be created for zero-field terms)
+    ;; Zero out the bytes of the existing term
+    (memory.fill (local.get $self) (i32.const 0) (call $Term::traits::size (local.get $self)))
+    ;; Rewrite a redirect pointer term at the same address where the term used to exist
+    (call $TermType::Pointer::construct (call $Term::pointer::value (local.get $self)) (local.get $target))
+    ;; Initialize the pointer term
+    (call $Term::init (local.get $self))
+    ;; Ignore the result
+    (drop))
 
   (func $Term::traits::clone (param $self i32) (result i32)
     (local $instance i32)
