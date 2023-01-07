@@ -133,7 +133,7 @@ fn deep_addition_benchmark(c: &mut Criterion) {
     group.finish()
 }
 
-const RUNTIME_BYTES: &'static [u8] = include_bytes!("../../reflex-wasm/build/runtime.cwasm");
+const RUNTIME_BYTES: &'static [u8] = include_bytes!("../../reflex-wasm/build/runtime.wasm");
 
 fn execute_rust_benchmark(
     query_gen: impl Fn(
@@ -244,7 +244,7 @@ fn generate_3_plus_5_rust(
 }
 
 fn initialize_interpreter_context(wasm: &[u8]) -> Result<WasmInterpreter, InterpreterError> {
-    WasmContextBuilder::from_cwasm(wasm)?
+    WasmContextBuilder::from_wasm(wasm, "memory")?
         .add_import("Math", "remainder", |a: f64, b: f64| a.rem(b))?
         .add_import("Math", "pow", |a: f64, b: f64| a.powf(b))?
         .add_import("Date", "parse", |_: u32, _: u32| 0u64)?
