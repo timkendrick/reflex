@@ -38,10 +38,11 @@ export default function signaturesDirective(node, context) {
   }
   return [
     createListDirective({
-      elements: signatures.map(({ identifier, args }) =>
+      elements: signatures.map(({ identifier, variant, args }) =>
         createListDirective({
           elements: [
             identifier,
+            variant,
             createListDirective({
               elements: args.map(({ identifier, type }) =>
                 createListDirective({
@@ -63,19 +64,20 @@ export default function signaturesDirective(node, context) {
 function parseConstructorSignatures(node, context) {
   if (isNamedInstructionNode(STRUCT_DIRECTIVE, node)) {
     const { identifier, fields } = parseStructDefinition(node, context);
-    return parseStructConstructorSignatures(identifier, fields, node.location);
+    return parseStructConstructorSignatures(identifier, null, fields, node.location);
   } else if (isNamedInstructionNode(UNION_DIRECTIVE, node)) {
     const { identifier, variants } = parseUnionDefinition(node, context);
-    return parseUnionConstructorSignatures(identifier, variants, node.location);
+    return parseUnionConstructorSignatures(identifier, null, variants, node.location);
   } else {
     return null;
   }
 }
 
-function parseStructConstructorSignatures(identifier, fields, location) {
+function parseStructConstructorSignatures(identifier, variant, fields, location) {
   return [
     {
       identifier,
+      variant: variant || identifier,
       args: getStructConstructorFields(fields).map((field) => ({
         identifier: field.name,
         type: getStructFieldDataType(field, location),
@@ -84,17 +86,33 @@ function parseStructConstructorSignatures(identifier, fields, location) {
   ];
 }
 
-function parseUnionConstructorSignatures(identifier, variants, location) {
-  return variants.flatMap((variant) => {
+function parseUnionConstructorSignatures(identifier, variant, variants, location) {
+  return variants.flatMap((item) => {
     const childIdentifier = NodeType.Term({
-      source: `${identifier.source}::${variant.identifier.source.slice('$'.length)}`,
+      source: `${identifier.source}::${item.identifier.source.slice('$'.length)}`,
       location,
     });
-    switch (variant.type) {
+    const childVariantIdentifier = variant
+      ? NodeType.Term({
+          source: `${variant.source}::${item.identifier.source.slice('$'.length)}`,
+          location,
+        })
+      : item.identifier;
+    switch (item.type) {
       case 'struct':
-        return parseStructConstructorSignatures(childIdentifier, variant.fields, location);
+        return parseStructConstructorSignatures(
+          childIdentifier,
+          childVariantIdentifier,
+          item.fields,
+          location,
+        );
       case 'union':
-        return parseUnionConstructorSignatures(childIdentifier, variant.variants, location);
+        return parseUnionConstructorSignatures(
+          childIdentifier,
+          childVariantIdentifier,
+          item.variants,
+          location,
+        );
     }
   });
 }

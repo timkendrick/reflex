@@ -97,6 +97,18 @@
       (@block
         (global (@concat "$TermType::" (@get $typename)) (export (@concat "\"" "TermType_" (@get $typename) "\"")) i32 (i32.const (@get $_)))))
 
+    (@map $signature
+      (@signatures (@get $TermType))
+      (@let $variant (@list_item (@get $signature) 1)
+        (@block
+
+          (func (@concat "$TermType::" (@get $variant) "::sizeof") (result i32)
+            (i32.add
+              ;; Add 4 bytes for the discriminant
+              (i32.const 4)
+              ;; Add the size of the underlying term type
+              (call (@concat "$" (@get $variant) "::sizeof")))))))
+
     (func $TermType::traits::size (param $self i32) (result i32)
       (@branch
         ;; Determine term size according to the underlying term type implementation

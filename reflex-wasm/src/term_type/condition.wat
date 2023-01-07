@@ -44,7 +44,14 @@
       (@map $typename
         (@union_variants (@get $Condition))
         (@block
-          (global (@concat "$Condition::" (@get $typename)) (export (@concat "\"" "ConditionType_" (@get $typename) "\"")) i32 (i32.const (@get $_)))))
+          (global (@concat "$Condition::" (@get $typename)) (export (@concat "\"" "ConditionType_" (@get $typename) "\"")) i32 (i32.const (@get $_)))
+
+          (func (@concat "$Condition::" (@get $typename) "::sizeof") (result i32)
+            (i32.add
+              ;; Add 4 bytes for the discriminant
+              (i32.const 4)
+              ;; Add the size of the underlying condition type
+              (call (@concat "$" (@get $typename) "::sizeof"))))))
 
       ;; Generate display formatters for condition types
       (func $ConditionType::display (param $variant i32) (param $offset i32) (result i32)

@@ -29,14 +29,19 @@
     (@map $signature
       (@signatures (@get $TermType))
       (@let $typename (@list_item (@get $signature) 0)
-        (@let $args (@list_item (@get $signature) 1)
+        (@let $args (@list_item (@get $signature) 2)
           (@block
 
-          (func (@concat "$Term::" (@get $typename) "::new")(@map $arg (@get $args) (@block (param (@list_item (@get $arg) 0) (@list_item (@get $arg) 1)))) (result i32)
-            (local i32)
-            (local.tee (@length (@get $args)) (call $Term::allocate))
-            (call (@concat "$" (@get $typename) "::construct") (call $Term::pointer::value (local.get (@length (@get $args))))(@map $arg (@get $args) (@block (local.get (@list_item (@get $arg) 0)))))
-            (call $Term::init))))))
+            (func (@concat "$Term::" (@get $typename) "::sizeof") (result i32)
+              (i32.add
+                (call $Term::header_size)
+                (call (@concat "$" (@get $typename) "::sizeof"))))
+
+            (func (@concat "$Term::" (@get $typename) "::new")(@map $arg (@get $args) (@block (param (@list_item (@get $arg) 0) (@list_item (@get $arg) 1)))) (result i32)
+              (local i32)
+              (local.tee (@length (@get $args)) (call $Allocator::allocate (call (@concat "$Term::" (@get $typename) "::sizeof"))))
+              (call (@concat "$" (@get $typename) "::construct") (call $Term::pointer::value (local.get (@length (@get $args))))(@map $arg (@get $args) (@block (local.get (@list_item (@get $arg) 0)))))
+              (call $Term::init))))))
 
     (func $Term::traits::is_atomic (param $self i32) (result i32)
       (@branch
@@ -102,13 +107,10 @@
 
   (func $Term::traits::size (param $self i32) (result i32)
     (i32.add
-      ;; Add 4 bytes for the term hash
-      (i32.const 4)
+      ;; Add the size of the term header
+      (call $Term::header_size)
       ;; Add the size of the underlying term type
       (call $TermType::traits::size (call $Term::pointer::value (local.get $self)))))
-
-  (func $Term::allocate (result i32)
-    (call $Allocator::allocate (call $Term::sizeof)))
 
   (func $Term::init (param $self i32) (result i32)
     ;; Precompute the term hash and store it for fast equality checks
@@ -116,6 +118,10 @@
       (local.get $self)
       (call $Term::traits::hash (local.get $self) (call $Hash::new)))
     (local.get $self))
+
+  (func $Term::header_size (result i32)
+    ;; 4 bytes for the term hash
+    (i32.const 4))
 
   (func $Term::get_hash (export "getTermHash") (param $self i32) (result i32)
     (call $Term::get::hash (local.get $self)))
@@ -165,9 +171,7 @@
     (memory.copy
       (local.tee $instance
         (call $Allocator::allocate
-          (call $Utils::i32::max_u
-            (local.tee $size (call $Term::traits::size (local.get $self)))
-            (call $Term::sizeof))))
+          (local.tee $size (call $Term::traits::size (local.get $self)))))
       (local.get $self)
       (local.get $size))
     (local.get $instance)))
