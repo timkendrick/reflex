@@ -15,11 +15,11 @@ use reflex_utils::{json::is_empty_json_object, MapIntoIterator};
 use serde_json::Value as JsonValue;
 
 use crate::{
-    allocator::ArenaAllocator,
+    allocator::{Arena, ArenaAllocator},
     hash::{TermHash, TermHasher, TermSize},
     term_type::TermType,
     term_type::TypedTerm,
-    ArenaArrayIter, ArenaRef, Array, IntoArenaRefIter, PointerIter, Term, TermPointer,
+    ArenaArrayIter, ArenaPointer, ArenaRef, Array, IntoArenaRefIter, PointerIter, Term,
 };
 
 use super::WasmExpression;
@@ -27,12 +27,12 @@ use super::WasmExpression;
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct ListTerm {
-    pub items: Array<TermPointer>,
+    pub items: Array<ArenaPointer>,
 }
 
-pub type ListTermPointerIter = std::vec::IntoIter<TermPointer>;
+pub type ListTermPointerIter = std::vec::IntoIter<ArenaPointer>;
 
-impl<A: ArenaAllocator> PointerIter for ArenaRef<ListTerm, A> {
+impl<A: Arena> PointerIter for ArenaRef<ListTerm, A> {
     type Iter<'a> = ListTermPointerIter
     where
         Self: 'a;
@@ -43,7 +43,10 @@ impl<A: ArenaAllocator> PointerIter for ArenaRef<ListTerm, A> {
 
             term.items
                 .items()
-                .map(|item| self.pointer.offset(item as *const TermPointer as u32 - ptr))
+                .map(|item| {
+                    self.pointer
+                        .offset(item as *const ArenaPointer as u32 - ptr)
+                })
                 .collect::<Vec<_>>()
         })
         .into_iter()
@@ -52,23 +55,23 @@ impl<A: ArenaAllocator> PointerIter for ArenaRef<ListTerm, A> {
 
 impl TermSize for ListTerm {
     fn size_of(&self) -> usize {
-        std::mem::size_of::<Self>() - std::mem::size_of::<Array<TermPointer>>()
+        std::mem::size_of::<Self>() - std::mem::size_of::<Array<ArenaPointer>>()
             + self.items.size_of()
     }
 }
 impl TermHash for ListTerm {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         hasher.hash(&self.items, arena)
     }
 }
 impl ListTerm {
     pub fn allocate(
         values: impl IntoIterator<
-            Item = TermPointer,
-            IntoIter = impl ExactSizeIterator<Item = TermPointer>,
+            Item = ArenaPointer,
+            IntoIter = impl ExactSizeIterator<Item = ArenaPointer>,
         >,
         arena: &mut impl ArenaAllocator,
-    ) -> TermPointer {
+    ) -> ArenaPointer {
         let values = values.into_iter();
         let term = Term::new(
             TermType::List(ListTerm {
@@ -78,8 +81,8 @@ impl ListTerm {
         );
         let term_size = term.size_of();
         let instance = arena.allocate(term);
-        let list = instance.offset((term_size - std::mem::size_of::<Array<TermPointer>>()) as u32);
-        Array::<TermPointer>::extend(list, values, arena);
+        let list = instance.offset((term_size - std::mem::size_of::<Array<ArenaPointer>>()) as u32);
+        Array::<ArenaPointer>::extend(list, values, arena);
         let hash = arena.read_value::<Term, _>(instance, |term| {
             TermHasher::default().hash(term, arena).finish()
         });
@@ -88,17 +91,17 @@ impl ListTerm {
     }
 }
 
-impl<A: ArenaAllocator + Clone> ArenaRef<ListTerm, A> {
-    fn items_pointer(&self) -> TermPointer {
+impl<A: Arena + Clone> ArenaRef<ListTerm, A> {
+    fn items_pointer(&self) -> ArenaPointer {
         self.inner_pointer(|value| &value.items)
     }
-    pub fn items(&self) -> ArenaRef<Array<TermPointer>, A> {
-        ArenaRef::<Array<TermPointer>, _>::new(self.arena.clone(), self.items_pointer())
+    pub fn items(&self) -> ArenaRef<Array<ArenaPointer>, A> {
+        ArenaRef::<Array<ArenaPointer>, _>::new(self.arena.clone(), self.items_pointer())
     }
-    pub fn iter(&self) -> IntoArenaRefIter<'_, Term, A, ArenaArrayIter<'_, TermPointer, A>> {
+    pub fn iter(&self) -> IntoArenaRefIter<'_, Term, A, ArenaArrayIter<'_, ArenaPointer, A>> {
         IntoArenaRefIter::new(
             &self.arena,
-            Array::<TermPointer>::iter(self.items_pointer(), &self.arena),
+            Array::<ArenaPointer>::iter(self.items_pointer(), &self.arena),
         )
     }
     pub fn len(&self) -> usize {
@@ -106,7 +109,7 @@ impl<A: ArenaAllocator + Clone> ArenaRef<ListTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<ListTerm, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<ListTerm, A> {
     fn size(&self) -> usize {
         1 + self.iter().map(|term| term.size()).sum::<usize>()
     }
@@ -151,9 +154,7 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<ListTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> ListTermType<WasmExpression<A>>
-    for ArenaRef<TypedTerm<ListTerm>, A>
-{
+impl<A: Arena + Clone> ListTermType<WasmExpression<A>> for ArenaRef<TypedTerm<ListTerm>, A> {
     fn items<'a>(&'a self) -> <WasmExpression<A> as Expression>::ExpressionListRef<'a>
     where
         <WasmExpression<A> as Expression>::ExpressionList: 'a,
@@ -163,9 +164,7 @@ impl<A: ArenaAllocator + Clone> ListTermType<WasmExpression<A>>
     }
 }
 
-impl<A: ArenaAllocator + Clone> StructPrototypeType<WasmExpression<A>>
-    for ArenaRef<TypedTerm<ListTerm>, A>
-{
+impl<A: Arena + Clone> StructPrototypeType<WasmExpression<A>> for ArenaRef<TypedTerm<ListTerm>, A> {
     fn keys<'a>(&'a self) -> <WasmExpression<A> as Expression>::ExpressionListRef<'a>
     where
         <WasmExpression<A> as Expression>::ExpressionList: 'a,
@@ -175,11 +174,9 @@ impl<A: ArenaAllocator + Clone> StructPrototypeType<WasmExpression<A>>
     }
 }
 
-impl<A: ArenaAllocator + Clone> ExpressionListType<WasmExpression<A>>
-    for ArenaRef<TypedTerm<ListTerm>, A>
-{
+impl<A: Arena + Clone> ExpressionListType<WasmExpression<A>> for ArenaRef<TypedTerm<ListTerm>, A> {
     type Iterator<'a> = MapIntoIterator<
-        IntoArenaRefIter<'a, Term, A, ArenaArrayIter<'a, TermPointer, A>>,
+        IntoArenaRefIter<'a, Term, A, ArenaArrayIter<'a, ArenaPointer, A>>,
         ArenaRef<Term, A>,
         <WasmExpression<A> as Expression>::ExpressionRef<'a>,
     >
@@ -210,12 +207,12 @@ impl<A: ArenaAllocator + Clone> ExpressionListType<WasmExpression<A>>
     {
         MapIntoIterator::new(IntoArenaRefIter::new(
             &self.arena,
-            Array::<TermPointer>::iter(self.as_inner().items_pointer(), &self.arena),
+            Array::<ArenaPointer>::iter(self.as_inner().items_pointer(), &self.arena),
         ))
     }
 }
 
-impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<ListTerm, A> {
+impl<A: Arena + Clone> SerializeJson for ArenaRef<ListTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         self.iter()
             .map(|key| key.to_json())
@@ -253,22 +250,22 @@ impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<ListTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<ListTerm, A> {
+impl<A: Arena + Clone> PartialEq for ArenaRef<ListTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         // TODO: Clarify PartialEq implementations for container terms
         // This assumes that lists with the same length and hash are almost certainly identical
         self.len() == other.len()
     }
 }
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<ListTerm, A> {}
+impl<A: Arena + Clone> Eq for ArenaRef<ListTerm, A> {}
 
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<ListTerm, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<ListTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<ListTerm, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<ListTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let max_displayed_items = 100;
         let items = self.iter();
@@ -296,7 +293,7 @@ impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<ListTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> Internable for ArenaRef<ListTerm, A> {
+impl<A: Arena + Clone> Internable for ArenaRef<ListTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
         self.capture_depth() == 0
     }

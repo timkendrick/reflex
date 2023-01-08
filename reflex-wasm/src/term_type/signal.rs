@@ -12,17 +12,17 @@ use serde_json::Value as JsonValue;
 
 use super::{TreeTerm, WasmExpression};
 use crate::{
-    allocator::ArenaAllocator,
+    allocator::Arena,
     hash::{TermHash, TermHasher, TermSize},
     term_type::TypedTerm,
-    ArenaRef, TermPointer,
+    ArenaPointer, ArenaRef,
 };
 use reflex_macros::PointerIter;
 
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct SignalTerm {
-    pub conditions: TermPointer,
+    pub conditions: ArenaPointer,
 }
 impl TermSize for SignalTerm {
     fn size_of(&self) -> usize {
@@ -30,12 +30,12 @@ impl TermSize for SignalTerm {
     }
 }
 impl TermHash for SignalTerm {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         hasher.hash(&self.conditions, arena)
     }
 }
 
-impl<A: ArenaAllocator + Clone> ArenaRef<SignalTerm, A> {
+impl<A: Arena + Clone> ArenaRef<SignalTerm, A> {
     pub fn conditions(&self) -> ArenaRef<TypedTerm<TreeTerm>, A> {
         ArenaRef::<TypedTerm<TreeTerm>, _>::new(
             self.arena.clone(),
@@ -44,7 +44,7 @@ impl<A: ArenaAllocator + Clone> ArenaRef<SignalTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> SignalTermType<WasmExpression<A>> for ArenaRef<SignalTerm, A> {
+impl<A: Arena + Clone> SignalTermType<WasmExpression<A>> for ArenaRef<SignalTerm, A> {
     fn signals<'a>(&'a self) -> <WasmExpression<A> as Expression>::SignalListRef<'a>
     where
         <WasmExpression<A> as Expression>::SignalList: 'a,
@@ -54,9 +54,7 @@ impl<A: ArenaAllocator + Clone> SignalTermType<WasmExpression<A>> for ArenaRef<S
     }
 }
 
-impl<A: ArenaAllocator + Clone> SignalTermType<WasmExpression<A>>
-    for ArenaRef<TypedTerm<SignalTerm>, A>
-{
+impl<A: Arena + Clone> SignalTermType<WasmExpression<A>> for ArenaRef<TypedTerm<SignalTerm>, A> {
     fn signals<'a>(&'a self) -> <WasmExpression<A> as Expression>::SignalListRef<'a>
     where
         <WasmExpression<A> as Expression>::SignalList: 'a,
@@ -66,7 +64,7 @@ impl<A: ArenaAllocator + Clone> SignalTermType<WasmExpression<A>>
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<SignalTerm, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<SignalTerm, A> {
     fn size(&self) -> usize {
         1 + (self.conditions().as_inner().len() as usize)
     }
@@ -96,7 +94,7 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<SignalTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<SignalTerm, A> {
+impl<A: Arena + Clone> SerializeJson for ArenaRef<SignalTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -108,20 +106,20 @@ impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<SignalTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<SignalTerm, A> {
+impl<A: Arena + Clone> PartialEq for ArenaRef<SignalTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.conditions() == other.conditions()
     }
 }
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<SignalTerm, A> {}
+impl<A: Arena + Clone> Eq for ArenaRef<SignalTerm, A> {}
 
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<SignalTerm, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<SignalTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<SignalTerm, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<SignalTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -136,7 +134,7 @@ impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<SignalTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> Internable for ArenaRef<SignalTerm, A> {
+impl<A: Arena + Clone> Internable for ArenaRef<SignalTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
         self.capture_depth() == 0
     }
@@ -152,7 +150,7 @@ mod tests {
     fn signal() {
         assert_eq!(
             TermType::Signal(SignalTerm {
-                conditions: TermPointer(12345),
+                conditions: ArenaPointer(12345),
             })
             .as_bytes(),
             [TermTypeDiscriminants::Signal as u32, 12345],

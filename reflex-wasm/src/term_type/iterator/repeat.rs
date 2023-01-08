@@ -8,16 +8,16 @@ use reflex::core::{DependencyList, Eagerness, GraphNode, Internable, SerializeJs
 use serde_json::Value as JsonValue;
 
 use crate::{
-    allocator::ArenaAllocator,
+    allocator::Arena,
     hash::{TermHash, TermHasher, TermSize},
-    ArenaRef, Term, TermPointer,
+    ArenaPointer, ArenaRef, Term,
 };
 use reflex_macros::PointerIter;
 
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct RepeatIteratorTerm {
-    pub value: TermPointer,
+    pub value: ArenaPointer,
 }
 impl TermSize for RepeatIteratorTerm {
     fn size_of(&self) -> usize {
@@ -25,18 +25,18 @@ impl TermSize for RepeatIteratorTerm {
     }
 }
 impl TermHash for RepeatIteratorTerm {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         hasher.hash(&self.value, arena)
     }
 }
 
-impl<A: ArenaAllocator + Clone> ArenaRef<RepeatIteratorTerm, A> {
+impl<A: Arena + Clone> ArenaRef<RepeatIteratorTerm, A> {
     pub fn value(&self) -> ArenaRef<Term, A> {
         ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|term| term.value))
     }
 }
 
-impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<RepeatIteratorTerm, A> {
+impl<A: Arena + Clone> SerializeJson for ArenaRef<RepeatIteratorTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -48,26 +48,26 @@ impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<RepeatIteratorTerm, A
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<RepeatIteratorTerm, A> {
+impl<A: Arena + Clone> PartialEq for ArenaRef<RepeatIteratorTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.value() == other.value()
     }
 }
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<RepeatIteratorTerm, A> {}
+impl<A: Arena + Clone> Eq for ArenaRef<RepeatIteratorTerm, A> {}
 
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<RepeatIteratorTerm, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<RepeatIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<RepeatIteratorTerm, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<RepeatIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "RepeatIterator")
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<RepeatIteratorTerm, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<RepeatIteratorTerm, A> {
     fn size(&self) -> usize {
         1 + self.value().size()
     }
@@ -105,7 +105,7 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<RepeatIteratorTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> Internable for ArenaRef<RepeatIteratorTerm, A> {
+impl<A: Arena + Clone> Internable for ArenaRef<RepeatIteratorTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
         self.capture_depth() == 0
     }
@@ -121,7 +121,7 @@ mod tests {
     fn repeat_iterator() {
         assert_eq!(
             TermType::RepeatIterator(RepeatIteratorTerm {
-                value: TermPointer(12345),
+                value: ArenaPointer(12345),
             })
             .as_bytes(),
             [TermTypeDiscriminants::RepeatIterator as u32, 12345],

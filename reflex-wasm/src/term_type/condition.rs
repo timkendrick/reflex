@@ -13,10 +13,10 @@ use strum_macros::EnumDiscriminants;
 
 use super::{ListTerm, StringTerm, WasmExpression};
 use crate::{
-    allocator::ArenaAllocator,
+    allocator::Arena,
     hash::{TermHash, TermHasher, TermSize},
     term_type::{TermTypeDiscriminants, TypedTerm},
-    ArenaRef, PointerIter, Term, TermPointer,
+    ArenaPointer, ArenaRef, PointerIter, Term,
 };
 use reflex_macros::PointerIter;
 
@@ -43,7 +43,7 @@ pub enum ConditionTermPointerIter {
 }
 
 impl Iterator for ConditionTermPointerIter {
-    type Item = TermPointer;
+    type Item = ArenaPointer;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
@@ -58,7 +58,7 @@ impl Iterator for ConditionTermPointerIter {
     }
 }
 
-impl<A: ArenaAllocator + Clone> PointerIter for ArenaRef<ConditionTerm, A> {
+impl<A: Arena + Clone> PointerIter for ArenaRef<ConditionTerm, A> {
     type Iter<'a> = ConditionTermPointerIter
     where
         Self: 'a;
@@ -129,7 +129,7 @@ impl TermSize for ConditionTerm {
     }
 }
 impl TermHash for ConditionTerm {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         let hasher = hasher.write_u8(self.condition_type() as u8);
         match self {
             Self::Custom(condition) => condition.hash(hasher, arena),
@@ -143,7 +143,7 @@ impl TermHash for ConditionTerm {
     }
 }
 
-impl<A: ArenaAllocator + Clone> ArenaRef<ConditionTerm, A> {
+impl<A: Arena + Clone> ArenaRef<ConditionTerm, A> {
     pub fn signal_type(&self) -> SignalType {
         match self.read_value(|term| term.condition_type()) {
             ConditionTermDiscriminants::Custom => self
@@ -223,15 +223,13 @@ impl<V> TypedCondition<V> {
     }
 }
 
-impl<A: ArenaAllocator + Clone, V> ArenaRef<TypedCondition<V>, A> {
+impl<A: Arena + Clone, V> ArenaRef<TypedCondition<V>, A> {
     fn as_inner(&self) -> ArenaRef<V, A> {
         self.inner_ref(|condition| condition.get_inner())
     }
 }
 
-impl<A: ArenaAllocator + Clone> ConditionType<WasmExpression<A>>
-    for ArenaRef<TypedTerm<ConditionTerm>, A>
-{
+impl<A: Arena + Clone> ConditionType<WasmExpression<A>> for ArenaRef<TypedTerm<ConditionTerm>, A> {
     fn id(&self) -> StateToken {
         self.read_value(|term| term.id())
     }
@@ -252,7 +250,7 @@ impl<A: ArenaAllocator + Clone> ConditionType<WasmExpression<A>>
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<ConditionTerm, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<ConditionTerm, A> {
     fn size(&self) -> usize {
         match self.read_value(|term| term.condition_type()) {
             ConditionTermDiscriminants::Custom => self
@@ -543,7 +541,7 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<ConditionTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<ConditionTerm, A> {
+impl<A: Arena + Clone> SerializeJson for ArenaRef<ConditionTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -555,7 +553,7 @@ impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<ConditionTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<ConditionTerm, A> {
+impl<A: Arena + Clone> PartialEq for ArenaRef<ConditionTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         match (
             self.read_value(|term| term.condition_type()),
@@ -611,9 +609,9 @@ impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<ConditionTerm, A> {
         }
     }
 }
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<ConditionTerm, A> {}
+impl<A: Arena + Clone> Eq for ArenaRef<ConditionTerm, A> {}
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<ConditionTerm, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<ConditionTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.read_value(|term| term.condition_type()) {
             ConditionTermDiscriminants::Custom => {
@@ -650,7 +648,7 @@ impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<ConditionTerm, A>
         }
     }
 }
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<ConditionTerm, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<ConditionTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
@@ -659,9 +657,9 @@ impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<ConditionTerm, A> {
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct CustomCondition {
-    pub effect_type: TermPointer,
-    pub payload: TermPointer,
-    pub token: TermPointer,
+    pub effect_type: ArenaPointer,
+    pub payload: ArenaPointer,
+    pub token: ArenaPointer,
 }
 impl TermSize for CustomCondition {
     fn size_of(&self) -> usize {
@@ -669,7 +667,7 @@ impl TermSize for CustomCondition {
     }
 }
 impl TermHash for CustomCondition {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         hasher
             .hash(&self.effect_type, arena)
             .hash(&self.payload, arena)
@@ -677,7 +675,7 @@ impl TermHash for CustomCondition {
     }
 }
 
-impl<A: ArenaAllocator + Clone> ArenaRef<CustomCondition, A> {
+impl<A: Arena + Clone> ArenaRef<CustomCondition, A> {
     pub fn signal_type(&self) -> SignalType {
         let effect_type = self.effect_type();
         // FIXME: Allow arbitrary expressions as condition types
@@ -694,7 +692,7 @@ impl<A: ArenaAllocator + Clone> ArenaRef<CustomCondition, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> ArenaRef<CustomCondition, A> {
+impl<A: Arena + Clone> ArenaRef<CustomCondition, A> {
     pub fn effect_type(&self) -> ArenaRef<Term, A> {
         ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|term| term.effect_type))
     }
@@ -706,7 +704,7 @@ impl<A: ArenaAllocator + Clone> ArenaRef<CustomCondition, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<CustomCondition, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<CustomCondition, A> {
     fn size(&self) -> usize {
         1
     }
@@ -753,22 +751,22 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<CustomCondition, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<CustomCondition, A> {
+impl<A: Arena + Clone> PartialEq for ArenaRef<CustomCondition, A> {
     fn eq(&self, other: &Self) -> bool {
         self.effect_type() == other.effect_type()
             && self.payload() == other.payload()
             && self.token() == other.token()
     }
 }
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<CustomCondition, A> {}
+impl<A: Arena + Clone> Eq for ArenaRef<CustomCondition, A> {}
 
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<CustomCondition, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<CustomCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<CustomCondition, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<CustomCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -789,12 +787,12 @@ impl TermSize for PendingCondition {
     }
 }
 impl TermHash for PendingCondition {
-    fn hash(&self, hasher: TermHasher, _arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, _arena: &impl Arena) -> TermHasher {
         hasher
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<PendingCondition, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<PendingCondition, A> {
     fn size(&self) -> usize {
         1
     }
@@ -824,20 +822,20 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<PendingCondition, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<PendingCondition, A> {
+impl<A: Arena + Clone> PartialEq for ArenaRef<PendingCondition, A> {
     fn eq(&self, _other: &Self) -> bool {
         true
     }
 }
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<PendingCondition, A> {}
+impl<A: Arena + Clone> Eq for ArenaRef<PendingCondition, A> {}
 
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<PendingCondition, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<PendingCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<PendingCondition, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<PendingCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<Pending>")
     }
@@ -846,7 +844,7 @@ impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<PendingCondition,
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct ErrorCondition {
-    pub payload: TermPointer,
+    pub payload: ArenaPointer,
 }
 impl TermSize for ErrorCondition {
     fn size_of(&self) -> usize {
@@ -854,18 +852,18 @@ impl TermSize for ErrorCondition {
     }
 }
 impl TermHash for ErrorCondition {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         hasher.hash(&self.payload, arena)
     }
 }
 
-impl<A: ArenaAllocator + Clone> ArenaRef<ErrorCondition, A> {
+impl<A: Arena + Clone> ArenaRef<ErrorCondition, A> {
     pub fn payload(&self) -> ArenaRef<Term, A> {
         ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|term| term.payload))
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<ErrorCondition, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<ErrorCondition, A> {
     fn size(&self) -> usize {
         1
     }
@@ -903,20 +901,20 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<ErrorCondition, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<ErrorCondition, A> {
+impl<A: Arena + Clone> PartialEq for ArenaRef<ErrorCondition, A> {
     fn eq(&self, other: &Self) -> bool {
         self.payload() == other.payload()
     }
 }
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<ErrorCondition, A> {}
+impl<A: Arena + Clone> Eq for ArenaRef<ErrorCondition, A> {}
 
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<ErrorCondition, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<ErrorCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<ErrorCondition, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<ErrorCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<Error:{}>", self.payload())
     }
@@ -926,7 +924,7 @@ impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<ErrorCondition, A
 #[repr(C)]
 pub struct TypeErrorCondition {
     pub expected: u32,
-    pub payload: TermPointer,
+    pub payload: ArenaPointer,
 }
 impl TermSize for TypeErrorCondition {
     fn size_of(&self) -> usize {
@@ -934,14 +932,14 @@ impl TermSize for TypeErrorCondition {
     }
 }
 impl TermHash for TypeErrorCondition {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         hasher
             .hash(&self.expected, arena)
             .hash(&self.payload, arena)
     }
 }
 
-impl<A: ArenaAllocator + Clone> ArenaRef<TypeErrorCondition, A> {
+impl<A: Arena + Clone> ArenaRef<TypeErrorCondition, A> {
     pub fn expected(&self) -> Option<TermTypeDiscriminants> {
         TermTypeDiscriminants::try_from(self.read_value(|term| term.expected)).ok()
     }
@@ -950,7 +948,7 @@ impl<A: ArenaAllocator + Clone> ArenaRef<TypeErrorCondition, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<TypeErrorCondition, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<TypeErrorCondition, A> {
     fn size(&self) -> usize {
         1
     }
@@ -988,21 +986,21 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<TypeErrorCondition, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<TypeErrorCondition, A> {
+impl<A: Arena + Clone> PartialEq for ArenaRef<TypeErrorCondition, A> {
     fn eq(&self, other: &Self) -> bool {
         self.read_value(|term| term.expected) == other.read_value(|term| term.expected)
             && self.payload() == other.payload()
     }
 }
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<TypeErrorCondition, A> {}
+impl<A: Arena + Clone> Eq for ArenaRef<TypeErrorCondition, A> {}
 
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<TypeErrorCondition, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<TypeErrorCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<TypeErrorCondition, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<TypeErrorCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(expected) = self.expected() {
             write!(f, "<TypeError:{:?}:{}>", expected, self.payload())
@@ -1015,7 +1013,7 @@ impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<TypeErrorConditio
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct InvalidFunctionTargetCondition {
-    pub target: TermPointer,
+    pub target: ArenaPointer,
 }
 impl TermSize for InvalidFunctionTargetCondition {
     fn size_of(&self) -> usize {
@@ -1023,18 +1021,18 @@ impl TermSize for InvalidFunctionTargetCondition {
     }
 }
 impl TermHash for InvalidFunctionTargetCondition {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         hasher.hash(&self.target, arena)
     }
 }
 
-impl<A: ArenaAllocator + Clone> ArenaRef<InvalidFunctionTargetCondition, A> {
+impl<A: Arena + Clone> ArenaRef<InvalidFunctionTargetCondition, A> {
     pub fn target(&self) -> ArenaRef<Term, A> {
         ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|term| term.target))
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<InvalidFunctionTargetCondition, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<InvalidFunctionTargetCondition, A> {
     fn size(&self) -> usize {
         1
     }
@@ -1072,20 +1070,20 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<InvalidFunctionTargetCond
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<InvalidFunctionTargetCondition, A> {
+impl<A: Arena + Clone> PartialEq for ArenaRef<InvalidFunctionTargetCondition, A> {
     fn eq(&self, other: &Self) -> bool {
         self.target() == other.target()
     }
 }
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<InvalidFunctionTargetCondition, A> {}
+impl<A: Arena + Clone> Eq for ArenaRef<InvalidFunctionTargetCondition, A> {}
 
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<InvalidFunctionTargetCondition, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<InvalidFunctionTargetCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<InvalidFunctionTargetCondition, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<InvalidFunctionTargetCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<InvalidFunctionTarget:{}>", self.target())
     }
@@ -1094,8 +1092,8 @@ impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<InvalidFunctionTa
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct InvalidFunctionArgsCondition {
-    pub target: TermPointer,
-    pub args: TermPointer,
+    pub target: ArenaPointer,
+    pub args: ArenaPointer,
 }
 impl TermSize for InvalidFunctionArgsCondition {
     fn size_of(&self) -> usize {
@@ -1103,12 +1101,12 @@ impl TermSize for InvalidFunctionArgsCondition {
     }
 }
 impl TermHash for InvalidFunctionArgsCondition {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         hasher.hash(&self.target, arena).hash(&self.args, arena)
     }
 }
 
-impl<A: ArenaAllocator + Clone> ArenaRef<InvalidFunctionArgsCondition, A> {
+impl<A: Arena + Clone> ArenaRef<InvalidFunctionArgsCondition, A> {
     pub fn target(&self) -> ArenaRef<Term, A> {
         ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|term| term.target))
     }
@@ -1120,7 +1118,7 @@ impl<A: ArenaAllocator + Clone> ArenaRef<InvalidFunctionArgsCondition, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<InvalidFunctionArgsCondition, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<InvalidFunctionArgsCondition, A> {
     fn size(&self) -> usize {
         1
     }
@@ -1167,20 +1165,20 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<InvalidFunctionArgsCondit
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<InvalidFunctionArgsCondition, A> {
+impl<A: Arena + Clone> PartialEq for ArenaRef<InvalidFunctionArgsCondition, A> {
     fn eq(&self, other: &Self) -> bool {
         self.target() == other.target() && self.args() == other.args()
     }
 }
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<InvalidFunctionArgsCondition, A> {}
+impl<A: Arena + Clone> Eq for ArenaRef<InvalidFunctionArgsCondition, A> {}
 
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<InvalidFunctionArgsCondition, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<InvalidFunctionArgsCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<InvalidFunctionArgsCondition, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<InvalidFunctionArgsCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<InvalidFunctionArgs:{}:{}>", self.target(), self.args())
     }
@@ -1195,12 +1193,12 @@ impl TermSize for InvalidPointerCondition {
     }
 }
 impl TermHash for InvalidPointerCondition {
-    fn hash(&self, hasher: TermHasher, _arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, _arena: &impl Arena) -> TermHasher {
         hasher
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<InvalidPointerCondition, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<InvalidPointerCondition, A> {
     fn size(&self) -> usize {
         1
     }
@@ -1230,26 +1228,26 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<InvalidPointerCondition, 
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<InvalidPointerCondition, A> {
+impl<A: Arena + Clone> PartialEq for ArenaRef<InvalidPointerCondition, A> {
     fn eq(&self, _other: &Self) -> bool {
         true
     }
 }
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<InvalidPointerCondition, A> {}
+impl<A: Arena + Clone> Eq for ArenaRef<InvalidPointerCondition, A> {}
 
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<InvalidPointerCondition, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<InvalidPointerCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<InvalidPointerCondition, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<InvalidPointerCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<InvalidPointer>")
     }
 }
 
-impl<A: ArenaAllocator + Clone> Internable for ArenaRef<ConditionTerm, A> {
+impl<A: Arena + Clone> Internable for ArenaRef<ConditionTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
         self.capture_depth() == 0
     }
@@ -1277,9 +1275,9 @@ mod tests {
     fn condition_custom() {
         assert_eq!(
             TermType::Condition(ConditionTerm::Custom(CustomCondition {
-                effect_type: TermPointer(12345),
-                payload: TermPointer(45678),
-                token: TermPointer(67890),
+                effect_type: ArenaPointer(12345),
+                payload: ArenaPointer(45678),
+                token: ArenaPointer(67890),
             }))
             .as_bytes(),
             [
@@ -1307,7 +1305,7 @@ mod tests {
     fn condition_error() {
         assert_eq!(
             TermType::Condition(ConditionTerm::Error(ErrorCondition {
-                payload: TermPointer(12345),
+                payload: ArenaPointer(12345),
             }))
             .as_bytes(),
             [
@@ -1323,7 +1321,7 @@ mod tests {
         assert_eq!(
             TermType::Condition(ConditionTerm::TypeError(TypeErrorCondition {
                 expected: 12345,
-                payload: TermPointer(67890),
+                payload: ArenaPointer(67890),
             }))
             .as_bytes(),
             [
@@ -1340,7 +1338,7 @@ mod tests {
         assert_eq!(
             TermType::Condition(ConditionTerm::InvalidFunctionTarget(
                 InvalidFunctionTargetCondition {
-                    target: TermPointer(12345),
+                    target: ArenaPointer(12345),
                 },
             ))
             .as_bytes(),
@@ -1357,8 +1355,8 @@ mod tests {
         assert_eq!(
             TermType::Condition(ConditionTerm::InvalidFunctionArgs(
                 InvalidFunctionArgsCondition {
-                    target: TermPointer(12345),
-                    args: TermPointer(67890),
+                    target: ArenaPointer(12345),
+                    args: ArenaPointer(67890),
                 },
             ))
             .as_bytes(),

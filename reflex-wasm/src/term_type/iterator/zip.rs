@@ -8,17 +8,17 @@ use reflex::core::{DependencyList, Eagerness, GraphNode, Internable, SerializeJs
 use serde_json::Value as JsonValue;
 
 use crate::{
-    allocator::ArenaAllocator,
+    allocator::Arena,
     hash::{TermHash, TermHasher, TermSize},
-    ArenaRef, Term, TermPointer,
+    ArenaPointer, ArenaRef, Term,
 };
 use reflex_macros::PointerIter;
 
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct ZipIteratorTerm {
-    pub left: TermPointer,
-    pub right: TermPointer,
+    pub left: ArenaPointer,
+    pub right: ArenaPointer,
 }
 impl TermSize for ZipIteratorTerm {
     fn size_of(&self) -> usize {
@@ -26,12 +26,12 @@ impl TermSize for ZipIteratorTerm {
     }
 }
 impl TermHash for ZipIteratorTerm {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         hasher.hash(&self.left, arena).hash(&self.right, arena)
     }
 }
 
-impl<A: ArenaAllocator + Clone> ArenaRef<ZipIteratorTerm, A> {
+impl<A: Arena + Clone> ArenaRef<ZipIteratorTerm, A> {
     pub fn left(&self) -> ArenaRef<Term, A> {
         ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|term| term.left))
     }
@@ -40,7 +40,7 @@ impl<A: ArenaAllocator + Clone> ArenaRef<ZipIteratorTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<ZipIteratorTerm, A> {
+impl<A: Arena + Clone> SerializeJson for ArenaRef<ZipIteratorTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -52,26 +52,26 @@ impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<ZipIteratorTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<ZipIteratorTerm, A> {
+impl<A: Arena + Clone> PartialEq for ArenaRef<ZipIteratorTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.left() == other.left() && self.right() == other.right()
     }
 }
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<ZipIteratorTerm, A> {}
+impl<A: Arena + Clone> Eq for ArenaRef<ZipIteratorTerm, A> {}
 
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<ZipIteratorTerm, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<ZipIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<ZipIteratorTerm, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<ZipIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "ZipIterator")
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<ZipIteratorTerm, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<ZipIteratorTerm, A> {
     fn size(&self) -> usize {
         1 + self.left().size() + self.right().size()
     }
@@ -116,7 +116,7 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<ZipIteratorTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> Internable for ArenaRef<ZipIteratorTerm, A> {
+impl<A: Arena + Clone> Internable for ArenaRef<ZipIteratorTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
         self.capture_depth() == 0
     }
@@ -132,8 +132,8 @@ mod tests {
     fn zip_iterator() {
         assert_eq!(
             TermType::ZipIterator(ZipIteratorTerm {
-                left: TermPointer(12345),
-                right: TermPointer(67890),
+                left: ArenaPointer(12345),
+                right: ArenaPointer(67890),
             })
             .as_bytes(),
             [TermTypeDiscriminants::ZipIterator as u32, 12345, 67890],

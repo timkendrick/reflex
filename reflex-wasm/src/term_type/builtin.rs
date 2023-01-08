@@ -11,7 +11,7 @@ use reflex::core::{
 use serde_json::Value as JsonValue;
 
 use crate::{
-    allocator::ArenaAllocator,
+    allocator::Arena,
     hash::{TermHash, TermHasher, TermSize},
     stdlib::Stdlib,
     term_type::TypedTerm,
@@ -28,7 +28,7 @@ impl TermSize for FunctionIndex {
     }
 }
 impl TermHash for FunctionIndex {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         let Self(uid) = self;
         hasher.hash(uid, arena)
     }
@@ -64,7 +64,7 @@ impl TermSize for BuiltinTerm {
     }
 }
 impl TermHash for BuiltinTerm {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         hasher.hash(&self.uid, arena)
     }
 }
@@ -82,7 +82,7 @@ impl std::fmt::Display for BuiltinTerm {
     }
 }
 
-impl<A: ArenaAllocator + Clone> ArenaRef<BuiltinTerm, A> {
+impl<A: Arena + Clone> ArenaRef<BuiltinTerm, A> {
     pub fn target(&self) -> FunctionIndex {
         self.read_value(|term| term.uid)
     }
@@ -93,7 +93,7 @@ impl<A: ArenaAllocator + Clone> ArenaRef<BuiltinTerm, A> {
     }
 }
 
-impl<T: Expression, A: ArenaAllocator + Clone> BuiltinTermType<T> for ArenaRef<BuiltinTerm, A>
+impl<T: Expression, A: Arena + Clone> BuiltinTermType<T> for ArenaRef<BuiltinTerm, A>
 where
     T::Builtin: From<FunctionIndex>,
 {
@@ -106,8 +106,7 @@ where
     }
 }
 
-impl<T: Expression, A: ArenaAllocator + Clone> BuiltinTermType<T>
-    for ArenaRef<TypedTerm<BuiltinTerm>, A>
+impl<T: Expression, A: Arena + Clone> BuiltinTermType<T> for ArenaRef<TypedTerm<BuiltinTerm>, A>
 where
     T::Builtin: From<FunctionIndex>,
 {
@@ -120,7 +119,7 @@ where
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<BuiltinTerm, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<BuiltinTerm, A> {
     fn size(&self) -> usize {
         1
     }
@@ -150,7 +149,7 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<BuiltinTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<BuiltinTerm, A> {
+impl<A: Arena + Clone> SerializeJson for ArenaRef<BuiltinTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -162,26 +161,26 @@ impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<BuiltinTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<BuiltinTerm, A> {
+impl<A: Arena + Clone> PartialEq for ArenaRef<BuiltinTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.target() == other.target()
     }
 }
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<BuiltinTerm, A> {}
+impl<A: Arena + Clone> Eq for ArenaRef<BuiltinTerm, A> {}
 
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<BuiltinTerm, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<BuiltinTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<BuiltinTerm, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<BuiltinTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<stdlib:{}>", self.target())
     }
 }
 
-impl<A: ArenaAllocator + Clone> Internable for ArenaRef<BuiltinTerm, A> {
+impl<A: Arena + Clone> Internable for ArenaRef<BuiltinTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
         self.capture_depth() == 0
     }

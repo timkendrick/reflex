@@ -11,13 +11,13 @@ use walrus::{
 };
 
 use crate::{
-    allocator::ArenaAllocator,
+    allocator::Arena,
     compiler::{
         CompileWasm, CompiledExpression, CompiledInstruction, CompilerError, CompilerState,
         RuntimeBuiltin,
     },
     term_type::WasmExpression,
-    ArenaRef, PointerIter, Term,
+    ArenaRef, Term,
 };
 
 #[derive(Debug)]
@@ -47,7 +47,7 @@ impl std::fmt::Display for WasmCompilerError {
     }
 }
 
-pub fn compile_module<A: ArenaAllocator + PointerIter + Clone>(
+pub fn compile_module<A: Arena + Clone>(
     entry_points: impl IntoIterator<Item = (String, WasmExpression<A>)>,
     runtime_wasm: &[u8],
 ) -> Result<Vec<u8>, WasmCompilerError> {
@@ -166,11 +166,11 @@ fn get_data_section_instruction_id(module: &walrus::Module) -> Result<DataId, Wa
 }
 
 fn compile_entry_points(
-    entry_points: impl IntoIterator<Item = (String, ArenaRef<Term, impl ArenaAllocator + Clone>)>,
+    entry_points: impl IntoIterator<Item = (String, ArenaRef<Term, impl Arena + Clone>)>,
     heap_snapshot: &[u8],
 ) -> Result<(Vec<(String, CompiledExpression)>, Vec<u8>), WasmCompilerError> {
     // Initialize the compiler state with the contents of the initialized linear memory
-    let mut compiler_state = CompilerState::from_heap_snapshot(heap_snapshot);
+    let mut compiler_state = CompilerState::from_heap_snapshot::<Term>(heap_snapshot);
     let compiled_entry_points = entry_points
         .into_iter()
         .map(|(export_name, expression)| {
@@ -263,13 +263,13 @@ mod tests {
     };
 
     use crate::{
-        allocator::VecAllocator,
+        allocator::{ArenaAllocator, VecAllocator},
         interpreter::{
             mocks::add_import_stubs, InterpreterError, WasmContextBuilder, WasmInterpreter,
         },
         stdlib::{Add, Stdlib},
         term_type::{ApplicationTerm, BuiltinTerm, IntTerm, ListTerm, TermType},
-        ArenaRef, Term, TermPointer,
+        ArenaPointer, ArenaRef, Term,
     };
 
     use super::*;
@@ -297,7 +297,7 @@ mod tests {
 
         let interpreter = create_mock_wasm_interpreter(&wasm_bytes).unwrap();
 
-        let state = TermPointer::null();
+        let state = ArenaPointer::null();
 
         let interpreter = Rc::new(RefCell::new(interpreter));
         let result = interpreter
@@ -353,7 +353,7 @@ mod tests {
 
         let interpreter = create_mock_wasm_interpreter(&wasm_bytes).unwrap();
 
-        let state = TermPointer::null();
+        let state = ArenaPointer::null();
 
         let interpreter = Rc::new(RefCell::new(interpreter));
 

@@ -8,9 +8,9 @@ use reflex::core::{DependencyList, Eagerness, GraphNode, Internable, SerializeJs
 use serde_json::Value as JsonValue;
 
 use crate::{
-    allocator::ArenaAllocator,
+    allocator::Arena,
     hash::{TermHash, TermHasher, TermSize},
-    ArenaRef, Term, TermPointer,
+    ArenaPointer, ArenaRef, Term,
 };
 
 use reflex_macros::PointerIter;
@@ -18,7 +18,7 @@ use reflex_macros::PointerIter;
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct HashmapKeysIteratorTerm {
-    pub source: TermPointer,
+    pub source: ArenaPointer,
 }
 
 impl TermSize for HashmapKeysIteratorTerm {
@@ -27,18 +27,18 @@ impl TermSize for HashmapKeysIteratorTerm {
     }
 }
 impl TermHash for HashmapKeysIteratorTerm {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         hasher.hash(&self.source, arena)
     }
 }
 
-impl<A: ArenaAllocator + Clone> ArenaRef<HashmapKeysIteratorTerm, A> {
+impl<A: Arena + Clone> ArenaRef<HashmapKeysIteratorTerm, A> {
     pub fn source(&self) -> ArenaRef<Term, A> {
         ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|term| term.source))
     }
 }
 
-impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<HashmapKeysIteratorTerm, A> {
+impl<A: Arena + Clone> SerializeJson for ArenaRef<HashmapKeysIteratorTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -50,26 +50,26 @@ impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<HashmapKeysIteratorTe
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<HashmapKeysIteratorTerm, A> {
+impl<A: Arena + Clone> PartialEq for ArenaRef<HashmapKeysIteratorTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.source() == other.source()
     }
 }
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<HashmapKeysIteratorTerm, A> {}
+impl<A: Arena + Clone> Eq for ArenaRef<HashmapKeysIteratorTerm, A> {}
 
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<HashmapKeysIteratorTerm, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<HashmapKeysIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<HashmapKeysIteratorTerm, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<HashmapKeysIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "HashmapKeysIterator")
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<HashmapKeysIteratorTerm, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<HashmapKeysIteratorTerm, A> {
     fn size(&self) -> usize {
         1 + self.source().size()
     }
@@ -107,7 +107,7 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<HashmapKeysIteratorTerm, 
     }
 }
 
-impl<A: ArenaAllocator + Clone> Internable for ArenaRef<HashmapKeysIteratorTerm, A> {
+impl<A: Arena + Clone> Internable for ArenaRef<HashmapKeysIteratorTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
         self.capture_depth() == 0
     }
@@ -123,7 +123,7 @@ mod tests {
     fn hashmap_keys_iterator() {
         assert_eq!(
             TermType::HashmapKeysIterator(HashmapKeysIteratorTerm {
-                source: TermPointer(12345),
+                source: ArenaPointer(12345),
             })
             .as_bytes(),
             [TermTypeDiscriminants::HashmapKeysIterator as u32, 12345],

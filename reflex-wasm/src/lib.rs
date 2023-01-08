@@ -4,7 +4,7 @@
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use std::{hash::Hash, marker::PhantomData};
 
-use allocator::ArenaAllocator;
+use allocator::{Arena, ArenaAllocator};
 use hash::{TermHash, TermHashState, TermHasher, TermSize};
 
 use reflex::{core::RefType, hash::HashId};
@@ -23,12 +23,12 @@ pub mod stdlib;
 pub mod term_type;
 pub mod utils;
 
-pub struct ArenaRef<T, A: ArenaAllocator> {
+pub struct ArenaRef<T, A: Arena> {
     arena: A,
-    pointer: TermPointer,
+    pointer: ArenaPointer,
     _type: PhantomData<T>,
 }
-impl<T, A: ArenaAllocator> std::hash::Hash for ArenaRef<T, A>
+impl<T, A: Arena> std::hash::Hash for ArenaRef<T, A>
 where
     T: Hash,
 {
@@ -36,8 +36,8 @@ where
         self.read_value(|value| value.hash(state))
     }
 }
-impl<T, A: ArenaAllocator> ArenaRef<T, A> {
-    pub fn new(arena: A, pointer: TermPointer) -> Self {
+impl<T, A: Arena> ArenaRef<T, A> {
+    pub fn new(arena: A, pointer: ArenaPointer) -> Self {
         Self {
             arena,
             pointer,
@@ -47,13 +47,13 @@ impl<T, A: ArenaAllocator> ArenaRef<T, A> {
     pub fn read_value<V>(&self, selector: impl FnOnce(&T) -> V) -> V {
         self.arena.read_value::<T, V>(self.pointer, selector)
     }
-    pub fn inner_pointer<V>(&self, selector: impl FnOnce(&T) -> &V) -> TermPointer {
+    pub fn inner_pointer<V>(&self, selector: impl FnOnce(&T) -> &V) -> ArenaPointer {
         self.arena.inner_pointer::<T, V>(self.pointer, selector)
     }
     pub fn arena(&self) -> &A {
         &self.arena
     }
-    pub fn as_pointer(&self) -> TermPointer {
+    pub fn as_pointer(&self) -> ArenaPointer {
         self.pointer
     }
     pub fn inner_ref<V>(&self, selector: impl FnOnce(&T) -> &V) -> ArenaRef<V, A>
@@ -66,8 +66,8 @@ impl<T, A: ArenaAllocator> ArenaRef<T, A> {
         )
     }
 }
-impl<T, A: ArenaAllocator> Copy for ArenaRef<T, A> where A: Copy {}
-impl<T, A: ArenaAllocator> Clone for ArenaRef<T, A>
+impl<T, A: Arena> Copy for ArenaRef<T, A> where A: Copy {}
+impl<T, A: Arena> Clone for ArenaRef<T, A>
 where
     A: Clone,
 {
@@ -80,7 +80,7 @@ where
     }
 }
 
-impl<'a, T, A: ArenaAllocator> From<&'a ArenaRef<T, A>> for ArenaRef<T, A>
+impl<'a, T, A: Arena> From<&'a ArenaRef<T, A>> for ArenaRef<T, A>
 where
     A: Clone,
 {
@@ -89,18 +89,18 @@ where
     }
 }
 
-impl<T, A: ArenaAllocator> RefType<Self> for ArenaRef<T, A> {
+impl<T, A: Arena> RefType<Self> for ArenaRef<T, A> {
     fn as_deref(&self) -> &Self {
         self
     }
 }
 
-pub struct IntoArenaRefIter<'a, T: 'a, A: ArenaAllocator, TInner: Iterator<Item = TermPointer>> {
+pub struct IntoArenaRefIter<'a, T: 'a, A: Arena, TInner: Iterator<Item = ArenaPointer>> {
     arena: &'a A,
     inner: TInner,
     _item: PhantomData<T>,
 }
-impl<'a, T: 'a, A: ArenaAllocator, TInner: Iterator<Item = TermPointer>>
+impl<'a, T: 'a, A: Arena, TInner: Iterator<Item = ArenaPointer>>
     IntoArenaRefIter<'a, T, A, TInner>
 {
     fn new(arena: &'a A, inner: TInner) -> Self {
@@ -112,23 +112,23 @@ impl<'a, T: 'a, A: ArenaAllocator, TInner: Iterator<Item = TermPointer>>
     }
 }
 
-pub trait IntoArenaRefIterator<'a, A: ArenaAllocator>
+pub trait IntoArenaRefIterator<'a, A: Arena>
 where
-    Self: Iterator<Item = TermPointer> + Sized,
+    Self: Iterator<Item = ArenaPointer> + Sized,
 {
     fn as_arena_refs<T: 'a>(self, arena: &'a A) -> IntoArenaRefIter<'a, T, A, Self>;
 }
 
-impl<'a, _Self, A: ArenaAllocator> IntoArenaRefIterator<'a, A> for _Self
+impl<'a, _Self, A: Arena> IntoArenaRefIterator<'a, A> for _Self
 where
-    Self: Iterator<Item = TermPointer> + Sized,
+    Self: Iterator<Item = ArenaPointer> + Sized,
 {
     fn as_arena_refs<T: 'a>(self, arena: &'a A) -> IntoArenaRefIter<'a, T, A, Self> {
         IntoArenaRefIter::new(arena, self)
     }
 }
 
-impl<'a, T: 'a, A: ArenaAllocator + Clone, TInner: Iterator<Item = TermPointer>> Iterator
+impl<'a, T: 'a, A: Arena + Clone, TInner: Iterator<Item = ArenaPointer>> Iterator
     for IntoArenaRefIter<'a, T, A, TInner>
 {
     type Item = ArenaRef<T, A>;
@@ -141,7 +141,7 @@ impl<'a, T: 'a, A: ArenaAllocator + Clone, TInner: Iterator<Item = TermPointer>>
         self.inner.size_hint()
     }
 }
-impl<'a, T: 'a, A: ArenaAllocator + Clone, TInner: Iterator<Item = TermPointer>> ExactSizeIterator
+impl<'a, T: 'a, A: Arena + Clone, TInner: Iterator<Item = ArenaPointer>> ExactSizeIterator
     for IntoArenaRefIter<'a, T, A, TInner>
 where
     TInner: ExactSizeIterator,
@@ -158,7 +158,7 @@ pub struct Term {
     value: TermType,
 }
 impl Term {
-    pub fn new(value: TermType, arena: &impl ArenaAllocator) -> Self {
+    pub fn new(value: TermType, arena: &impl Arena) -> Self {
         Self {
             header: TermHeader {
                 hash: value.hash(TermHasher::default(), arena).finish(),
@@ -170,10 +170,10 @@ impl Term {
         // FIXME: 64-bit term hash
         u32::from(self.header.hash) as HashId
     }
-    pub fn get_hash_pointer(term: TermPointer) -> TermPointer {
+    pub fn get_hash_pointer(term: ArenaPointer) -> ArenaPointer {
         term.offset(0)
     }
-    pub fn get_value_pointer(term: TermPointer) -> TermPointer {
+    pub fn get_value_pointer(term: ArenaPointer) -> ArenaPointer {
         term.offset(std::mem::size_of::<TermHeader>() as u32)
     }
     pub fn as_bytes(&self) -> &[u32] {
@@ -193,21 +193,21 @@ impl TermSize for Term {
     }
 }
 impl TermHash for Term {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         // TODO: Investigate shallow hashing for compound terms
         // hasher.write_hash(self.header.hash)
         self.value.hash(hasher, arena)
     }
 }
 
-impl<A: ArenaAllocator> ArenaRef<Term, A> {
-    pub(crate) fn get_value_pointer(&self) -> TermPointer {
+impl<A: Arena> ArenaRef<Term, A> {
+    pub(crate) fn get_value_pointer(&self) -> ArenaPointer {
         Term::get_value_pointer(self.pointer)
     }
 }
 
-impl<A: ArenaAllocator> TermHash for ArenaRef<Term, A> {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+impl<A: Arena> TermHash for ArenaRef<Term, A> {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         self.read_value(move |value| TermHash::hash(value, hasher, arena))
     }
 }
@@ -218,10 +218,10 @@ pub struct TermHeader {
     hash: TermHashState,
 }
 
-#[derive(PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(PartialOrd, Ord, PartialEq, Eq, Clone, Copy, Hash)]
 #[repr(transparent)]
-pub struct TermPointer(u32);
-impl TermPointer {
+pub struct ArenaPointer(u32);
+impl ArenaPointer {
     pub fn null() -> Self {
         Self(0xFFFFFFFF)
     }
@@ -248,23 +248,23 @@ impl TermPointer {
         }
     }
 }
-impl From<TermPointer> for u32 {
-    fn from(value: TermPointer) -> Self {
-        let TermPointer(value) = value;
+impl From<ArenaPointer> for u32 {
+    fn from(value: ArenaPointer) -> Self {
+        let ArenaPointer(value) = value;
         value
     }
 }
-impl From<u32> for TermPointer {
+impl From<u32> for ArenaPointer {
     fn from(value: u32) -> Self {
         Self(value)
     }
 }
-impl TermHash for TermPointer {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+impl TermHash for ArenaPointer {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         arena.read_value::<Term, _>(*self, |term| term.hash(hasher, arena))
     }
 }
-impl std::fmt::Debug for TermPointer {
+impl std::fmt::Debug for ArenaPointer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:#016x}", self.0)
     }
@@ -298,7 +298,7 @@ impl<T> TermHash for Array<T>
 where
     T: TermHash,
 {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         let hasher = hasher.write_u32(self.length);
         self.items()
             .fold(hasher, |hasher, item| item.hash(hasher, arena))
@@ -310,7 +310,7 @@ impl<T: Sized> Array<T> {
         self.length as usize
     }
     pub fn extend(
-        list: TermPointer,
+        list: ArenaPointer,
         items: impl IntoIterator<Item = T, IntoIter = impl ExactSizeIterator<Item = T>>,
         arena: &mut impl ArenaAllocator,
     ) {
@@ -328,7 +328,7 @@ impl<T: Sized> Array<T> {
         let array_offset = u32::from(items_offset);
         for (index, item) in items.enumerate() {
             arena.write(
-                TermPointer::from(array_offset + ((index * std::mem::size_of::<T>()) as u32)),
+                ArenaPointer::from(array_offset + ((index * std::mem::size_of::<T>()) as u32)),
                 item,
             );
         }
@@ -348,10 +348,10 @@ impl<T: Sized> Array<T> {
     pub fn items(&self) -> ArrayIter<'_, T> {
         ArrayIter::new(self)
     }
-    pub fn get_item_offset(list: TermPointer, index: usize) -> TermPointer {
+    pub fn get_item_offset(list: ArenaPointer, index: usize) -> ArenaPointer {
         list.offset((std::mem::size_of::<Array<T>>() + (index * std::mem::size_of::<T>())) as u32)
     }
-    pub fn iter<'a, A: ArenaAllocator>(list: TermPointer, arena: &'a A) -> ArenaArrayIter<'a, T, A>
+    pub fn iter<'a, A: Arena>(list: ArenaPointer, arena: &'a A) -> ArenaArrayIter<'a, T, A>
     where
         T: Copy,
     {
@@ -364,7 +364,7 @@ impl<T: Sized> Array<T> {
     }
 }
 
-impl<T, A: ArenaAllocator> ArenaRef<Array<T>, A> {
+impl<T, A: Arena> ArenaRef<Array<T>, A> {
     pub fn len(&self) -> usize {
         self.arena
             .read_value::<Array<T>, u32>(self.pointer, |value| value.length) as usize
@@ -409,14 +409,14 @@ impl<'a, T: Sized> Iterator for ArrayIter<'a, T> {
     }
 }
 
-pub struct ArenaArrayIter<'a, T: Sized + Copy, A: ArenaAllocator> {
+pub struct ArenaArrayIter<'a, T: Sized + Copy, A: Arena> {
     length: usize,
-    offset: TermPointer,
+    offset: ArenaPointer,
     arena: &'a A,
     _item: PhantomData<T>,
 }
 
-impl<'a, T: Sized + Copy, A: ArenaAllocator> Iterator for ArenaArrayIter<'a, T, A> {
+impl<'a, T: Sized + Copy, A: Arena> Iterator for ArenaArrayIter<'a, T, A> {
     type Item = T;
     fn next(&mut self) -> Option<Self::Item> {
         if self.length == 0 {
@@ -438,7 +438,7 @@ impl<'a, T: Sized + Copy, A: ArenaAllocator> Iterator for ArenaArrayIter<'a, T, 
         self.length
     }
 }
-impl<'a, T: Sized + Copy, A: ArenaAllocator> ExactSizeIterator for ArenaArrayIter<'a, T, A> {}
+impl<'a, T: Sized + Copy, A: Arena> ExactSizeIterator for ArenaArrayIter<'a, T, A> {}
 
 pub fn pad_to_4_byte_offset(value: usize) -> usize {
     if value == 0 {
@@ -449,7 +449,7 @@ pub fn pad_to_4_byte_offset(value: usize) -> usize {
 }
 
 pub trait PointerIter {
-    type Iter<'a>: Iterator<Item = TermPointer>
+    type Iter<'a>: Iterator<Item = ArenaPointer>
     where
         Self: 'a;
 
@@ -462,9 +462,9 @@ mod tests {
     use reflex_macros::PointerIter;
 
     use crate::{
-        allocator::{ArenaAllocator, VecAllocator},
+        allocator::{Arena, ArenaAllocator, VecAllocator},
         hash::TermSize,
-        ArenaRef, PointerIter, TermPointer,
+        ArenaPointer, ArenaRef, PointerIter,
     };
 
     use super::*;
@@ -473,9 +473,9 @@ mod tests {
     #[repr(C)]
     pub struct TreeNode {
         pub id: u64,
-        pub first: TermPointer,
+        pub first: ArenaPointer,
         pub after: u32,
-        pub second: TermPointer,
+        pub second: ArenaPointer,
     }
     impl TermSize for TreeNode {
         fn size_of(&self) -> usize {
@@ -489,13 +489,13 @@ mod tests {
         }
     }
 
-    impl<A: ArenaAllocator + Clone> NodeId for ArenaRef<TreeNode, A> {
+    impl<A: Arena + Clone> NodeId for ArenaRef<TreeNode, A> {
         fn id(&self) -> HashId {
             self.read_value(|term| term.id())
         }
     }
 
-    impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<TreeNode, A> {
+    impl<A: Arena + Clone> PartialEq for ArenaRef<TreeNode, A> {
         fn eq(&self, other: &Self) -> bool {
             self.read_value(|value| value.id) == other.read_value(|value| value.id)
                 && self.read_value(|value| value.after) == other.read_value(|value| value.after)
@@ -504,7 +504,7 @@ mod tests {
         }
     }
 
-    impl<A: ArenaAllocator + Clone> ArenaRef<TreeNode, A> {
+    impl<A: Arena + Clone> ArenaRef<TreeNode, A> {
         pub fn first(&self) -> Option<ArenaRef<TreeNode, A>> {
             self.read_value(|value| value.first)
                 .as_non_null()
@@ -517,7 +517,7 @@ mod tests {
         }
     }
 
-    impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<TreeNode, A> {
+    impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<TreeNode, A> {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             self.read_value(|term| std::fmt::Debug::fmt(term, f))
         }
@@ -529,16 +529,16 @@ mod tests {
 
         let term = TreeNode {
             id: 3,
-            first: TermPointer::from(20),
+            first: ArenaPointer::from(20),
             after: 123,
-            second: TermPointer::from(50),
+            second: ArenaPointer::from(50),
         };
         let instance = allocator.allocate(term);
-        let expression = ArenaRef::<TreeNode, _>::new(&mut allocator, instance);
+        let expression = ArenaRef::<TreeNode, _>::new(&allocator, instance);
         let (before_pointer, before_size) = (instance.offset(0), std::mem::size_of::<u64>() as u32);
         let (first_pointer, first_size) = (
             before_pointer.offset(before_size),
-            std::mem::size_of::<TermPointer>() as u32,
+            std::mem::size_of::<ArenaPointer>() as u32,
         );
         let (after_pointer, after_size) = (
             first_pointer.offset(first_size),
@@ -546,7 +546,7 @@ mod tests {
         );
         let (second_pointer, _second_size) = (
             after_pointer.offset(after_size),
-            std::mem::size_of::<TermPointer>() as u32,
+            std::mem::size_of::<ArenaPointer>() as u32,
         );
 
         assert_eq!(

@@ -11,10 +11,10 @@ use reflex::core::{
 use serde_json::Value as JsonValue;
 
 use crate::{
-    allocator::ArenaAllocator,
+    allocator::Arena,
     hash::{TermHash, TermHasher, TermSize},
     term_type::TypedTerm,
-    ArenaRef, Term, TermPointer,
+    ArenaPointer, ArenaRef, Term,
 };
 
 use reflex_macros::PointerIter;
@@ -24,8 +24,8 @@ use super::{ListTerm, WasmExpression};
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct ApplicationTerm {
-    pub target: TermPointer,
-    pub args: TermPointer,
+    pub target: ArenaPointer,
+    pub args: ArenaPointer,
 }
 
 impl TermSize for ApplicationTerm {
@@ -34,12 +34,12 @@ impl TermSize for ApplicationTerm {
     }
 }
 impl TermHash for ApplicationTerm {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         hasher.hash(&self.target, arena).hash(&self.args, arena)
     }
 }
 
-impl<A: ArenaAllocator + Clone> ArenaRef<ApplicationTerm, A> {
+impl<A: Arena + Clone> ArenaRef<ApplicationTerm, A> {
     pub fn target(&self) -> ArenaRef<Term, A> {
         ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|value| value.target))
     }
@@ -51,9 +51,7 @@ impl<A: ArenaAllocator + Clone> ArenaRef<ApplicationTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> ApplicationTermType<WasmExpression<A>>
-    for ArenaRef<ApplicationTerm, A>
-{
+impl<A: Arena + Clone> ApplicationTermType<WasmExpression<A>> for ArenaRef<ApplicationTerm, A> {
     fn target<'a>(&'a self) -> <WasmExpression<A> as Expression>::ExpressionRef<'a>
     where
         WasmExpression<A>: 'a,
@@ -69,7 +67,7 @@ impl<A: ArenaAllocator + Clone> ApplicationTermType<WasmExpression<A>>
     }
 }
 
-impl<A: ArenaAllocator + Clone> ApplicationTermType<WasmExpression<A>>
+impl<A: Arena + Clone> ApplicationTermType<WasmExpression<A>>
     for ArenaRef<TypedTerm<ApplicationTerm>, A>
 {
     fn target<'a>(&'a self) -> <WasmExpression<A> as Expression>::ExpressionRef<'a>
@@ -91,7 +89,7 @@ impl<A: ArenaAllocator + Clone> ApplicationTermType<WasmExpression<A>>
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<ApplicationTerm, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<ApplicationTerm, A> {
     fn size(&self) -> usize {
         1 + self.target().size() + self.args().size()
     }
@@ -155,7 +153,7 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<ApplicationTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<ApplicationTerm, A> {
+impl<A: Arena + Clone> SerializeJson for ArenaRef<ApplicationTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -164,20 +162,20 @@ impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<ApplicationTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<ApplicationTerm, A> {
+impl<A: Arena + Clone> PartialEq for ArenaRef<ApplicationTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.target() == other.target() && self.args() == other.args()
     }
 }
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<ApplicationTerm, A> {}
+impl<A: Arena + Clone> Eq for ArenaRef<ApplicationTerm, A> {}
 
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<ApplicationTerm, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<ApplicationTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<ApplicationTerm, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<ApplicationTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -203,7 +201,7 @@ fn get_eager_args<T>(args: impl IntoIterator<Item = T>, arity: &Arity) -> impl I
         })
 }
 
-impl<A: ArenaAllocator + Clone> Internable for ArenaRef<ApplicationTerm, A> {
+impl<A: Arena + Clone> Internable for ArenaRef<ApplicationTerm, A> {
     fn should_intern(&self, eager: Eagerness) -> bool {
         eager == Eagerness::Lazy
             && self.target().capture_depth() == 0
@@ -221,8 +219,8 @@ mod tests {
     fn application() {
         assert_eq!(
             TermType::Application(ApplicationTerm {
-                target: TermPointer(12345),
-                args: TermPointer(67890),
+                target: ArenaPointer(12345),
+                args: ArenaPointer(67890),
             })
             .as_bytes(),
             [TermTypeDiscriminants::Application as u32, 12345, 67890],

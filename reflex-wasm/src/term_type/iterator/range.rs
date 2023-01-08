@@ -8,7 +8,7 @@ use reflex::core::{DependencyList, Eagerness, GraphNode, Internable, SerializeJs
 use serde_json::Value as JsonValue;
 
 use crate::{
-    allocator::ArenaAllocator,
+    allocator::Arena,
     hash::{TermHash, TermHasher, TermSize},
     ArenaRef,
 };
@@ -26,12 +26,12 @@ impl TermSize for RangeIteratorTerm {
     }
 }
 impl TermHash for RangeIteratorTerm {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         hasher.hash(&self.offset, arena).write_u32(self.length)
     }
 }
 
-impl<A: ArenaAllocator + Clone> ArenaRef<RangeIteratorTerm, A> {
+impl<A: Arena + Clone> ArenaRef<RangeIteratorTerm, A> {
     pub fn offset(&self) -> i32 {
         self.read_value(|term| term.offset)
     }
@@ -40,7 +40,7 @@ impl<A: ArenaAllocator + Clone> ArenaRef<RangeIteratorTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<RangeIteratorTerm, A> {
+impl<A: Arena + Clone> SerializeJson for ArenaRef<RangeIteratorTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -52,26 +52,26 @@ impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<RangeIteratorTerm, A>
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<RangeIteratorTerm, A> {
+impl<A: Arena + Clone> PartialEq for ArenaRef<RangeIteratorTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.offset() == other.offset() && self.length() == other.length()
     }
 }
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<RangeIteratorTerm, A> {}
+impl<A: Arena + Clone> Eq for ArenaRef<RangeIteratorTerm, A> {}
 
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<RangeIteratorTerm, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<RangeIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<RangeIteratorTerm, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<RangeIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "RangeIterator")
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<RangeIteratorTerm, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<RangeIteratorTerm, A> {
     fn size(&self) -> usize {
         1
     }
@@ -101,7 +101,7 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<RangeIteratorTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> Internable for ArenaRef<RangeIteratorTerm, A> {
+impl<A: Arena + Clone> Internable for ArenaRef<RangeIteratorTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
         self.capture_depth() == 0
     }

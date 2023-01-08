@@ -11,10 +11,10 @@ use reflex::core::{
 use serde_json::Value as JsonValue;
 
 use crate::{
-    allocator::ArenaAllocator,
+    allocator::Arena,
     hash::{TermHash, TermHasher, TermSize},
     term_type::TypedTerm,
-    ArenaRef, TermPointer,
+    ArenaPointer, ArenaRef,
 };
 use reflex_macros::PointerIter;
 
@@ -23,7 +23,7 @@ use super::{ConditionTerm, WasmExpression};
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct EffectTerm {
-    pub condition: TermPointer,
+    pub condition: ArenaPointer,
 }
 impl TermSize for EffectTerm {
     fn size_of(&self) -> usize {
@@ -31,12 +31,12 @@ impl TermSize for EffectTerm {
     }
 }
 impl TermHash for EffectTerm {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         hasher.hash(&self.condition, arena)
     }
 }
 
-impl<A: ArenaAllocator + Clone> ArenaRef<EffectTerm, A> {
+impl<A: Arena + Clone> ArenaRef<EffectTerm, A> {
     pub fn condition(&self) -> ArenaRef<TypedTerm<ConditionTerm>, A> {
         ArenaRef::<TypedTerm<ConditionTerm>, _>::new(
             self.arena.clone(),
@@ -45,7 +45,7 @@ impl<A: ArenaAllocator + Clone> ArenaRef<EffectTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> EffectTermType<WasmExpression<A>> for ArenaRef<EffectTerm, A> {
+impl<A: Arena + Clone> EffectTermType<WasmExpression<A>> for ArenaRef<EffectTerm, A> {
     fn condition<'a>(&'a self) -> <WasmExpression<A> as Expression>::SignalRef<'a>
     where
         <WasmExpression<A> as Expression>::Signal: 'a,
@@ -55,9 +55,7 @@ impl<A: ArenaAllocator + Clone> EffectTermType<WasmExpression<A>> for ArenaRef<E
     }
 }
 
-impl<A: ArenaAllocator + Clone> EffectTermType<WasmExpression<A>>
-    for ArenaRef<TypedTerm<EffectTerm>, A>
-{
+impl<A: Arena + Clone> EffectTermType<WasmExpression<A>> for ArenaRef<TypedTerm<EffectTerm>, A> {
     fn condition<'a>(&'a self) -> <WasmExpression<A> as Expression>::SignalRef<'a>
     where
         <WasmExpression<A> as Expression>::Signal: 'a,
@@ -67,7 +65,7 @@ impl<A: ArenaAllocator + Clone> EffectTermType<WasmExpression<A>>
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<EffectTerm, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<EffectTerm, A> {
     fn size(&self) -> usize {
         1
     }
@@ -97,7 +95,7 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<EffectTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<EffectTerm, A> {
+impl<A: Arena + Clone> SerializeJson for ArenaRef<EffectTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -109,26 +107,26 @@ impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<EffectTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<EffectTerm, A> {
+impl<A: Arena + Clone> PartialEq for ArenaRef<EffectTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.condition() == other.condition()
     }
 }
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<EffectTerm, A> {}
+impl<A: Arena + Clone> Eq for ArenaRef<EffectTerm, A> {}
 
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<EffectTerm, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<EffectTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<EffectTerm, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<EffectTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<effect:{}>", self.condition())
     }
 }
 
-impl<A: ArenaAllocator + Clone> Internable for ArenaRef<EffectTerm, A> {
+impl<A: Arena + Clone> Internable for ArenaRef<EffectTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
         self.capture_depth() == 0
     }
@@ -144,7 +142,7 @@ mod tests {
     fn effect() {
         assert_eq!(
             TermType::Effect(EffectTerm {
-                condition: TermPointer(12345)
+                condition: ArenaPointer(12345)
             })
             .as_bytes(),
             [TermTypeDiscriminants::Effect as u32, 12345],

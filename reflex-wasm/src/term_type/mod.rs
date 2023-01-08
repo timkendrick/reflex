@@ -66,10 +66,10 @@ pub use tree::*;
 pub use variable::*;
 
 use crate::{
-    allocator::ArenaAllocator,
+    allocator::Arena,
     hash::{TermHash, TermHasher, TermSize},
     stdlib::Stdlib,
-    ArenaRef, Term, TermPointer,
+    ArenaPointer, ArenaRef, Term,
 };
 
 const TERM_TYPE_DISCRIMINANT_SIZE: usize = std::mem::size_of::<u32>();
@@ -215,7 +215,7 @@ impl TermSize for TermType {
     }
 }
 impl TermHash for TermType {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         match self {
             Self::Application(term) => hasher
                 .write_u8(TermTypeDiscriminants::Application as u8)
@@ -662,7 +662,7 @@ impl<'a> Into<Option<&'a ZipIteratorTerm>> for &'a TermType {
     }
 }
 
-impl<A: ArenaAllocator + Clone> ArenaRef<Term, A> {
+impl<A: Arena + Clone> ArenaRef<Term, A> {
     pub fn arity(&self) -> Option<Arity> {
         match &self.read_value(|term| term.type_id()) {
             TermTypeDiscriminants::Builtin => {
@@ -685,8 +685,8 @@ impl<A: ArenaAllocator + Clone> ArenaRef<Term, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<Term, A> {}
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<Term, A> {
+impl<A: Arena + Clone> Eq for ArenaRef<Term, A> {}
+impl<A: Arena + Clone> PartialEq for ArenaRef<Term, A> {
     fn eq(&self, other: &Self) -> bool {
         if self.read_value(|term| term.header.hash) != other.read_value(|term| term.header.hash) {
             return false;
@@ -873,7 +873,7 @@ impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<Term, A> {
 
 pub type WasmExpression<A> = ArenaRef<Term, A>;
 
-impl<A: ArenaAllocator + Clone> Expression for ArenaRef<Term, A> {
+impl<A: Arena + Clone> Expression for ArenaRef<Term, A> {
     type String = ArenaRef<TypedTerm<StringTerm>, A>;
     type Builtin = Stdlib;
     type Signal = ArenaRef<TypedTerm<ConditionTerm>, A>;
@@ -911,13 +911,13 @@ impl<A: ArenaAllocator + Clone> Expression for ArenaRef<Term, A> {
     type ExpressionRef<'a> = ArenaRef<Term, A> where Self: 'a;
 }
 
-impl<A: ArenaAllocator + Clone> NodeId for ArenaRef<Term, A> {
+impl<A: Arena + Clone> NodeId for ArenaRef<Term, A> {
     fn id(&self) -> HashId {
         self.read_value(|term| term.id())
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<Term, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
     fn size(&self) -> usize {
         match self.read_value(|term| term.type_id()) {
             TermTypeDiscriminants::Application => {
@@ -2197,7 +2197,7 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<Term, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<Term, A> {
+impl<A: Arena + Clone> SerializeJson for ArenaRef<Term, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         match self.read_value(|term| term.type_id()) {
             TermTypeDiscriminants::Application => {
@@ -2508,7 +2508,7 @@ impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<Term, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<Term, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<Term, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.read_value(|term| term.type_id()) {
             TermTypeDiscriminants::Application => {
@@ -2638,7 +2638,7 @@ impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<Term, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<Term, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<Term, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.read_value(|term| term.type_id()) {
             TermTypeDiscriminants::Application => {
@@ -2767,7 +2767,7 @@ impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<Term, A> {
         }
     }
 }
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<TermType, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<TermType, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.read_value(|term| TermTypeDiscriminants::from(term)) {
             TermTypeDiscriminants::Application => {
@@ -2979,7 +2979,7 @@ impl<V> TypedTerm<V> {
     }
 }
 
-impl<A: ArenaAllocator + Clone, V> ArenaRef<TypedTerm<V>, A> {
+impl<A: Arena + Clone, V> ArenaRef<TypedTerm<V>, A> {
     pub fn as_inner(&self) -> ArenaRef<V, A> {
         ArenaRef::<V, _>::new(
             self.arena.clone(),
@@ -2990,18 +2990,18 @@ impl<A: ArenaAllocator + Clone, V> ArenaRef<TypedTerm<V>, A> {
     pub(crate) fn as_term(&self) -> &ArenaRef<Term, A> {
         unsafe { std::mem::transmute::<&ArenaRef<TypedTerm<V>, A>, &ArenaRef<Term, A>>(self) }
     }
-    pub(crate) fn get_value_pointer(&self) -> TermPointer {
+    pub(crate) fn get_value_pointer(&self) -> ArenaPointer {
         self.as_term().get_value_pointer()
     }
 }
 
-impl<A: ArenaAllocator + Clone> ArenaRef<Term, A> {
+impl<A: Arena + Clone> ArenaRef<Term, A> {
     pub(crate) fn as_typed_term<V>(&self) -> &ArenaRef<TypedTerm<V>, A> {
         unsafe { std::mem::transmute::<&ArenaRef<Term, A>, &ArenaRef<TypedTerm<V>, A>>(self) }
     }
 }
 
-impl<A: ArenaAllocator + Clone, V> GraphNode for ArenaRef<TypedTerm<V>, A>
+impl<A: Arena + Clone, V> GraphNode for ArenaRef<TypedTerm<V>, A>
 where
     ArenaRef<V, A>: GraphNode,
 {
@@ -3034,7 +3034,7 @@ where
     }
 }
 
-impl<A: ArenaAllocator + Clone, V> PartialEq for ArenaRef<TypedTerm<V>, A>
+impl<A: Arena + Clone, V> PartialEq for ArenaRef<TypedTerm<V>, A>
 where
     ArenaRef<V, A>: PartialEq,
 {
@@ -3042,9 +3042,9 @@ where
         self.as_term() == other.as_term()
     }
 }
-impl<A: ArenaAllocator + Clone, V> Eq for ArenaRef<TypedTerm<V>, A> where ArenaRef<V, A>: Eq {}
+impl<A: Arena + Clone, V> Eq for ArenaRef<TypedTerm<V>, A> where ArenaRef<V, A>: Eq {}
 
-impl<A: ArenaAllocator + Clone, V> std::fmt::Debug for ArenaRef<TypedTerm<V>, A>
+impl<A: Arena + Clone, V> std::fmt::Debug for ArenaRef<TypedTerm<V>, A>
 where
     ArenaRef<V, A>: std::fmt::Debug,
 {
@@ -3056,7 +3056,7 @@ where
     }
 }
 
-impl<A: ArenaAllocator + Clone, V> std::fmt::Display for ArenaRef<TypedTerm<V>, A>
+impl<A: Arena + Clone, V> std::fmt::Display for ArenaRef<TypedTerm<V>, A>
 where
     ArenaRef<V, A>: std::fmt::Display,
 {

@@ -8,17 +8,17 @@ use reflex::core::{DependencyList, Eagerness, GraphNode, Internable, SerializeJs
 use serde_json::Value as JsonValue;
 
 use crate::{
-    allocator::ArenaAllocator,
+    allocator::Arena,
     hash::{TermHash, TermHasher, TermSize},
-    ArenaRef, Term, TermPointer,
+    ArenaPointer, ArenaRef, Term,
 };
 use reflex_macros::PointerIter;
 
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct FilterIteratorTerm {
-    pub source: TermPointer,
-    pub predicate: TermPointer,
+    pub source: ArenaPointer,
+    pub predicate: ArenaPointer,
 }
 impl TermSize for FilterIteratorTerm {
     fn size_of(&self) -> usize {
@@ -26,14 +26,14 @@ impl TermSize for FilterIteratorTerm {
     }
 }
 impl TermHash for FilterIteratorTerm {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         hasher
             .hash(&self.source, arena)
             .hash(&self.predicate, arena)
     }
 }
 
-impl<A: ArenaAllocator + Clone> ArenaRef<FilterIteratorTerm, A> {
+impl<A: Arena + Clone> ArenaRef<FilterIteratorTerm, A> {
     pub fn source(&self) -> ArenaRef<Term, A> {
         ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|term| term.source))
     }
@@ -42,7 +42,7 @@ impl<A: ArenaAllocator + Clone> ArenaRef<FilterIteratorTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<FilterIteratorTerm, A> {
+impl<A: Arena + Clone> SerializeJson for ArenaRef<FilterIteratorTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -54,26 +54,26 @@ impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<FilterIteratorTerm, A
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<FilterIteratorTerm, A> {
+impl<A: Arena + Clone> PartialEq for ArenaRef<FilterIteratorTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.source() == other.source() && other.predicate() == other.predicate()
     }
 }
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<FilterIteratorTerm, A> {}
+impl<A: Arena + Clone> Eq for ArenaRef<FilterIteratorTerm, A> {}
 
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<FilterIteratorTerm, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<FilterIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<FilterIteratorTerm, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<FilterIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "FilterIterator")
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<FilterIteratorTerm, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<FilterIteratorTerm, A> {
     fn size(&self) -> usize {
         1 + self.source().size() + self.predicate().size()
     }
@@ -118,7 +118,7 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<FilterIteratorTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> Internable for ArenaRef<FilterIteratorTerm, A> {
+impl<A: Arena + Clone> Internable for ArenaRef<FilterIteratorTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
         self.capture_depth() == 0
     }
@@ -134,8 +134,8 @@ mod tests {
     fn filter_iterator() {
         assert_eq!(
             TermType::FilterIterator(FilterIteratorTerm {
-                source: TermPointer(12345),
-                predicate: TermPointer(67890),
+                source: ArenaPointer(12345),
+                predicate: ArenaPointer(67890),
             })
             .as_bytes(),
             [TermTypeDiscriminants::FilterIterator as u32, 12345, 67890],

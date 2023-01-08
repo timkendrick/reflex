@@ -150,7 +150,7 @@ fn execute_rust_benchmark(
     evaluate(&expression, &state, &factory, &allocator, &mut cache);
 }
 
-fn generate_3_plus_5_wasm(interpreter: &mut WasmInterpreter) -> (TermPointer, TermPointer) {
+fn generate_3_plus_5_wasm(interpreter: &mut WasmInterpreter) -> (ArenaPointer, ArenaPointer) {
     let int3 = interpreter.allocate(Term::new(TermType::Int(IntTerm::from(3)), interpreter));
 
     let int2 = interpreter.allocate(Term::new(TermType::Int(IntTerm::from(2)), interpreter));
@@ -178,7 +178,7 @@ fn generate_3_plus_5_wasm(interpreter: &mut WasmInterpreter) -> (TermPointer, Te
 fn generate_deep_add_wasm(
     interpreter: &mut WasmInterpreter,
     depth: i32,
-) -> (TermPointer, TermPointer) {
+) -> (ArenaPointer, ArenaPointer) {
     let mut current = interpreter.allocate(Term::new(TermType::Int(IntTerm::from(1)), interpreter));
 
     let add = interpreter.allocate(Term::new(

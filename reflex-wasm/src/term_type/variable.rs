@@ -10,7 +10,7 @@ use reflex::core::{
 use serde_json::Value as JsonValue;
 
 use crate::{
-    allocator::ArenaAllocator,
+    allocator::Arena,
     hash::{TermHash, TermHasher, TermSize},
     term_type::TypedTerm,
     ArenaRef,
@@ -28,30 +28,30 @@ impl TermSize for VariableTerm {
     }
 }
 impl TermHash for VariableTerm {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         hasher.hash(&self.stack_offset, arena)
     }
 }
 
-impl<A: ArenaAllocator + Clone> ArenaRef<VariableTerm, A> {
+impl<A: Arena + Clone> ArenaRef<VariableTerm, A> {
     pub fn stack_offset(&self) -> StackOffset {
         self.read_value(|term| term.stack_offset as StackOffset)
     }
 }
 
-impl<A: ArenaAllocator + Clone> VariableTermType for ArenaRef<VariableTerm, A> {
+impl<A: Arena + Clone> VariableTermType for ArenaRef<VariableTerm, A> {
     fn offset(&self) -> StackOffset {
         self.stack_offset()
     }
 }
 
-impl<A: ArenaAllocator + Clone> VariableTermType for ArenaRef<TypedTerm<VariableTerm>, A> {
+impl<A: Arena + Clone> VariableTermType for ArenaRef<TypedTerm<VariableTerm>, A> {
     fn offset(&self) -> StackOffset {
         <ArenaRef<VariableTerm, A> as VariableTermType>::offset(&self.as_inner())
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<VariableTerm, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<VariableTerm, A> {
     fn size(&self) -> usize {
         1
     }
@@ -85,7 +85,7 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<VariableTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<VariableTerm, A> {
+impl<A: Arena + Clone> SerializeJson for ArenaRef<VariableTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -97,26 +97,26 @@ impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<VariableTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<VariableTerm, A> {
+impl<A: Arena + Clone> PartialEq for ArenaRef<VariableTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.stack_offset() == other.stack_offset()
     }
 }
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<VariableTerm, A> {}
+impl<A: Arena + Clone> Eq for ArenaRef<VariableTerm, A> {}
 
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<VariableTerm, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<VariableTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<VariableTerm, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<VariableTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<variable:{}>", self.stack_offset())
     }
 }
 
-impl<A: ArenaAllocator + Clone> Internable for ArenaRef<VariableTerm, A> {
+impl<A: Arena + Clone> Internable for ArenaRef<VariableTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
         self.capture_depth() == 0
     }

@@ -2,13 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use std::{
-    cell::RefCell,
-    collections::{
-        linked_list::{IntoIter, Iter},
-        LinkedList,
-    },
-    rc::Rc,
+use std::collections::{
+    linked_list::{IntoIter, Iter},
+    LinkedList,
 };
 
 use reflex::core::{Eagerness, Internable, NodeId};
@@ -16,11 +12,12 @@ use strum_macros::EnumIter;
 use walrus::ir::{Const, Instr, Value};
 
 use crate::{
-    allocator::{ArenaAllocator, VecAllocator},
+    allocator::{Arena, ArenaIterator, VecAllocator},
+    hash::TermSize,
     serialize::{Serialize, SerializerState},
     stdlib::Stdlib,
     term_type::*,
-    ArenaRef, IntoArenaRefIterator, PointerIter, Term, TermPointer,
+    ArenaPointer, ArenaRef, IntoArenaRefIterator, PointerIter, Term,
 };
 
 #[derive(Clone, Debug)]
@@ -145,23 +142,26 @@ pub struct CompilerState {
 }
 
 impl CompilerState {
-    pub fn from_heap_snapshot(bytes: &[u8]) -> Self {
+    pub fn from_heap_snapshot<T: TermSize>(bytes: &[u8]) -> Self
+    where
+        for<'a> ArenaRef<T, &'a VecAllocator>: NodeId,
+    {
         let heap_arena = VecAllocator::from_bytes(bytes);
         Self {
             serializer_state: {
-                // FIXME: Avoid cloning arena
-                let arena = Rc::new(RefCell::new(VecAllocator::from_bytes(bytes)));
-                let allocated_terms = arena
-                    .iter()
-                    .as_arena_refs::<Term>(&arena)
+                let arena = &heap_arena;
+                let start_offset = arena.start_offset();
+                let end_offset = arena.end_offset();
+                let next_offset = end_offset;
+                let allocated_terms = ArenaIterator::<T, _>::new(arena, start_offset, end_offset)
+                    .as_arena_refs::<T>(&arena)
                     .map(|term| (term.id(), term.pointer));
-                let next_offset = TermPointer::from(arena.len() as u32);
                 SerializerState::new(allocated_terms, next_offset)
             },
             heap_arena,
         }
     }
-    pub fn from_arena<A: ArenaAllocator + PointerIter + Clone>(arena: &A) -> Self {
+    pub fn from_arena<A: Arena + PointerIter + Clone>(arena: &A) -> Self {
         Self::from_heap_values(
             arena
                 .iter()
@@ -170,8 +170,8 @@ impl CompilerState {
     }
     fn from_heap_values<T: Serialize>(values: impl IntoIterator<Item = T>) -> Self {
         let mut destination_arena = VecAllocator::default();
-        let next_offset = destination_arena.len() as u32;
-        let mut serializer_state = SerializerState::new([], TermPointer::from(next_offset));
+        let next_offset = destination_arena.end_offset();
+        let mut serializer_state = SerializerState::new([], next_offset);
 
         // Serialize all the source terms into the destination arena
         for value in values.into_iter() {
@@ -184,18 +184,13 @@ impl CompilerState {
         }
     }
     pub fn into_linear_memory(self) -> Vec<u8> {
-        // Destructure the state into the underlying arena
         let Self {
             heap_arena: arena, ..
         } = self;
 
-        // Write the updated heap length into offset 0
-        let allocated_bytes = arena.len();
-        let mut words = arena.into_inner();
-        words[0] = allocated_bytes as u32;
-
-        // Convert the result to bytes
-        words
+        // Convert the underlying arena contents from Vec<u32> into Vec<u8>
+        arena
+            .into_inner()
             .into_iter()
             .flat_map(u32::to_le_bytes)
             .collect::<Vec<_>>()
@@ -211,7 +206,7 @@ pub trait CompileWasm {
     ) -> CompilerResult;
 }
 
-impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<Term, A> {
+impl<A: Arena + Clone> CompileWasm for ArenaRef<Term, A> {
     fn compile(
         &self,
         eager: Eagerness,
@@ -392,7 +387,7 @@ impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<Term, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<IntTerm, A> {
+impl<A: Arena + Clone> CompileWasm for ArenaRef<IntTerm, A> {
     fn compile(
         &self,
         _eager: Eagerness,
@@ -413,7 +408,7 @@ impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<IntTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<FloatTerm, A> {
+impl<A: Arena + Clone> CompileWasm for ArenaRef<FloatTerm, A> {
     fn compile(
         &self,
         _eager: Eagerness,
@@ -434,7 +429,7 @@ impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<FloatTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<BooleanTerm, A> {
+impl<A: Arena + Clone> CompileWasm for ArenaRef<BooleanTerm, A> {
     fn compile(
         &self,
         _eager: Eagerness,
@@ -455,7 +450,7 @@ impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<BooleanTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<ListTerm, A> {
+impl<A: Arena + Clone> CompileWasm for ArenaRef<ListTerm, A> {
     fn compile(
         &self,
         eager: Eagerness,
@@ -504,7 +499,7 @@ impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<ListTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<BuiltinTerm, A> {
+impl<A: Arena + Clone> CompileWasm for ArenaRef<BuiltinTerm, A> {
     fn compile(
         &self,
         _eager: Eagerness,
@@ -527,7 +522,7 @@ impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<BuiltinTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<ApplicationTerm, A> {
+impl<A: Arena + Clone> CompileWasm for ArenaRef<ApplicationTerm, A> {
     fn compile(
         &self,
         eager: Eagerness,
@@ -595,7 +590,7 @@ pub enum TermPointerIterator {
 }
 
 impl Iterator for TermPointerIterator {
-    type Item = TermPointer;
+    type Item = ArenaPointer;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
@@ -643,7 +638,7 @@ impl Iterator for TermPointerIterator {
     }
 }
 
-impl<A: ArenaAllocator + Clone> PointerIter for ArenaRef<Term, A> {
+impl<A: Arena + Clone> PointerIter for ArenaRef<Term, A> {
     type Iter<'a> = TermPointerIterator
     where
         Self: 'a;
@@ -788,7 +783,7 @@ impl<A: ArenaAllocator + Clone> PointerIter for ArenaRef<Term, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> Internable for ArenaRef<Term, A> {
+impl<A: Arena + Clone> Internable for ArenaRef<Term, A> {
     fn should_intern(&self, eager: Eagerness) -> bool {
         match self.read_value(|term| term.type_id()) {
             TermTypeDiscriminants::Application => self

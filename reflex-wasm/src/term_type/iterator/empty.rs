@@ -8,7 +8,7 @@ use reflex::core::{DependencyList, Eagerness, GraphNode, Internable, SerializeJs
 use serde_json::Value as JsonValue;
 
 use crate::{
-    allocator::ArenaAllocator,
+    allocator::Arena,
     hash::{TermHash, TermHasher, TermSize},
     ArenaRef,
 };
@@ -23,12 +23,12 @@ impl TermSize for EmptyIteratorTerm {
     }
 }
 impl TermHash for EmptyIteratorTerm {
-    fn hash(&self, hasher: TermHasher, _arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, _arena: &impl Arena) -> TermHasher {
         hasher
     }
 }
 
-impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<EmptyIteratorTerm, A> {
+impl<A: Arena + Clone> SerializeJson for ArenaRef<EmptyIteratorTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -40,26 +40,26 @@ impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<EmptyIteratorTerm, A>
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<EmptyIteratorTerm, A> {
+impl<A: Arena + Clone> PartialEq for ArenaRef<EmptyIteratorTerm, A> {
     fn eq(&self, _other: &Self) -> bool {
         true
     }
 }
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<EmptyIteratorTerm, A> {}
+impl<A: Arena + Clone> Eq for ArenaRef<EmptyIteratorTerm, A> {}
 
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<EmptyIteratorTerm, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<EmptyIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<EmptyIteratorTerm, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<EmptyIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "EmptyIterator")
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<EmptyIteratorTerm, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<EmptyIteratorTerm, A> {
     fn size(&self) -> usize {
         1
     }
@@ -89,7 +89,7 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<EmptyIteratorTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> Internable for ArenaRef<EmptyIteratorTerm, A> {
+impl<A: Arena + Clone> Internable for ArenaRef<EmptyIteratorTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
         self.capture_depth() == 0
     }

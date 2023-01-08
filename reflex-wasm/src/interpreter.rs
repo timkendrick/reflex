@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
-use std::{cell::RefCell, path::Path, rc::Rc};
+use std::{cell::RefCell, ops::Deref, path::Path, rc::Rc};
 
 use wasmtime::{
     Engine, ExternType, Instance, IntoFunc, Linker, Memory, Module, Store, Val, WasmParams,
@@ -11,24 +11,24 @@ use wasmtime::{
 use wasmtime_wasi::{sync::WasiCtxBuilder, WasiCtx};
 
 use crate::{
-    allocator::{ArenaAllocator, ArenaIterator},
+    allocator::{Arena, ArenaAllocator, ArenaIterator},
     compiler::RuntimeBuiltin,
     hash::TermSize,
     pad_to_4_byte_offset,
     term_type::{TreeTerm, TypedTerm},
-    ArenaRef, PointerIter, Term, TermPointer,
+    ArenaPointer, ArenaRef, PointerIter, Term,
 };
 
-/// The 64kB page size constant mentioned in the WASM specification.
-const WASM_PAGE_SIZE: u64 = 0x10000;
+// Memory is allocated in 64KiB pages according to WASM spec
+const WASM_PAGE_SIZE: usize = 64 * 1024;
 
 pub struct UnboundEvaluationResult {
-    result_pointer: TermPointer,
-    dependencies_pointer: Option<TermPointer>,
+    result_pointer: ArenaPointer,
+    dependencies_pointer: Option<ArenaPointer>,
 }
 
 impl UnboundEvaluationResult {
-    pub fn bind<A: ArenaAllocator>(self, arena: A) -> InterpreterEvaluationResult<A> {
+    pub fn bind<A: Arena>(self, arena: A) -> InterpreterEvaluationResult<A> {
         InterpreterEvaluationResult {
             arena,
             result_pointer: self.result_pointer,
@@ -38,22 +38,29 @@ impl UnboundEvaluationResult {
 }
 
 impl PointerIter for Rc<RefCell<WasmInterpreter>> {
-    type Iter<'a> = ArenaIterator<'a, Self, Term>
+    type Iter<'a> = ArenaIterator<'a, Term, Self>
     where
         Self: 'a;
 
     fn iter<'a>(&'a self) -> Self::Iter<'a> {
-        ArenaIterator::new(&self, self.borrow().arena_start())
+        let (start_offset, end_offset) = {
+            let interpreter = self.borrow();
+            let interpreter = interpreter.deref();
+            let start_offset = interpreter.start_offset();
+            let end_offset = interpreter.end_offset();
+            (start_offset, end_offset)
+        };
+        ArenaIterator::new(&self, start_offset, end_offset)
     }
 }
 
-pub struct InterpreterEvaluationResult<A: ArenaAllocator> {
+pub struct InterpreterEvaluationResult<A: Arena> {
     arena: A,
-    result_pointer: TermPointer,
-    dependencies_pointer: Option<TermPointer>,
+    result_pointer: ArenaPointer,
+    dependencies_pointer: Option<ArenaPointer>,
 }
 
-impl<A: ArenaAllocator + Clone> InterpreterEvaluationResult<A> {
+impl<A: Arena + Clone> InterpreterEvaluationResult<A> {
     pub fn result(&self) -> ArenaRef<Term, A> {
         ArenaRef::<Term, _>::new(self.arena.clone(), self.result_pointer)
     }
@@ -240,18 +247,26 @@ impl WasmContext {
         self.memory.data_mut(&mut self.store)
     }
 
-    fn get_ref<T>(&self, offset: TermPointer) -> &T {
+    fn get_ref<T>(&self, offset: ArenaPointer) -> &T {
         let data = self.data();
         let offset = u32::from(offset) as usize;
         let item = &data[offset];
         unsafe { std::mem::transmute::<&u8, &T>(item) }
     }
 
-    fn get_mut<T>(&mut self, offset: TermPointer) -> &mut T {
+    fn get_mut<T>(&mut self, offset: ArenaPointer) -> &mut T {
         let data = self.data_mut();
         let offset = u32::from(offset) as usize;
         let item = &mut data[offset];
         unsafe { std::mem::transmute::<&mut u8, &mut T>(item) }
+    }
+
+    fn start_offset(&self) -> ArenaPointer {
+        ArenaPointer::from(std::mem::size_of::<u32>() as u32)
+    }
+
+    fn end_offset(&self) -> ArenaPointer {
+        ArenaPointer::from(*self.get_ref::<u32>(0.into()))
     }
 
     pub fn get_global(&mut self, export_name: &str) -> Option<Val> {
@@ -277,19 +292,23 @@ impl WasmContext {
 }
 
 impl WasmInterpreter {
-    fn arena_start(&self) -> TermPointer {
-        TermPointer::from(std::mem::size_of::<u32>() as u32)
-    }
-
     pub fn data(&self) -> &[u8] {
         self.0.data()
+    }
+
+    pub fn start_offset(&self) -> ArenaPointer {
+        self.0.start_offset()
+    }
+
+    pub fn end_offset(&self) -> ArenaPointer {
+        self.0.end_offset()
     }
 
     #[must_use]
     pub fn interpret(
         &mut self,
-        input: TermPointer,
-        state: TermPointer,
+        input: ArenaPointer,
+        state: ArenaPointer,
     ) -> Result<UnboundEvaluationResult, InterpreterError> {
         let (result, dependencies) = self.call::<(u32, u32), (u32, u32)>(
             RuntimeBuiltin::Evaluate.name(),
@@ -297,7 +316,7 @@ impl WasmInterpreter {
         )?;
         Ok(UnboundEvaluationResult {
             result_pointer: result.into(),
-            dependencies_pointer: TermPointer::from(dependencies).as_non_null(),
+            dependencies_pointer: ArenaPointer::from(dependencies).as_non_null(),
         })
     }
 
@@ -305,12 +324,12 @@ impl WasmInterpreter {
     pub fn execute(
         &mut self,
         export_name: &str,
-        state: TermPointer,
+        state: ArenaPointer,
     ) -> Result<UnboundEvaluationResult, InterpreterError> {
         let (result, dependencies) = self.call::<u32, (u32, u32)>(export_name, state.into())?;
         Ok(UnboundEvaluationResult {
             result_pointer: result.into(),
-            dependencies_pointer: TermPointer::from(dependencies).as_non_null(),
+            dependencies_pointer: ArenaPointer::from(dependencies).as_non_null(),
         })
     }
 
@@ -358,76 +377,27 @@ impl From<WasmContext> for WasmInterpreter {
     }
 }
 
-impl ArenaAllocator for WasmContext {
+impl Arena for WasmContext {
     type Slice<'a> = &'a [u8]
         where
             Self: 'a;
 
-    fn len(&self) -> usize {
-        *self.get_ref::<u32>(0.into()) as usize
-    }
-
-    fn allocate<T: TermSize>(&mut self, value: T) -> TermPointer {
-        let offset = TermPointer(self.len() as u32);
-        let static_size = pad_to_4_byte_offset(std::mem::size_of::<T>());
-        let actual_size = pad_to_4_byte_offset(value.size_of());
-        self.extend(offset, static_size);
-        self.write(offset, value);
-        if actual_size < static_size {
-            self.shrink(offset.offset(static_size as u32), static_size - actual_size);
-        }
-        TermPointer::from(offset)
-    }
-
-    fn extend(&mut self, offset: TermPointer, size: usize) {
-        let offset = u32::from(offset);
-
-        if offset != self.len() as u32 {
-            panic!("Invalid allocator offset");
-        } else {
-            let curr_data_len = self.len();
-
-            let pages_to_allocate = (curr_data_len + size) / WASM_PAGE_SIZE as usize
-                - curr_data_len / WASM_PAGE_SIZE as usize;
-            if pages_to_allocate > 0 {
-                self.memory
-                    .grow(&mut self.store, pages_to_allocate as u64)
-                    .expect("Could not reallocate linear memory for Wasm context");
-            }
-
-            *self.get_mut::<u32>(0.into()) += size as u32;
-        }
-    }
-
-    fn shrink(&mut self, offset: TermPointer, size: usize) {
-        let offset = u32::from(offset);
-        if offset != self.len() as u32 {
-            panic!("Invalid allocator offset");
-        } else {
-            *self.get_mut::<u32>(0.into()) -= pad_to_4_byte_offset(size) as u32;
-        }
-    }
-
-    fn write<T: Sized>(&mut self, offset: TermPointer, value: T) {
-        *self.get_mut(offset) = value
-    }
-
-    fn read_value<T, V>(&self, offset: TermPointer, selector: impl FnOnce(&T) -> V) -> V {
+    fn read_value<T, V>(&self, offset: ArenaPointer, selector: impl FnOnce(&T) -> V) -> V {
         selector(self.get_ref(offset))
     }
 
     fn inner_pointer<T, V>(
         &self,
-        offset: TermPointer,
+        offset: ArenaPointer,
         selector: impl FnOnce(&T) -> &V,
-    ) -> TermPointer {
+    ) -> ArenaPointer {
         let target = self.get_ref(offset);
         let outer_pointer = target as *const T as usize;
         let inner_pointer = selector(target) as *const V as usize;
         offset.offset((inner_pointer - outer_pointer) as u32)
     }
 
-    fn as_slice<'a>(&'a self, offset: TermPointer, length: usize) -> Self::Slice<'a>
+    fn as_slice<'a>(&'a self, offset: ArenaPointer, length: usize) -> Self::Slice<'a>
     where
         Self::Slice<'a>: 'a,
     {
@@ -437,40 +407,87 @@ impl ArenaAllocator for WasmContext {
     }
 }
 
-impl ArenaAllocator for WasmInterpreter {
+impl ArenaAllocator for WasmContext {
+    fn allocate<T: TermSize>(&mut self, value: T) -> ArenaPointer {
+        let offset = self.end_offset();
+        let static_size = pad_to_4_byte_offset(std::mem::size_of::<T>());
+        let actual_size = pad_to_4_byte_offset(value.size_of());
+        self.extend(offset, static_size);
+        self.write(offset, value);
+        if actual_size < static_size {
+            self.shrink(offset.offset(static_size as u32), static_size - actual_size);
+        }
+        ArenaPointer::from(offset)
+    }
+
+    fn extend(&mut self, offset: ArenaPointer, size: usize) {
+        let next_offset = self.end_offset();
+        if offset != next_offset {
+            panic!("Invalid allocator offset");
+        } else {
+            let existing_length = u32::from(next_offset) as usize;
+            let target_length = existing_length + size;
+
+            let num_existing_pages = self.memory.size(&self.store) as usize;
+            let num_target_pages = 1 + (target_length.saturating_sub(1) / WASM_PAGE_SIZE);
+            if num_target_pages > num_existing_pages {
+                let pages_to_allocate = num_target_pages.next_power_of_two() - num_existing_pages;
+                self.memory
+                    .grow(&mut self.store, pages_to_allocate as u64)
+                    .expect("Could not reallocate linear memory for Wasm context");
+            }
+
+            *self.get_mut::<u32>(0.into()) = target_length as u32;
+        }
+    }
+
+    fn shrink(&mut self, offset: ArenaPointer, size: usize) {
+        if offset != self.end_offset() {
+            panic!("Invalid allocator offset");
+        } else {
+            *self.get_mut::<u32>(0.into()) -= pad_to_4_byte_offset(size) as u32;
+        }
+    }
+
+    fn write<T: Sized>(&mut self, offset: ArenaPointer, value: T) {
+        *self.get_mut(offset) = value
+    }
+}
+
+impl Arena for WasmInterpreter {
     type Slice<'a> = &'a [u8]
         where
             Self: 'a;
-    fn len(&self) -> usize {
-        <WasmContext as ArenaAllocator>::len(&self.0)
-    }
-    fn allocate<T: TermSize>(&mut self, value: T) -> TermPointer {
-        <WasmContext as ArenaAllocator>::allocate(&mut self.0, value)
-    }
-    fn extend(&mut self, offset: TermPointer, size: usize) {
-        <WasmContext as ArenaAllocator>::extend(&mut self.0, offset, size)
-    }
-    fn shrink(&mut self, offset: TermPointer, size: usize) {
-        <WasmContext as ArenaAllocator>::shrink(&mut self.0, offset, size)
-    }
-    fn write<T: Sized>(&mut self, offset: TermPointer, value: T) {
-        <WasmContext as ArenaAllocator>::write(&mut self.0, offset, value)
-    }
-    fn read_value<T, V>(&self, offset: TermPointer, selector: impl FnOnce(&T) -> V) -> V {
-        <WasmContext as ArenaAllocator>::read_value::<T, V>(&self.0, offset, selector)
+    fn read_value<T, V>(&self, offset: ArenaPointer, selector: impl FnOnce(&T) -> V) -> V {
+        <WasmContext as Arena>::read_value::<T, V>(&self.0, offset, selector)
     }
     fn inner_pointer<T, V>(
         &self,
-        offset: TermPointer,
+        offset: ArenaPointer,
         selector: impl FnOnce(&T) -> &V,
-    ) -> TermPointer {
-        <WasmContext as ArenaAllocator>::inner_pointer::<T, V>(&self.0, offset, selector)
+    ) -> ArenaPointer {
+        <WasmContext as Arena>::inner_pointer::<T, V>(&self.0, offset, selector)
     }
-    fn as_slice<'a>(&'a self, offset: TermPointer, length: usize) -> Self::Slice<'a>
+    fn as_slice<'a>(&'a self, offset: ArenaPointer, length: usize) -> Self::Slice<'a>
     where
         Self::Slice<'a>: 'a,
     {
-        <WasmContext as ArenaAllocator>::as_slice(&self.0, offset, length)
+        <WasmContext as Arena>::as_slice(&self.0, offset, length)
+    }
+}
+
+impl ArenaAllocator for WasmInterpreter {
+    fn allocate<T: TermSize>(&mut self, value: T) -> ArenaPointer {
+        <WasmContext as ArenaAllocator>::allocate(&mut self.0, value)
+    }
+    fn extend(&mut self, offset: ArenaPointer, size: usize) {
+        <WasmContext as ArenaAllocator>::extend(&mut self.0, offset, size)
+    }
+    fn shrink(&mut self, offset: ArenaPointer, size: usize) {
+        <WasmContext as ArenaAllocator>::shrink(&mut self.0, offset, size)
+    }
+    fn write<T: Sized>(&mut self, offset: ArenaPointer, value: T) {
+        <WasmContext as ArenaAllocator>::write(&mut self.0, offset, value)
     }
 }
 
@@ -522,7 +539,7 @@ mod tests {
             ApplicationTerm, BuiltinTerm, ConditionTerm, CustomCondition, EffectTerm, HashmapTerm,
             IntTerm, ListTerm, NilTerm, SignalTerm, SymbolTerm, TermType, TreeTerm, TypedTerm,
         },
-        ArenaRef, Term, TermPointer,
+        ArenaPointer, ArenaRef, Term,
     };
     use std::{
         cell::RefCell,
@@ -686,7 +703,7 @@ mod tests {
         let expected_dependencies = interpreter.allocate(Term::new(
             TermType::Tree(TreeTerm {
                 left: condition,
-                right: TermPointer::null(),
+                right: ArenaPointer::null(),
                 length: 1,
             }),
             &interpreter,

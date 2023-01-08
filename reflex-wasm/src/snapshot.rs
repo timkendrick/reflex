@@ -8,12 +8,11 @@ use walrus::{
     GlobalId, GlobalKind, InitExpr, MemoryId,
 };
 
-use crate::{
-    allocator::ArenaAllocator,
-    interpreter::{mocks::add_import_stubs, InterpreterError, WasmContextBuilder, WasmInterpreter},
+use crate::interpreter::{
+    mocks::add_import_stubs, InterpreterError, WasmContextBuilder, WasmInterpreter,
 };
 
-// WASM specificies that memory is allocated in 64KiB pages
+// Memory is allocated in 64KiB pages according to WASM spec
 const WASM_PAGE_SIZE: u32 = 64 * 1024;
 
 #[derive(Debug)]
@@ -161,7 +160,8 @@ fn capture_initial_memory_snapshot(
     let updated_global_values = capture_interpreter_globals(interpreter);
 
     // Capture an updated heap snapshot
-    let heap_snapshot = Vec::<u8>::from(&interpreter.data()[0..interpreter.len()]);
+    let heap_length = u32::from(interpreter.end_offset()) as usize;
+    let heap_snapshot = Vec::<u8>::from(&interpreter.data()[0..heap_length]);
 
     // Determine the set of globals whose values have been mutated
     let modified_global_values = updated_global_values

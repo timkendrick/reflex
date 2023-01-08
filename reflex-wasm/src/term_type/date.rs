@@ -9,7 +9,7 @@ use reflex::core::{DependencyList, Eagerness, GraphNode, Internable, SerializeJs
 use serde_json::Value as JsonValue;
 
 use crate::{
-    allocator::ArenaAllocator,
+    allocator::Arena,
     hash::{TermHash, TermHasher, TermSize},
     ArenaRef,
 };
@@ -26,7 +26,7 @@ impl TermSize for DateTerm {
     }
 }
 impl TermHash for DateTerm {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         hasher.hash(&self.timestamp, arena)
     }
 }
@@ -44,13 +44,13 @@ impl From<DateTerm> for i64 {
     }
 }
 
-impl<A: ArenaAllocator + Clone> ArenaRef<DateTerm, A> {
+impl<A: Arena + Clone> ArenaRef<DateTerm, A> {
     pub fn timestamp(&self) -> i64 {
         self.read_value(|term| i64::from(*term))
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<DateTerm, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<DateTerm, A> {
     fn size(&self) -> usize {
         1
     }
@@ -80,7 +80,7 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<DateTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<DateTerm, A> {
+impl<A: Arena + Clone> SerializeJson for ArenaRef<DateTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Ok(JsonValue::String(format!("{}", self)))
     }
@@ -93,20 +93,20 @@ impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<DateTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<DateTerm, A> {
+impl<A: Arena + Clone> PartialEq for ArenaRef<DateTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.timestamp() == other.timestamp()
     }
 }
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<DateTerm, A> {}
+impl<A: Arena + Clone> Eq for ArenaRef<DateTerm, A> {}
 
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<DateTerm, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<DateTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<DateTerm, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<DateTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let timestamp = self.timestamp();
         let seconds = timestamp / 1000;
@@ -147,7 +147,7 @@ fn chunks_to_i64(value: [u32; 2]) -> i64 {
     ])
 }
 
-impl<A: ArenaAllocator + Clone> Internable for ArenaRef<DateTerm, A> {
+impl<A: Arena + Clone> Internable for ArenaRef<DateTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
         self.capture_depth() == 0
     }

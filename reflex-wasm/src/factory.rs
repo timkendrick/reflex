@@ -23,7 +23,7 @@ use reflex::{
 use reflex_utils::WithExactSizeIterator;
 
 use crate::{
-    allocator::ArenaAllocator,
+    allocator::{Arena, ArenaAllocator},
     hash::TermSize,
     stdlib::Stdlib,
     term_type::{
@@ -33,11 +33,11 @@ use crate::{
         PendingCondition, RecordTerm, SignalTerm, StringTerm, SymbolTerm, TermType,
         TermTypeDiscriminants, TreeTerm, TypedTerm, VariableTerm, WasmExpression,
     },
-    ArenaRef, Term, TermPointer,
+    ArenaPointer, ArenaRef, Term,
 };
 
 #[derive(Debug)]
-pub struct WasmTermFactory<A: ArenaAllocator> {
+pub struct WasmTermFactory<A: Arena> {
     arena: Rc<RefCell<A>>,
 }
 impl<A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static + Clone> WasmTermFactory<A> {
@@ -197,7 +197,7 @@ impl<A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static + Clone> WasmTerm
         }
     }
 }
-impl<A: ArenaAllocator> Clone for WasmTermFactory<A> {
+impl<A: Arena> Clone for WasmTermFactory<A> {
     fn clone(&self) -> Self {
         Self {
             arena: Rc::clone(&self.arena),
@@ -205,42 +205,42 @@ impl<A: ArenaAllocator> Clone for WasmTermFactory<A> {
     }
 }
 
-impl<A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static> ArenaAllocator
-    for WasmTermFactory<A>
-{
+impl<A: for<'a> Arena<Slice<'a> = &'a [u8]> + 'static> Arena for WasmTermFactory<A> {
     type Slice<'a> = Ref<'a, [u8]>
     where
         Self: 'a;
-    fn len(&self) -> usize {
-        self.arena.len()
-    }
-    fn allocate<T: TermSize>(&mut self, value: T) -> TermPointer {
-        self.arena.allocate(value)
-    }
-    fn extend(&mut self, offset: TermPointer, size: usize) {
-        self.arena.extend(offset, size)
-    }
-    fn shrink(&mut self, offset: TermPointer, size: usize) {
-        self.arena.shrink(offset, size)
-    }
-    fn write<T: Sized>(&mut self, offset: TermPointer, value: T) {
-        self.arena.write(offset, value)
-    }
-    fn read_value<T, V>(&self, offset: TermPointer, selector: impl FnOnce(&T) -> V) -> V {
+    fn read_value<T, V>(&self, offset: ArenaPointer, selector: impl FnOnce(&T) -> V) -> V {
         self.arena.read_value::<T, V>(offset, selector)
     }
     fn inner_pointer<T, V>(
         &self,
-        offset: TermPointer,
+        offset: ArenaPointer,
         selector: impl FnOnce(&T) -> &V,
-    ) -> TermPointer {
+    ) -> ArenaPointer {
         self.arena.inner_pointer::<T, V>(offset, selector)
     }
-    fn as_slice<'a>(&'a self, offset: TermPointer, length: usize) -> Self::Slice<'a>
+    fn as_slice<'a>(&'a self, offset: ArenaPointer, length: usize) -> Self::Slice<'a>
     where
         Self::Slice<'a>: 'a,
     {
         self.arena.as_slice(offset, length)
+    }
+}
+
+impl<A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static> ArenaAllocator
+    for WasmTermFactory<A>
+{
+    fn allocate<T: TermSize>(&mut self, value: T) -> ArenaPointer {
+        self.arena.allocate(value)
+    }
+    fn extend(&mut self, offset: ArenaPointer, size: usize) {
+        self.arena.extend(offset, size)
+    }
+    fn shrink(&mut self, offset: ArenaPointer, size: usize) {
+        self.arena.shrink(offset, size)
+    }
+    fn write<T: Sized>(&mut self, offset: ArenaPointer, value: T) {
+        self.arena.write(offset, value)
     }
 }
 
@@ -335,8 +335,8 @@ impl<A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static + Clone>
         let root_size = first.as_ref().into_iter().chain(second.as_ref()).count();
         let root_term = Term::new(
             TermType::Tree(TreeTerm {
-                left: second.unwrap_or(TermPointer::null()),
-                right: first.unwrap_or(TermPointer::null()),
+                left: second.unwrap_or(ArenaPointer::null()),
+                right: first.unwrap_or(ArenaPointer::null()),
                 length: root_size as u32,
             }),
             self.arena.deref().borrow().deref(),
@@ -631,7 +631,7 @@ impl<A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static + Clone>
         let signal_list_term = Term::new(
             TermType::Tree(TreeTerm {
                 left: condition_pointer,
-                right: TermPointer::null(),
+                right: ArenaPointer::null(),
                 length: 1,
             }),
             &*self.arena.borrow(),
@@ -697,7 +697,7 @@ impl<A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static + Clone>
                 values,
                 lookup_table: match lookup_table {
                     Some(term) => term.pointer,
-                    None => TermPointer::null(),
+                    None => ArenaPointer::null(),
                 },
             }),
             &*self.arena.borrow(),

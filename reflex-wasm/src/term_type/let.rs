@@ -11,10 +11,10 @@ use reflex::core::{
 use serde_json::Value as JsonValue;
 
 use crate::{
-    allocator::ArenaAllocator,
+    allocator::Arena,
     hash::{TermHash, TermHasher, TermSize},
     term_type::TypedTerm,
-    ArenaRef, Term, TermPointer,
+    ArenaPointer, ArenaRef, Term,
 };
 use reflex_macros::PointerIter;
 
@@ -23,8 +23,8 @@ use super::WasmExpression;
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct LetTerm {
-    pub initializer: TermPointer,
-    pub body: TermPointer,
+    pub initializer: ArenaPointer,
+    pub body: ArenaPointer,
 }
 impl TermSize for LetTerm {
     fn size_of(&self) -> usize {
@@ -32,14 +32,14 @@ impl TermSize for LetTerm {
     }
 }
 impl TermHash for LetTerm {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         hasher
             .hash(&self.initializer, arena)
             .hash(&self.body, arena)
     }
 }
 
-impl<A: ArenaAllocator + Clone> ArenaRef<LetTerm, A> {
+impl<A: Arena + Clone> ArenaRef<LetTerm, A> {
     pub fn initializer(&self) -> ArenaRef<Term, A> {
         ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|term| term.initializer))
     }
@@ -48,7 +48,7 @@ impl<A: ArenaAllocator + Clone> ArenaRef<LetTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> LetTermType<WasmExpression<A>> for ArenaRef<LetTerm, A> {
+impl<A: Arena + Clone> LetTermType<WasmExpression<A>> for ArenaRef<LetTerm, A> {
     fn initializer<'a>(&'a self) -> <WasmExpression<A> as Expression>::ExpressionRef<'a>
     where
         WasmExpression<A>: 'a,
@@ -63,7 +63,7 @@ impl<A: ArenaAllocator + Clone> LetTermType<WasmExpression<A>> for ArenaRef<LetT
     }
 }
 
-impl<A: ArenaAllocator + Clone> LetTermType<WasmExpression<A>> for ArenaRef<TypedTerm<LetTerm>, A> {
+impl<A: Arena + Clone> LetTermType<WasmExpression<A>> for ArenaRef<TypedTerm<LetTerm>, A> {
     fn initializer<'a>(&'a self) -> <WasmExpression<A> as Expression>::ExpressionRef<'a>
     where
         WasmExpression<A>: 'a,
@@ -78,7 +78,7 @@ impl<A: ArenaAllocator + Clone> LetTermType<WasmExpression<A>> for ArenaRef<Type
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<LetTerm, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<LetTerm, A> {
     fn size(&self) -> usize {
         1 + self.initializer().size() + self.body().size()
     }
@@ -125,7 +125,7 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<LetTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<LetTerm, A> {
+impl<A: Arena + Clone> SerializeJson for ArenaRef<LetTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -137,26 +137,26 @@ impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<LetTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<LetTerm, A> {
+impl<A: Arena + Clone> PartialEq for ArenaRef<LetTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.initializer() == other.initializer() && self.body() == other.body()
     }
 }
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<LetTerm, A> {}
+impl<A: Arena + Clone> Eq for ArenaRef<LetTerm, A> {}
 
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<LetTerm, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<LetTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<LetTerm, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<LetTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<let:{}:{}>", self.initializer(), self.body())
     }
 }
 
-impl<A: ArenaAllocator + Clone> Internable for ArenaRef<LetTerm, A> {
+impl<A: Arena + Clone> Internable for ArenaRef<LetTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
         self.capture_depth() == 0
     }
@@ -172,8 +172,8 @@ mod tests {
     fn r#let() {
         assert_eq!(
             TermType::Let(LetTerm {
-                initializer: TermPointer(12345),
-                body: TermPointer(67890),
+                initializer: ArenaPointer(12345),
+                body: ArenaPointer(67890),
             })
             .as_bytes(),
             [TermTypeDiscriminants::Let as u32, 12345, 67890],

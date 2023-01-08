@@ -7,36 +7,24 @@ use reflex::{
 };
 
 use crate::{
-    allocator::ArenaAllocator, hash::TermSize, ArenaRef, IntoArenaRefIterator, PointerIter,
-    TermPointer,
+    allocator::{Arena, ArenaAllocator},
+    hash::TermSize,
+    ArenaPointer, ArenaRef, PointerIter,
 };
 
 pub struct SerializerState {
-    allocated_terms: IntMap<HashId, TermPointer>,
-    next_offset: TermPointer,
+    allocated_terms: IntMap<HashId, ArenaPointer>,
+    next_offset: ArenaPointer,
 }
 impl SerializerState {
     pub(crate) fn new(
-        allocated_terms: impl IntoIterator<Item = (HashId, TermPointer)>,
-        next_offset: TermPointer,
+        allocated_terms: impl IntoIterator<Item = (HashId, ArenaPointer)>,
+        next_offset: ArenaPointer,
     ) -> Self {
         Self {
             allocated_terms: allocated_terms.into_iter().collect(),
             next_offset,
         }
-    }
-    pub fn from_existing_arena<T, A: ArenaAllocator + PointerIter + Clone>(arena: &A) -> Self
-    where
-        ArenaRef<T, A>: NodeId,
-    {
-        let next_offset = arena.len() as u32;
-        Self::new(
-            arena.iter().as_arena_refs::<T>(arena).map(|term| {
-                let term_id = term.id();
-                (term_id, term.pointer)
-            }),
-            TermPointer::from(next_offset),
-        )
     }
 }
 
@@ -45,10 +33,10 @@ pub trait Serialize {
         &self,
         destination: &mut A,
         state: &mut SerializerState,
-    ) -> TermPointer;
+    ) -> ArenaPointer;
 }
 
-impl<ASource: ArenaAllocator + Clone, T: Clone + TermSize> Serialize for ArenaRef<T, ASource>
+impl<ASource: Arena + Clone, T: Clone + TermSize> Serialize for ArenaRef<T, ASource>
 where
     ArenaRef<T, ASource>: PointerIter + NodeId,
 {
@@ -56,7 +44,7 @@ where
         &self,
         destination: &mut ADest,
         state: &mut SerializerState,
-    ) -> TermPointer {
+    ) -> ArenaPointer {
         // Check if we have already serialized this before
         let cached_result = state.allocated_terms.get(&self.id()).copied();
         if let Some(existing) = cached_result {
@@ -68,7 +56,7 @@ where
             .filter_map(|inner_pointer| {
                 let value_pointer = self
                     .arena
-                    .read_value(inner_pointer, |target_pointer: &TermPointer| {
+                    .read_value(inner_pointer, |target_pointer: &ArenaPointer| {
                         *target_pointer
                     })
                     .as_non_null()?;
@@ -121,9 +109,9 @@ mod tests {
     use std::rc::Rc;
 
     use crate::{
-        allocator::{ArenaAllocator, VecAllocator},
+        allocator::{ArenaAllocator, ArenaIterator, VecAllocator},
         term_type::{IntTerm, TermType, TreeTerm},
-        ArenaRef, Term,
+        ArenaRef, IntoArenaRefIterator, Term,
     };
 
     use super::*;
@@ -168,9 +156,21 @@ mod tests {
             &target_arena,
         ));
 
-        let mut target_arena = Rc::new(RefCell::new(target_arena));
+        let mut serializer_state = {
+            let arena = &target_arena;
+            let start_offset = arena.start_offset();
+            let end_offset = arena.end_offset();
+            let heap_values = ArenaIterator::<Term, _>::new(arena, start_offset, end_offset)
+                .as_arena_refs::<Term>(&arena)
+                .map(|term| {
+                    let term_id = term.id();
+                    (term_id, term.pointer)
+                });
+            let next_offset = arena.end_offset();
+            SerializerState::new(heap_values, next_offset)
+        };
 
-        let mut serializer_state = SerializerState::from_existing_arena::<Term, _>(&target_arena);
+        let mut target_arena = Rc::new(RefCell::new(target_arena));
 
         let serialized_expression = root_ref.serialize(&mut target_arena, &mut serializer_state);
 

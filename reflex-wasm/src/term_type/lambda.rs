@@ -11,10 +11,10 @@ use reflex::core::{
 use serde_json::Value as JsonValue;
 
 use crate::{
-    allocator::ArenaAllocator,
+    allocator::Arena,
     hash::{TermHash, TermHasher, TermSize},
     term_type::TypedTerm,
-    ArenaRef, Term, TermPointer,
+    ArenaPointer, ArenaRef, Term,
 };
 
 use reflex_macros::PointerIter;
@@ -25,7 +25,7 @@ use super::WasmExpression;
 #[repr(C)]
 pub struct LambdaTerm {
     pub num_args: u32,
-    pub body: TermPointer,
+    pub body: ArenaPointer,
 }
 impl TermSize for LambdaTerm {
     fn size_of(&self) -> usize {
@@ -33,12 +33,12 @@ impl TermSize for LambdaTerm {
     }
 }
 impl TermHash for LambdaTerm {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         hasher.hash(&self.num_args, arena).hash(&self.body, arena)
     }
 }
 
-impl<A: ArenaAllocator + Clone> ArenaRef<LambdaTerm, A> {
+impl<A: Arena + Clone> ArenaRef<LambdaTerm, A> {
     pub fn num_args(&self) -> u32 {
         self.read_value(|term| term.num_args)
     }
@@ -50,7 +50,7 @@ impl<A: ArenaAllocator + Clone> ArenaRef<LambdaTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> LambdaTermType<WasmExpression<A>> for ArenaRef<LambdaTerm, A> {
+impl<A: Arena + Clone> LambdaTermType<WasmExpression<A>> for ArenaRef<LambdaTerm, A> {
     fn num_args<'a>(&'a self) -> StackOffset {
         self.num_args() as StackOffset
     }
@@ -62,9 +62,7 @@ impl<A: ArenaAllocator + Clone> LambdaTermType<WasmExpression<A>> for ArenaRef<L
     }
 }
 
-impl<A: ArenaAllocator + Clone> LambdaTermType<WasmExpression<A>>
-    for ArenaRef<TypedTerm<LambdaTerm>, A>
-{
+impl<A: Arena + Clone> LambdaTermType<WasmExpression<A>> for ArenaRef<TypedTerm<LambdaTerm>, A> {
     fn num_args<'a>(&'a self) -> StackOffset {
         <ArenaRef<LambdaTerm, A> as LambdaTermType<WasmExpression<A>>>::num_args(&self.as_inner())
     }
@@ -76,7 +74,7 @@ impl<A: ArenaAllocator + Clone> LambdaTermType<WasmExpression<A>>
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<LambdaTerm, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<LambdaTerm, A> {
     fn size(&self) -> usize {
         1 + self.body().size()
     }
@@ -124,7 +122,7 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<LambdaTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<LambdaTerm, A> {
+impl<A: Arena + Clone> SerializeJson for ArenaRef<LambdaTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -136,26 +134,26 @@ impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<LambdaTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<LambdaTerm, A> {
+impl<A: Arena + Clone> PartialEq for ArenaRef<LambdaTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.num_args() == other.num_args() && self.body() == other.body()
     }
 }
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<LambdaTerm, A> {}
+impl<A: Arena + Clone> Eq for ArenaRef<LambdaTerm, A> {}
 
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<LambdaTerm, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<LambdaTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<LambdaTerm, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<LambdaTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<function:{}>", self.num_args())
     }
 }
 
-impl<A: ArenaAllocator + Clone> Internable for ArenaRef<LambdaTerm, A> {
+impl<A: Arena + Clone> Internable for ArenaRef<LambdaTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
         self.capture_depth() == 0 // FIXME: Should be compiled into raw WASM
     }
@@ -172,7 +170,7 @@ mod tests {
         assert_eq!(
             TermType::Lambda(LambdaTerm {
                 num_args: 12345,
-                body: TermPointer(67890),
+                body: ArenaPointer(67890),
             })
             .as_bytes(),
             [TermTypeDiscriminants::Lambda as u32, 12345, 67890],

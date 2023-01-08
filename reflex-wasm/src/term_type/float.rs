@@ -11,7 +11,7 @@ use reflex::core::{
 use serde_json::Value as JsonValue;
 
 use crate::{
-    allocator::ArenaAllocator,
+    allocator::Arena,
     hash::{TermHash, TermHasher, TermSize},
     term_type::TypedTerm,
     ArenaRef,
@@ -29,7 +29,7 @@ impl TermSize for FloatTerm {
     }
 }
 impl TermHash for FloatTerm {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         hasher.hash(&self.value, arena)
     }
 }
@@ -70,25 +70,25 @@ fn chunks_to_f64(value: [u32; 2]) -> f64 {
     ])
 }
 
-impl<A: ArenaAllocator + Clone> ArenaRef<FloatTerm, A> {
+impl<A: Arena + Clone> ArenaRef<FloatTerm, A> {
     pub fn value(&self) -> f64 {
         chunks_to_f64(self.read_value(|term| term.value))
     }
 }
 
-impl<A: ArenaAllocator + Clone> FloatTermType for ArenaRef<FloatTerm, A> {
+impl<A: Arena + Clone> FloatTermType for ArenaRef<FloatTerm, A> {
     fn value(&self) -> FloatValue {
         self.value()
     }
 }
 
-impl<A: ArenaAllocator + Clone> FloatTermType for ArenaRef<TypedTerm<FloatTerm>, A> {
+impl<A: Arena + Clone> FloatTermType for ArenaRef<TypedTerm<FloatTerm>, A> {
     fn value(&self) -> FloatValue {
         <ArenaRef<FloatTerm, A> as FloatTermType>::value(&self.as_inner())
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<FloatTerm, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<FloatTerm, A> {
     fn size(&self) -> usize {
         1
     }
@@ -118,7 +118,7 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<FloatTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<FloatTerm, A> {
+impl<A: Arena + Clone> SerializeJson for ArenaRef<FloatTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         match serde_json::Number::from_f64(self.value()) {
             Some(number) => Ok(JsonValue::Number(number)),
@@ -137,26 +137,26 @@ impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<FloatTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<FloatTerm, A> {
+impl<A: Arena + Clone> PartialEq for ArenaRef<FloatTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.value() == other.value()
     }
 }
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<FloatTerm, A> {}
+impl<A: Arena + Clone> Eq for ArenaRef<FloatTerm, A> {}
 
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<FloatTerm, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<FloatTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<FloatTerm, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<FloatTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.value())
     }
 }
 
-impl<A: ArenaAllocator + Clone> Internable for ArenaRef<FloatTerm, A> {
+impl<A: Arena + Clone> Internable for ArenaRef<FloatTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
         self.capture_depth() == 0
     }

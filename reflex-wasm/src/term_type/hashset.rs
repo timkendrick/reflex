@@ -12,10 +12,10 @@ use reflex_utils::MapIntoIterator;
 use serde_json::Value as JsonValue;
 
 use crate::{
-    allocator::ArenaAllocator,
+    allocator::Arena,
     hash::{TermHash, TermHasher, TermSize},
     term_type::TypedTerm,
-    ArenaRef, Array, IntoArenaRefIter, TermPointer,
+    ArenaPointer, ArenaRef, Array, IntoArenaRefIter,
 };
 use reflex_macros::PointerIter;
 
@@ -26,7 +26,7 @@ use super::{
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct HashsetTerm {
-    pub entries: TermPointer,
+    pub entries: ArenaPointer,
 }
 impl TermSize for HashsetTerm {
     fn size_of(&self) -> usize {
@@ -34,12 +34,12 @@ impl TermSize for HashsetTerm {
     }
 }
 impl TermHash for HashsetTerm {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         hasher.hash(&self.entries, arena)
     }
 }
 
-impl<A: ArenaAllocator + Clone> ArenaRef<HashsetTerm, A> {
+impl<A: Arena + Clone> ArenaRef<HashsetTerm, A> {
     fn entries(&self) -> ArenaRef<TypedTerm<HashmapTerm>, A> {
         ArenaRef::<TypedTerm<HashmapTerm>, _>::new(
             self.arena.clone(),
@@ -66,7 +66,7 @@ impl<A: ArenaAllocator + Clone> ArenaRef<HashsetTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> HashsetTermType<WasmExpression<A>> for ArenaRef<HashsetTerm, A> {
+impl<A: Arena + Clone> HashsetTermType<WasmExpression<A>> for ArenaRef<HashsetTerm, A> {
     type ValuesIterator<'a> = <ArenaRef<HashmapTerm, A> as HashmapTermType<WasmExpression<A>>>::KeysIterator<'a>
     where
         WasmExpression<A>: 'a,
@@ -91,9 +91,7 @@ impl<A: ArenaAllocator + Clone> HashsetTermType<WasmExpression<A>> for ArenaRef<
     }
 }
 
-impl<A: ArenaAllocator + Clone> HashsetTermType<WasmExpression<A>>
-    for ArenaRef<TypedTerm<HashsetTerm>, A>
-{
+impl<A: Arena + Clone> HashsetTermType<WasmExpression<A>> for ArenaRef<TypedTerm<HashsetTerm>, A> {
     type ValuesIterator<'a> = <ArenaRef<HashsetTerm, A> as HashsetTermType<WasmExpression<A>>>::ValuesIterator<'a>
     where
         WasmExpression<A>: 'a,
@@ -121,7 +119,7 @@ impl<A: ArenaAllocator + Clone> HashsetTermType<WasmExpression<A>>
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<HashsetTerm, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<HashsetTerm, A> {
     fn size(&self) -> usize {
         1 + self.entries().size()
     }
@@ -159,7 +157,7 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<HashsetTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<HashsetTerm, A> {
+impl<A: Arena + Clone> SerializeJson for ArenaRef<HashsetTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -171,20 +169,20 @@ impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<HashsetTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<HashsetTerm, A> {
+impl<A: Arena + Clone> PartialEq for ArenaRef<HashsetTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.entries() == other.entries()
     }
 }
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<HashsetTerm, A> {}
+impl<A: Arena + Clone> Eq for ArenaRef<HashsetTerm, A> {}
 
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<HashsetTerm, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<HashsetTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<HashsetTerm, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<HashsetTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let max_displayed_values = 10;
         let values = self.values();
@@ -212,7 +210,7 @@ impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<HashsetTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> Internable for ArenaRef<HashsetTerm, A> {
+impl<A: Arena + Clone> Internable for ArenaRef<HashsetTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
         self.capture_depth() == 0
     }
@@ -228,7 +226,7 @@ mod tests {
     fn hashset() {
         assert_eq!(
             TermType::Hashset(HashsetTerm {
-                entries: TermPointer(12345),
+                entries: ArenaPointer(12345),
             })
             .as_bytes(),
             [TermTypeDiscriminants::Hashset as u32, 12345],

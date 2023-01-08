@@ -15,10 +15,10 @@ use reflex_utils::{MapIntoIterator, WithExactSizeIterator};
 use serde_json::Value as JsonValue;
 
 use crate::{
-    allocator::ArenaAllocator,
+    allocator::Arena,
     hash::{TermHash, TermHasher, TermSize},
     term_type::{TermTypeDiscriminants, TypedTerm},
-    ArenaRef, IntoArenaRefIter, Term, TermPointer,
+    ArenaPointer, ArenaRef, IntoArenaRefIter, Term,
 };
 use reflex_macros::PointerIter;
 
@@ -27,8 +27,8 @@ use super::{ConditionTerm, WasmExpression};
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct TreeTerm {
-    pub left: TermPointer,
-    pub right: TermPointer,
+    pub left: ArenaPointer,
+    pub right: ArenaPointer,
     pub length: u32,
 }
 impl TermSize for TreeTerm {
@@ -37,7 +37,7 @@ impl TermSize for TreeTerm {
     }
 }
 impl TermHash for TreeTerm {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         let hasher = if self.left.is_null() {
             hasher.write_bool(false)
         } else {
@@ -52,10 +52,10 @@ impl TermHash for TreeTerm {
     }
 }
 
-impl<A: ArenaAllocator + Clone> ArenaRef<TreeTerm, A> {
+impl<A: Arena + Clone> ArenaRef<TreeTerm, A> {
     pub fn left(&self) -> Option<ArenaRef<Term, A>> {
         let pointer = self.read_value(|term| term.left);
-        if pointer == TermPointer::null() {
+        if pointer == ArenaPointer::null() {
             None
         } else {
             Some(ArenaRef::<Term, _>::new(self.arena.clone(), pointer))
@@ -63,7 +63,7 @@ impl<A: ArenaAllocator + Clone> ArenaRef<TreeTerm, A> {
     }
     pub fn right(&self) -> Option<ArenaRef<Term, A>> {
         let pointer = self.read_value(|term| term.right);
-        if pointer == TermPointer::null() {
+        if pointer == ArenaPointer::null() {
             None
         } else {
             Some(ArenaRef::<Term, _>::new(self.arena.clone(), pointer))
@@ -80,7 +80,7 @@ impl<A: ArenaAllocator + Clone> ArenaRef<TreeTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> ConditionListType<WasmExpression<A>> for ArenaRef<TreeTerm, A> {
+impl<A: Arena + Clone> ConditionListType<WasmExpression<A>> for ArenaRef<TreeTerm, A> {
     type Iterator<'a> = WithExactSizeIterator<MapIntoIterator<
         MatchConditionTermsIterator<'a, TreeIterator<'a, A>, A>,
         ArenaRef<TypedTerm<ConditionTerm>, A>,
@@ -112,9 +112,7 @@ impl<A: ArenaAllocator + Clone> ConditionListType<WasmExpression<A>> for ArenaRe
     }
 }
 
-impl<A: ArenaAllocator + Clone> ConditionListType<WasmExpression<A>>
-    for ArenaRef<TypedTerm<TreeTerm>, A>
-{
+impl<A: Arena + Clone> ConditionListType<WasmExpression<A>> for ArenaRef<TypedTerm<TreeTerm>, A> {
     type Iterator<'a> = <ArenaRef<TreeTerm, A> as ConditionListType<WasmExpression<A>>>::Iterator<'a>
     where
         <WasmExpression<A> as Expression>::Signal: 'a,
@@ -146,16 +144,16 @@ impl<A: ArenaAllocator + Clone> ConditionListType<WasmExpression<A>>
 
 pub struct MatchConditionTermsIterator<'a, T, A>
 where
-    T: Iterator<Item = TermPointer>,
-    A: ArenaAllocator,
+    T: Iterator<Item = ArenaPointer>,
+    A: Arena,
 {
     inner: T,
     arena: &'a A,
 }
 impl<'a, T, A> MatchConditionTermsIterator<'a, T, A>
 where
-    T: Iterator<Item = TermPointer>,
-    A: ArenaAllocator,
+    T: Iterator<Item = ArenaPointer>,
+    A: Arena,
 {
     pub fn new(arena: &'a A, inner: T) -> Self {
         Self { arena, inner }
@@ -164,8 +162,8 @@ where
 
 impl<'a, T, A> Iterator for MatchConditionTermsIterator<'a, T, A>
 where
-    T: Iterator<Item = TermPointer>,
-    A: ArenaAllocator + Clone,
+    T: Iterator<Item = ArenaPointer>,
+    A: Arena + Clone,
 {
     type Item = ArenaRef<TypedTerm<ConditionTerm>, A>;
     fn next(&mut self) -> Option<Self::Item> {
@@ -190,15 +188,15 @@ where
 
 impl<'a, T, A> ExactSizeIterator for MatchConditionTermsIterator<'a, T, A>
 where
-    T: Iterator<Item = TermPointer> + ExactSizeIterator,
-    A: ArenaAllocator + Clone,
+    T: Iterator<Item = ArenaPointer> + ExactSizeIterator,
+    A: Arena + Clone,
 {
     fn len(&self) -> usize {
         self.inner.len()
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<TreeTerm, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<TreeTerm, A> {
     fn size(&self) -> usize {
         1 + self.left().map(|term| term.size()).unwrap_or(0)
             + self.right().map(|term| term.size()).unwrap_or(0)
@@ -276,7 +274,7 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<TreeTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<TreeTerm, A> {
+impl<A: Arena + Clone> SerializeJson for ArenaRef<TreeTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -288,33 +286,33 @@ impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<TreeTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<TreeTerm, A> {
+impl<A: Arena + Clone> PartialEq for ArenaRef<TreeTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         // TODO: Clarify PartialEq implementations for container terms
         // This assumes that trees with the same length and hash are almost certainly identical
         self.len() == other.len()
     }
 }
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<TreeTerm, A> {}
+impl<A: Arena + Clone> Eq for ArenaRef<TreeTerm, A> {}
 
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<TreeTerm, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<TreeTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<TreeTerm, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<TreeTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let left = self.read_value(|term| term.left);
         let right = self.read_value(|term| term.right);
         write!(f, "(")?;
-        if TermPointer::is_null(left) {
+        if ArenaPointer::is_null(left) {
             write!(f, "NULL")?;
         } else {
             write!(f, "{}", ArenaRef::<Term, _>::new(self.arena.clone(), left))?;
         }
         write!(f, " . ")?;
-        if TermPointer::is_null(right) {
+        if ArenaPointer::is_null(right) {
             write!(f, "NULL")?;
         } else {
             write!(f, "{}", ArenaRef::<Term, _>::new(self.arena.clone(), right))?;
@@ -323,12 +321,12 @@ impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<TreeTerm, A> {
     }
 }
 
-pub struct TreeIterator<'a, A: ArenaAllocator> {
+pub struct TreeIterator<'a, A: Arena> {
     stack: TreeIteratorStack,
     arena: &'a A,
 }
-impl<'a, A: ArenaAllocator> TreeIterator<'a, A> {
-    fn new(arena: &'a A, root: TermPointer) -> Self {
+impl<'a, A: Arena> TreeIterator<'a, A> {
+    fn new(arena: &'a A, root: ArenaPointer) -> Self {
         Self {
             arena,
             stack: TreeIteratorStack {
@@ -340,10 +338,10 @@ impl<'a, A: ArenaAllocator> TreeIterator<'a, A> {
 }
 struct TreeIteratorStack {
     cursor: TreeIteratorCursor,
-    items: Vec<TermPointer>,
+    items: Vec<ArenaPointer>,
 }
 impl TreeIteratorStack {
-    fn push(&mut self, item: TermPointer) {
+    fn push(&mut self, item: ArenaPointer) {
         match self.cursor {
             TreeIteratorCursor::Left => {
                 // If we were processing the left branch, create a new stack entry so that we can return later to process the right branch
@@ -367,7 +365,7 @@ impl TreeIteratorStack {
             }
         }
     }
-    fn peek(&self) -> Option<&TermPointer> {
+    fn peek(&self) -> Option<&ArenaPointer> {
         if self.items.is_empty() {
             None
         } else {
@@ -375,8 +373,8 @@ impl TreeIteratorStack {
         }
     }
 }
-impl<'a, A: ArenaAllocator + Clone> Iterator for TreeIterator<'a, A> {
-    type Item = TermPointer;
+impl<'a, A: Arena + Clone> Iterator for TreeIterator<'a, A> {
+    type Item = ArenaPointer;
     fn next(&mut self) -> Option<Self::Item> {
         let (cursor, child_pointer) = match self.stack.peek().copied() {
             None => None,
@@ -461,7 +459,7 @@ enum TreeIteratorCursor {
     Right,
 }
 
-impl<A: ArenaAllocator + Clone> Internable for ArenaRef<TreeTerm, A> {
+impl<A: Arena + Clone> Internable for ArenaRef<TreeTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
         self.capture_depth() == 0
     }
@@ -477,8 +475,8 @@ mod tests {
     fn tree() {
         assert_eq!(
             TermType::Tree(TreeTerm {
-                left: TermPointer(12345),
-                right: TermPointer(67890),
+                left: ArenaPointer(12345),
+                right: ArenaPointer(67890),
                 length: 54321
             })
             .as_bytes(),

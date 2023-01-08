@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
+// SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 extern crate proc_macro;
 use quote::{quote, ToTokens};
 use syn;
@@ -35,14 +36,14 @@ fn impl_pointer_iter_struct(
             .named
             .iter()
             .cloned()
-            .filter(|field| field.ty.to_token_stream().to_string() == "TermPointer")
+            .filter(|field| field.ty.to_token_stream().to_string() == "ArenaPointer")
             .map(|field| field.ident.unwrap())
             .collect(),
         syn::Fields::Unnamed(fields) => fields
             .unnamed
             .iter()
             .cloned()
-            .filter(|field| field.ty.to_token_stream().to_string() == "TermPointer")
+            .filter(|field| field.ty.to_token_stream().to_string() == "ArenaPointer")
             .map(|field| field.ident.unwrap())
             .collect(),
         syn::Fields::Unit => vec![],
@@ -54,10 +55,10 @@ fn impl_pointer_iter_struct(
 
     quote!(
 
-        #visibility type #iter_name = ::std::array::IntoIter<crate::TermPointer, #num_fields>;
+        #visibility type #iter_name = ::std::array::IntoIter<crate::ArenaPointer, #num_fields>;
 
         #[automatically_derived]
-        impl<A: crate::ArenaAllocator> crate::PointerIter for crate::ArenaRef<#name, A> {
+        impl<A: crate::Arena> crate::PointerIter for crate::ArenaRef<#name, A> {
             type Iter<'a> = #iter_name
             where Self: 'a;
 

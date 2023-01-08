@@ -15,10 +15,10 @@ use serde_json::Value as JsonValue;
 
 use super::WasmExpression;
 use crate::{
-    allocator::ArenaAllocator,
+    allocator::{Arena, ArenaAllocator},
     hash::{TermHash, TermHasher, TermSize},
     term_type::{TermType, TypedTerm},
-    ArenaRef, Array, Term, TermPointer,
+    ArenaPointer, ArenaRef, Array, Term,
 };
 use reflex_macros::PointerIter;
 
@@ -34,12 +34,12 @@ impl TermSize for StringTerm {
     }
 }
 impl TermHash for StringTerm {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         hasher.hash(&self.length, arena).hash(&self.data, arena)
     }
 }
 impl StringTerm {
-    pub fn allocate(value: &str, arena: &mut impl ArenaAllocator) -> TermPointer {
+    pub fn allocate(value: &str, arena: &mut impl ArenaAllocator) -> ArenaPointer {
         let term = Term::new(
             TermType::String(StringTerm {
                 length: value.len() as u32,
@@ -100,7 +100,7 @@ impl std::fmt::Display for StringTerm {
     }
 }
 
-impl<A: ArenaAllocator + Clone> ArenaRef<StringTerm, A> {
+impl<A: Arena + Clone> ArenaRef<StringTerm, A> {
     pub fn len(&self) -> usize {
         self.read_value(|term| term.length as usize)
     }
@@ -110,7 +110,7 @@ impl<A: ArenaAllocator + Clone> ArenaRef<StringTerm, A> {
             u32::from(term.hash(TermHasher::default(), &self.arena).finish()) as HashId
         })
     }
-    fn offset(&self) -> TermPointer {
+    fn offset(&self) -> ArenaPointer {
         self.inner_pointer(|term| &term.data.items[0])
     }
     fn as_utf8<'a>(&'a self) -> Utf8Bytes<A::Slice<'a>> {
@@ -131,7 +131,7 @@ impl<T: Deref<Target = [u8]>> From<Utf8Bytes<T>> for String {
     }
 }
 
-impl<A: ArenaAllocator + Clone> StringValue for ArenaRef<StringTerm, A> {
+impl<A: Arena + Clone> StringValue for ArenaRef<StringTerm, A> {
     type StringRef<'a> = Utf8Bytes<A::Slice<'a>>
         where
             Self: 'a;
@@ -143,7 +143,7 @@ impl<A: ArenaAllocator + Clone> StringValue for ArenaRef<StringTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> StringValue for ArenaRef<TypedTerm<StringTerm>, A> {
+impl<A: Arena + Clone> StringValue for ArenaRef<TypedTerm<StringTerm>, A> {
     type StringRef<'a> = Utf8Bytes<A::Slice<'a>>
         where
             Self: 'a;
@@ -156,9 +156,7 @@ impl<A: ArenaAllocator + Clone> StringValue for ArenaRef<TypedTerm<StringTerm>, 
     }
 }
 
-impl<A: ArenaAllocator + Clone> StringTermType<WasmExpression<A>>
-    for ArenaRef<TypedTerm<StringTerm>, A>
-{
+impl<A: Arena + Clone> StringTermType<WasmExpression<A>> for ArenaRef<TypedTerm<StringTerm>, A> {
     fn value<'a>(&'a self) -> <WasmExpression<A> as Expression>::StringRef<'a>
     where
         <WasmExpression<A> as Expression>::String: 'a,
@@ -168,7 +166,7 @@ impl<A: ArenaAllocator + Clone> StringTermType<WasmExpression<A>>
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<StringTerm, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<StringTerm, A> {
     fn size(&self) -> usize {
         1
     }
@@ -198,7 +196,7 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<StringTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<StringTerm, A> {
+impl<A: Arena + Clone> SerializeJson for ArenaRef<StringTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Ok(JsonValue::String(String::from(self.as_utf8())))
     }
@@ -211,22 +209,22 @@ impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<StringTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<StringTerm, A> {
+impl<A: Arena + Clone> PartialEq for ArenaRef<StringTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         // TODO: Clarify PartialEq implementations for container terms
         // This assumes that strings with the same length and hash are almost certainly identical
         self.len() == other.len()
     }
 }
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<StringTerm, A> {}
+impl<A: Arena + Clone> Eq for ArenaRef<StringTerm, A> {}
 
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<StringTerm, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<StringTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<StringTerm, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<StringTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
@@ -267,7 +265,7 @@ fn get_string_chunks(value: &str) -> Vec<u32> {
         .collect::<Vec<_>>()
 }
 
-impl<A: ArenaAllocator + Clone> Internable for ArenaRef<StringTerm, A> {
+impl<A: Arena + Clone> Internable for ArenaRef<StringTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
         self.capture_depth() == 0
     }

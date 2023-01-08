@@ -11,10 +11,10 @@ use reflex::core::{
 use serde_json::Value as JsonValue;
 
 use crate::{
-    allocator::ArenaAllocator,
+    allocator::Arena,
     hash::{TermHash, TermHasher, TermSize},
     term_type::TypedTerm,
-    ArenaRef, TermPointer,
+    ArenaPointer, ArenaRef,
 };
 use reflex_macros::PointerIter;
 
@@ -23,7 +23,7 @@ use super::{ListTerm, WasmExpression};
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct ConstructorTerm {
-    pub keys: TermPointer,
+    pub keys: ArenaPointer,
 }
 impl TermSize for ConstructorTerm {
     fn size_of(&self) -> usize {
@@ -31,12 +31,12 @@ impl TermSize for ConstructorTerm {
     }
 }
 impl TermHash for ConstructorTerm {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         hasher.hash(&self.keys, arena)
     }
 }
 
-impl<A: ArenaAllocator + Clone> ArenaRef<ConstructorTerm, A> {
+impl<A: Arena + Clone> ArenaRef<ConstructorTerm, A> {
     pub fn keys(&self) -> ArenaRef<TypedTerm<ListTerm>, A> {
         ArenaRef::<TypedTerm<ListTerm>, _>::new(
             self.arena.clone(),
@@ -48,9 +48,7 @@ impl<A: ArenaAllocator + Clone> ArenaRef<ConstructorTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> ConstructorTermType<WasmExpression<A>>
-    for ArenaRef<ConstructorTerm, A>
-{
+impl<A: Arena + Clone> ConstructorTermType<WasmExpression<A>> for ArenaRef<ConstructorTerm, A> {
     fn prototype<'a>(&'a self) -> <WasmExpression<A> as Expression>::StructPrototypeRef<'a>
     where
         <WasmExpression<A> as Expression>::StructPrototype: 'a,
@@ -60,7 +58,7 @@ impl<A: ArenaAllocator + Clone> ConstructorTermType<WasmExpression<A>>
     }
 }
 
-impl<A: ArenaAllocator + Clone> ConstructorTermType<WasmExpression<A>>
+impl<A: Arena + Clone> ConstructorTermType<WasmExpression<A>>
     for ArenaRef<TypedTerm<ConstructorTerm>, A>
 {
     fn prototype<'a>(&'a self) -> <WasmExpression<A> as Expression>::StructPrototypeRef<'a>
@@ -74,7 +72,7 @@ impl<A: ArenaAllocator + Clone> ConstructorTermType<WasmExpression<A>>
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<ConstructorTerm, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<ConstructorTerm, A> {
     fn size(&self) -> usize {
         1
     }
@@ -104,7 +102,7 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<ConstructorTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<ConstructorTerm, A> {
+impl<A: Arena + Clone> SerializeJson for ArenaRef<ConstructorTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -116,26 +114,26 @@ impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<ConstructorTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<ConstructorTerm, A> {
+impl<A: Arena + Clone> PartialEq for ArenaRef<ConstructorTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.keys() == other.keys()
     }
 }
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<ConstructorTerm, A> {}
+impl<A: Arena + Clone> Eq for ArenaRef<ConstructorTerm, A> {}
 
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<ConstructorTerm, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<ConstructorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<ConstructorTerm, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<ConstructorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<constructor:{{{}}}>", self.keys())
     }
 }
 
-impl<A: ArenaAllocator + Clone> Internable for ArenaRef<ConstructorTerm, A> {
+impl<A: Arena + Clone> Internable for ArenaRef<ConstructorTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
         self.capture_depth() == 0
     }
@@ -151,7 +149,7 @@ mod tests {
     fn constructor() {
         assert_eq!(
             TermType::Constructor(ConstructorTerm {
-                keys: TermPointer(12345)
+                keys: ArenaPointer(12345)
             })
             .as_bytes(),
             [TermTypeDiscriminants::Constructor as u32, 12345],

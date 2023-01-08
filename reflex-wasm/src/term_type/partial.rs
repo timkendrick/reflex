@@ -11,10 +11,10 @@ use reflex::core::{
 use serde_json::Value as JsonValue;
 
 use crate::{
-    allocator::ArenaAllocator,
+    allocator::Arena,
     hash::{TermHash, TermHasher, TermSize},
     term_type::TypedTerm,
-    ArenaRef, Term, TermPointer,
+    ArenaPointer, ArenaRef, Term,
 };
 use reflex_macros::PointerIter;
 
@@ -23,8 +23,8 @@ use super::{ListTerm, WasmExpression};
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct PartialTerm {
-    pub target: TermPointer,
-    pub args: TermPointer,
+    pub target: ArenaPointer,
+    pub args: ArenaPointer,
 }
 impl TermSize for PartialTerm {
     fn size_of(&self) -> usize {
@@ -32,12 +32,12 @@ impl TermSize for PartialTerm {
     }
 }
 impl TermHash for PartialTerm {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         hasher.hash(&self.target, arena).hash(&self.args, arena)
     }
 }
 
-impl<A: ArenaAllocator + Clone> ArenaRef<PartialTerm, A> {
+impl<A: Arena + Clone> ArenaRef<PartialTerm, A> {
     pub fn target(&self) -> ArenaRef<Term, A> {
         ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|term| term.target))
     }
@@ -54,9 +54,7 @@ impl<A: ArenaAllocator + Clone> ArenaRef<PartialTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialApplicationTermType<WasmExpression<A>>
-    for ArenaRef<PartialTerm, A>
-{
+impl<A: Arena + Clone> PartialApplicationTermType<WasmExpression<A>> for ArenaRef<PartialTerm, A> {
     fn target<'a>(&'a self) -> <WasmExpression<A> as Expression>::ExpressionRef<'a>
     where
         WasmExpression<A>: 'a,
@@ -72,7 +70,7 @@ impl<A: ArenaAllocator + Clone> PartialApplicationTermType<WasmExpression<A>>
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialApplicationTermType<WasmExpression<A>>
+impl<A: Arena + Clone> PartialApplicationTermType<WasmExpression<A>>
     for ArenaRef<TypedTerm<PartialTerm>, A>
 {
     fn target<'a>(&'a self) -> <WasmExpression<A> as Expression>::ExpressionRef<'a>
@@ -94,7 +92,7 @@ impl<A: ArenaAllocator + Clone> PartialApplicationTermType<WasmExpression<A>>
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<PartialTerm, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<PartialTerm, A> {
     fn size(&self) -> usize {
         1 + self.target().size() + self.args().size()
     }
@@ -158,7 +156,7 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<PartialTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<PartialTerm, A> {
+impl<A: Arena + Clone> SerializeJson for ArenaRef<PartialTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -170,20 +168,20 @@ impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<PartialTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<PartialTerm, A> {
+impl<A: Arena + Clone> PartialEq for ArenaRef<PartialTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.target() == other.target() && self.args() == other.args()
     }
 }
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<PartialTerm, A> {}
+impl<A: Arena + Clone> Eq for ArenaRef<PartialTerm, A> {}
 
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<PartialTerm, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<PartialTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<PartialTerm, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<PartialTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -204,7 +202,7 @@ fn get_eager_args<T>(args: impl IntoIterator<Item = T>, arity: &Arity) -> impl I
         })
 }
 
-impl<A: ArenaAllocator + Clone> Internable for ArenaRef<PartialTerm, A> {
+impl<A: Arena + Clone> Internable for ArenaRef<PartialTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
         self.capture_depth() == 0
     }
@@ -220,8 +218,8 @@ mod tests {
     fn partial() {
         assert_eq!(
             TermType::Partial(PartialTerm {
-                target: TermPointer(12345),
-                args: TermPointer(67890),
+                target: ArenaPointer(12345),
+                args: ArenaPointer(67890),
             })
             .as_bytes(),
             [TermTypeDiscriminants::Partial as u32, 12345, 67890],

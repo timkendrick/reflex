@@ -12,10 +12,10 @@ use reflex_utils::json::is_empty_json_object;
 use serde_json::{Map as JsonMap, Value as JsonValue};
 
 use crate::{
-    allocator::ArenaAllocator,
+    allocator::Arena,
     hash::{TermHash, TermHasher, TermSize},
     term_type::TypedTerm,
-    ArenaRef, Term, TermPointer,
+    ArenaPointer, ArenaRef, Term,
 };
 use reflex_macros::PointerIter;
 
@@ -24,9 +24,9 @@ use super::{ListTerm, WasmExpression};
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct RecordTerm {
-    pub keys: TermPointer,
-    pub values: TermPointer,
-    pub lookup_table: TermPointer,
+    pub keys: ArenaPointer,
+    pub values: ArenaPointer,
+    pub lookup_table: ArenaPointer,
 }
 impl TermSize for RecordTerm {
     fn size_of(&self) -> usize {
@@ -34,12 +34,12 @@ impl TermSize for RecordTerm {
     }
 }
 impl TermHash for RecordTerm {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         hasher.hash(&self.keys, arena).hash(&self.values, arena)
     }
 }
 
-impl<A: ArenaAllocator + Clone> ArenaRef<RecordTerm, A> {
+impl<A: Arena + Clone> ArenaRef<RecordTerm, A> {
     fn keys(&self) -> ArenaRef<TypedTerm<ListTerm>, A> {
         ArenaRef::<TypedTerm<ListTerm>, _>::new(
             self.arena.clone(),
@@ -68,7 +68,7 @@ impl<A: ArenaAllocator + Clone> ArenaRef<RecordTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> RecordTermType<WasmExpression<A>> for ArenaRef<RecordTerm, A> {
+impl<A: Arena + Clone> RecordTermType<WasmExpression<A>> for ArenaRef<RecordTerm, A> {
     fn prototype<'a>(&'a self) -> <WasmExpression<A> as Expression>::StructPrototypeRef<'a>
     where
         <WasmExpression<A> as Expression>::StructPrototype: 'a,
@@ -94,9 +94,7 @@ impl<A: ArenaAllocator + Clone> RecordTermType<WasmExpression<A>> for ArenaRef<R
     }
 }
 
-impl<A: ArenaAllocator + Clone> RecordTermType<WasmExpression<A>>
-    for ArenaRef<TypedTerm<RecordTerm>, A>
-{
+impl<A: Arena + Clone> RecordTermType<WasmExpression<A>> for ArenaRef<TypedTerm<RecordTerm>, A> {
     fn prototype<'a>(&'a self) -> <WasmExpression<A> as Expression>::StructPrototypeRef<'a>
     where
         <WasmExpression<A> as Expression>::StructPrototype: 'a,
@@ -122,7 +120,7 @@ impl<A: ArenaAllocator + Clone> RecordTermType<WasmExpression<A>>
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<RecordTerm, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<RecordTerm, A> {
     fn size(&self) -> usize {
         1 + self.keys().size() + self.values().size()
     }
@@ -160,7 +158,7 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<RecordTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<RecordTerm, A> {
+impl<A: Arena + Clone> SerializeJson for ArenaRef<RecordTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         let keys = self.keys().as_inner();
         let values = self.values().as_inner();
@@ -222,20 +220,20 @@ impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<RecordTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<RecordTerm, A> {
+impl<A: Arena + Clone> PartialEq for ArenaRef<RecordTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.keys() == other.keys() && self.values() == other.values()
     }
 }
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<RecordTerm, A> {}
+impl<A: Arena + Clone> Eq for ArenaRef<RecordTerm, A> {}
 
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<RecordTerm, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<RecordTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<RecordTerm, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<RecordTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.keys().as_inner().len() {
             0 => write!(f, "{{}}"),
@@ -254,7 +252,7 @@ impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<RecordTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> Internable for ArenaRef<RecordTerm, A> {
+impl<A: Arena + Clone> Internable for ArenaRef<RecordTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
         self.capture_depth() == 0
     }
@@ -270,9 +268,9 @@ mod tests {
     fn record() {
         assert_eq!(
             TermType::Record(RecordTerm {
-                keys: TermPointer(12345),
-                values: TermPointer(67890),
-                lookup_table: TermPointer::null(),
+                keys: ArenaPointer(12345),
+                values: ArenaPointer(67890),
+                lookup_table: ArenaPointer::null(),
             })
             .as_bytes(),
             [

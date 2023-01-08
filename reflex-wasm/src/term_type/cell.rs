@@ -8,10 +8,10 @@ use reflex::core::{DependencyList, Eagerness, GraphNode, Internable, SerializeJs
 use serde_json::Value as JsonValue;
 
 use crate::{
-    allocator::ArenaAllocator,
+    allocator::{Arena, ArenaAllocator},
     hash::{TermHash, TermHashState, TermHasher, TermSize},
     term_type::TermType,
-    ArenaRef, Array, Term, TermPointer,
+    ArenaPointer, ArenaRef, Array, Term,
 };
 use reflex_macros::PointerIter;
 
@@ -26,7 +26,7 @@ impl TermSize for CellTerm {
     }
 }
 impl TermHash for CellTerm {
-    fn hash(&self, hasher: TermHasher, _arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, _arena: &impl Arena) -> TermHasher {
         hasher
     }
 }
@@ -34,7 +34,7 @@ impl CellTerm {
     pub fn allocate(
         values: impl IntoIterator<Item = u32, IntoIter = impl ExactSizeIterator<Item = u32>>,
         arena: &mut impl ArenaAllocator,
-    ) -> TermPointer {
+    ) -> ArenaPointer {
         let values = values.into_iter();
         let term = Term::new(
             TermType::Cell(Self {
@@ -52,13 +52,13 @@ impl CellTerm {
     }
 }
 
-impl<A: ArenaAllocator + Clone> ArenaRef<CellTerm, A> {
+impl<A: Arena + Clone> ArenaRef<CellTerm, A> {
     pub fn fields(&self) -> impl Iterator<Item = u32> + '_ {
         Array::<u32>::iter(self.inner_pointer(|value| &value.fields), &self.arena)
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<CellTerm, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<CellTerm, A> {
     fn size(&self) -> usize {
         1
     }
@@ -88,7 +88,7 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<CellTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<CellTerm, A> {
+impl<A: Arena + Clone> SerializeJson for ArenaRef<CellTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -100,20 +100,20 @@ impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<CellTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<CellTerm, A> {
+impl<A: Arena + Clone> PartialEq for ArenaRef<CellTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         std::ptr::eq(&self.arena, &other.arena) && self.pointer == other.pointer
     }
 }
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<CellTerm, A> {}
+impl<A: Arena + Clone> Eq for ArenaRef<CellTerm, A> {}
 
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<CellTerm, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<CellTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<CellTerm, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<CellTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -126,7 +126,7 @@ impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<CellTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> Internable for ArenaRef<CellTerm, A> {
+impl<A: Arena + Clone> Internable for ArenaRef<CellTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
         self.capture_depth() == 0
     }

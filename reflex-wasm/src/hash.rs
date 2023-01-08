@@ -4,7 +4,7 @@
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use crate::{
     utils::{u32_get_byte, u64_get_byte},
-    ArenaAllocator,
+    Arena,
 };
 
 pub trait TermSize {
@@ -57,50 +57,50 @@ impl TermSize for f64 {
 }
 
 pub trait TermHash {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher;
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher;
 }
 impl TermHash for bool {
-    fn hash(&self, hasher: TermHasher, _arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, _arena: &impl Arena) -> TermHasher {
         hasher.write_bool(*self)
     }
 }
 impl TermHash for u8 {
-    fn hash(&self, hasher: TermHasher, _arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, _arena: &impl Arena) -> TermHasher {
         hasher.write_u8(*self)
     }
 }
 impl TermHash for u32 {
-    fn hash(&self, hasher: TermHasher, _arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, _arena: &impl Arena) -> TermHasher {
         hasher.write_u32(*self)
     }
 }
 impl TermHash for [u32; 2] {
-    fn hash(&self, hasher: TermHasher, _arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, _arena: &impl Arena) -> TermHasher {
         hasher.write_u64(unsafe { std::mem::transmute::<[u32; 2], u64>(*self) })
     }
 }
 impl TermHash for u64 {
-    fn hash(&self, hasher: TermHasher, _arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, _arena: &impl Arena) -> TermHasher {
         hasher.write_u64(*self)
     }
 }
 impl TermHash for i32 {
-    fn hash(&self, hasher: TermHasher, _arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, _arena: &impl Arena) -> TermHasher {
         hasher.write_i32(*self)
     }
 }
 impl TermHash for i64 {
-    fn hash(&self, hasher: TermHasher, _arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, _arena: &impl Arena) -> TermHasher {
         hasher.write_i64(*self)
     }
 }
 impl TermHash for f32 {
-    fn hash(&self, hasher: TermHasher, _arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, _arena: &impl Arena) -> TermHasher {
         hasher.write_f32(*self)
     }
 }
 impl TermHash for f64 {
-    fn hash(&self, hasher: TermHasher, _arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, _arena: &impl Arena) -> TermHasher {
         hasher.write_f64(*self)
     }
 }
@@ -132,7 +132,7 @@ impl Default for TermHasher {
     }
 }
 impl TermHasher {
-    pub fn hash<T: TermHash, A: ArenaAllocator>(self, value: &T, arena: &A) -> Self {
+    pub fn hash<T: TermHash, A: Arena>(self, value: &T, arena: &A) -> Self {
         value.hash(self, arena)
     }
     pub fn finish(self) -> TermHashState {

@@ -17,7 +17,7 @@ use reflex::{
 use serde_json::Value as JsonValue;
 
 use crate::{
-    allocator::ArenaAllocator,
+    allocator::Arena,
     hash::{TermHash, TermHasher, TermSize},
     term_type::TypedTerm,
     ArenaRef,
@@ -33,7 +33,7 @@ impl TermSize for CompiledFunctionIndex {
     }
 }
 impl TermHash for CompiledFunctionIndex {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         let Self(uid) = self;
         hasher.hash(uid, arena)
     }
@@ -67,12 +67,12 @@ impl TermSize for CompiledTerm {
     }
 }
 impl TermHash for CompiledTerm {
-    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         hasher.hash(&self.target, arena).hash(&self.num_args, arena)
     }
 }
 
-impl<A: ArenaAllocator + Clone> ArenaRef<CompiledTerm, A> {
+impl<A: Arena + Clone> ArenaRef<CompiledTerm, A> {
     pub fn target(&self) -> CompiledFunctionIndex {
         self.read_value(|term| term.target)
     }
@@ -84,7 +84,7 @@ impl<A: ArenaAllocator + Clone> ArenaRef<CompiledTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> CompiledFunctionTermType for ArenaRef<CompiledTerm, A> {
+impl<A: Arena + Clone> CompiledFunctionTermType for ArenaRef<CompiledTerm, A> {
     fn address(&self) -> InstructionPointer {
         InstructionPointer::new(u32::from(self.target()) as usize)
     }
@@ -101,7 +101,7 @@ impl<A: ArenaAllocator + Clone> CompiledFunctionTermType for ArenaRef<CompiledTe
     }
 }
 
-impl<A: ArenaAllocator + Clone> CompiledFunctionTermType for ArenaRef<TypedTerm<CompiledTerm>, A> {
+impl<A: Arena + Clone> CompiledFunctionTermType for ArenaRef<TypedTerm<CompiledTerm>, A> {
     fn address(&self) -> InstructionPointer {
         <ArenaRef<CompiledTerm, A> as CompiledFunctionTermType>::address(&self.as_inner())
     }
@@ -116,7 +116,7 @@ impl<A: ArenaAllocator + Clone> CompiledFunctionTermType for ArenaRef<TypedTerm<
     }
 }
 
-impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<CompiledTerm, A> {
+impl<A: Arena + Clone> GraphNode for ArenaRef<CompiledTerm, A> {
     fn size(&self) -> usize {
         1
     }
@@ -146,7 +146,7 @@ impl<A: ArenaAllocator + Clone> GraphNode for ArenaRef<CompiledTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<CompiledTerm, A> {
+impl<A: Arena + Clone> SerializeJson for ArenaRef<CompiledTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
     }
@@ -158,26 +158,26 @@ impl<A: ArenaAllocator + Clone> SerializeJson for ArenaRef<CompiledTerm, A> {
     }
 }
 
-impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<CompiledTerm, A> {
+impl<A: Arena + Clone> PartialEq for ArenaRef<CompiledTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         self.address() == other.address() && self.num_args() == other.num_args()
     }
 }
-impl<A: ArenaAllocator + Clone> Eq for ArenaRef<CompiledTerm, A> {}
+impl<A: Arena + Clone> Eq for ArenaRef<CompiledTerm, A> {}
 
-impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<CompiledTerm, A> {
+impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<CompiledTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
     }
 }
 
-impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<CompiledTerm, A> {
+impl<A: Arena + Clone> std::fmt::Display for ArenaRef<CompiledTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<compiled:{}>", self.target())
     }
 }
 
-impl<A: ArenaAllocator + Clone> Internable for ArenaRef<CompiledTerm, A> {
+impl<A: Arena + Clone> Internable for ArenaRef<CompiledTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
         self.capture_depth() == 0
     }
