@@ -32,8 +32,11 @@ export default function constInitDirective(node, context) {
   );
   return getTemplateElements(
     context.import(TEMPLATE, {
-      $initializers: createListDirective({
-        elements: initializers,
+      $globals: createListDirective({
+        elements: initializers.map(({ identifier, type, initializer }) => createListDirective({
+          elements: [identifier, type, initializer],
+          location: node.location,
+        })),
         location: node.location,
       }),
     }).module,
@@ -60,7 +63,7 @@ function sortInitializers(initializers) {
   }
   return entries
     .sort((a, b) => depths.get(a[0]) - depths.get(b[0]))
-    .map(([_, { identifier }]) => identifier);
+    .map(([_, entry]) => entry);
 }
 
 function getTemplateElements(template) {

@@ -75,24 +75,76 @@ export default function constDirective(node, context) {
       )}`,
     );
   }
-  registerInitializer(identifier, dependencyNames, node.location, context);
+  registerInitializer(identifier, type, dependencyNames, node.location, context);
   return getTemplateElements(
     context.import(TEMPLATE, {
       $identifier: identifier,
       $type: type,
+      $default: getDefaultValue(type.source, node.location, context),
       $initializer: initializer,
     }).module,
   );
 }
 
-function getInitializerName(identifier) {
-  return `${identifier.source}::initialize`;
+function getDefaultValue(type, location, context) {
+  switch (type) {
+    case 'i32':
+      return NodeType.Instruction({
+        instruction: 'i32.const',
+        elements: [
+          NodeType.Term({ source: 'i32.const', location }),
+          NodeType.Whitespace({ source: ' ', location }),
+          NodeType.Term({ source: '-1', location }),
+        ],
+        location,
+      });
+    case 'i64':
+      return NodeType.Instruction({
+        instruction: 'i64.const',
+        elements: [
+          NodeType.Term({ source: 'i64.const', location }),
+          NodeType.Whitespace({ source: ' ', location }),
+          NodeType.Term({ source: '-1', location }),
+        ],
+        location,
+      });
+    case 'f32':
+      return NodeType.Instruction({
+        instruction: 'f32.const',
+        elements: [
+          NodeType.Term({ source: 'f32.const', location }),
+          NodeType.Whitespace({ source: ' ', location }),
+          NodeType.Term({ source: '0.0', location }),
+        ],
+        location,
+      });
+    case 'f64':
+      return NodeType.Instruction({
+        instruction: 'f64.const',
+        elements: [
+          NodeType.Term({ source: 'f64.const', location }),
+          NodeType.Whitespace({ source: ' ', location }),
+          NodeType.Term({ source: '0.0', location }),
+        ],
+        location,
+      });
+    default: {
+      const source = context.sources.get(context.path);
+      throw new ParseError(
+        location,
+        source,
+        `Invalid ${CONST_DIRECTIVE} directive type: ${formatSourceRange(
+          source,
+          location,
+        )}`,
+      );
+    }
+  }
 }
 
-function registerInitializer(identifier, dependencies, location, context) {
+function registerInitializer(identifier, type, dependencies, location, context) {
   const initializers = context.globals.get(CONST_INITIALIZERS_GLOBAL) || new Map();
-  const initializerName = getInitializerName(identifier);
-  if (initializers.has(initializerName)) {
+  if (initializers.has(identifier.source)) {
     const source = context.sources.get(context.path);
     throw new ParseError(
       location,
@@ -102,8 +154,13 @@ function registerInitializer(identifier, dependencies, location, context) {
   }
   context.globals.set(
     CONST_INITIALIZERS_GLOBAL,
-    initializers.set(initializerName, {
-      identifier: NodeType.Term({ source: initializerName, location: identifier.location }),
+    initializers.set(identifier.source, {
+      identifier,
+      type,
+      initializer: NodeType.Term({
+        source: getInitializerName(identifier),
+        location: identifier.location,
+      }),
       dependencies,
     }),
   );
@@ -130,7 +187,7 @@ function parseDependencyNode(node, context) {
       `Invalid ${DEPENDS_ON_DIRECTIVE} directive: ${formatSourceRange(source, node.location)}`,
     );
   }
-  return getInitializerName(identifier);
+  return identifier.source;
 }
 
 function parseInitializer(identifier, instructions, location, context) {
@@ -143,21 +200,25 @@ function parseInitializer(identifier, instructions, location, context) {
       NodeType.Term({ source: 'func', location }),
       NodeType.Whitespace({ source: ' ', location }),
       NodeType.Term({ source: getInitializerName(identifier), location }),
-      NodeType.Whitespace({ source: '\n    ', location }),
-      ...initializerBody,
-      NodeType.Whitespace({ source: '\n    ', location }),
+      NodeType.Whitespace({ source: ' ', location }),
       NodeType.Instruction({
-        instruction: 'global.set',
+        instruction: 'result',
         elements: [
-          NodeType.Term({ source: 'global.set', location }),
+          NodeType.Term({ source: 'result', location }),
           NodeType.Whitespace({ source: ' ', location }),
-          identifier,
+          NodeType.Term({ source: 'i32', location }),
         ],
         location,
       }),
+      NodeType.Whitespace({ source: '\n    ', location }),
+      ...initializerBody,
     ],
     location,
   });
+}
+
+function getInitializerName(identifier) {
+  return `${identifier.source}::initialize`;
 }
 
 function parseFunctionInitializer(elements, context) {
