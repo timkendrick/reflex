@@ -10,7 +10,7 @@ import tests from './index.test.mjs';
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 
-const runner = createWasmTestRunner(path.join(__dirname, `../build/runtime.debug.wasm`));
+const runner = createWasmTestRunner(path.join(__dirname, `../build/runtime.wasm`));
 
 runner(tests).then((success) => {
   process.exit(success ? 0 : 1);

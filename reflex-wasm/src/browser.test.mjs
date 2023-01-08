@@ -5,7 +5,7 @@ import createWasmTestRunner from './browser.runner.mjs';
 
 import tests from './index.test.mjs';
 
-const runner = createWasmTestRunner('../build/runtime.debug.wasm');
+const runner = createWasmTestRunner('../build/runtime.wasm');
 
 runner(tests).then((success) => {
   document.body.appendChild(document.createTextNode(success ? 'Tests passed' : 'Tests failed'));
