@@ -26,6 +26,7 @@ use super::{ListTerm, WasmExpression};
 pub struct RecordTerm {
     pub keys: TermPointer,
     pub values: TermPointer,
+    pub lookup_table: TermPointer,
 }
 impl TermSize for RecordTerm {
     fn size_of(&self) -> usize {
@@ -52,6 +53,7 @@ impl<A: ArenaAllocator + Clone> ArenaRef<RecordTerm, A> {
         )
     }
     fn get<T: Expression>(&self, key: &T) -> Option<ArenaRef<Term, A>> {
+        // TODO: implement `Record::get()` using hashmap lookup if one exists
         self.keys()
             .as_inner()
             .iter()
@@ -270,9 +272,15 @@ mod tests {
             TermType::Record(RecordTerm {
                 keys: TermPointer(12345),
                 values: TermPointer(67890),
+                lookup_table: TermPointer::null(),
             })
             .as_bytes(),
-            [TermTypeDiscriminants::Record as u32, 12345, 67890],
+            [
+                TermTypeDiscriminants::Record as u32,
+                12345,
+                67890,
+                0xFFFFFFFF
+            ],
         );
     }
 }
