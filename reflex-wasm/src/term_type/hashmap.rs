@@ -35,19 +35,24 @@ impl<A: ArenaAllocator> PointerIter for ArenaRef<HashmapTerm, A> {
         Self: 'a;
 
     fn iter(&self) -> Self::Iter<'_> {
+        let items_pointer = self.inner_pointer(|term| &term.buckets.items);
         self.read_value(|term| {
-            let ptr = term as *const HashmapTerm as u32;
-
             term.buckets
                 .items()
-                .filter(|bucket| !bucket.key.is_uninitialized())
-                .flat_map(|bucket| {
-                    [
-                        self.pointer
-                            .offset(&bucket.key as *const TermPointer as u32 - ptr),
-                        self.pointer
-                            .offset(&bucket.value as *const TermPointer as u32 - ptr),
-                    ]
+                .enumerate()
+                .filter(|(_, bucket)| !bucket.key.is_uninitialized())
+                .map(|(index, _)| {
+                    let item_offset = index * std::mem::size_of::<HashmapBucket>();
+                    items_pointer.offset(item_offset as u32)
+                })
+                .flat_map(|bucket_pointer| {
+                    let key_pointer = self
+                        .arena
+                        .inner_pointer::<HashmapBucket, _>(bucket_pointer, |bucket| &bucket.key);
+                    let value_pointer = self
+                        .arena
+                        .inner_pointer::<HashmapBucket, _>(bucket_pointer, |bucket| &bucket.value);
+                    [key_pointer, value_pointer]
                 })
                 .collect::<Vec<_>>()
         })
@@ -66,6 +71,8 @@ impl TermHash for HashmapTerm {
         let hasher = hasher.hash(&self.num_entries, arena);
         self.buckets
             .items()
+            .filter(|bucket| !bucket.key.is_uninitialized())
+            .take(self.num_entries as usize)
             .fold(hasher, |hasher, item| item.hash(hasher, arena))
     }
 }
