@@ -11,18 +11,21 @@ use reflex::{core::RefType, hash::HashId};
 use term_type::*;
 
 pub mod allocator;
+pub mod compile;
 pub mod compiler;
 pub mod factory;
 pub mod hash;
 pub mod interpreter;
 pub mod parser;
+pub mod serialize;
+pub mod snapshot;
 pub mod stdlib;
 pub mod term_type;
 pub mod utils;
 
 pub struct ArenaRef<T, A: ArenaAllocator> {
-    pub(crate) arena: A,
-    pub pointer: TermPointer,
+    arena: A,
+    pointer: TermPointer,
     _type: PhantomData<T>,
 }
 impl<T, A: ArenaAllocator> std::hash::Hash for ArenaRef<T, A>
@@ -47,7 +50,10 @@ impl<T, A: ArenaAllocator> ArenaRef<T, A> {
     pub fn inner_pointer<V>(&self, selector: impl FnOnce(&T) -> &V) -> TermPointer {
         self.arena.inner_pointer::<T, V>(self.pointer, selector)
     }
-    pub(crate) fn as_pointer(&self) -> TermPointer {
+    pub fn arena(&self) -> &A {
+        &self.arena
+    }
+    pub fn as_pointer(&self) -> TermPointer {
         self.pointer
     }
     pub fn inner_ref<V>(&self, selector: impl FnOnce(&T) -> &V) -> ArenaRef<V, A>
@@ -106,18 +112,18 @@ impl<'a, T: 'a, A: ArenaAllocator, TInner: Iterator<Item = TermPointer>>
     }
 }
 
-pub trait IntoArenaRefIterator<'a, T: 'a, A: ArenaAllocator>
+pub trait IntoArenaRefIterator<'a, A: ArenaAllocator>
 where
     Self: Iterator<Item = TermPointer> + Sized,
 {
-    fn as_arena_ref(self, arena: &'a A) -> IntoArenaRefIter<'a, T, A, Self>;
+    fn as_arena_refs<T: 'a>(self, arena: &'a A) -> IntoArenaRefIter<'a, T, A, Self>;
 }
 
-impl<'a, _Self, T: 'a, A: ArenaAllocator> IntoArenaRefIterator<'a, T, A> for _Self
+impl<'a, _Self, A: ArenaAllocator> IntoArenaRefIterator<'a, A> for _Self
 where
     Self: Iterator<Item = TermPointer> + Sized,
 {
-    fn as_arena_ref(self, arena: &'a A) -> IntoArenaRefIter<'a, T, A, Self> {
+    fn as_arena_refs<T: 'a>(self, arena: &'a A) -> IntoArenaRefIter<'a, T, A, Self> {
         IntoArenaRefIter::new(arena, self)
     }
 }
@@ -220,7 +226,7 @@ impl TermPointer {
         Self(0xFFFFFFFF)
     }
     pub fn uninitialized() -> Self {
-        Self(0)
+        Self(0x00000000)
     }
     pub fn is_null(self) -> bool {
         let Self(offset) = self;
@@ -299,10 +305,7 @@ where
     }
 }
 
-impl<T> Array<T>
-where
-    T: Sized,
-{
+impl<T: Sized> Array<T> {
     pub fn len(&self) -> usize {
         self.length as usize
     }
@@ -339,7 +342,7 @@ where
     }
     pub unsafe fn get_unchecked(&self, index: usize) -> &T {
         let offset = &self.items as *const T as usize;
-        let pointer = (offset + (index * 4)) as *const T;
+        let pointer = (offset + (index * std::mem::size_of::<T>())) as *const T;
         std::mem::transmute::<*const T, &T>(pointer)
     }
     pub fn items(&self) -> ArrayIter<'_, T> {
@@ -380,11 +383,11 @@ impl<T, A: ArenaAllocator> ArenaRef<Array<T>, A> {
     }
 }
 
-pub struct ArrayIter<'a, T> {
+pub struct ArrayIter<'a, T: Sized> {
     array: &'a Array<T>,
     offset: usize,
 }
-impl<'a, T> ArrayIter<'a, T> {
+impl<'a, T: Sized> ArrayIter<'a, T> {
     fn new(array: &'a Array<T>) -> Self {
         Self { array, offset: 0 }
     }
@@ -450,21 +453,47 @@ pub trait PointerIter {
     where
         Self: 'a;
 
-    fn iter(&self) -> Self::Iter<'_>;
+    fn iter<'a>(&'a self) -> Self::Iter<'a>;
 }
 
 #[cfg(test)]
 mod tests {
-    use std::cell::RefCell;
-    use std::rc::Rc;
-
-    use super::*;
-    use crate::allocator::{ArenaAllocator, VecAllocator};
-    use crate::compiler::Serialize;
-    use crate::hash::TermSize;
-    use crate::{ArenaRef, PointerIter, TermPointer};
     use reflex::core::NodeId;
     use reflex_macros::PointerIter;
+
+    use crate::{
+        allocator::{ArenaAllocator, VecAllocator},
+        hash::TermSize,
+        ArenaRef, PointerIter, TermPointer,
+    };
+
+    use super::*;
+
+    #[derive(PointerIter, PartialEq, Eq, Debug, Clone)]
+    #[repr(C)]
+    pub struct TreeNode {
+        pub id: u64,
+        pub first: TermPointer,
+        pub after: u32,
+        pub second: TermPointer,
+    }
+    impl TermSize for TreeNode {
+        fn size_of(&self) -> usize {
+            std::mem::size_of::<Self>()
+        }
+    }
+
+    impl NodeId for TreeNode {
+        fn id(&self) -> HashId {
+            self.id
+        }
+    }
+
+    impl<A: ArenaAllocator + Clone> NodeId for ArenaRef<TreeNode, A> {
+        fn id(&self) -> HashId {
+            self.read_value(|term| term.id())
+        }
+    }
 
     impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<TreeNode, A> {
         fn eq(&self, other: &Self) -> bool {
@@ -494,104 +523,14 @@ mod tests {
         }
     }
 
-    #[derive(PointerIter, PartialEq, Eq, Debug, Clone)]
-    #[repr(C)]
-    pub struct TreeNode {
-        pub id: u64,
-        pub first: TermPointer,
-        pub after: u32,
-        pub second: TermPointer,
-    }
-    impl TermSize for TreeNode {
-        fn size_of(&self) -> usize {
-            std::mem::size_of::<Self>()
-        }
-    }
-
-    impl NodeId for TreeNode {
-        fn id(&self) -> HashId {
-            self.id
-        }
-    }
-
-    impl<A: ArenaAllocator + Clone> NodeId for ArenaRef<TreeNode, A> {
-        fn id(&self) -> HashId {
-            self.read_value(|term| term.id)
-        }
-    }
-
     #[test]
-    fn basic_usage() {
-        let mut source_allocator = VecAllocator::default();
-
-        let _filler = source_allocator.allocate(TreeNode {
-            id: 22341u64,
-            first: TermPointer::null(),
-            after: 2232u32,
-            second: TermPointer::null(),
-        });
-
-        let leaf = TreeNode {
-            id: 15u64,
-            first: TermPointer::null(),
-            after: 16u32,
-            second: TermPointer::null(),
-        };
-        let leaf_instance = source_allocator.allocate(leaf);
-
-        let root = TreeNode {
-            id: 15u64,
-            first: leaf_instance,
-            after: 16u32,
-            second: leaf_instance,
-        };
-        let root_instance = source_allocator.allocate(root);
-        let source_allocator = Rc::new(RefCell::new(source_allocator));
-        let root_ref = ArenaRef::<TreeNode, _>::new(source_allocator.clone(), root_instance);
-
-        let leaf_ref = ArenaRef::<TreeNode, _>::new(source_allocator.clone(), leaf_instance);
-
-        let mut target_allocator = VecAllocator::default();
-
-        let _filler = target_allocator.allocate(TreeNode {
-            id: 234u64,
-            first: TermPointer::null(),
-            after: 2222u32,
-            second: TermPointer::null(),
-        });
-
-        let _filler = target_allocator.allocate(TreeNode {
-            id: 223444u64,
-            first: TermPointer::null(),
-            after: 224442u32,
-            second: TermPointer::null(),
-        });
-
-        let mut target_allocator = Rc::new(RefCell::new(target_allocator));
-
-        let serialized_expression =
-            root_ref.serialize(&mut target_allocator, &mut Default::default());
-
-        let serialized_expression_ref =
-            ArenaRef::<TreeNode, _>::new(target_allocator.clone(), serialized_expression);
-
-        assert_eq!(root_ref, serialized_expression_ref);
-
-        let serialized_leaf_ref = serialized_expression_ref.read_value(|root| root.first);
-        let serialized_leaf_ref =
-            ArenaRef::<TreeNode, _>::new(target_allocator.clone(), serialized_leaf_ref);
-
-        assert_eq!(leaf_ref, serialized_leaf_ref);
-    }
-
-    #[test]
-    fn serialize_trait() {
+    fn pointer_iter_trait() {
         let mut allocator = VecAllocator::default();
 
         let term = TreeNode {
-            id: 0u64,
+            id: 3,
             first: TermPointer::from(20),
-            after: 0u32,
+            after: 123,
             second: TermPointer::from(50),
         };
         let instance = allocator.allocate(term);

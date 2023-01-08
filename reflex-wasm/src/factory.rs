@@ -682,10 +682,23 @@ impl<A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static + Clone>
             std::ptr::eq(&*prototype.arena.arena.borrow(), &*self.arena.borrow())
                 && std::ptr::eq(&*fields.arena.arena.borrow(), &*self.arena.borrow())
         );
+        let keys = prototype.keys();
+        let keys = keys.as_deref();
+        let lookup_table = if keys.len() >= 16 {
+            Some(self.create_hashmap_term(keys.iter().zip(fields.iter())))
+        } else {
+            None
+        };
+        let keys = prototype.as_pointer();
+        let values = fields.as_pointer();
         let term = Term::new(
             TermType::Record(RecordTerm {
-                keys: prototype.as_pointer(),
-                values: fields.as_pointer(),
+                keys,
+                values,
+                lookup_table: match lookup_table {
+                    Some(term) => term.pointer,
+                    None => TermPointer::null(),
+                },
             }),
             &*self.arena.borrow(),
         );

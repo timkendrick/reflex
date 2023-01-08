@@ -784,6 +784,6 @@ impl TryFrom<Uuid> for Stdlib {
 
 impl std::fmt::Display for Stdlib {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<wasm:{:?}>", self)
+        write!(f, "wasm::{:?}", StdlibDiscriminants::from(self))
     }
 }

@@ -1,9 +1,7 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
-// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use std::ops::Rem;
-
+// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use reflex::cache::SubstitutionCache;
 use reflex::core::{evaluate, InstructionPointer, StateCache};
@@ -17,6 +15,7 @@ use reflex_lang::{self, CachedSharedTerm, ExpressionList, SharedTermFactory};
 use reflex_lisp::parse;
 use reflex_wasm::allocator::ArenaAllocator;
 
+use reflex_wasm::interpreter::mocks::add_import_stubs;
 use reflex_wasm::stdlib::{Add, Stdlib};
 use reflex_wasm::*;
 use reflex_wasm::{
@@ -244,12 +243,7 @@ fn generate_3_plus_5_rust(
 }
 
 fn initialize_interpreter_context(wasm: &[u8]) -> Result<WasmInterpreter, InterpreterError> {
-    WasmContextBuilder::from_wasm(wasm, "memory")?
-        .add_import("Math", "remainder", |a: f64, b: f64| a.rem(b))?
-        .add_import("Math", "pow", |a: f64, b: f64| a.powf(b))?
-        .add_import("Date", "parse", |_: u32, _: u32| 0u64)?
-        .add_import("Date", "toISOString", |_: u64, _: u32| 0u32)?
-        .add_import("Number", "toString", |_: f64, _: u32| 0u32)?
+    add_import_stubs(WasmContextBuilder::from_wasm(wasm, "memory")?)?
         .build()
         .map(WasmInterpreter::from)
 }

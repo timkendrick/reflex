@@ -4,6 +4,8 @@ set -e
 INPUT_PATH="$1"
 OUTPUT_PATH="$2"
 
-
+# Optimise WASM module
 wasm-opt --enable-bulk-memory --enable-multivalue -O4 --debuginfo --output "$OUTPUT_PATH" "$INPUT_PATH"
-wasmtime compile -o "$OUTPUT_PATH.cwasm" "$OUTPUT_PATH"
+
+# Pre-compile wasmtime module
+wasmtime compile --output "$OUTPUT_PATH.cwasm" "$OUTPUT_PATH"

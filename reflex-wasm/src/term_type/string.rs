@@ -65,12 +65,7 @@ impl StringTerm {
         let slice = unsafe { slice::from_raw_parts(start_pointer, num_bytes) };
         // ... and then convert that slice into a string slice
         // FIXME: Prevent panic on invalid UTF-8 bytes
-        std::str::from_utf8(slice)
-            .map_err(|e| {
-                println!("{slice:?}");
-                e
-            })
-            .expect("Invalid UTF-8 bytes")
+        std::str::from_utf8(slice).expect("Invalid UTF-8 bytes")
     }
 }
 

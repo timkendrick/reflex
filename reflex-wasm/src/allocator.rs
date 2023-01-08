@@ -10,12 +10,13 @@ use std::{
     rc::Rc,
 };
 
-use crate::{hash::TermSize, ArenaRef, TermPointer};
+use crate::{hash::TermSize, PointerIter, Term, TermPointer};
 
 pub trait ArenaAllocator: Sized {
     type Slice<'a>: Deref<Target = [u8]>
     where
         Self: 'a;
+
     fn len(&self) -> usize;
     fn allocate<T: TermSize>(&mut self, value: T) -> TermPointer;
     fn extend(&mut self, offset: TermPointer, size: usize);
@@ -112,6 +113,16 @@ impl<A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static> ArenaAllocator f
 
 pub struct VecAllocator(Vec<u32>);
 impl VecAllocator {
+    pub fn from_bytes(data: &[u8]) -> Self {
+        if data.len() % 4 != 0 {
+            panic!("Invalid VecAllocator data alignment");
+        }
+        Self::from_vec_u32(
+            data.chunks_exact(4)
+                .map(|word| u32::from_le_bytes([word[0], word[1], word[2], word[3]]))
+                .collect(),
+        )
+    }
     pub fn from_vec_u32(data: Vec<u32>) -> Self {
         Self(data)
     }
@@ -141,10 +152,19 @@ impl VecAllocator {
         let item = &mut data[offset / 4];
         unsafe { std::mem::transmute::<&mut u32, &mut T>(item) }
     }
+    pub fn into_inner(self) -> Vec<u32> {
+        let Self(data) = self;
+        data
+    }
+    fn start_offset(&self) -> TermPointer {
+        // Skip over the initial 4-byte length marker
+        TermPointer::from(std::mem::size_of::<u32>() as u32)
+    }
 }
 impl Default for VecAllocator {
     fn default() -> Self {
-        Self(Default::default())
+        // Start with an initial 4-byte length marker to match the WASM allocator representation
+        Self(vec![0x00000004u32])
     }
 }
 impl ArenaAllocator for VecAllocator {
@@ -176,7 +196,12 @@ impl ArenaAllocator for VecAllocator {
             );
         } else {
             let Self(data) = self;
-            data.extend(repeat(0).take(pad_to_4_byte_offset(size) / 4));
+            // Ensure all allocations are 32-bit aligned
+            let padded_size = pad_to_4_byte_offset(size) as u32;
+            // Extend the allocation with zero-filled bytes
+            data.extend(repeat(0).take((padded_size as usize) / 4));
+            // Update the length marker
+            data[0] += padded_size;
         }
     }
     fn shrink(&mut self, offset: TermPointer, size: usize) {
@@ -189,7 +214,12 @@ impl ArenaAllocator for VecAllocator {
             );
         } else {
             let Self(data) = self;
-            data.truncate((offset as u32 as usize - pad_to_4_byte_offset(size)) / 4);
+            // Ensure all allocations are 32-bit aligned
+            let padded_size = pad_to_4_byte_offset(size) as u32;
+            // Truncate the allocation
+            data.truncate((offset - padded_size) as usize / 4);
+            // Update the length marker
+            data[0] -= padded_size;
         }
     }
     fn write<T: Sized>(&mut self, offset: TermPointer, value: T) {
@@ -235,6 +265,27 @@ impl Into<Vec<u32>> for VecAllocator {
     }
 }
 
+// FIXME: Remove hard-coded assumption that VecAllocator always contains Term values
+// e.g. impl<T: NodeId + TermSize> PointerIter for TypedVecAllocator<T>
+impl PointerIter for VecAllocator {
+    type Iter<'a> = ArenaIterator<'a, Self, Term>
+    where
+        Self: 'a;
+
+    fn iter<'a>(&'a self) -> Self::Iter<'a> {
+        ArenaIterator::new(self, self.start_offset())
+    }
+}
+impl PointerIter for Rc<RefCell<VecAllocator>> {
+    type Iter<'a> = ArenaIterator<'a, Self, Term>
+    where
+        Self: 'a;
+
+    fn iter<'a>(&'a self) -> Self::Iter<'a> {
+        ArenaIterator::new(self, self.deref().borrow().start_offset())
+    }
+}
+
 fn pad_to_4_byte_offset(value: usize) -> usize {
     if value == 0 {
         0
@@ -243,57 +294,41 @@ fn pad_to_4_byte_offset(value: usize) -> usize {
     }
 }
 
-pub struct ArenaIterator<A: ArenaAllocator, T: TermSize> {
-    arena: A,
-    current_head: TermPointer,
+pub struct ArenaIterator<'a, A: ArenaAllocator, T: TermSize> {
+    arena: &'a A,
+    next_offset: TermPointer,
     _value: PhantomData<T>,
 }
 
-impl<A: ArenaAllocator, T: TermSize> ArenaIterator<A, T> {
-    pub fn new(arena: A, start_point: TermPointer) -> Self {
+impl<'a, A: ArenaAllocator, T: TermSize> ArenaIterator<'a, A, T> {
+    pub fn new(arena: &'a A, start_point: TermPointer) -> Self {
         ArenaIterator {
-            arena: arena,
-            current_head: start_point,
+            arena,
+            next_offset: start_point,
             _value: Default::default(),
         }
     }
 }
 
-impl<A: ArenaAllocator + Clone, T: TermSize> Iterator for ArenaIterator<A, T>
-where
-    T: std::fmt::Debug,
-    for<'a> A::Slice<'a>: Deref<Target = [u8]>,
-{
+impl<'a, A: ArenaAllocator, T: TermSize> Iterator for ArenaIterator<'a, A, T> {
     type Item = TermPointer;
 
     fn next(&mut self) -> Option<Self::Item> {
-        println!("{} vs {}", self.arena.len(), u32::from(self.current_head));
-        if self.arena.len() == u32::from(self.current_head) as usize {
+        if u32::from(self.next_offset) >= (self.arena.len() as u32) {
             None
         } else {
-            let current_head = self.current_head;
+            let current_pointer = self.next_offset;
 
-            let term_size = self
+            // Determine the size of the current struct
+            let value_size = self
                 .arena
-                .read_value::<T, _>(current_head, |value| value.size_of());
+                .read_value::<T, _>(current_pointer, |term| term.size_of());
 
-            let previous_head = current_head;
+            // Increment the next offset by the size of the struct
+            self.next_offset = current_pointer.offset(value_size as u32);
 
-            // FIXME: Internal Wasm allocator needs to shrink the data afterwards
-            let term_size = (term_size).max(24);
-
-            self.current_head = previous_head.offset(term_size as u32);
-
-            self.arena
-                .read_value::<T, _>(current_head, |value| println!("{:?}", value));
-
-            println!(
-                "({} bytes: {:?})",
-                term_size,
-                self.arena.as_slice(previous_head, term_size).deref()
-            );
-
-            Some(previous_head)
+            // Return a pointer to the current struct
+            Some(current_pointer)
         }
     }
 }

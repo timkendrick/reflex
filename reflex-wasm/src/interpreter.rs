@@ -2,21 +2,21 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
-use std::{marker::PhantomData, path::Path};
+use std::{cell::RefCell, path::Path, rc::Rc};
 
-use reflex::core::GraphNode;
 use wasmtime::{
-    Engine, ExternType, Instance, IntoFunc, Linker, Memory, Module, Store, WasmParams, WasmResults,
+    Engine, ExternType, Instance, IntoFunc, Linker, Memory, Module, Store, Val, WasmParams,
+    WasmResults,
 };
 use wasmtime_wasi::{sync::WasiCtxBuilder, WasiCtx};
 
 use crate::{
-    allocator::ArenaAllocator,
+    allocator::{ArenaAllocator, ArenaIterator},
     compiler::RuntimeBuiltin,
-    hash::{TermHash, TermSize},
+    hash::TermSize,
     pad_to_4_byte_offset,
-    term_type::{TermType, TreeTerm, TypedTerm},
-    ArenaRef, Term, TermPointer,
+    term_type::{TreeTerm, TypedTerm},
+    ArenaRef, PointerIter, Term, TermPointer,
 };
 
 /// The 64kB page size constant mentioned in the WASM specification.
@@ -34,6 +34,16 @@ impl UnboundEvaluationResult {
             result_pointer: self.result_pointer,
             dependencies_pointer: self.dependencies_pointer,
         }
+    }
+}
+
+impl PointerIter for Rc<RefCell<WasmInterpreter>> {
+    type Iter<'a> = ArenaIterator<'a, Self, Term>
+    where
+        Self: 'a;
+
+    fn iter<'a>(&'a self) -> Self::Iter<'a> {
+        ArenaIterator::new(&self, self.borrow().arena_start())
     }
 }
 
@@ -57,17 +67,13 @@ impl<A: ArenaAllocator + Clone> InterpreterEvaluationResult<A> {
 
 #[derive(Debug)]
 pub enum InterpreterError {
-    ImportNotFound {
-        module: String,
-        name: String,
-        ty: ExternType,
-    },
-    FunctionNotFound(anyhow::Error),
-    WasiContexBuild(wasi_common::StringArrayError),
-    Linking(anyhow::Error),
-    ModuleCreation(anyhow::Error),
-    LinearMemoryNotFound(String),
-    FunctionEvaluation(anyhow::Error),
+    ModuleLoadError(anyhow::Error),
+    GlobalNotFound(String),
+    MemoryNotFound(String),
+    InvalidFunctionDefinition(String, anyhow::Error),
+    InvalidFunctionEvaluation(String, anyhow::Error),
+    WasiContextError(wasi_common::StringArrayError),
+    WasiLinkError(anyhow::Error),
 }
 
 impl std::error::Error for InterpreterError {}
@@ -75,26 +81,30 @@ impl std::error::Error for InterpreterError {}
 impl std::fmt::Display for InterpreterError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            InterpreterError::ImportNotFound { module, name, ty } => write!(
-                f,
-                "Import {name} from module {module} of type {ty:?} not found"
-            ),
-            InterpreterError::WasiContexBuild(err) => std::fmt::Display::fmt(err, f),
-
-            InterpreterError::Linking(err)
-            | InterpreterError::FunctionEvaluation(err)
-            | InterpreterError::FunctionNotFound(err)
-            | InterpreterError::ModuleCreation(err) => std::fmt::Display::fmt(err, f),
-            InterpreterError::LinearMemoryNotFound(memory_name) => {
-                write!(f, "Could not find memory by name {memory_name}")
+            InterpreterError::ModuleLoadError(err) => {
+                write!(f, "Unable to load WASM module: {err}")
             }
+            InterpreterError::GlobalNotFound(global_name) => {
+                write!(f, "Unable to find exported global: \"{global_name}\"")
+            }
+            InterpreterError::MemoryNotFound(memory_name) => {
+                write!(f, "Unable to find exported memory: \"{memory_name}\"")
+            }
+            InterpreterError::InvalidFunctionDefinition(name, err) => {
+                write!(f, "Invalid exported function \"{name}\": {err}")
+            }
+            InterpreterError::InvalidFunctionEvaluation(name, err) => {
+                write!(f, "Failed to evaluate function \"{name}\": {err}")
+            }
+            InterpreterError::WasiContextError(err) => std::fmt::Display::fmt(err, f),
+            InterpreterError::WasiLinkError(err) => std::fmt::Display::fmt(err, f),
         }
     }
 }
 
 impl From<wasi_common::StringArrayError> for InterpreterError {
     fn from(value: wasi_common::StringArrayError) -> Self {
-        InterpreterError::WasiContexBuild(value)
+        InterpreterError::WasiContextError(value)
     }
 }
 
@@ -113,7 +123,7 @@ impl WasmContextBuilder {
         Self::from_module_factory(
             |engine| {
                 unsafe { Module::deserialize(engine, program_bytes) }
-                    .map_err(InterpreterError::ModuleCreation)
+                    .map_err(InterpreterError::ModuleLoadError)
             },
             memory_name.into(),
         )
@@ -124,7 +134,7 @@ impl WasmContextBuilder {
         memory_name: impl Into<String>,
     ) -> Result<Self, InterpreterError> {
         Self::from_module_factory(
-            |e| Module::from_binary(e, bytes).map_err(InterpreterError::ModuleCreation),
+            |e| Module::from_binary(e, bytes).map_err(InterpreterError::ModuleLoadError),
             memory_name.into(),
         )
     }
@@ -134,7 +144,7 @@ impl WasmContextBuilder {
         memory_name: impl Into<String>,
     ) -> Result<Self, InterpreterError> {
         Self::from_module_factory(
-            |engine| Module::from_file(engine, path).map_err(InterpreterError::ModuleCreation),
+            |engine| Module::from_file(engine, path).map_err(InterpreterError::ModuleLoadError),
             memory_name.into(),
         )
     }
@@ -153,7 +163,8 @@ impl WasmContextBuilder {
         let mut linker = Linker::new(store.engine());
         let module = builder(store.engine())?;
 
-        wasmtime_wasi::add_to_linker(&mut linker, |s| s).map_err(InterpreterError::Linking)?;
+        wasmtime_wasi::add_to_linker(&mut linker, |s| s)
+            .map_err(InterpreterError::WasiLinkError)?;
 
         Ok(Self {
             store,
@@ -174,7 +185,7 @@ impl WasmContextBuilder {
     {
         self.linker
             .func_wrap(module, name, func)
-            .map_err(InterpreterError::Linking)?;
+            .map_err(InterpreterError::WasiLinkError)?;
 
         Ok(self)
     }
@@ -183,35 +194,44 @@ impl WasmContextBuilder {
         let instance = self
             .linker
             .instantiate(&mut self.store, &self.module)
-            .map_err(InterpreterError::Linking)?;
-
-        instance
-            .get_typed_func::<(), ()>(&mut self.store, "_initialize")
-            .map_err(InterpreterError::FunctionNotFound)?
-            .call(&mut self.store, ())
-            .map_err(InterpreterError::FunctionEvaluation)?;
+            .map_err(InterpreterError::WasiLinkError)?;
 
         let memory = instance
             .get_memory(&mut self.store, &self.memory_name)
-            .ok_or(InterpreterError::LinearMemoryNotFound(
-                self.memory_name.clone(),
-            ))?;
+            .ok_or(InterpreterError::MemoryNotFound(self.memory_name.clone()))?;
 
-        Ok(WasmContext {
-            store: self.store,
-            program: instance,
-            memory,
-        })
+        Ok(WasmContext::new(instance, self.store, memory))
     }
 }
 
 pub struct WasmContext {
+    instance: Instance,
     store: Store<WasiCtx>,
-    program: Instance,
     memory: Memory,
+    exports: Vec<(String, ExternType)>,
 }
 
 impl WasmContext {
+    pub fn new(instance: Instance, store: Store<WasiCtx>, memory: Memory) -> Self {
+        let mut store = store;
+        let exports = {
+            let exports = instance
+                .exports(&mut store)
+                .map(|export| (String::from(export.name()), export.into_extern()))
+                .collect::<Vec<_>>();
+            exports
+                .into_iter()
+                .map(|(key, value)| (key, value.ty(&store)))
+                .collect()
+        };
+        Self {
+            instance,
+            store,
+            memory,
+            exports,
+        }
+    }
+
     fn data(&self) -> &[u8] {
         self.memory.data(&self.store)
     }
@@ -233,13 +253,39 @@ impl WasmContext {
         let item = &mut data[offset];
         unsafe { std::mem::transmute::<&mut u8, &mut T>(item) }
     }
+
+    pub fn get_global(&mut self, export_name: &str) -> Option<Val> {
+        self.instance
+            .get_global(&mut self.store, export_name)
+            .map(|global| global.get(&mut self.store))
+    }
+
+    pub fn get_globals(&mut self) -> impl Iterator<Item = (&str, Val)> + '_ {
+        self.exports
+            .iter()
+            .filter_map(|(export_name, export_type)| match export_type {
+                ExternType::Global(_) => Some(export_name),
+                _ => None,
+            })
+            .filter_map(|export_name| {
+                self.instance
+                    .get_global(&mut self.store, export_name)
+                    .map(|global| global.get(&mut self.store))
+                    .map(|value| (export_name.as_str(), value))
+            })
+    }
 }
 
 impl WasmInterpreter {
+    fn arena_start(&self) -> TermPointer {
+        TermPointer::from(std::mem::size_of::<u32>() as u32)
+    }
+
     pub fn data(&self) -> &[u8] {
         self.0.data()
     }
 
+    #[must_use]
     pub fn interpret(
         &mut self,
         input: TermPointer,
@@ -255,6 +301,7 @@ impl WasmInterpreter {
         })
     }
 
+    #[must_use]
     pub fn execute(
         &mut self,
         export_name: &str,
@@ -267,6 +314,7 @@ impl WasmInterpreter {
         })
     }
 
+    #[must_use]
     pub fn call<I: WasmParams, O: WasmResults>(
         &mut self,
         export_name: &str,
@@ -274,19 +322,35 @@ impl WasmInterpreter {
     ) -> Result<O, InterpreterError> {
         let target = self
             .0
-            .program
+            .instance
             .get_typed_func::<I, O>(&mut self.0.store, export_name)
-            .map_err(InterpreterError::FunctionNotFound)?;
+            .map_err(|err| {
+                InterpreterError::InvalidFunctionDefinition(String::from(export_name), err)
+            })?;
 
-        let output = target
-            .call(&mut self.0.store, args)
-            .map_err(InterpreterError::FunctionEvaluation)?;
+        let output = target.call(&mut self.0.store, args).map_err(|err| {
+            InterpreterError::InvalidFunctionEvaluation(String::from(export_name), err)
+        })?;
 
         Ok(output)
+    }
+
+    #[must_use]
+    pub fn initialize(&mut self) -> Result<(), InterpreterError> {
+        self.call::<(), ()>("_initialize", ())
     }
 }
 
 pub struct WasmInterpreter(WasmContext);
+
+impl WasmInterpreter {
+    pub fn get_global(&mut self, export_name: &str) -> Option<Val> {
+        self.0.get_global(export_name)
+    }
+    pub fn get_globals(&mut self) -> impl Iterator<Item = (&str, Val)> {
+        self.0.get_globals()
+    }
+}
 
 impl From<WasmContext> for WasmInterpreter {
     fn from(value: WasmContext) -> Self {
@@ -452,7 +516,7 @@ pub mod mocks {
 mod tests {
     use crate::{
         allocator::ArenaAllocator,
-        interpreter::{WasmContext, WasmInterpreter},
+        interpreter::WasmInterpreter,
         stdlib::{Add, Stdlib},
         term_type::{
             ApplicationTerm, BuiltinTerm, ConditionTerm, CustomCondition, EffectTerm, HashmapTerm,
@@ -470,13 +534,18 @@ mod tests {
 
     const RUNTIME_BYTES: &'static [u8] = include_bytes!("../build/runtime.wasm");
 
-    fn create_mock_wasm_context() -> Result<WasmContext, InterpreterError> {
-        add_import_stubs(WasmContextBuilder::from_wasm(RUNTIME_BYTES, "memory")?)?.build()
+    fn create_mock_wasm_interpreter() -> Result<WasmInterpreter, InterpreterError> {
+        let mut interpreter: WasmInterpreter =
+            add_import_stubs(WasmContextBuilder::from_wasm(RUNTIME_BYTES, "memory")?)?
+                .build()?
+                .into();
+        interpreter.initialize()?;
+        Ok(interpreter)
     }
 
     #[test]
     fn atomic_expressions() {
-        let mut interpreter: WasmInterpreter = create_mock_wasm_context().unwrap().into();
+        let mut interpreter: WasmInterpreter = create_mock_wasm_interpreter().unwrap().into();
 
         let input = interpreter.allocate(Term::new(TermType::Int(IntTerm::from(3)), &interpreter));
 
@@ -507,7 +576,7 @@ mod tests {
 
     #[test]
     fn evaluated_expressions() {
-        let mut interpreter: WasmInterpreter = create_mock_wasm_context().unwrap().into();
+        let mut interpreter: WasmInterpreter = create_mock_wasm_interpreter().unwrap().into();
 
         let input = {
             let int3 =
@@ -559,7 +628,7 @@ mod tests {
 
     #[test]
     fn stateful_expressions() {
-        let mut interpreter: WasmInterpreter = create_mock_wasm_context().unwrap().into();
+        let mut interpreter: WasmInterpreter = create_mock_wasm_interpreter().unwrap().into();
 
         let condition = {
             let effect_type = interpreter.allocate(Term::new(

@@ -7,6 +7,13 @@ echo "\x1b[2J\x1b[3J\x1b[H"
 RUNTIME=runtime
 OUTPUT_DIR=./build
 
+# Expand macros in .wat source code
 node ./scripts/compile.mjs "./src/$RUNTIME.wat" > "$OUTPUT_DIR/$RUNTIME.build.wat"
+
+# Convert to binary .wasm module
 wat2wasm "$OUTPUT_DIR/$RUNTIME.build.wat" --debug-names --output "$OUTPUT_DIR/$RUNTIME.wasm"
+
+# Inline initial heap snapshot into .wasm module
+cargo run --quiet --bin snapshot -- --memory-name "memory" --input "$OUTPUT_DIR/$RUNTIME.wasm" --output "$OUTPUT_DIR/$RUNTIME.wasm"
+
 echo "Compiled $OUTPUT_DIR/$RUNTIME.wasm"

@@ -1,39 +1,34 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
-use std::collections::{
-    linked_list::{IntoIter, Iter},
-    HashMap, LinkedList,
+// SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
+use std::{
+    cell::RefCell,
+    collections::{
+        linked_list::{IntoIter, Iter},
+        LinkedList,
+    },
+    rc::Rc,
 };
 
-use reflex::{
-    core::{Eagerness, Internable, NodeId},
-    hash::{HashId, IntMap},
-};
-use strum::IntoEnumIterator;
+use reflex::core::{Eagerness, Internable, NodeId};
 use strum_macros::EnumIter;
-use walrus::{
-    ir::{Call, Const, Instr, LocalGet, LocalTee, Value},
-    ExportItem, FunctionId, LocalId,
-};
+use walrus::ir::{Const, Instr, Value};
 
 use crate::{
-    allocator::ArenaAllocator, hash::TermSize, stdlib::Stdlib, term_type::*, ArenaRef, PointerIter,
-    Term, TermPointer,
+    allocator::{ArenaAllocator, VecAllocator},
+    serialize::{Serialize, SerializerState},
+    stdlib::Stdlib,
+    term_type::*,
+    ArenaRef, IntoArenaRefIterator, PointerIter, Term, TermPointer,
 };
 
 #[derive(Clone, Debug)]
-pub enum CompilerError {
-    MissingRuntimeBuiltin(&'static str),
-}
+pub enum CompilerError {}
 
 impl std::fmt::Display for CompilerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            CompilerError::MissingRuntimeBuiltin(function_name) => {
-                write!(f, "Missing runtime builtin: {}", function_name)
-            }
-        }
+        write!(f, "Compilation failed")
     }
 }
 
@@ -43,69 +38,44 @@ type CompilerResult = Result<CompiledExpression, CompilerError>;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, EnumIter)]
 pub enum RuntimeBuiltin {
-    CreateInt,
-    Evaluate,
-    CreateFloat,
-    CreateBoolean,
-    CreateApplication,
-    CreateBuiltin,
-    AllocateList,
-    SetListItem,
-    InitList,
     Initialize,
+    Evaluate,
+    CreateApplication,
+    CreateBoolean,
+    CreateBuiltin,
+    CreateFloat,
+    CreateInt,
+    AllocateList,
+    InitList,
+    SetListItem,
 }
 
 impl RuntimeBuiltin {
     pub fn name(self) -> &'static str {
         match self {
-            RuntimeBuiltin::CreateInt => "createInt",
-            RuntimeBuiltin::Evaluate => "evaluate",
-            RuntimeBuiltin::CreateFloat => "createFloat",
-            RuntimeBuiltin::CreateBoolean => "createBoolean",
-            RuntimeBuiltin::CreateApplication => "createApplication",
-            RuntimeBuiltin::CreateBuiltin => "createBuiltin",
-            RuntimeBuiltin::AllocateList => "allocateList",
-            RuntimeBuiltin::SetListItem => "setListItem",
-            RuntimeBuiltin::InitList => "initList",
             RuntimeBuiltin::Initialize => "_initialize",
+            RuntimeBuiltin::Evaluate => "evaluate",
+            RuntimeBuiltin::CreateApplication => "createApplication",
+            RuntimeBuiltin::CreateBoolean => "createBoolean",
+            RuntimeBuiltin::CreateBuiltin => "createBuiltin",
+            RuntimeBuiltin::CreateFloat => "createFloat",
+            RuntimeBuiltin::CreateInt => "createInt",
+            RuntimeBuiltin::AllocateList => "allocateList",
+            RuntimeBuiltin::InitList => "initList",
+            RuntimeBuiltin::SetListItem => "setListItem",
         }
     }
 }
 
-pub type ModuleLinkTable = HashMap<RuntimeBuiltin, FunctionId>;
-
-pub fn generate_link_table(
-    exports: &walrus::ModuleExports,
-) -> Result<ModuleLinkTable, CompilerError> {
-    let function_map = exports
-        .iter()
-        .filter_map(|e| {
-            if let ExportItem::Function(fid) = e.item {
-                Some((e.name.clone(), fid))
-            } else {
-                None
-            }
-        })
-        .collect::<HashMap<_, _>>();
-
-    let link_table = RuntimeBuiltin::iter()
-        .map(|rb| {
-            function_map
-                .get(rb.name())
-                .map(|id| (rb, *id))
-                .ok_or(CompilerError::MissingRuntimeBuiltin(rb.name()))
-        })
-        .collect::<Result<_, _>>();
-
-    link_table
-}
-
 #[derive(Debug, Clone)]
 pub enum CompiledInstruction {
+    // Arbitrary WASM bytecode instruction
     Wasm(walrus::ir::Instr),
+    // Call one of the interpreter builtin functions
     CallRuntimeBuiltin(RuntimeBuiltin),
+    // Call a userland standard library function
     CallStdlib(Stdlib),
-    /// Duplicates the top item of the stack
+    /// Duplicate the top item of the stack
     Duplicate,
 }
 
@@ -132,27 +102,6 @@ impl FromIterator<CompiledInstruction> for CompiledExpression {
 }
 
 impl CompiledExpression {
-    pub fn link_instrs(
-        self,
-        temp_local: LocalId,
-        link_table: &HashMap<RuntimeBuiltin, FunctionId>,
-    ) -> Vec<Instr> {
-        self.instrs
-            .into_iter()
-            .flat_map(|ci| match ci {
-                CompiledInstruction::Wasm(i) => vec![i],
-                CompiledInstruction::CallRuntimeBuiltin(rb) => vec![Instr::Call(Call {
-                    func: link_table.get(&rb).unwrap().clone(),
-                })],
-                CompiledInstruction::CallStdlib(_) => todo!(),
-                CompiledInstruction::Duplicate => vec![
-                    Instr::LocalTee(LocalTee { local: temp_local }),
-                    Instr::LocalGet(LocalGet { local: temp_local }),
-                ],
-            })
-            .collect()
-    }
-
     pub fn push_back(&mut self, item: CompiledInstruction) {
         self.instrs.push_back(item)
     }
@@ -190,34 +139,88 @@ impl<'a> IntoIterator for &'a CompiledExpression {
     }
 }
 
-#[derive(Default)]
-pub struct CompilerState<DestA: ArenaAllocator> {
-    pub serializer_state: SerializerState,
-    pub destination_arena: DestA,
+pub struct CompilerState {
+    serializer_state: SerializerState,
+    heap_arena: VecAllocator,
 }
 
-pub trait CompileWasm<DestA: ArenaAllocator> {
+impl CompilerState {
+    pub fn from_heap_snapshot(bytes: &[u8]) -> Self {
+        let heap_arena = VecAllocator::from_bytes(bytes);
+        Self {
+            serializer_state: {
+                // FIXME: Avoid cloning arena
+                let arena = Rc::new(RefCell::new(VecAllocator::from_bytes(bytes)));
+                let allocated_terms = arena
+                    .iter()
+                    .as_arena_refs::<Term>(&arena)
+                    .map(|term| (term.id(), term.pointer));
+                let next_offset = TermPointer::from(arena.len() as u32);
+                SerializerState::new(allocated_terms, next_offset)
+            },
+            heap_arena,
+        }
+    }
+    pub fn from_arena<A: ArenaAllocator + PointerIter + Clone>(arena: &A) -> Self {
+        Self::from_heap_values(
+            arena
+                .iter()
+                .map(|pointer| ArenaRef::<Term, _>::new(arena.clone(), pointer)),
+        )
+    }
+    fn from_heap_values<T: Serialize>(values: impl IntoIterator<Item = T>) -> Self {
+        let mut destination_arena = VecAllocator::default();
+        let next_offset = destination_arena.len() as u32;
+        let mut serializer_state = SerializerState::new([], TermPointer::from(next_offset));
+
+        // Serialize all the source terms into the destination arena
+        for value in values.into_iter() {
+            value.serialize(&mut destination_arena, &mut serializer_state);
+        }
+
+        Self {
+            serializer_state,
+            heap_arena: destination_arena,
+        }
+    }
+    pub fn into_linear_memory(self) -> Vec<u8> {
+        // Destructure the state into the underlying arena
+        let Self {
+            heap_arena: arena, ..
+        } = self;
+
+        // Write the updated heap length into offset 0
+        let allocated_bytes = arena.len();
+        let mut words = arena.into_inner();
+        words[0] = allocated_bytes as u32;
+
+        // Convert the result to bytes
+        words
+            .into_iter()
+            .flat_map(u32::to_le_bytes)
+            .collect::<Vec<_>>()
+    }
+}
+
+pub trait CompileWasm {
     fn compile(
         &self,
         eager: Eagerness,
-        state: &mut CompilerState<DestA>,
+        state: &mut CompilerState,
         options: &CompilerOptions,
     ) -> CompilerResult;
 }
 
-impl<A: ArenaAllocator + Clone, DestA: ArenaAllocator> CompileWasm<DestA> for ArenaRef<Term, A> {
+impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<Term, A> {
     fn compile(
         &self,
         eager: Eagerness,
-        state: &mut CompilerState<DestA>,
+        state: &mut CompilerState,
         options: &CompilerOptions,
     ) -> CompilerResult {
         if self.should_intern(eager) {
-            let ptr = Serialize::serialize(
-                self,
-                &mut state.destination_arena,
-                &mut state.serializer_state,
-            );
+            let ptr =
+                Serialize::serialize(self, &mut state.heap_arena, &mut state.serializer_state);
             return Ok(CompiledExpression::from_iter([CompiledInstruction::Wasm(
                 Instr::Const(Const {
                     value: Value::I32(u32::from(ptr) as i32),
@@ -233,12 +236,10 @@ impl<A: ArenaAllocator + Clone, DestA: ArenaAllocator> CompileWasm<DestA> for Ar
                 todo!();
                 // self.as_typed_term::<BooleanTerm>().as_inner().compile(eager, state, options)
             }
-            TermTypeDiscriminants::Builtin => {
-                // todo!();
-                self.as_typed_term::<BuiltinTerm>()
-                    .as_inner()
-                    .compile(eager, state, options)
-            }
+            TermTypeDiscriminants::Builtin => self
+                .as_typed_term::<BuiltinTerm>()
+                .as_inner()
+                .compile(eager, state, options),
             TermTypeDiscriminants::Cell => {
                 todo!();
                 // self.as_typed_term::<CellTerm>().as_inner().compile(eager, state, options)
@@ -391,11 +392,11 @@ impl<A: ArenaAllocator + Clone, DestA: ArenaAllocator> CompileWasm<DestA> for Ar
     }
 }
 
-impl<A: ArenaAllocator + Clone, DestA: ArenaAllocator> CompileWasm<DestA> for ArenaRef<IntTerm, A> {
+impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<IntTerm, A> {
     fn compile(
         &self,
         _eager: Eagerness,
-        _state: &mut CompilerState<DestA>,
+        _state: &mut CompilerState,
         _options: &CompilerOptions,
     ) -> CompilerResult {
         let mut instructions = CompiledExpression::default();
@@ -412,13 +413,11 @@ impl<A: ArenaAllocator + Clone, DestA: ArenaAllocator> CompileWasm<DestA> for Ar
     }
 }
 
-impl<A: ArenaAllocator + Clone, DestA: ArenaAllocator> CompileWasm<DestA>
-    for ArenaRef<FloatTerm, A>
-{
+impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<FloatTerm, A> {
     fn compile(
         &self,
         _eager: Eagerness,
-        _state: &mut CompilerState<DestA>,
+        _state: &mut CompilerState,
         _options: &CompilerOptions,
     ) -> CompilerResult {
         let mut instructions = CompiledExpression::default();
@@ -435,13 +434,11 @@ impl<A: ArenaAllocator + Clone, DestA: ArenaAllocator> CompileWasm<DestA>
     }
 }
 
-impl<A: ArenaAllocator + Clone, DestA: ArenaAllocator> CompileWasm<DestA>
-    for ArenaRef<BooleanTerm, A>
-{
+impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<BooleanTerm, A> {
     fn compile(
         &self,
         _eager: Eagerness,
-        _state: &mut CompilerState<DestA>,
+        _state: &mut CompilerState,
         _options: &CompilerOptions,
     ) -> CompilerResult {
         let mut instructions = CompiledExpression::default();
@@ -458,13 +455,11 @@ impl<A: ArenaAllocator + Clone, DestA: ArenaAllocator> CompileWasm<DestA>
     }
 }
 
-impl<A: ArenaAllocator + Clone, DestA: ArenaAllocator> CompileWasm<DestA>
-    for ArenaRef<ListTerm, A>
-{
+impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<ListTerm, A> {
     fn compile(
         &self,
         eager: Eagerness,
-        state: &mut CompilerState<DestA>,
+        state: &mut CompilerState,
         options: &CompilerOptions,
     ) -> CompilerResult {
         let mut instructions = CompiledExpression::default();
@@ -509,13 +504,11 @@ impl<A: ArenaAllocator + Clone, DestA: ArenaAllocator> CompileWasm<DestA>
     }
 }
 
-impl<A: ArenaAllocator + Clone, DestA: ArenaAllocator> CompileWasm<DestA>
-    for ArenaRef<BuiltinTerm, A>
-{
+impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<BuiltinTerm, A> {
     fn compile(
         &self,
         _eager: Eagerness,
-        _state: &mut CompilerState<DestA>,
+        _state: &mut CompilerState,
         _options: &CompilerOptions,
     ) -> CompilerResult {
         let mut instructions = CompiledExpression::default();
@@ -534,13 +527,11 @@ impl<A: ArenaAllocator + Clone, DestA: ArenaAllocator> CompileWasm<DestA>
     }
 }
 
-impl<A: ArenaAllocator + Clone, DestA: ArenaAllocator> CompileWasm<DestA>
-    for ArenaRef<ApplicationTerm, A>
-{
+impl<A: ArenaAllocator + Clone> CompileWasm for ArenaRef<ApplicationTerm, A> {
     fn compile(
         &self,
         eager: Eagerness,
-        state: &mut CompilerState<DestA>,
+        state: &mut CompilerState,
         options: &CompilerOptions,
     ) -> CompilerResult {
         let mut instructions = CompiledExpression::default();
@@ -557,66 +548,6 @@ impl<A: ArenaAllocator + Clone, DestA: ArenaAllocator> CompileWasm<DestA>
         ));
 
         Ok(instructions)
-    }
-}
-
-#[derive(Default)]
-pub struct SerializerState {
-    pub allocated_terms: IntMap<HashId, TermPointer>,
-}
-
-pub trait Serialize {
-    fn serialize<A: ArenaAllocator>(
-        &self,
-        destination: &mut A,
-        state: &mut SerializerState,
-    ) -> TermPointer;
-}
-
-impl<ASource: ArenaAllocator + Clone, T: Clone + TermSize> Serialize for ArenaRef<T, ASource>
-where
-    ArenaRef<T, ASource>: PointerIter + NodeId,
-{
-    fn serialize<ADest: ArenaAllocator>(
-        &self,
-        destination: &mut ADest,
-        state: &mut SerializerState,
-    ) -> TermPointer {
-        // Check if we have already serialized this before
-        let cached_result = state.allocated_terms.get(&self.id());
-        if let Some(existing) = cached_result {
-            return *existing;
-        }
-
-        let children = PointerIter::iter(self)
-            .filter_map(|inner_pointer| {
-                let value_pointer = self
-                    .arena
-                    .read_value(inner_pointer, |target_pointer: &TermPointer| {
-                        *target_pointer
-                    })
-                    .as_non_null()?;
-                Some((inner_pointer, value_pointer))
-            })
-            .map(|(inner_pointer, value_pointer)| {
-                (
-                    // The offset of the field of the term within the struct
-                    u32::from(inner_pointer) - u32::from(self.pointer),
-                    ArenaRef::<T, ASource>::new(self.arena.clone(), value_pointer)
-                        .serialize(destination, state),
-                )
-            })
-            .collect::<Vec<_>>();
-
-        let new_term = destination.allocate(self.read_value(|t| t.clone()));
-
-        for (delta, child_pointer) in children {
-            destination.write(new_term.offset(delta), child_pointer)
-        }
-
-        state.allocated_terms.insert(self.id(), new_term);
-
-        new_term
     }
 }
 

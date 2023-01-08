@@ -1,11 +1,59 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
-// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use crate::ArenaAllocator;
+// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
+use crate::{
+    utils::{u32_get_byte, u64_get_byte},
+    ArenaAllocator,
+};
 
 pub trait TermSize {
     fn size_of(&self) -> usize;
+}
+impl TermSize for bool {
+    fn size_of(&self) -> usize {
+        std::mem::size_of::<Self>()
+    }
+}
+impl TermSize for u8 {
+    fn size_of(&self) -> usize {
+        std::mem::size_of::<Self>()
+    }
+}
+impl TermSize for u32 {
+    fn size_of(&self) -> usize {
+        std::mem::size_of::<Self>()
+    }
+}
+impl TermSize for [u32; 2] {
+    fn size_of(&self) -> usize {
+        std::mem::size_of::<Self>()
+    }
+}
+impl TermSize for u64 {
+    fn size_of(&self) -> usize {
+        std::mem::size_of::<Self>()
+    }
+}
+impl TermSize for i32 {
+    fn size_of(&self) -> usize {
+        std::mem::size_of::<Self>()
+    }
+}
+impl TermSize for i64 {
+    fn size_of(&self) -> usize {
+        std::mem::size_of::<Self>()
+    }
+}
+impl TermSize for f32 {
+    fn size_of(&self) -> usize {
+        std::mem::size_of::<Self>()
+    }
+}
+impl TermSize for f64 {
+    fn size_of(&self) -> usize {
+        std::mem::size_of::<Self>()
+    }
 }
 
 pub trait TermHash {
@@ -132,12 +180,4 @@ impl TermHasher {
     pub fn write_hash(self, value: TermHashState) -> Self {
         self.write_u32(value.into())
     }
-}
-
-fn u32_get_byte(value: u32, index: u8) -> u8 {
-    (0xFF & (value >> (index * 8))) as u8
-}
-
-fn u64_get_byte(value: u64, index: u8) -> u8 {
-    (0xFF & (value >> (index * 8))) as u8
 }
