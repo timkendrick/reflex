@@ -73,6 +73,14 @@ impl From<Stdlib> for BuiltinTerm {
         Self { uid: value.into() }
     }
 }
+impl std::fmt::Display for BuiltinTerm {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match Stdlib::try_from(u32::from(self.uid)) {
+            Ok(builtin) => std::fmt::Display::fmt(&builtin, f),
+            Err(_) => std::fmt::Debug::fmt(self, f),
+        }
+    }
+}
 
 impl<A: ArenaAllocator + Clone> ArenaRef<BuiltinTerm, A> {
     pub fn target(&self) -> FunctionIndex {
@@ -169,7 +177,7 @@ impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<BuiltinTerm, A> {
 
 impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<BuiltinTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<stdlib:{:?}>", self.target())
+        write!(f, "<stdlib:{}>", self.target())
     }
 }
 

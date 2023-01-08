@@ -179,7 +179,17 @@ impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<ApplicationTerm, A>
 
 impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<ApplicationTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<apply:{}:{}>", self.target(), self.args())
+        write!(
+            f,
+            "<apply:{}:({})>",
+            self.target(),
+            self.args()
+                .as_inner()
+                .iter()
+                .map(|arg| format!("{}", arg))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
     }
 }
 

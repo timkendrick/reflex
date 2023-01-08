@@ -871,7 +871,7 @@ impl<A: ArenaAllocator + Clone> PartialEq for ArenaRef<Term, A> {
     }
 }
 
-pub(crate) type WasmExpression<A> = ArenaRef<Term, A>;
+pub type WasmExpression<A> = ArenaRef<Term, A>;
 
 impl<A: ArenaAllocator + Clone> Expression for ArenaRef<Term, A> {
     type String = ArenaRef<TypedTerm<StringTerm>, A>;

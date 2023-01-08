@@ -772,7 +772,7 @@ impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<CustomCondition, 
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Custom({}):{}:{}",
+            "<Custom({}):{}:{}>",
             self.effect_type(),
             self.payload(),
             self.token()
@@ -839,7 +839,7 @@ impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<PendingCondition, A
 
 impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<PendingCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Pending")
+        write!(f, "<Pending>")
     }
 }
 
@@ -918,7 +918,7 @@ impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<ErrorCondition, A> 
 
 impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<ErrorCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Error:{}", self.payload())
+        write!(f, "<Error:{}>", self.payload())
     }
 }
 
@@ -1005,9 +1005,9 @@ impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<TypeErrorCondition,
 impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<TypeErrorCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(expected) = self.expected() {
-            write!(f, "TypeError:{:?}:{}", expected, self.payload())
+            write!(f, "<TypeError:{:?}:{}>", expected, self.payload())
         } else {
-            write!(f, "TypeError:<unknown>:{}", self.payload())
+            write!(f, "<TypeError:<unknown>:{}>", self.payload())
         }
     }
 }
@@ -1087,7 +1087,7 @@ impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<InvalidFunctionTarg
 
 impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<InvalidFunctionTargetCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "InvalidFunctionTarget:{}", self.target())
+        write!(f, "<InvalidFunctionTarget:{}>", self.target())
     }
 }
 
@@ -1182,7 +1182,7 @@ impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<InvalidFunctionArgs
 
 impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<InvalidFunctionArgsCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "InvalidFunctionArgs:{}:{}", self.target(), self.args())
+        write!(f, "<InvalidFunctionArgs:{}:{}>", self.target(), self.args())
     }
 }
 
@@ -1245,7 +1245,7 @@ impl<A: ArenaAllocator + Clone> std::fmt::Debug for ArenaRef<InvalidPointerCondi
 
 impl<A: ArenaAllocator + Clone> std::fmt::Display for ArenaRef<InvalidPointerCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "InvalidPointer")
+        write!(f, "<InvalidPointer>")
     }
 }
 
