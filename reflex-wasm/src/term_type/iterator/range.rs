@@ -109,17 +109,12 @@ impl<A: ArenaAllocator + Clone> Internable for ArenaRef<RangeIteratorTerm, A> {
 
 #[cfg(test)]
 mod tests {
-    use crate::term_type::{TermType, TermTypeDiscriminants};
+    use crate::{
+        term_type::{TermType, TermTypeDiscriminants},
+        utils::into_twos_complement,
+    };
 
     use super::*;
-
-    fn twos_complement(value: i32) -> u32 {
-        if value >= 0 {
-            value as u32
-        } else {
-            0xFFFFFFFF - ((value.abs() - 1) as u32)
-        }
-    }
 
     #[test]
     fn range_iterator() {
@@ -139,7 +134,7 @@ mod tests {
             .as_bytes(),
             [
                 TermTypeDiscriminants::RangeIterator as u32,
-                twos_complement(-12345),
+                into_twos_complement(-12345),
                 67890
             ],
         );

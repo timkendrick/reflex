@@ -18,6 +18,7 @@ pub mod interpreter;
 pub mod parser;
 pub mod stdlib;
 pub mod term_type;
+pub mod utils;
 
 pub struct ArenaRef<T, A: ArenaAllocator> {
     pub(crate) arena: A,
