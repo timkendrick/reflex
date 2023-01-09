@@ -58,13 +58,99 @@ impl Iterator for ConditionTermPointerIter {
     }
 }
 
+impl ConditionTerm {
+    fn condition_type(&self) -> ConditionTermDiscriminants {
+        ConditionTermDiscriminants::from(self)
+    }
+}
+impl TermSize for ConditionTerm {
+    fn size_of(&self) -> usize {
+        let discriminant_size = std::mem::size_of::<u32>();
+        let value_size = match self {
+            Self::Custom(condition) => condition.size_of(),
+            Self::Pending(condition) => condition.size_of(),
+            Self::Error(condition) => condition.size_of(),
+            Self::TypeError(condition) => condition.size_of(),
+            Self::InvalidFunctionTarget(condition) => condition.size_of(),
+            Self::InvalidFunctionArgs(condition) => condition.size_of(),
+            Self::InvalidPointer(condition) => condition.size_of(),
+        };
+        discriminant_size + value_size
+    }
+}
+impl TermHash for ConditionTerm {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
+        let hasher = hasher.write_u8(self.condition_type() as u8);
+        match self {
+            Self::Custom(condition) => condition.hash(hasher, arena),
+            Self::Pending(condition) => condition.hash(hasher, arena),
+            Self::Error(condition) => condition.hash(hasher, arena),
+            Self::TypeError(condition) => condition.hash(hasher, arena),
+            Self::InvalidFunctionTarget(condition) => condition.hash(hasher, arena),
+            Self::InvalidFunctionArgs(condition) => condition.hash(hasher, arena),
+            Self::InvalidPointer(condition) => condition.hash(hasher, arena),
+        }
+    }
+}
+
+impl<A: Arena + Clone> ArenaRef<ConditionTerm, A> {
+    pub fn signal_type(&self) -> SignalType {
+        match self.condition_type() {
+            ConditionTermDiscriminants::Custom => self
+                .as_typed_condition::<CustomCondition>()
+                .as_inner()
+                .signal_type(),
+            ConditionTermDiscriminants::Pending => SignalType::Pending,
+            ConditionTermDiscriminants::Error => SignalType::Error,
+            ConditionTermDiscriminants::TypeError => SignalType::Error,
+            ConditionTermDiscriminants::InvalidFunctionTarget => SignalType::Error,
+            ConditionTermDiscriminants::InvalidFunctionArgs => SignalType::Error,
+            ConditionTermDiscriminants::InvalidPointer => SignalType::Error,
+        }
+    }
+    pub fn payload(&self) -> Option<ArenaRef<Term, A>> {
+        match self.condition_type() {
+            ConditionTermDiscriminants::Custom => Some(
+                self.as_typed_condition::<CustomCondition>()
+                    .as_inner()
+                    .payload(),
+            ),
+            ConditionTermDiscriminants::Error => Some(
+                self.as_typed_condition::<ErrorCondition>()
+                    .as_inner()
+                    .payload(),
+            ),
+            _ => None,
+        }
+    }
+    pub fn token(&self) -> Option<ArenaRef<Term, A>> {
+        match self.condition_type() {
+            ConditionTermDiscriminants::Custom => Some(
+                self.as_typed_condition::<CustomCondition>()
+                    .as_inner()
+                    .token(),
+            ),
+            _ => None,
+        }
+    }
+    pub(crate) fn condition_type(&self) -> ConditionTermDiscriminants {
+        self.read_value(|term| term.condition_type())
+    }
+    pub(crate) fn as_typed_condition<V>(&self) -> &ArenaRef<TypedCondition<V>, A> {
+        unsafe {
+            std::mem::transmute::<&ArenaRef<ConditionTerm, A>, &ArenaRef<TypedCondition<V>, A>>(
+                self,
+            )
+        }
+    }
+}
+
 impl<A: Arena + Clone> PointerIter for ArenaRef<ConditionTerm, A> {
     type Iter<'a> = ConditionTermPointerIter
     where
         Self: 'a;
-
     fn iter(&self) -> Self::Iter<'_> {
-        match self.read_value(|term| term.condition_type()) {
+        match self.condition_type() {
             ConditionTermDiscriminants::Custom => ConditionTermPointerIter::Custom(
                 self.as_typed_condition::<CustomCondition>()
                     .as_inner()
@@ -108,92 +194,8 @@ impl<A: Arena + Clone> PointerIter for ArenaRef<ConditionTerm, A> {
     }
 }
 
-impl ConditionTerm {
-    fn condition_type(&self) -> ConditionTermDiscriminants {
-        ConditionTermDiscriminants::from(self)
-    }
-}
-impl TermSize for ConditionTerm {
-    fn size_of(&self) -> usize {
-        let discriminant_size = std::mem::size_of::<u32>();
-        let value_size = match self {
-            Self::Custom(condition) => condition.size_of(),
-            Self::Pending(condition) => condition.size_of(),
-            Self::Error(condition) => condition.size_of(),
-            Self::TypeError(condition) => condition.size_of(),
-            Self::InvalidFunctionTarget(condition) => condition.size_of(),
-            Self::InvalidFunctionArgs(condition) => condition.size_of(),
-            Self::InvalidPointer(condition) => condition.size_of(),
-        };
-        discriminant_size + value_size
-    }
-}
-impl TermHash for ConditionTerm {
-    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
-        let hasher = hasher.write_u8(self.condition_type() as u8);
-        match self {
-            Self::Custom(condition) => condition.hash(hasher, arena),
-            Self::Pending(condition) => condition.hash(hasher, arena),
-            Self::Error(condition) => condition.hash(hasher, arena),
-            Self::TypeError(condition) => condition.hash(hasher, arena),
-            Self::InvalidFunctionTarget(condition) => condition.hash(hasher, arena),
-            Self::InvalidFunctionArgs(condition) => condition.hash(hasher, arena),
-            Self::InvalidPointer(condition) => condition.hash(hasher, arena),
-        }
-    }
-}
-
-impl<A: Arena + Clone> ArenaRef<ConditionTerm, A> {
-    pub fn signal_type(&self) -> SignalType {
-        match self.read_value(|term| term.condition_type()) {
-            ConditionTermDiscriminants::Custom => self
-                .as_typed_condition::<CustomCondition>()
-                .as_inner()
-                .signal_type(),
-            ConditionTermDiscriminants::Pending => SignalType::Pending,
-            ConditionTermDiscriminants::Error => SignalType::Error,
-            ConditionTermDiscriminants::TypeError => SignalType::Error,
-            ConditionTermDiscriminants::InvalidFunctionTarget => SignalType::Error,
-            ConditionTermDiscriminants::InvalidFunctionArgs => SignalType::Error,
-            ConditionTermDiscriminants::InvalidPointer => SignalType::Error,
-        }
-    }
-    pub fn payload(&self) -> Option<ArenaRef<Term, A>> {
-        match self.read_value(|term| term.condition_type()) {
-            ConditionTermDiscriminants::Custom => Some(
-                self.as_typed_condition::<CustomCondition>()
-                    .as_inner()
-                    .payload(),
-            ),
-            ConditionTermDiscriminants::Error => Some(
-                self.as_typed_condition::<ErrorCondition>()
-                    .as_inner()
-                    .payload(),
-            ),
-            _ => None,
-        }
-    }
-    pub fn token(&self) -> Option<ArenaRef<Term, A>> {
-        match self.read_value(|term| term.condition_type()) {
-            ConditionTermDiscriminants::Custom => Some(
-                self.as_typed_condition::<CustomCondition>()
-                    .as_inner()
-                    .token(),
-            ),
-            _ => None,
-        }
-    }
-    fn as_typed_condition<V>(&self) -> &ArenaRef<TypedCondition<V>, A> {
-        unsafe {
-            std::mem::transmute::<&ArenaRef<ConditionTerm, A>, &ArenaRef<TypedCondition<V>, A>>(
-                self,
-            )
-        }
-    }
-}
-
 #[repr(transparent)]
-struct TypedCondition<V> {
+pub(crate) struct TypedCondition<V> {
     condition: ConditionTerm,
     _type: PhantomData<V>,
 }
@@ -224,7 +226,7 @@ impl<V> TypedCondition<V> {
 }
 
 impl<A: Arena + Clone, V> ArenaRef<TypedCondition<V>, A> {
-    fn as_inner(&self) -> ArenaRef<V, A> {
+    pub fn as_inner(&self) -> ArenaRef<V, A> {
         self.inner_ref(|condition| condition.get_inner())
     }
 }
@@ -252,7 +254,7 @@ impl<A: Arena + Clone> ConditionType<WasmExpression<A>> for ArenaRef<TypedTerm<C
 
 impl<A: Arena + Clone> GraphNode for ArenaRef<ConditionTerm, A> {
     fn size(&self) -> usize {
-        match self.read_value(|term| term.condition_type()) {
+        match self.condition_type() {
             ConditionTermDiscriminants::Custom => self
                 .as_typed_condition::<CustomCondition>()
                 .as_inner()
@@ -284,7 +286,7 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<ConditionTerm, A> {
         }
     }
     fn capture_depth(&self) -> StackOffset {
-        match self.read_value(|term| term.condition_type()) {
+        match self.condition_type() {
             ConditionTermDiscriminants::Custom => self
                 .as_typed_condition::<CustomCondition>()
                 .as_inner()
@@ -316,7 +318,7 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<ConditionTerm, A> {
         }
     }
     fn free_variables(&self) -> HashSet<StackOffset> {
-        match self.read_value(|term| term.condition_type()) {
+        match self.condition_type() {
             ConditionTermDiscriminants::Custom => self
                 .as_typed_condition::<CustomCondition>()
                 .as_inner()
@@ -348,7 +350,7 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<ConditionTerm, A> {
         }
     }
     fn count_variable_usages(&self, offset: StackOffset) -> usize {
-        match self.read_value(|term| term.condition_type()) {
+        match self.condition_type() {
             ConditionTermDiscriminants::Custom => self
                 .as_typed_condition::<CustomCondition>()
                 .as_inner()
@@ -380,7 +382,7 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<ConditionTerm, A> {
         }
     }
     fn dynamic_dependencies(&self, deep: bool) -> DependencyList {
-        match self.read_value(|term| term.condition_type()) {
+        match self.condition_type() {
             ConditionTermDiscriminants::Custom => self
                 .as_typed_condition::<CustomCondition>()
                 .as_inner()
@@ -412,7 +414,7 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<ConditionTerm, A> {
         }
     }
     fn has_dynamic_dependencies(&self, deep: bool) -> bool {
-        match self.read_value(|term| term.condition_type()) {
+        match self.condition_type() {
             ConditionTermDiscriminants::Custom => self
                 .as_typed_condition::<CustomCondition>()
                 .as_inner()
@@ -444,7 +446,7 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<ConditionTerm, A> {
         }
     }
     fn is_static(&self) -> bool {
-        match self.read_value(|term| term.condition_type()) {
+        match self.condition_type() {
             ConditionTermDiscriminants::Custom => self
                 .as_typed_condition::<CustomCondition>()
                 .as_inner()
@@ -476,7 +478,7 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<ConditionTerm, A> {
         }
     }
     fn is_atomic(&self) -> bool {
-        match self.read_value(|term| term.condition_type()) {
+        match self.condition_type() {
             ConditionTermDiscriminants::Custom => self
                 .as_typed_condition::<CustomCondition>()
                 .as_inner()
@@ -508,7 +510,7 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<ConditionTerm, A> {
         }
     }
     fn is_complex(&self) -> bool {
-        match self.read_value(|term| term.condition_type()) {
+        match self.condition_type() {
             ConditionTermDiscriminants::Custom => self
                 .as_typed_condition::<CustomCondition>()
                 .as_inner()
@@ -556,7 +558,7 @@ impl<A: Arena + Clone> SerializeJson for ArenaRef<ConditionTerm, A> {
 impl<A: Arena + Clone> PartialEq for ArenaRef<ConditionTerm, A> {
     fn eq(&self, other: &Self) -> bool {
         match (
-            self.read_value(|term| term.condition_type()),
+            self.condition_type(),
             other.read_value(|term| term.condition_type()),
         ) {
             (ConditionTermDiscriminants::Custom, ConditionTermDiscriminants::Custom) => {
@@ -613,7 +615,7 @@ impl<A: Arena + Clone> Eq for ArenaRef<ConditionTerm, A> {}
 
 impl<A: Arena + Clone> std::fmt::Display for ArenaRef<ConditionTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.read_value(|term| term.condition_type()) {
+        match self.condition_type() {
             ConditionTermDiscriminants::Custom => {
                 std::fmt::Display::fmt(&self.as_typed_condition::<CustomCondition>().as_inner(), f)
             }
@@ -940,11 +942,14 @@ impl TermHash for TypeErrorCondition {
 }
 
 impl<A: Arena + Clone> ArenaRef<TypeErrorCondition, A> {
-    pub fn expected(&self) -> Option<TermTypeDiscriminants> {
-        TermTypeDiscriminants::try_from(self.read_value(|term| term.expected)).ok()
+    pub fn expected(&self) -> u32 {
+        self.read_value(|term| term.expected)
     }
     pub fn payload(&self) -> ArenaRef<Term, A> {
         ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|term| term.payload))
+    }
+    pub fn type_id(&self) -> Option<TermTypeDiscriminants> {
+        TermTypeDiscriminants::try_from(self.expected()).ok()
     }
 }
 
@@ -1002,7 +1007,7 @@ impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<TypeErrorCondition, A> {
 
 impl<A: Arena + Clone> std::fmt::Display for ArenaRef<TypeErrorCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(expected) = self.expected() {
+        if let Some(expected) = self.type_id() {
             write!(f, "<TypeError:{:?}:{}>", expected, self.payload())
         } else {
             write!(f, "<TypeError:<unknown>:{}>", self.payload())

@@ -31,38 +31,41 @@ impl TermHash for PointerTerm {
 }
 
 impl<A: Arena + Clone> ArenaRef<PointerTerm, A> {
-    pub fn target(&self) -> ArenaRef<Term, A> {
-        ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|term| term.target))
+    pub fn target(&self) -> ArenaPointer {
+        self.read_value(|term| term.target)
+    }
+    pub fn as_target(&self) -> ArenaRef<Term, A> {
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.target())
     }
 }
 
 impl<A: Arena + Clone> GraphNode for ArenaRef<PointerTerm, A> {
     fn size(&self) -> usize {
-        self.target().size()
+        self.as_target().size()
     }
     fn capture_depth(&self) -> StackOffset {
-        self.target().capture_depth()
+        self.as_target().capture_depth()
     }
     fn free_variables(&self) -> HashSet<StackOffset> {
-        self.target().free_variables()
+        self.as_target().free_variables()
     }
     fn count_variable_usages(&self, offset: StackOffset) -> usize {
-        self.target().count_variable_usages(offset)
+        self.as_target().count_variable_usages(offset)
     }
     fn dynamic_dependencies(&self, deep: bool) -> DependencyList {
-        self.target().dynamic_dependencies(deep)
+        self.as_target().dynamic_dependencies(deep)
     }
     fn has_dynamic_dependencies(&self, deep: bool) -> bool {
-        self.target().has_dynamic_dependencies(deep)
+        self.as_target().has_dynamic_dependencies(deep)
     }
     fn is_static(&self) -> bool {
-        self.target().is_static()
+        self.as_target().is_static()
     }
     fn is_atomic(&self) -> bool {
-        self.target().is_atomic()
+        self.as_target().is_atomic()
     }
     fn is_complex(&self) -> bool {
-        self.target().is_complex()
+        self.as_target().is_complex()
     }
 }
 
@@ -80,7 +83,7 @@ impl<A: Arena + Clone> SerializeJson for ArenaRef<PointerTerm, A> {
 
 impl<A: Arena + Clone> PartialEq for ArenaRef<PointerTerm, A> {
     fn eq(&self, other: &Self) -> bool {
-        self.target() == other.target()
+        self.as_target() == other.as_target()
     }
 }
 impl<A: Arena + Clone> Eq for ArenaRef<PointerTerm, A> {}

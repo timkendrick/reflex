@@ -127,8 +127,8 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<EffectTerm, A> {
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<EffectTerm, A> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        self.capture_depth() == 0
+    fn should_intern(&self, eager: Eagerness) -> bool {
+        eager == Eagerness::Lazy && self.capture_depth() == 0
     }
 }
 

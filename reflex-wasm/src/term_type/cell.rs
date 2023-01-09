@@ -53,6 +53,9 @@ impl CellTerm {
 }
 
 impl<A: Arena + Clone> ArenaRef<CellTerm, A> {
+    pub fn capacity(&self) -> u32 {
+        self.read_value(|term| term.fields.capacity)
+    }
     pub fn fields(&self) -> impl Iterator<Item = u32> + '_ {
         Array::<u32>::iter(self.inner_pointer(|value| &value.fields), &self.arena)
     }

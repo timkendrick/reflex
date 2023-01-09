@@ -104,6 +104,9 @@ impl<A: Arena + Clone> ArenaRef<StringTerm, A> {
     pub fn len(&self) -> usize {
         self.read_value(|term| term.length as usize)
     }
+    pub fn data(&self) -> ArenaRef<Array<u32>, A> {
+        self.inner_ref(|term| &term.data)
+    }
     pub fn string_hash(&self) -> HashId {
         self.read_value(|term| {
             // FIXME: Convert to 64-bit hashes

@@ -9,6 +9,29 @@ pub(crate) fn u64_get_byte(value: u64, index: u8) -> u8 {
     (0xFF & (value >> (index * 8))) as u8
 }
 
+pub(crate) fn i64_to_chunks(value: i64) -> [u32; 2] {
+    let bytes = value.to_le_bytes();
+    let low_word = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+    let high_word = u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
+    [low_word, high_word]
+}
+
+pub(crate) fn chunks_to_i64(value: [u32; 2]) -> i64 {
+    let [low_word, high_word] = value;
+    let low_bytes = low_word.to_le_bytes();
+    let high_bytes = high_word.to_le_bytes();
+    i64::from_le_bytes([
+        low_bytes[0],
+        low_bytes[1],
+        low_bytes[2],
+        low_bytes[3],
+        high_bytes[0],
+        high_bytes[1],
+        high_bytes[2],
+        high_bytes[3],
+    ])
+}
+
 #[allow(dead_code)]
 pub(crate) fn into_twos_complement(value: i32) -> u32 {
     if value >= 0 {
@@ -18,7 +41,6 @@ pub(crate) fn into_twos_complement(value: i32) -> u32 {
     }
 }
 
-#[allow(dead_code)]
 pub(crate) fn from_twos_complement(value: u32) -> i32 {
     if value <= 0x7FFFFFFF {
         value as i32

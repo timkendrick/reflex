@@ -153,6 +153,9 @@ impl<A: Arena + Clone> ArenaRef<HashmapTerm, A> {
     pub(crate) fn buckets_pointer(&self) -> ArenaPointer {
         self.inner_pointer(|value| &value.buckets)
     }
+    pub fn capacity(&self) -> usize {
+        self.read_value(|term| term.buckets.capacity as usize)
+    }
     pub fn num_entries(&self) -> usize {
         self.read_value(|term| term.num_entries as usize)
     }

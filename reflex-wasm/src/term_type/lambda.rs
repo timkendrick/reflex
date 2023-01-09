@@ -155,7 +155,8 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<LambdaTerm, A> {
 
 impl<A: Arena + Clone> Internable for ArenaRef<LambdaTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
-        self.capture_depth() == 0 // FIXME: Should be compiled into raw WASM
+        // FIXME: Lambda terms should always be compiled
+        self.capture_depth() == 0
     }
 }
 

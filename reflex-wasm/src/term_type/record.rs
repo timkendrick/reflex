@@ -40,19 +40,19 @@ impl TermHash for RecordTerm {
 }
 
 impl<A: Arena + Clone> ArenaRef<RecordTerm, A> {
-    fn keys(&self) -> ArenaRef<TypedTerm<ListTerm>, A> {
+    pub fn keys(&self) -> ArenaRef<TypedTerm<ListTerm>, A> {
         ArenaRef::<TypedTerm<ListTerm>, _>::new(
             self.arena.clone(),
             self.read_value(|term| term.keys),
         )
     }
-    fn values(&self) -> ArenaRef<TypedTerm<ListTerm>, A> {
+    pub fn values(&self) -> ArenaRef<TypedTerm<ListTerm>, A> {
         ArenaRef::<TypedTerm<ListTerm>, _>::new(
             self.arena.clone(),
             self.read_value(|term| term.values),
         )
     }
-    fn get<T: Expression>(&self, key: &T) -> Option<ArenaRef<Term, A>> {
+    pub fn get<T: Expression>(&self, key: &T) -> Option<ArenaRef<Term, A>> {
         // TODO: implement `Record::get()` using hashmap lookup if one exists
         self.keys()
             .as_inner()

@@ -40,7 +40,7 @@ impl TermHash for HashsetTerm {
 }
 
 impl<A: Arena + Clone> ArenaRef<HashsetTerm, A> {
-    fn entries(&self) -> ArenaRef<TypedTerm<HashmapTerm>, A> {
+    pub fn entries(&self) -> ArenaRef<TypedTerm<HashmapTerm>, A> {
         ArenaRef::<TypedTerm<HashmapTerm>, _>::new(
             self.arena.clone(),
             self.read_value(|value| value.entries),
