@@ -148,7 +148,7 @@
   (func $Term::String::get_length (param $self i32) (result i32)
     (call $Term::String::get::length (local.get $self)))
 
-  (func $Term::String::get_char_offset (param $self i32) (param $index i32) (result i32)
+  (func $Term::String::get_char_offset (export "getStringCharOffset") (param $self i32) (param $index i32) (result i32)
     (i32.add
       (call $Term::String::get_offset (local.get $self))
       (local.get $index)))

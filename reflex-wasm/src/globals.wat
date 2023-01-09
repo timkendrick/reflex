@@ -6,4 +6,4 @@
   (global $FALSE i32 (i32.const 0))
   (global $TRUE i32 (i32.const 1))
   ;; Sentinel value used to indicate missing values
-  (global $NULL i32 (i32.const 0xFFFFFFFF)))
+  (global $NULL (export "NULL") i32 (i32.const 0xFFFFFFFF)))

@@ -48,7 +48,10 @@
           (i32.mul (i32.const 4) (local.get $capacity)))))
     ;; Then manually write the cell struct contents into the term wrapper
     (call $TermType::Cell::construct (call $Term::pointer::value (local.get $self)))
-    (call $Term::Cell::set::fields::capacity (local.get $self) (local.get $capacity)))
+    (call $Term::Cell::set::fields::capacity (local.get $self) (local.get $capacity))
+    (call $Term::Cell::set::fields::length (local.get $self) (local.get $capacity))
+    ;; Instantiate the cell term
+    (call $Term::init))
 
   (func $Term::Cell::traits::is_atomic (param $self i32) (result i32)
     (global.get $TRUE))
@@ -68,5 +71,5 @@
   (func $Term::Cell::get_field (export "getCellField") (param $self i32) (param $field i32) (result i32)
     (call $Term::Cell::get::fields::value (local.get $self) (local.get $field)))
 
-  (func $Term::Cell::set_field (param $self i32) (param $field i32) (param $value i32)
+  (func $Term::Cell::set_field (export "setCellField") (param $self i32) (param $field i32) (param $value i32)
     (call $Term::Cell::set::fields::value (local.get $self) (local.get $field) (local.get $value))))

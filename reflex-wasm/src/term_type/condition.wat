@@ -95,7 +95,7 @@
   (func $Term::Condition::invalid_function_args (export "createInvalidFunctionArgsCondition") (param $target i32) (param $args i32) (result i32)
     (call $Term::TermType::Condition::InvalidFunctionArgsCondition::new (local.get $target) (local.get $args)))
 
-  (func $Term::Condition::invalid_pointer (result i32)
+  (func $Term::Condition::invalid_pointer (export "createInvalidPointerCondition") (result i32)
     (global.get $Term::Condition::INVALID_POINTER))
 
   (func $Term::Condition::CustomCondition::get::effect_type (export "getCustomConditionEffectType") (param $self i32) (result i32)

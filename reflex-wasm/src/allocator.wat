@@ -72,6 +72,9 @@
             ;; Blank out the newly-deallocated space with zero bytes
             (memory.fill (local.get $offset) (i32.const 0) (local.get $size)))))))
 
+  (func $Allocator::write (export "write") (param $offset i32) (param $value i32) (param $size i32)
+    (i32.store (local.get $offset) (local.get $value)))
+
   (func $Allocator::increase_linear_memory_size (param $pages i32) (result i32)
     ;; Attempt to grow the memory by the requested number of pages
     (loop $LOOP (result i32)
