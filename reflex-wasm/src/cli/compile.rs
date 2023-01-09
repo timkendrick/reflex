@@ -254,7 +254,7 @@ fn parse_exported_functions(
 
 #[cfg(test)]
 mod tests {
-    const RUNTIME_BYTES: &[u8] = include_bytes!("../build/runtime.wasm");
+    const RUNTIME_BYTES: &[u8] = include_bytes!("../../build/runtime.wasm");
 
     use std::{
         cell::RefCell,

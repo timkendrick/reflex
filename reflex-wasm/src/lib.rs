@@ -11,14 +11,13 @@ use reflex::{core::RefType, hash::HashId};
 use term_type::*;
 
 pub mod allocator;
-pub mod compile;
+pub mod cli;
 pub mod compiler;
 pub mod factory;
 pub mod hash;
 pub mod interpreter;
 pub mod parser;
 pub mod serialize;
-pub mod snapshot;
 pub mod stdlib;
 pub mod term_type;
 pub mod utils;

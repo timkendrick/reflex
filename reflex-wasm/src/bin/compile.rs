@@ -8,7 +8,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use reflex_wasm::{
     allocator::{ArenaAllocator, VecAllocator},
-    compile::compile_module,
+    cli::compile::compile_module,
     term_type::{IntTerm, TermType},
     ArenaRef, Term,
 };

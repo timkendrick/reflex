@@ -5,7 +5,7 @@ use std::io::Write;
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use reflex_wasm::snapshot::inline_heap_snapshot;
+use reflex_wasm::cli::snapshot::inline_heap_snapshot;
 
 // Reflex WebAssembly memory snapshot tool
 #[derive(Parser, Debug)]
