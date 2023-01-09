@@ -88,32 +88,32 @@ pub struct CompilerOptions {}
 
 #[derive(Default, Debug)]
 pub struct CompiledExpression {
-    instrs: LinkedList<CompiledInstruction>,
+    instructions: LinkedList<CompiledInstruction>,
 }
 
 impl FromIterator<CompiledInstruction> for CompiledExpression {
     fn from_iter<I: IntoIterator<Item = CompiledInstruction>>(iter: I) -> Self {
-        let mut list = LinkedList::new();
-        list.extend(iter);
-        CompiledExpression { instrs: list }
+        CompiledExpression {
+            instructions: iter.into_iter().collect::<LinkedList<_>>(),
+        }
     }
 }
 
 impl CompiledExpression {
-    pub fn push_back(&mut self, item: CompiledInstruction) {
-        self.instrs.push_back(item)
+    pub fn push(&mut self, item: CompiledInstruction) {
+        self.instructions.push_back(item)
     }
 }
 
 impl CompiledExpression {
     pub fn iter(&self) -> Iter<'_, CompiledInstruction> {
-        self.instrs.iter()
+        self.instructions.iter()
     }
 }
 
 impl Extend<CompiledInstruction> for CompiledExpression {
     fn extend<T: IntoIterator<Item = CompiledInstruction>>(&mut self, iter: T) {
-        self.instrs.extend(iter)
+        self.instructions.extend(iter)
     }
 }
 
@@ -123,7 +123,7 @@ impl IntoIterator for CompiledExpression {
     type IntoIter = IntoIter<CompiledInstruction>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.instrs.into_iter()
+        self.instructions.into_iter()
     }
 }
 
@@ -133,7 +133,7 @@ impl<'a> IntoIterator for &'a CompiledExpression {
     type IntoIter = Iter<'a, CompiledInstruction>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.instrs.iter()
+        self.instructions.iter()
     }
 }
 

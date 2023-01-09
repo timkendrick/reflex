@@ -22,15 +22,16 @@ impl<A: Arena + Clone> CompileWasm for ArenaRef<IntTerm, A> {
         _options: &CompilerOptions,
     ) -> CompilerResult {
         let mut instructions = CompiledExpression::default();
-
-        instructions.push_back(CompiledInstruction::Wasm(Instr::Const(Const {
+        // Push the value argument onto the stack
+        // Resulting stack state: [value]
+        instructions.push(CompiledInstruction::Wasm(Instr::Const(Const {
             value: Value::I32(self.value()),
         })));
-
-        instructions.push_back(CompiledInstruction::CallRuntimeBuiltin(
+        // Invoke the term constructor
+        // Resulting stack state: [IntTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
             RuntimeBuiltin::CreateInt,
         ));
-
         Ok(instructions)
     }
 }
@@ -43,15 +44,16 @@ impl<A: Arena + Clone> CompileWasm for ArenaRef<FloatTerm, A> {
         _options: &CompilerOptions,
     ) -> CompilerResult {
         let mut instructions = CompiledExpression::default();
-
-        instructions.push_back(CompiledInstruction::Wasm(Instr::Const(Const {
+        // Push the value argument onto the stack
+        // Resulting stack state: [value]
+        instructions.push(CompiledInstruction::Wasm(Instr::Const(Const {
             value: Value::F64(self.value()),
         })));
-
-        instructions.push_back(CompiledInstruction::CallRuntimeBuiltin(
+        // Invoke the term constructor
+        // Resulting stack state: [FloatTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
             RuntimeBuiltin::CreateFloat,
         ));
-
         Ok(instructions)
     }
 }
@@ -64,15 +66,16 @@ impl<A: Arena + Clone> CompileWasm for ArenaRef<BooleanTerm, A> {
         _options: &CompilerOptions,
     ) -> CompilerResult {
         let mut instructions = CompiledExpression::default();
-
-        instructions.push_back(CompiledInstruction::Wasm(Instr::Const(Const {
+        // Push the value argument onto the stack
+        // Resulting stack state: [value]
+        instructions.push(CompiledInstruction::Wasm(Instr::Const(Const {
             value: Value::I32(self.value() as i32),
         })));
-
-        instructions.push_back(CompiledInstruction::CallRuntimeBuiltin(
+        // Invoke the term constructor
+        // Resulting stack state: [BooleanTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
             RuntimeBuiltin::CreateBoolean,
         ));
-
         Ok(instructions)
     }
 }
@@ -85,43 +88,45 @@ impl<A: Arena + Clone> CompileWasm for ArenaRef<ListTerm, A> {
         options: &CompilerOptions,
     ) -> CompilerResult {
         let mut instructions = CompiledExpression::default();
-
-        // Get the list capacity -> Capacity
-        instructions.push_back(CompiledInstruction::Wasm(Instr::Const(Const {
+        // Push the list capacity onto the stack
+        // Resulting stack state: [capacity]
+        instructions.push(CompiledInstruction::Wasm(Instr::Const(Const {
             value: Value::I32(self.len() as i32),
         })));
-
-        // Allocate the list -> List
-        instructions.push_back(CompiledInstruction::CallRuntimeBuiltin(
+        // Allocate the list term
+        // Resulting stack state: [ListTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
             RuntimeBuiltin::AllocateList,
         ));
-
+        // Allocate the list items
         for (idx, item) in self.iter().enumerate() {
-            // Duplicate the list pointer -> List List
-            instructions.push_back(CompiledInstruction::Duplicate);
-            // Push the item index -> List List Idx
-            instructions.push_back(CompiledInstruction::Wasm(Instr::Const(Const {
+            // Duplicate the list term pointer for use later
+            // Resulting stack state: [ListTerm, ListTerm]
+            instructions.push(CompiledInstruction::Duplicate);
+            // Push the item index
+            // Resulting stack state: [ListTerm, ListTerm, index]
+            instructions.push(CompiledInstruction::Wasm(Instr::Const(Const {
                 value: Value::I32(idx as i32),
             })));
-
-            // Compile the child item -> List List Idx Item
+            // Allocate the child item
+            // Resulting stack state: [ListTerm, ListTerm, index, Term]
             instructions.extend(item.compile(eager, state, options)?);
-            // Set the item to the index -> List
-            instructions.push_back(CompiledInstruction::CallRuntimeBuiltin(
+            // Set the list term's value at the given index to the child item
+            // Resulting stack state: [ListTerm]
+            instructions.push(CompiledInstruction::CallRuntimeBuiltin(
                 RuntimeBuiltin::SetListItem,
             ));
         }
-
-        // Instantiate List with correct length -> List Length
-        instructions.push_back(CompiledInstruction::Wasm(Instr::Const(Const {
+        // Now that all the items have been added, push the list length onto the stack
+        // Resulting stack state: [ListTerm, length]
+        instructions.push(CompiledInstruction::Wasm(Instr::Const(Const {
             value: Value::I32(self.len() as i32),
         })));
-
-        // Initialize the list term -> List
-        instructions.push_back(CompiledInstruction::CallRuntimeBuiltin(
+        // Initialize the list term with the length that is on the stack
+        // Resulting stack state: [ListTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
             RuntimeBuiltin::InitList,
         ));
-
         Ok(instructions)
     }
 }
@@ -134,17 +139,16 @@ impl<A: Arena + Clone> CompileWasm for ArenaRef<BuiltinTerm, A> {
         _options: &CompilerOptions,
     ) -> CompilerResult {
         let mut instructions = CompiledExpression::default();
-
-        // Put the builtin term's number onto the stack
-        instructions.push_back(CompiledInstruction::Wasm(Instr::Const(Const {
+        // Push the function index argument onto the stack
+        // Resulting stack state: [index]
+        instructions.push(CompiledInstruction::Wasm(Instr::Const(Const {
             value: Value::I32(u32::from(self.target()) as i32),
         })));
-
-        // Create builtin term
-        instructions.push_back(CompiledInstruction::CallRuntimeBuiltin(
+        // Invoke the term constructor
+        // Resulting stack state: [BuiltinTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
             RuntimeBuiltin::CreateBuiltin,
         ));
-
         Ok(instructions)
     }
 }
@@ -157,18 +161,17 @@ impl<A: Arena + Clone> CompileWasm for ArenaRef<ApplicationTerm, A> {
         options: &CompilerOptions,
     ) -> CompilerResult {
         let mut instructions = CompiledExpression::default();
-
-        // Compile the target
+        // Push the application target onto the stack
+        // Resulting stack state: [Term]
         instructions.extend(self.target().compile(eager, state, options)?);
-
-        // Compile the args list
+        // Push the application arguments onto the stack
+        // Resulting stack state: [Term, ListTerm]
         instructions.extend(self.args().as_term().compile(eager, state, options)?);
-
-        // Create application term
-        instructions.push_back(CompiledInstruction::CallRuntimeBuiltin(
+        // Invoke the term constructor
+        // Resulting stack state: [ApplicationTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
             RuntimeBuiltin::CreateApplication,
         ));
-
         Ok(instructions)
     }
 }
