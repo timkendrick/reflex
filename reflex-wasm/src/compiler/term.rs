@@ -14,7 +14,30 @@ use crate::{
     ArenaRef,
 };
 
-impl<A: Arena + Clone> CompileWasm for ArenaRef<IntTerm, A> {
+impl<A: Arena + Clone> CompileWasm for ArenaRef<ApplicationTerm, A> {
+    fn compile(
+        &self,
+        eager: Eagerness,
+        state: &mut CompilerState,
+        options: &CompilerOptions,
+    ) -> CompilerResult {
+        let mut instructions = CompiledExpression::default();
+        // Push the application target onto the stack
+        // Resulting stack state: [Term]
+        instructions.extend(self.target().compile(eager, state, options)?);
+        // Push the application arguments onto the stack
+        // Resulting stack state: [Term, ListTerm]
+        instructions.extend(self.args().as_term().compile(eager, state, options)?);
+        // Invoke the term constructor
+        // Resulting stack state: [ApplicationTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+            RuntimeBuiltin::CreateApplication,
+        ));
+        Ok(instructions)
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<BooleanTerm, A> {
     fn compile(
         &self,
         _eager: Eagerness,
@@ -25,14 +48,102 @@ impl<A: Arena + Clone> CompileWasm for ArenaRef<IntTerm, A> {
         // Push the value argument onto the stack
         // Resulting stack state: [value]
         instructions.push(CompiledInstruction::Wasm(Instr::Const(Const {
-            value: Value::I32(self.value()),
+            value: Value::I32(self.value() as i32),
         })));
         // Invoke the term constructor
-        // Resulting stack state: [IntTerm]
+        // Resulting stack state: [BooleanTerm]
         instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-            RuntimeBuiltin::CreateInt,
+            RuntimeBuiltin::CreateBoolean,
         ));
         Ok(instructions)
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<BuiltinTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        let mut instructions = CompiledExpression::default();
+        // Push the function index argument onto the stack
+        // Resulting stack state: [index]
+        instructions.push(CompiledInstruction::Wasm(Instr::Const(Const {
+            value: Value::I32(u32::from(self.target()) as i32),
+        })));
+        // Invoke the term constructor
+        // Resulting stack state: [BuiltinTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+            RuntimeBuiltin::CreateBuiltin,
+        ));
+        Ok(instructions)
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<CellTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        todo!()
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<CompiledTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        todo!()
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<ConditionTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        todo!()
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<ConstructorTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        todo!()
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<DateTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        todo!()
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<EffectTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        todo!()
     }
 }
 
@@ -58,7 +169,29 @@ impl<A: Arena + Clone> CompileWasm for ArenaRef<FloatTerm, A> {
     }
 }
 
-impl<A: Arena + Clone> CompileWasm for ArenaRef<BooleanTerm, A> {
+impl<A: Arena + Clone> CompileWasm for ArenaRef<HashmapTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        todo!()
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<HashsetTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        todo!()
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<IntTerm, A> {
     fn compile(
         &self,
         _eager: Eagerness,
@@ -69,14 +202,36 @@ impl<A: Arena + Clone> CompileWasm for ArenaRef<BooleanTerm, A> {
         // Push the value argument onto the stack
         // Resulting stack state: [value]
         instructions.push(CompiledInstruction::Wasm(Instr::Const(Const {
-            value: Value::I32(self.value() as i32),
+            value: Value::I32(self.value()),
         })));
         // Invoke the term constructor
-        // Resulting stack state: [BooleanTerm]
+        // Resulting stack state: [IntTerm]
         instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-            RuntimeBuiltin::CreateBoolean,
+            RuntimeBuiltin::CreateInt,
         ));
         Ok(instructions)
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<LambdaTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        todo!()
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<LetTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        todo!()
     }
 }
 
@@ -131,47 +286,266 @@ impl<A: Arena + Clone> CompileWasm for ArenaRef<ListTerm, A> {
     }
 }
 
-impl<A: Arena + Clone> CompileWasm for ArenaRef<BuiltinTerm, A> {
+impl<A: Arena + Clone> CompileWasm for ArenaRef<NilTerm, A> {
     fn compile(
         &self,
         _eager: Eagerness,
         _state: &mut CompilerState,
         _options: &CompilerOptions,
     ) -> CompilerResult {
-        let mut instructions = CompiledExpression::default();
-        // Push the function index argument onto the stack
-        // Resulting stack state: [index]
-        instructions.push(CompiledInstruction::Wasm(Instr::Const(Const {
-            value: Value::I32(u32::from(self.target()) as i32),
-        })));
-        // Invoke the term constructor
-        // Resulting stack state: [BuiltinTerm]
-        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-            RuntimeBuiltin::CreateBuiltin,
-        ));
-        Ok(instructions)
+        todo!()
     }
 }
 
-impl<A: Arena + Clone> CompileWasm for ArenaRef<ApplicationTerm, A> {
+impl<A: Arena + Clone> CompileWasm for ArenaRef<PartialTerm, A> {
     fn compile(
         &self,
-        eager: Eagerness,
-        state: &mut CompilerState,
-        options: &CompilerOptions,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
     ) -> CompilerResult {
-        let mut instructions = CompiledExpression::default();
-        // Push the application target onto the stack
-        // Resulting stack state: [Term]
-        instructions.extend(self.target().compile(eager, state, options)?);
-        // Push the application arguments onto the stack
-        // Resulting stack state: [Term, ListTerm]
-        instructions.extend(self.args().as_term().compile(eager, state, options)?);
-        // Invoke the term constructor
-        // Resulting stack state: [ApplicationTerm]
-        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-            RuntimeBuiltin::CreateApplication,
-        ));
-        Ok(instructions)
+        todo!()
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<PointerTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        todo!()
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<RecordTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        todo!()
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<SignalTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        todo!()
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<StringTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        todo!()
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<SymbolTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        todo!()
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<TreeTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        todo!()
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<VariableTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        todo!()
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<EmptyIteratorTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        todo!()
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<EvaluateIteratorTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        todo!()
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<FilterIteratorTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        todo!()
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<FlattenIteratorTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        todo!()
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<HashmapKeysIteratorTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        todo!()
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<HashmapValuesIteratorTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        todo!()
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<IntegersIteratorTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        todo!()
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<IntersperseIteratorTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        todo!()
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<MapIteratorTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        todo!()
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<OnceIteratorTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        todo!()
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<RangeIteratorTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        todo!()
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<RepeatIteratorTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        todo!()
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<SkipIteratorTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        todo!()
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<TakeIteratorTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        todo!()
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm for ArenaRef<ZipIteratorTerm, A> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _state: &mut CompilerState,
+        _options: &CompilerOptions,
+    ) -> CompilerResult {
+        todo!()
     }
 }

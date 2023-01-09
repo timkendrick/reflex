@@ -236,154 +236,154 @@ impl<A: Arena + Clone> CompileWasm for ArenaRef<Term, A> {
                 .as_typed_term::<BuiltinTerm>()
                 .as_inner()
                 .compile(eager, state, options),
-            TermTypeDiscriminants::Cell => {
-                todo!();
-                // self.as_typed_term::<CellTerm>().as_inner().compile(eager, state, options)
-            }
-            TermTypeDiscriminants::Compiled => {
-                todo!();
-                // self.as_typed_term::<CompiledTerm>().as_inner().compile(eager, state, options)
-            }
-            TermTypeDiscriminants::Condition => {
-                todo!();
-                // self.as_typed_term::<ConditionTerm>().as_inner().compile(eager, state, options)
-            }
-            TermTypeDiscriminants::Constructor => {
-                todo!();
-                // self.as_typed_term::<ConstructorTerm>().as_inner().compile(eager, state, options)
-            }
-            TermTypeDiscriminants::Date => {
-                todo!();
-                // self.as_typed_term::<DateTerm>().as_inner().compile(eager, state, options)
-            }
-            TermTypeDiscriminants::Effect => {
-                todo!();
-                // self.as_typed_term::<EffectTerm>().as_inner().compile(eager, state, options)
-            }
+            TermTypeDiscriminants::Cell => self
+                .as_typed_term::<CellTerm>()
+                .as_inner()
+                .compile(eager, state, options),
+            TermTypeDiscriminants::Compiled => self
+                .as_typed_term::<CompiledTerm>()
+                .as_inner()
+                .compile(eager, state, options),
+            TermTypeDiscriminants::Condition => self
+                .as_typed_term::<ConditionTerm>()
+                .as_inner()
+                .compile(eager, state, options),
+            TermTypeDiscriminants::Constructor => self
+                .as_typed_term::<ConstructorTerm>()
+                .as_inner()
+                .compile(eager, state, options),
+            TermTypeDiscriminants::Date => self
+                .as_typed_term::<DateTerm>()
+                .as_inner()
+                .compile(eager, state, options),
+            TermTypeDiscriminants::Effect => self
+                .as_typed_term::<EffectTerm>()
+                .as_inner()
+                .compile(eager, state, options),
             TermTypeDiscriminants::Float => self
                 .as_typed_term::<FloatTerm>()
                 .as_inner()
                 .compile(eager, state, options),
-            TermTypeDiscriminants::Hashmap => {
-                todo!();
-                // self.as_typed_term::<HashmapTerm>().as_inner().compile(eager, state, options)
-            }
-            TermTypeDiscriminants::Hashset => {
-                todo!();
-                // self.as_typed_term::<HashsetTerm>().as_inner().compile(eager, state, options)
-            }
+            TermTypeDiscriminants::Hashmap => self
+                .as_typed_term::<HashmapTerm>()
+                .as_inner()
+                .compile(eager, state, options),
+            TermTypeDiscriminants::Hashset => self
+                .as_typed_term::<HashsetTerm>()
+                .as_inner()
+                .compile(eager, state, options),
             TermTypeDiscriminants::Int => self
                 .as_typed_term::<IntTerm>()
                 .as_inner()
                 .compile(eager, state, options),
-            TermTypeDiscriminants::Lambda => {
-                todo!();
-                // self.as_typed_term::<LambdaTerm>().as_inner().compile(eager, state, options)
-            }
-            TermTypeDiscriminants::Let => {
-                todo!();
-                // self.as_typed_term::<LetTerm>().as_inner().compile(eager, state, options)
-            }
+            TermTypeDiscriminants::Lambda => self
+                .as_typed_term::<LambdaTerm>()
+                .as_inner()
+                .compile(eager, state, options),
+            TermTypeDiscriminants::Let => self
+                .as_typed_term::<LetTerm>()
+                .as_inner()
+                .compile(eager, state, options),
             TermTypeDiscriminants::List => self
                 .as_typed_term::<ListTerm>()
                 .as_inner()
                 .compile(eager, state, options),
-            TermTypeDiscriminants::Nil => {
-                todo!();
-                // self.as_typed_term::<NilTerm>().as_inner().compile(eager, state, options)
-            }
-            TermTypeDiscriminants::Partial => {
-                todo!();
-                // self.as_typed_term::<PartialTerm>().as_inner().compile(eager, state, options)
-            }
-            TermTypeDiscriminants::Pointer => {
-                todo!();
-                // self.as_typed_term::<PointerTerm>().as_inner().compile(eager, state, options)
-            }
-            TermTypeDiscriminants::Record => {
-                todo!();
-                // self.as_typed_term::<RecordTerm>().as_inner().compile(eager, state, options)
-            }
-            TermTypeDiscriminants::Signal => {
-                todo!();
-                // self.as_typed_term::<SignalTerm>().as_inner().compile(eager, state, options)
-            }
-            TermTypeDiscriminants::String => {
-                todo!();
-                // self.as_typed_term::<StringTerm>().as_inner().compile(eager, state, options)
-            }
-            TermTypeDiscriminants::Symbol => {
-                todo!();
-                // self.as_typed_term::<SymbolTerm>().as_inner().compile(eager, state, options)
-            }
-            TermTypeDiscriminants::Tree => {
-                todo!();
-                // self.as_typed_term::<TreeTerm>().as_inner().compile(eager, state, options)
-            }
-            TermTypeDiscriminants::Variable => {
-                todo!();
-                // self.as_typed_term::<VariableTerm>().as_inner().compile(eager, state, options)
-            }
-            TermTypeDiscriminants::EmptyIterator => {
-                todo!();
-                // self.as_typed_term::<EmptyIteratorTerm>().as_inner().compile(eager, state, options)
-            }
-            TermTypeDiscriminants::EvaluateIterator => {
-                todo!();
-                // self.as_typed_term::<EvaluateIteratorTerm>().as_inner().compile(eager, state, options)
-            }
-            TermTypeDiscriminants::FilterIterator => {
-                todo!();
-                // self.as_typed_term::<FilterIteratorTerm>().as_inner().compile(eager, state, options)
-            }
-            TermTypeDiscriminants::FlattenIterator => {
-                todo!();
-                // self.as_typed_term::<FlattenIteratorTerm>().as_inner().compile(eager, state, options)
-            }
-            TermTypeDiscriminants::HashmapKeysIterator => {
-                todo!();
-                // self.as_typed_term::<HashmapKeysIteratorTerm>().as_inner().compile(eager, state, options)
-            }
-            TermTypeDiscriminants::HashmapValuesIterator => {
-                todo!();
-                // self.as_typed_term::<HashmapValuesIteratorTerm>().as_inner().compile(eager, state, options)
-            }
-            TermTypeDiscriminants::IntegersIterator => {
-                todo!();
-                // self.as_typed_term::<IntegersIteratorTerm>().as_inner().compile(eager, state, options)
-            }
-            TermTypeDiscriminants::IntersperseIterator => {
-                todo!();
-                // self.as_typed_term::<IntersperseIteratorTerm>().as_inner().compile(eager, state, options)
-            }
-            TermTypeDiscriminants::MapIterator => {
-                todo!();
-                // self.as_typed_term::<MapIteratorTerm>().as_inner().compile(eager, state, options)
-            }
-            TermTypeDiscriminants::OnceIterator => {
-                todo!();
-                // self.as_typed_term::<OnceIteratorTerm>().as_inner().compile(eager, state, options)
-            }
-            TermTypeDiscriminants::RangeIterator => {
-                todo!();
-                // self.as_typed_term::<RangeIteratorTerm>().as_inner().compile(eager, state, options)
-            }
-            TermTypeDiscriminants::RepeatIterator => {
-                todo!();
-                // self.as_typed_term::<RepeatIteratorTerm>().as_inner().compile(eager, state, options)
-            }
-            TermTypeDiscriminants::SkipIterator => {
-                todo!();
-                // self.as_typed_term::<SkipIteratorTerm>().as_inner().compile(eager, state, options)
-            }
-            TermTypeDiscriminants::TakeIterator => {
-                todo!();
-                // self.as_typed_term::<TakeIteratorTerm>().as_inner().compile(eager, state, options)
-            }
-            TermTypeDiscriminants::ZipIterator => {
-                todo!();
-                // self.as_typed_term::<ZipIteratorTerm>().as_inner().compile(eager, state, options)
-            }
+            TermTypeDiscriminants::Nil => self
+                .as_typed_term::<NilTerm>()
+                .as_inner()
+                .compile(eager, state, options),
+            TermTypeDiscriminants::Partial => self
+                .as_typed_term::<PartialTerm>()
+                .as_inner()
+                .compile(eager, state, options),
+            TermTypeDiscriminants::Pointer => self
+                .as_typed_term::<PointerTerm>()
+                .as_inner()
+                .compile(eager, state, options),
+            TermTypeDiscriminants::Record => self
+                .as_typed_term::<RecordTerm>()
+                .as_inner()
+                .compile(eager, state, options),
+            TermTypeDiscriminants::Signal => self
+                .as_typed_term::<SignalTerm>()
+                .as_inner()
+                .compile(eager, state, options),
+            TermTypeDiscriminants::String => self
+                .as_typed_term::<StringTerm>()
+                .as_inner()
+                .compile(eager, state, options),
+            TermTypeDiscriminants::Symbol => self
+                .as_typed_term::<SymbolTerm>()
+                .as_inner()
+                .compile(eager, state, options),
+            TermTypeDiscriminants::Tree => self
+                .as_typed_term::<TreeTerm>()
+                .as_inner()
+                .compile(eager, state, options),
+            TermTypeDiscriminants::Variable => self
+                .as_typed_term::<VariableTerm>()
+                .as_inner()
+                .compile(eager, state, options),
+            TermTypeDiscriminants::EmptyIterator => self
+                .as_typed_term::<EmptyIteratorTerm>()
+                .as_inner()
+                .compile(eager, state, options),
+            TermTypeDiscriminants::EvaluateIterator => self
+                .as_typed_term::<EvaluateIteratorTerm>()
+                .as_inner()
+                .compile(eager, state, options),
+            TermTypeDiscriminants::FilterIterator => self
+                .as_typed_term::<FilterIteratorTerm>()
+                .as_inner()
+                .compile(eager, state, options),
+            TermTypeDiscriminants::FlattenIterator => self
+                .as_typed_term::<FlattenIteratorTerm>()
+                .as_inner()
+                .compile(eager, state, options),
+            TermTypeDiscriminants::HashmapKeysIterator => self
+                .as_typed_term::<HashmapKeysIteratorTerm>()
+                .as_inner()
+                .compile(eager, state, options),
+            TermTypeDiscriminants::HashmapValuesIterator => self
+                .as_typed_term::<HashmapValuesIteratorTerm>()
+                .as_inner()
+                .compile(eager, state, options),
+            TermTypeDiscriminants::IntegersIterator => self
+                .as_typed_term::<IntegersIteratorTerm>()
+                .as_inner()
+                .compile(eager, state, options),
+            TermTypeDiscriminants::IntersperseIterator => self
+                .as_typed_term::<IntersperseIteratorTerm>()
+                .as_inner()
+                .compile(eager, state, options),
+            TermTypeDiscriminants::MapIterator => self
+                .as_typed_term::<MapIteratorTerm>()
+                .as_inner()
+                .compile(eager, state, options),
+            TermTypeDiscriminants::OnceIterator => self
+                .as_typed_term::<OnceIteratorTerm>()
+                .as_inner()
+                .compile(eager, state, options),
+            TermTypeDiscriminants::RangeIterator => self
+                .as_typed_term::<RangeIteratorTerm>()
+                .as_inner()
+                .compile(eager, state, options),
+            TermTypeDiscriminants::RepeatIterator => self
+                .as_typed_term::<RepeatIteratorTerm>()
+                .as_inner()
+                .compile(eager, state, options),
+            TermTypeDiscriminants::SkipIterator => self
+                .as_typed_term::<SkipIteratorTerm>()
+                .as_inner()
+                .compile(eager, state, options),
+            TermTypeDiscriminants::TakeIterator => self
+                .as_typed_term::<TakeIteratorTerm>()
+                .as_inner()
+                .compile(eager, state, options),
+            TermTypeDiscriminants::ZipIterator => self
+                .as_typed_term::<ZipIteratorTerm>()
+                .as_inner()
+                .compile(eager, state, options),
         }
     }
 }
