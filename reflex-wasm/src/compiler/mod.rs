@@ -20,7 +20,7 @@ use crate::{
     ArenaRef, IntoArenaRefIterator, PointerIter, Term,
 };
 
-pub mod term;
+pub mod term_type;
 
 #[derive(Clone)]
 pub enum CompilerError<A: Arena> {
