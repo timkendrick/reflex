@@ -16,7 +16,6 @@ function createTermTypes(runtime) {
     Boolean: runtime.TermType_Boolean.value,
     Builtin: runtime.TermType_Builtin.value,
     Cell: runtime.TermType_Cell.value,
-    Compiled: runtime.TermType_Compiled.value,
     Hashmap: runtime.TermType_Hashmap.value,
     Hashset: runtime.TermType_Hashset.value,
     List: runtime.TermType_List.value,

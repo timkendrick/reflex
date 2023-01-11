@@ -27,11 +27,11 @@ use crate::{
     hash::TermSize,
     stdlib::Stdlib,
     term_type::{
-        ApplicationTerm, BooleanTerm, BuiltinTerm, CompiledFunctionIndex, CompiledTerm,
-        ConditionTerm, ConstructorTerm, CustomCondition, EffectTerm, ErrorCondition, FloatTerm,
-        HashmapTerm, HashsetTerm, IntTerm, LambdaTerm, LetTerm, ListTerm, NilTerm, PartialTerm,
-        PendingCondition, RecordTerm, SignalTerm, StringTerm, SymbolTerm, TermType,
-        TermTypeDiscriminants, TreeTerm, TypedTerm, VariableTerm, WasmExpression,
+        ApplicationTerm, BooleanTerm, BuiltinTerm, ConditionTerm, ConstructorTerm, CustomCondition,
+        EffectTerm, ErrorCondition, FloatTerm, HashmapTerm, HashsetTerm, IntTerm, LambdaTerm,
+        LetTerm, ListTerm, NilTerm, PartialTerm, PendingCondition, RecordTerm, SignalTerm,
+        StringTerm, SymbolTerm, TermType, TermTypeDiscriminants, TreeTerm, TypedTerm, VariableTerm,
+        WasmExpression,
     },
     ArenaPointer, ArenaRef, Term,
 };
@@ -655,22 +655,21 @@ impl<A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static + Clone>
         ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
+    // TODO: Remove compiled function term type
     fn create_compiled_function_term(
         &self,
-        address: InstructionPointer,
+        _address: InstructionPointer,
         _hash: HashId,
-        required_args: StackOffset,
-        optional_args: StackOffset,
+        _required_args: StackOffset,
+        _optional_args: StackOffset,
     ) -> ArenaRef<Term, Self> {
-        let term = Term::new(
-            TermType::Compiled(CompiledTerm {
-                target: CompiledFunctionIndex::from(address.get() as u32),
-                num_args: (required_args + optional_args) as u32,
-            }),
-            &*self.arena.borrow(),
-        );
-        let pointer = self.arena.borrow_mut().allocate(term);
-        ArenaRef::<Term, Self>::new(self.clone(), pointer)
+        self.create_signal_term(self.create_signal_list([self.create_signal(
+            SignalType::Error,
+            self.create_string_term(
+                self.create_static_string("Compiled functions not supported in WASM interpreter"),
+            ),
+            self.create_nil_term(),
+        )]))
     }
 
     fn create_record_term(
@@ -929,12 +928,9 @@ impl<A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static + Clone>
 
     fn match_compiled_function_term<'a>(
         &self,
-        expression: &'a ArenaRef<Term, Self>,
+        _expression: &'a ArenaRef<Term, Self>,
     ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::CompiledFunctionTerm> {
-        match expression.read_value(|term| term.type_id()) {
-            TermTypeDiscriminants::Compiled => Some(expression.as_typed_term::<CompiledTerm>()),
-            _ => None,
-        }
+        None
     }
 
     fn match_record_term<'a>(

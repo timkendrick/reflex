@@ -173,32 +173,6 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<CellTerm, A> {
     }
 }
 
-impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<CompiledTerm, A> {
-    fn compile(
-        &self,
-        _eager: Eagerness,
-        _scope: &CompilerScope,
-        _state: &mut CompilerState,
-        _options: &CompilerOptions,
-    ) -> CompilerResult<A> {
-        let target = self.target();
-        let num_args = self.num_args();
-        let mut instructions = CompiledExpression::default();
-        // Push the target function index onto the stack
-        // => [index]
-        instructions.push(CompiledInstruction::u32_const(u32::from(target)));
-        // Push the number of arguments onto the stack
-        // => [index, num_args]
-        instructions.push(CompiledInstruction::u32_const(u32::from(num_args)));
-        // Invoke the term constructor
-        // => [CompiledTerm]
-        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-            RuntimeBuiltin::CreateCompiled,
-        ));
-        Ok(instructions)
-    }
-}
-
 impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<ConditionTerm, A> {
     fn compile(
         &self,

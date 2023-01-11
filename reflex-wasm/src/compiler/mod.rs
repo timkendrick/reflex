@@ -401,10 +401,6 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<Term, A> {
                 .as_typed_term::<CellTerm>()
                 .as_inner()
                 .compile(eager, scope, state, options),
-            TermTypeDiscriminants::Compiled => self
-                .as_typed_term::<CompiledTerm>()
-                .as_inner()
-                .compile(eager, scope, state, options),
             TermTypeDiscriminants::Condition => self
                 .as_typed_term::<ConditionTerm>()
                 .as_inner()

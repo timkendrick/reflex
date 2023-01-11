@@ -6,7 +6,6 @@
   (@include "./boolean.wat")
   (@include "./builtin.wat")
   (@include "./cell.wat")
-  (@include "./compiled.wat")
   (@include "./condition.wat")
   (@include "./constructor.wat")
   (@include "./date.wat")
@@ -49,7 +48,6 @@
       (@import $Boolean "./boolean.wat")
       (@import $Builtin "./builtin.wat")
       (@import $Cell "./cell.wat")
-      (@import $Compiled "./compiled.wat")
       (@import $Condition "./condition.wat")
       (@import $Constructor "./constructor.wat")
       (@import $Date "./date.wat")
@@ -195,7 +193,6 @@
     (@let $trait_typenames
       (@list
         $Builtin
-        $Compiled
         $Partial
         $Constructor
         $Lambda

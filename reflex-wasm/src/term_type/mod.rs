@@ -18,7 +18,6 @@ mod application;
 mod boolean;
 mod builtin;
 mod cell;
-mod compiled;
 mod condition;
 mod constructor;
 mod date;
@@ -45,7 +44,6 @@ pub use application::*;
 pub use boolean::*;
 pub use builtin::*;
 pub use cell::*;
-pub use compiled::*;
 pub use condition::*;
 pub use constructor::*;
 pub use date::*;
@@ -84,7 +82,6 @@ pub enum TermType {
     Boolean(BooleanTerm),
     Builtin(BuiltinTerm),
     Cell(CellTerm),
-    Compiled(CompiledTerm),
     Condition(ConditionTerm),
     Constructor(ConstructorTerm),
     Date(DateTerm),
@@ -129,7 +126,6 @@ impl TryFrom<u32> for TermTypeDiscriminants {
             value if value == Self::Boolean as u32 => Ok(Self::Boolean),
             value if value == Self::Builtin as u32 => Ok(Self::Builtin),
             value if value == Self::Cell as u32 => Ok(Self::Cell),
-            value if value == Self::Compiled as u32 => Ok(Self::Compiled),
             value if value == Self::Condition as u32 => Ok(Self::Condition),
             value if value == Self::Constructor as u32 => Ok(Self::Constructor),
             value if value == Self::Date as u32 => Ok(Self::Date),
@@ -177,7 +173,6 @@ impl TermSize for TermType {
             Self::Boolean(term) => term.size_of(),
             Self::Builtin(term) => term.size_of(),
             Self::Cell(term) => term.size_of(),
-            Self::Compiled(term) => term.size_of(),
             Self::Condition(term) => term.size_of(),
             Self::Constructor(term) => term.size_of(),
             Self::Date(term) => term.size_of(),
@@ -231,9 +226,6 @@ impl TermHash for TermType {
                 .hash(term, arena),
             Self::Cell(term) => hasher
                 .write_u8(TermTypeDiscriminants::Cell as u8)
-                .hash(term, arena),
-            Self::Compiled(term) => hasher
-                .write_u8(TermTypeDiscriminants::Compiled as u8)
                 .hash(term, arena),
             Self::Condition(term) => hasher
                 .write_u8(TermTypeDiscriminants::Condition as u8)
@@ -349,7 +341,6 @@ pub enum TermPointerIterator {
     Boolean(BooleanTermPointerIter),
     Builtin(BuiltinTermPointerIter),
     Cell(CellTermPointerIter),
-    Compiled(CompiledTermPointerIter),
     Condition(ConditionTermPointerIter),
     Constructor(ConstructorTermPointerIter),
     Date(DateTermPointerIter),
@@ -396,7 +387,6 @@ impl Iterator for TermPointerIterator {
             TermPointerIterator::Boolean(inner) => inner.next(),
             TermPointerIterator::Builtin(inner) => inner.next(),
             TermPointerIterator::Cell(inner) => inner.next(),
-            TermPointerIterator::Compiled(inner) => inner.next(),
             TermPointerIterator::Condition(inner) => inner.next(),
             TermPointerIterator::Constructor(inner) => inner.next(),
             TermPointerIterator::Date(inner) => inner.next(),
@@ -455,9 +445,6 @@ impl<A: Arena + Clone> PointerIter for ArenaRef<Term, A> {
             TermTypeDiscriminants::Cell => {
                 TermPointerIterator::Cell(self.as_typed_term::<CellTerm>().as_inner().iter())
             }
-            TermTypeDiscriminants::Compiled => TermPointerIterator::Compiled(
-                self.as_typed_term::<CompiledTerm>().as_inner().iter(),
-            ),
             TermTypeDiscriminants::Condition => TermPointerIterator::Condition(
                 self.as_typed_term::<ConditionTerm>().as_inner().iter(),
             ),
@@ -598,10 +585,6 @@ impl<A: Arena + Clone> Internable for ArenaRef<Term, A> {
                 .should_intern(eager),
             TermTypeDiscriminants::Cell => self
                 .as_typed_term::<CellTerm>()
-                .as_inner()
-                .should_intern(eager),
-            TermTypeDiscriminants::Compiled => self
-                .as_typed_term::<CompiledTerm>()
                 .as_inner()
                 .should_intern(eager),
             TermTypeDiscriminants::Condition => self
@@ -776,14 +759,6 @@ impl<'a> Into<Option<&'a CellTerm>> for &'a TermType {
     fn into(self) -> Option<&'a CellTerm> {
         match self {
             TermType::Cell(term) => Some(term),
-            _ => None,
-        }
-    }
-}
-impl<'a> Into<Option<&'a CompiledTerm>> for &'a TermType {
-    fn into(self) -> Option<&'a CompiledTerm> {
-        match self {
-            TermType::Compiled(term) => Some(term),
             _ => None,
         }
     }
@@ -1075,9 +1050,6 @@ impl<A: Arena + Clone> ArenaRef<Term, A> {
             TermTypeDiscriminants::Builtin => {
                 self.as_typed_term::<BuiltinTerm>().as_inner().arity()
             }
-            TermTypeDiscriminants::Compiled => {
-                Some(self.as_typed_term::<CompiledTerm>().as_inner().arity())
-            }
             TermTypeDiscriminants::Constructor => {
                 Some(self.as_typed_term::<ConstructorTerm>().as_inner().arity())
             }
@@ -1117,10 +1089,6 @@ impl<A: Arena + Clone> PartialEq for ArenaRef<Term, A> {
             (TermTypeDiscriminants::Cell, TermTypeDiscriminants::Cell) => {
                 self.as_typed_term::<CellTerm>().as_inner()
                     == other.as_typed_term::<CellTerm>().as_inner()
-            }
-            (TermTypeDiscriminants::Compiled, TermTypeDiscriminants::Compiled) => {
-                self.as_typed_term::<CompiledTerm>().as_inner()
-                    == other.as_typed_term::<CompiledTerm>().as_inner()
             }
             (TermTypeDiscriminants::Condition, TermTypeDiscriminants::Condition) => {
                 self.as_typed_term::<ConditionTerm>().as_inner()
@@ -1302,7 +1270,8 @@ impl<A: Arena + Clone> Expression for ArenaRef<Term, A> {
     // FIXME: implement recursive term type
     type RecursiveTerm = ArenaRef<TypedTerm<NilTerm>, A>;
     type BuiltinTerm = ArenaRef<TypedTerm<BuiltinTerm>, A>;
-    type CompiledFunctionTerm = ArenaRef<TypedTerm<CompiledTerm>, A>;
+    // FIXME: remove compiled function term
+    type CompiledFunctionTerm = ArenaRef<TypedTerm<NilTerm>, A>;
     type RecordTerm = ArenaRef<TypedTerm<RecordTerm>, A>;
     type ConstructorTerm = ArenaRef<TypedTerm<ConstructorTerm>, A>;
     type ListTerm = ArenaRef<TypedTerm<ListTerm>, A>;
@@ -1333,9 +1302,6 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             TermTypeDiscriminants::Boolean => self.as_typed_term::<BooleanTerm>().as_inner().size(),
             TermTypeDiscriminants::Builtin => self.as_typed_term::<BuiltinTerm>().as_inner().size(),
             TermTypeDiscriminants::Cell => self.as_typed_term::<CellTerm>().as_inner().size(),
-            TermTypeDiscriminants::Compiled => {
-                self.as_typed_term::<CompiledTerm>().as_inner().size()
-            }
             TermTypeDiscriminants::Condition => {
                 self.as_typed_term::<ConditionTerm>().as_inner().size()
             }
@@ -1432,10 +1398,6 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             TermTypeDiscriminants::Cell => {
                 self.as_typed_term::<CellTerm>().as_inner().capture_depth()
             }
-            TermTypeDiscriminants::Compiled => self
-                .as_typed_term::<CompiledTerm>()
-                .as_inner()
-                .capture_depth(),
             TermTypeDiscriminants::Condition => self
                 .as_typed_term::<ConditionTerm>()
                 .as_inner()
@@ -1588,10 +1550,6 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             TermTypeDiscriminants::Cell => {
                 self.as_typed_term::<CellTerm>().as_inner().free_variables()
             }
-            TermTypeDiscriminants::Compiled => self
-                .as_typed_term::<CompiledTerm>()
-                .as_inner()
-                .free_variables(),
             TermTypeDiscriminants::Condition => self
                 .as_typed_term::<ConditionTerm>()
                 .as_inner()
@@ -1744,10 +1702,6 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
                 .count_variable_usages(offset),
             TermTypeDiscriminants::Cell => self
                 .as_typed_term::<CellTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::Compiled => self
-                .as_typed_term::<CompiledTerm>()
                 .as_inner()
                 .count_variable_usages(offset),
             TermTypeDiscriminants::Condition => self
@@ -1910,10 +1864,6 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
                 .as_typed_term::<CellTerm>()
                 .as_inner()
                 .dynamic_dependencies(deep),
-            TermTypeDiscriminants::Compiled => self
-                .as_typed_term::<CompiledTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
             TermTypeDiscriminants::Condition => self
                 .as_typed_term::<ConditionTerm>()
                 .as_inner()
@@ -2074,10 +2024,6 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
                 .as_typed_term::<CellTerm>()
                 .as_inner()
                 .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::Compiled => self
-                .as_typed_term::<CompiledTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
             TermTypeDiscriminants::Condition => self
                 .as_typed_term::<ConditionTerm>()
                 .as_inner()
@@ -2233,9 +2179,6 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
                 self.as_typed_term::<BuiltinTerm>().as_inner().is_static()
             }
             TermTypeDiscriminants::Cell => self.as_typed_term::<CellTerm>().as_inner().is_static(),
-            TermTypeDiscriminants::Compiled => {
-                self.as_typed_term::<CompiledTerm>().as_inner().is_static()
-            }
             TermTypeDiscriminants::Condition => {
                 self.as_typed_term::<ConditionTerm>().as_inner().is_static()
             }
@@ -2360,9 +2303,6 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
                 self.as_typed_term::<BuiltinTerm>().as_inner().is_atomic()
             }
             TermTypeDiscriminants::Cell => self.as_typed_term::<CellTerm>().as_inner().is_atomic(),
-            TermTypeDiscriminants::Compiled => {
-                self.as_typed_term::<CompiledTerm>().as_inner().is_atomic()
-            }
             TermTypeDiscriminants::Condition => {
                 self.as_typed_term::<ConditionTerm>().as_inner().is_atomic()
             }
@@ -2487,9 +2427,6 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
                 self.as_typed_term::<BuiltinTerm>().as_inner().is_complex()
             }
             TermTypeDiscriminants::Cell => self.as_typed_term::<CellTerm>().as_inner().is_complex(),
-            TermTypeDiscriminants::Compiled => {
-                self.as_typed_term::<CompiledTerm>().as_inner().is_complex()
-            }
             TermTypeDiscriminants::Condition => self
                 .as_typed_term::<ConditionTerm>()
                 .as_inner()
@@ -2617,9 +2554,6 @@ impl<A: Arena + Clone> SerializeJson for ArenaRef<Term, A> {
                 self.as_typed_term::<BuiltinTerm>().as_inner().to_json()
             }
             TermTypeDiscriminants::Cell => self.as_typed_term::<CellTerm>().as_inner().to_json(),
-            TermTypeDiscriminants::Compiled => {
-                self.as_typed_term::<CompiledTerm>().as_inner().to_json()
-            }
             TermTypeDiscriminants::Condition => {
                 self.as_typed_term::<ConditionTerm>().as_inner().to_json()
             }
@@ -2750,10 +2684,6 @@ impl<A: Arena + Clone> SerializeJson for ArenaRef<Term, A> {
                 .as_typed_term::<CellTerm>()
                 .as_inner()
                 .patch(&target.as_typed_term::<CellTerm>().as_inner()),
-            (TermTypeDiscriminants::Compiled, TermTypeDiscriminants::Compiled) => self
-                .as_typed_term::<CompiledTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<CompiledTerm>().as_inner()),
             (TermTypeDiscriminants::Condition, TermTypeDiscriminants::Condition) => self
                 .as_typed_term::<ConditionTerm>()
                 .as_inner()
@@ -2930,9 +2860,6 @@ impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<Term, A> {
             TermTypeDiscriminants::Cell => {
                 std::fmt::Debug::fmt(&self.as_typed_term::<CellTerm>().as_inner(), f)
             }
-            TermTypeDiscriminants::Compiled => {
-                std::fmt::Debug::fmt(&self.as_typed_term::<CompiledTerm>().as_inner(), f)
-            }
             TermTypeDiscriminants::Condition => {
                 std::fmt::Debug::fmt(&self.as_typed_term::<ConditionTerm>().as_inner(), f)
             }
@@ -3060,9 +2987,6 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<Term, A> {
             TermTypeDiscriminants::Cell => {
                 std::fmt::Display::fmt(&self.as_typed_term::<CellTerm>().as_inner(), f)
             }
-            TermTypeDiscriminants::Compiled => {
-                std::fmt::Display::fmt(&self.as_typed_term::<CompiledTerm>().as_inner(), f)
-            }
             TermTypeDiscriminants::Condition => {
                 std::fmt::Display::fmt(&self.as_typed_term::<ConditionTerm>().as_inner(), f)
             }
@@ -3187,9 +3111,6 @@ impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<TermType, A> {
                 std::fmt::Debug::fmt(&self.read_value(|value| *value), f)
             }
             TermTypeDiscriminants::Cell => {
-                std::fmt::Debug::fmt(&self.read_value(|value| *value), f)
-            }
-            TermTypeDiscriminants::Compiled => {
                 std::fmt::Debug::fmt(&self.read_value(|value| *value), f)
             }
             TermTypeDiscriminants::Condition => {
@@ -3319,7 +3240,6 @@ impl<V> TypedTerm<V> {
                 TermType::Boolean(inner) => std::mem::transmute::<&BooleanTerm, &V>(inner),
                 TermType::Builtin(inner) => std::mem::transmute::<&BuiltinTerm, &V>(inner),
                 TermType::Cell(inner) => std::mem::transmute::<&CellTerm, &V>(inner),
-                TermType::Compiled(inner) => std::mem::transmute::<&CompiledTerm, &V>(inner),
                 TermType::Condition(inner) => std::mem::transmute::<&ConditionTerm, &V>(inner),
                 TermType::Constructor(inner) => std::mem::transmute::<&ConstructorTerm, &V>(inner),
                 TermType::Date(inner) => std::mem::transmute::<&DateTerm, &V>(inner),
@@ -3483,41 +3403,40 @@ mod tests {
         assert_eq!(TermTypeDiscriminants::Boolean as u32, 1);
         assert_eq!(TermTypeDiscriminants::Builtin as u32, 2);
         assert_eq!(TermTypeDiscriminants::Cell as u32, 3);
-        assert_eq!(TermTypeDiscriminants::Compiled as u32, 4);
-        assert_eq!(TermTypeDiscriminants::Condition as u32, 5);
-        assert_eq!(TermTypeDiscriminants::Constructor as u32, 6);
-        assert_eq!(TermTypeDiscriminants::Date as u32, 7);
-        assert_eq!(TermTypeDiscriminants::Effect as u32, 8);
-        assert_eq!(TermTypeDiscriminants::Float as u32, 9);
-        assert_eq!(TermTypeDiscriminants::Hashmap as u32, 10);
-        assert_eq!(TermTypeDiscriminants::Hashset as u32, 11);
-        assert_eq!(TermTypeDiscriminants::Int as u32, 12);
-        assert_eq!(TermTypeDiscriminants::Lambda as u32, 13);
-        assert_eq!(TermTypeDiscriminants::Let as u32, 14);
-        assert_eq!(TermTypeDiscriminants::List as u32, 15);
-        assert_eq!(TermTypeDiscriminants::Nil as u32, 16);
-        assert_eq!(TermTypeDiscriminants::Partial as u32, 17);
-        assert_eq!(TermTypeDiscriminants::Pointer as u32, 18);
-        assert_eq!(TermTypeDiscriminants::Record as u32, 19);
-        assert_eq!(TermTypeDiscriminants::Signal as u32, 20);
-        assert_eq!(TermTypeDiscriminants::String as u32, 21);
-        assert_eq!(TermTypeDiscriminants::Symbol as u32, 22);
-        assert_eq!(TermTypeDiscriminants::Tree as u32, 23);
-        assert_eq!(TermTypeDiscriminants::Variable as u32, 24);
-        assert_eq!(TermTypeDiscriminants::EmptyIterator as u32, 25);
-        assert_eq!(TermTypeDiscriminants::EvaluateIterator as u32, 26);
-        assert_eq!(TermTypeDiscriminants::FilterIterator as u32, 27);
-        assert_eq!(TermTypeDiscriminants::FlattenIterator as u32, 28);
-        assert_eq!(TermTypeDiscriminants::HashmapKeysIterator as u32, 29);
-        assert_eq!(TermTypeDiscriminants::HashmapValuesIterator as u32, 30);
-        assert_eq!(TermTypeDiscriminants::IntegersIterator as u32, 31);
-        assert_eq!(TermTypeDiscriminants::IntersperseIterator as u32, 32);
-        assert_eq!(TermTypeDiscriminants::MapIterator as u32, 33);
-        assert_eq!(TermTypeDiscriminants::OnceIterator as u32, 34);
-        assert_eq!(TermTypeDiscriminants::RangeIterator as u32, 35);
-        assert_eq!(TermTypeDiscriminants::RepeatIterator as u32, 36);
-        assert_eq!(TermTypeDiscriminants::SkipIterator as u32, 37);
-        assert_eq!(TermTypeDiscriminants::TakeIterator as u32, 38);
-        assert_eq!(TermTypeDiscriminants::ZipIterator as u32, 39);
+        assert_eq!(TermTypeDiscriminants::Condition as u32, 4);
+        assert_eq!(TermTypeDiscriminants::Constructor as u32, 5);
+        assert_eq!(TermTypeDiscriminants::Date as u32, 6);
+        assert_eq!(TermTypeDiscriminants::Effect as u32, 7);
+        assert_eq!(TermTypeDiscriminants::Float as u32, 8);
+        assert_eq!(TermTypeDiscriminants::Hashmap as u32, 9);
+        assert_eq!(TermTypeDiscriminants::Hashset as u32, 10);
+        assert_eq!(TermTypeDiscriminants::Int as u32, 11);
+        assert_eq!(TermTypeDiscriminants::Lambda as u32, 12);
+        assert_eq!(TermTypeDiscriminants::Let as u32, 13);
+        assert_eq!(TermTypeDiscriminants::List as u32, 14);
+        assert_eq!(TermTypeDiscriminants::Nil as u32, 15);
+        assert_eq!(TermTypeDiscriminants::Partial as u32, 16);
+        assert_eq!(TermTypeDiscriminants::Pointer as u32, 17);
+        assert_eq!(TermTypeDiscriminants::Record as u32, 18);
+        assert_eq!(TermTypeDiscriminants::Signal as u32, 19);
+        assert_eq!(TermTypeDiscriminants::String as u32, 20);
+        assert_eq!(TermTypeDiscriminants::Symbol as u32, 21);
+        assert_eq!(TermTypeDiscriminants::Tree as u32, 22);
+        assert_eq!(TermTypeDiscriminants::Variable as u32, 23);
+        assert_eq!(TermTypeDiscriminants::EmptyIterator as u32, 24);
+        assert_eq!(TermTypeDiscriminants::EvaluateIterator as u32, 25);
+        assert_eq!(TermTypeDiscriminants::FilterIterator as u32, 26);
+        assert_eq!(TermTypeDiscriminants::FlattenIterator as u32, 27);
+        assert_eq!(TermTypeDiscriminants::HashmapKeysIterator as u32, 28);
+        assert_eq!(TermTypeDiscriminants::HashmapValuesIterator as u32, 29);
+        assert_eq!(TermTypeDiscriminants::IntegersIterator as u32, 30);
+        assert_eq!(TermTypeDiscriminants::IntersperseIterator as u32, 31);
+        assert_eq!(TermTypeDiscriminants::MapIterator as u32, 32);
+        assert_eq!(TermTypeDiscriminants::OnceIterator as u32, 33);
+        assert_eq!(TermTypeDiscriminants::RangeIterator as u32, 34);
+        assert_eq!(TermTypeDiscriminants::RepeatIterator as u32, 35);
+        assert_eq!(TermTypeDiscriminants::SkipIterator as u32, 36);
+        assert_eq!(TermTypeDiscriminants::TakeIterator as u32, 37);
+        assert_eq!(TermTypeDiscriminants::ZipIterator as u32, 38);
     }
 }

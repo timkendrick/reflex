@@ -5,8 +5,8 @@
 use std::collections::HashSet;
 
 use reflex::core::{
-    DependencyList, Eagerness, Expression, GraphNode, Internable, NilTermType, RecursiveTermType,
-    SerializeJson, StackOffset,
+    CompiledFunctionTermType, DependencyList, Eagerness, Expression, GraphNode, Internable,
+    NilTermType, RecursiveTermType, SerializeJson, StackOffset,
 };
 use serde_json::Value as JsonValue;
 
@@ -44,7 +44,23 @@ impl<A: Arena + Clone> RecursiveTermType<WasmExpression<A>> for ArenaRef<TypedTe
     where
         WasmExpression<A>: 'a,
     {
-        panic!("Recursive terms not current supported")
+        panic!("Recursive terms not currently supported")
+    }
+}
+
+// FIXME: remove CompiledFunctionTerm
+impl<A: Arena + Clone> CompiledFunctionTermType for ArenaRef<TypedTerm<NilTerm>, A> {
+    fn address(&self) -> reflex::core::InstructionPointer {
+        panic!("Compiled function terms not supported")
+    }
+    fn hash(&self) -> reflex::hash::HashId {
+        panic!("Compiled function terms not supported")
+    }
+    fn required_args(&self) -> StackOffset {
+        panic!("Compiled function terms not supported")
+    }
+    fn optional_args(&self) -> StackOffset {
+        panic!("Compiled function terms not supported")
     }
 }
 
