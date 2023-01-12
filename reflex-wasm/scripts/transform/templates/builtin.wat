@@ -6,12 +6,9 @@
   (i32.add (local.get $offset)))
 
 (func (@concat "$" (@get $builtin_name) "::apply") (param $args i32) (param $state i32) (result i32 i32)
-  (@map $arg_name
-    (@get $arg_names)
-    (local (@get $arg_name) i32))
   (if (result i32 i32)
     ;; If an insufficient number of arguments has been supplied, return an error signal
-    (i32.lt_u (call $Term::List::traits::length (local.get $args)) (i32.const (@length (@get $arg_names))))
+    (i32.lt_u (call $Term::List::get_length (local.get $args)) (i32.const (@length (@get $arg_names))))
     (then
       (call $Term::Signal::of
         (call $Term::Condition::invalid_builtin_function_args
@@ -19,14 +16,14 @@
           (local.get $args)))
       (global.get $NULL))
     (else
-      ;; Extract the arguments from the argument list
+      ;; Extract the arguments from the argument list, pushing each argument onto the stack
       (@map $arg_name
         (@get $arg_names)
-        (local.set (@get $arg_name) (call $Term::List::get_item (local.get $args) (i32.const (@get $_)))))
+        (@block
+          (call $Term::List::get_item (local.get $args) (i32.const (@get $_)))))
       ;; Invoke the method implementation
       (call
         (@concat "$" (@get $builtin_name))
-        (@map $arg_name (@get $arg_names) (local.get (@get $arg_name)))
         (local.get $state)))))
 
 (func (@concat "$" (@get $builtin_name) "::arity") (result i32)
