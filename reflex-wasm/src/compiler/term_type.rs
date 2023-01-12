@@ -344,10 +344,15 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<InvalidFunctionArgsCondition,
         let args = self.args();
         let mut instructions = CompiledExpression::default();
         // Yield the target onto the stack
-        // => [Term]
-        instructions.extend(target.compile(eager, scope, state, options)?);
+        // => [Option<Term>]
+        match target {
+            Some(target) => {
+                instructions.extend(target.compile(eager, scope, state, options)?);
+            }
+            None => instructions.push(CompiledInstruction::Null),
+        }
         // Yield the argument list onto the stack
-        // => [Term, ListTerm]
+        // => [Option<Term>, ListTerm]
         instructions.extend(args.as_inner().compile(eager, scope, state, options)?);
         // Invoke the term constructor
         // => [ConditionTerm]

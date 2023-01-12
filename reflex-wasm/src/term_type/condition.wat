@@ -23,7 +23,7 @@
         (@field $target (@ref $Term)))
 
       (@struct $InvalidFunctionArgsCondition
-        (@field $target (@ref $Term))
+        (@field $target (@ref $Term @optional))
         (@field $args (@ref $Term)))
 
       (@struct $InvalidPointerCondition))

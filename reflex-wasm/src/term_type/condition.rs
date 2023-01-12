@@ -1112,8 +1112,10 @@ impl TermHash for InvalidFunctionArgsCondition {
 }
 
 impl<A: Arena + Clone> ArenaRef<InvalidFunctionArgsCondition, A> {
-    pub fn target(&self) -> ArenaRef<Term, A> {
-        ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|term| term.target))
+    pub fn target(&self) -> Option<ArenaRef<Term, A>> {
+        self.read_value(|term| term.target)
+            .as_non_null()
+            .map(|pointer| ArenaRef::<Term, _>::new(self.arena.clone(), pointer))
     }
     pub fn args(&self) -> ArenaRef<TypedTerm<ListTerm>, A> {
         ArenaRef::<TypedTerm<ListTerm>, _>::new(
@@ -1129,23 +1131,29 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<InvalidFunctionArgsCondition, A> {
     }
     fn capture_depth(&self) -> StackOffset {
         self.target()
-            .capture_depth()
+            .map(|target| target.capture_depth())
+            .unwrap_or(0)
             .max(self.args().capture_depth())
     }
     fn free_variables(&self) -> HashSet<StackOffset> {
         self.target()
-            .free_variables()
+            .map(|target| target.free_variables())
+            .unwrap_or_default()
             .into_iter()
             .chain(self.args().free_variables())
             .collect()
     }
     fn count_variable_usages(&self, offset: StackOffset) -> usize {
-        self.target().count_variable_usages(offset) + self.args().count_variable_usages(offset)
+        self.target()
+            .map(|target| target.count_variable_usages(offset))
+            .unwrap_or(0)
+            + self.args().count_variable_usages(offset)
     }
     fn dynamic_dependencies(&self, deep: bool) -> DependencyList {
         if deep {
             self.target()
-                .dynamic_dependencies(deep)
+                .map(|target| target.dynamic_dependencies(deep))
+                .unwrap_or_default()
                 .union(self.args().dynamic_dependencies(deep))
         } else {
             DependencyList::empty()
@@ -1153,7 +1161,9 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<InvalidFunctionArgsCondition, A> {
     }
     fn has_dynamic_dependencies(&self, deep: bool) -> bool {
         if deep {
-            self.target().has_dynamic_dependencies(deep)
+            self.target()
+                .map(|target| target.has_dynamic_dependencies(deep))
+                .unwrap_or(false)
                 || self.args().has_dynamic_dependencies(deep)
         } else {
             false
@@ -1185,7 +1195,12 @@ impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<InvalidFunctionArgsCondition
 
 impl<A: Arena + Clone> std::fmt::Display for ArenaRef<InvalidFunctionArgsCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<InvalidFunctionArgs:{}:{}>", self.target(), self.args())
+        write!(f, "<InvalidFunctionArgs:")?;
+        match self.target() {
+            Some(target) => write!(f, "{}", target)?,
+            None => write!(f, "NULL")?,
+        }
+        write!(f, ":{}>", self.args())
     }
 }
 
