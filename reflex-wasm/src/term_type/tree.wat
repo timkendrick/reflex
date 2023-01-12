@@ -64,29 +64,13 @@
     (local.set $offset (i32.add (local.get $offset)))
     ;; Write the left branch to the output
     (local.set $offset
-      (if (result i32)
-        (i32.eq
-          (local.tee $branch (call $Term::Tree::get::left (local.get $self)))
-          (global.get $NULL))
-        (then
-          (@store-bytes $offset "NULL")
-          (i32.add (local.get $offset)))
-        (else
-          (call $Term::traits::debug (local.get $branch) (local.get $offset)))))
+      (call $Term::traits::debug (call $Term::Tree::get::left (local.get $self)) (local.get $offset)))
     ;; Write the pair separator to the output
     (@store-bytes $offset " . ")
     (local.set $offset (i32.add (local.get $offset)))
     ;; Write the right branch to the output
     (local.set $offset
-      (if (result i32)
-        (i32.eq
-          (local.tee $branch (call $Term::Tree::get::right (local.get $self)))
-          (global.get $NULL))
-        (then
-          (@store-bytes $offset "NULL")
-          (i32.add (local.get $offset)))
-        (else
-          (call $Term::traits::debug (local.get $branch) (local.get $offset)))))
+      (call $Term::traits::debug (call $Term::Tree::get::right (local.get $self)) (local.get $offset)))
     ;; Write the closing parenthesis to the output and return the updated offset
     (@store-bytes $offset ")")
     (i32.add (local.get $offset)))

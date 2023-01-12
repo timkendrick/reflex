@@ -146,15 +146,21 @@
         (local.get $offset)))
 
     (func $Term::traits::debug (param $self i32) (param $offset i32) (result i32)
-      (@branch
-        ;; Format term according to the underlying term type implementation
-        (call $Term::TermType::get::type (local.get $self))
-        (@list
-          (@map $typename
-            (@union_variants (@get $TermType))
-            (return (call (@concat "$Term::" (@get $typename) "::traits::debug") (local.get $self) (local.get $offset)))))
-        ;; Default implementation
-        (local.get $offset)))
+      (if (result i32)
+        (i32.eq (local.get $self) (global.get $NULL))
+        (then
+          (@store-bytes $offset "NULL")
+          (i32.add (local.get $offset)))
+        (else
+          (@branch
+            ;; Format term according to the underlying term type implementation
+            (call $Term::TermType::get::type (local.get $self))
+            (@list
+              (@map $typename
+                (@union_variants (@get $TermType))
+                (return (call (@concat "$Term::" (@get $typename) "::traits::debug") (local.get $self) (local.get $offset)))))
+            ;; Default implementation
+            (local.get $offset)))))
 
     ;; Trait implementations
     ;; TODO: Refactor manual trait delegation implementations into macro
