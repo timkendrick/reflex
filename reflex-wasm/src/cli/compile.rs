@@ -96,7 +96,6 @@ struct RuntimeBuiltinMappings {
     create_application: FunctionId,
     create_boolean: FunctionId,
     create_builtin: FunctionId,
-    create_compiled: FunctionId,
     create_custom_condition: FunctionId,
     create_pending_condition: FunctionId,
     create_error_condition: FunctionId,
@@ -155,7 +154,6 @@ impl RuntimeBuiltinMappings {
             RuntimeBuiltin::CreateApplication => self.create_application,
             RuntimeBuiltin::CreateBoolean => self.create_boolean,
             RuntimeBuiltin::CreateBuiltin => self.create_builtin,
-            RuntimeBuiltin::CreateCompiled => self.create_compiled,
             RuntimeBuiltin::CreateCustomCondition => self.create_custom_condition,
             RuntimeBuiltin::CreatePendingCondition => self.create_pending_condition,
             RuntimeBuiltin::CreateErrorCondition => self.create_error_condition,
@@ -229,7 +227,6 @@ fn parse_runtime_builtins(
         create_application: get_builtin_function(&builtins, RuntimeBuiltin::CreateApplication)?,
         create_boolean: get_builtin_function(&builtins, RuntimeBuiltin::CreateBoolean)?,
         create_builtin: get_builtin_function(&builtins, RuntimeBuiltin::CreateBuiltin)?,
-        create_compiled: get_builtin_function(&builtins, RuntimeBuiltin::CreateCompiled)?,
         create_custom_condition: get_builtin_function(
             &builtins,
             RuntimeBuiltin::CreateCustomCondition,

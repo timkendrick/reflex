@@ -16,9 +16,32 @@ export default (describe) => {
       createZipIterator,
       evaluate,
       format,
+      isRecord,
+      getListItems,
+      getListLength,
+      getRecordKeys,
+      getRecordValues,
+      getRecordField,
       NULL,
+      TRUE,
       Stdlib,
     }) => {
+      function formatSortedRecord(result) {
+        const keys = getListItems(getRecordKeys(result));
+        const values = getListItems(getRecordValues(result));
+        const entries = keys.map((key, index) => [key, values[index]]);
+        return entries.length == 0
+          ? '{}'
+          : `{ ${entries
+              .map(([key, value]) => [key, value, format(key), format(value)])
+              .sort((a, b) => (a[2] > b[2] ? 1 : -1))
+              .map(
+                ([_key, _value, formattedKey, formattedValue]) =>
+                  `${formattedKey}: ${formattedValue}`,
+              )
+              .join(', ')} }`;
+      }
+
       (() => {
         const expression = createApplication(
           createBuiltin(Stdlib.Merge),
@@ -49,8 +72,12 @@ export default (describe) => {
           ),
         );
         const [result, dependencies] = evaluate(expression, NULL);
+        const expected = { a: 3, b: 4, c: 5, d: 6, e: 7, f: 8, g: 9, h: 10, i: 11 };
+        assert.strictEqual(isRecord(result), TRUE);
+        assert.strictEqual(getListLength(getRecordKeys(result)), Object.keys(expected).length);
+        assert.strictEqual(getListLength(getRecordValues(result)), Object.values(expected).length);
         assert.strictEqual(
-          format(result),
+          formatSortedRecord(result),
           '{ "a": 3, "b": 4, "c": 5, "d": 6, "e": 7, "f": 8, "g": 9, "h": 10, "i": 11 }',
         );
         assert.strictEqual(format(dependencies), 'NULL');
@@ -77,7 +104,7 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(
-          format(result),
+          formatSortedRecord(result),
           '{ "a": 3, "b": 4, "c": 5, "d": 6, "e": 7, "f": 8, "g": 9, "h": 10, "i": 11 }',
         );
         assert.strictEqual(format(dependencies), 'NULL');

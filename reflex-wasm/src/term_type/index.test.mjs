@@ -5,7 +5,6 @@ import application from './application.test.mjs';
 import boolean from './boolean.test.mjs';
 import builtin from './builtin.test.mjs';
 import cell from './cell.test.mjs';
-import compiled from './compiled.test.mjs';
 import condition from './condition.test.mjs';
 import constructor from './constructor.test.mjs';
 import date from './date.test.mjs';
@@ -33,7 +32,6 @@ export default (describe) => {
   boolean(describe);
   builtin(describe);
   cell(describe);
-  compiled(describe);
   condition(describe);
   constructor(describe);
   date(describe);
