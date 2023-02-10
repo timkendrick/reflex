@@ -166,6 +166,7 @@ fn generate_3_plus_5_wasm(interpreter: &mut WasmInterpreter) -> (ArenaPointer, A
         TermType::Application(ApplicationTerm {
             target: add,
             args: list,
+            cache: Default::default(),
         }),
         interpreter,
     ));
@@ -195,6 +196,7 @@ fn generate_deep_add_wasm(
             TermType::Application(ApplicationTerm {
                 target: add,
                 args: list,
+                cache: Default::default(),
             }),
             interpreter,
         ));

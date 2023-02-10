@@ -568,6 +568,7 @@ mod tests {
                 TermType::Application(ApplicationTerm {
                     target: add,
                     args: list,
+                    cache: Default::default(),
                 }),
                 &arena,
             ));

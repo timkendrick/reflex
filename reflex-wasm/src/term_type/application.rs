@@ -12,20 +12,51 @@ use serde_json::Value as JsonValue;
 
 use crate::{
     allocator::Arena,
-    hash::{TermHash, TermHasher, TermSize},
+    hash::{TermHash, TermHashState, TermHasher, TermSize},
     term_type::TypedTerm,
-    ArenaPointer, ArenaRef, Term,
+    ArenaPointer, ArenaRef, PointerIter, Term,
 };
 
 use reflex_macros::PointerIter;
 
-use super::{ListTerm, WasmExpression};
+use super::{ListTerm, TreeTerm, WasmExpression};
 
-#[derive(Clone, Copy, Debug, PointerIter)]
+#[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct ApplicationTerm {
     pub target: ArenaPointer,
     pub args: ArenaPointer,
+    pub cache: ApplicationCache,
+}
+
+#[derive(Clone, Copy, Debug, PointerIter)]
+#[repr(C)]
+pub struct ApplicationCache {
+    pub value: ArenaPointer,
+    pub dependencies: ArenaPointer,
+    pub overall_state_hash: u32,
+    pub minimal_state_hash: u32,
+}
+
+pub type ApplicationTermPointerIter =
+    std::iter::Chain<std::array::IntoIter<ArenaPointer, 2>, ApplicationCachePointerIter>;
+
+impl<A: Arena + Clone> PointerIter for ArenaRef<ApplicationTerm, A> {
+    type Iter<'a> = ApplicationTermPointerIter
+    where
+        Self: 'a;
+    fn iter<'a>(&self) -> Self::Iter<'a>
+    where
+        Self: 'a,
+    {
+        let pointers = [
+            self.inner_pointer(|term| &term.target),
+            self.inner_pointer(|term| &term.args),
+        ];
+        let cache = self.inner_ref::<ApplicationCache>(|term| &term.cache);
+        let cache_pointers: ApplicationCachePointerIter = PointerIter::iter(&cache);
+        pointers.into_iter().chain(cache_pointers)
+    }
 }
 
 impl TermSize for ApplicationTerm {
@@ -39,6 +70,23 @@ impl TermHash for ApplicationTerm {
     }
 }
 
+impl TermSize for ApplicationCache {
+    fn size_of(&self) -> usize {
+        std::mem::size_of::<Self>()
+    }
+}
+
+impl Default for ApplicationCache {
+    fn default() -> Self {
+        Self {
+            value: ArenaPointer::null(),
+            dependencies: ArenaPointer::null(),
+            overall_state_hash: u32::from(ArenaPointer::null()),
+            minimal_state_hash: u32::from(ArenaPointer::null()),
+        }
+    }
+}
+
 impl<A: Arena + Clone> ArenaRef<ApplicationTerm, A> {
     pub fn target(&self) -> ArenaRef<Term, A> {
         ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|value| value.target))
@@ -48,6 +96,39 @@ impl<A: Arena + Clone> ArenaRef<ApplicationTerm, A> {
             self.arena.clone(),
             self.read_value(|value| value.args),
         )
+    }
+    pub fn cache(&self) -> ArenaRef<ApplicationCache, A> {
+        self.inner_ref(|value| &value.cache)
+    }
+}
+
+impl<A: Arena + Clone> ArenaRef<ApplicationCache, A> {
+    pub fn value(&self) -> Option<ArenaRef<Term, A>> {
+        let pointer = self.read_value(|value| value.value).as_non_null()?;
+        Some(ArenaRef::<Term, _>::new(self.arena.clone(), pointer))
+    }
+    pub fn dependencies(&self) -> Option<ArenaRef<TypedTerm<TreeTerm>, A>> {
+        let pointer = self.read_value(|value| value.dependencies).as_non_null()?;
+        Some(ArenaRef::<TypedTerm<TreeTerm>, _>::new(
+            self.arena.clone(),
+            pointer,
+        ))
+    }
+    pub fn overall_state_hash(&self) -> Option<TermHashState> {
+        let value = self.read_value(|value| value.overall_state_hash);
+        if value == u32::from(ArenaPointer::null()) {
+            None
+        } else {
+            Some(TermHashState::from(value))
+        }
+    }
+    pub fn minimal_state_hash(&self) -> Option<TermHashState> {
+        let value = self.read_value(|value| value.minimal_state_hash);
+        if value == u32::from(ArenaPointer::null()) {
+            None
+        } else {
+            Some(TermHashState::from(value))
+        }
     }
 }
 
@@ -221,9 +302,23 @@ mod tests {
             TermType::Application(ApplicationTerm {
                 target: ArenaPointer(12345),
                 args: ArenaPointer(67890),
+                cache: ApplicationCache {
+                    value: ArenaPointer::null(),
+                    dependencies: ArenaPointer::null(),
+                    overall_state_hash: u32::from(ArenaPointer::null()),
+                    minimal_state_hash: u32::from(ArenaPointer::null()),
+                },
             })
             .as_bytes(),
-            [TermTypeDiscriminants::Application as u32, 12345, 67890],
+            [
+                TermTypeDiscriminants::Application as u32,
+                12345,
+                67890,
+                0xFFFFFFFF,
+                0xFFFFFFFF,
+                0xFFFFFFFF,
+                0xFFFFFFFF,
+            ],
         );
     }
 }

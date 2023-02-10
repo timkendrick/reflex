@@ -616,6 +616,7 @@ mod tests {
                 TermType::Application(ApplicationTerm {
                     target: add,
                     args: arg_list,
+                    cache: Default::default(),
                 }),
                 &interpreter,
             ))
@@ -692,6 +693,7 @@ mod tests {
                     TermType::Application(ApplicationTerm {
                         target: add_builtin,
                         args: ListTerm::allocate([stateful_arg, static_arg], &mut interpreter),
+                        cache: Default::default(),
                     }),
                     &interpreter,
                 );

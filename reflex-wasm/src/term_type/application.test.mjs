@@ -326,5 +326,174 @@ export default (describe) => {
         );
       })();
     });
+
+    test('result caching', (assert, {
+      createApplication,
+      createBuiltin,
+      createCustomCondition,
+      createEffect,
+      createHashmap,
+      createInt,
+      createPair,
+      createString,
+      createSymbol,
+      evaluate,
+      format,
+      Stdlib,
+      NULL,
+    }) => {
+      (() => {
+        const target = createBuiltin(Stdlib.Add);
+        const args = createPair(
+          createEffect(
+            createCustomCondition(createSymbol(123), createString('foo'), createSymbol(0)),
+          ),
+          createEffect(
+            createCustomCondition(createSymbol(456), createString('bar'), createSymbol(0)),
+          ),
+        );
+        const expression = createApplication(target, args);
+        {
+          const state = NULL;
+          const [result, dependencies] = evaluate(expression, state);
+          assert.strictEqual(
+            format(result),
+            '{<CustomCondition:Symbol(123):"foo":Symbol(0)>,<CustomCondition:Symbol(456):"bar":Symbol(0)>}',
+          );
+          assert.strictEqual(
+            format(dependencies),
+            '((<CustomCondition:Symbol(456):"bar":Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):"foo":Symbol(0)> . NULL))',
+          );
+        }
+        {
+          const state = NULL;
+          const [result, dependencies] = evaluate(expression, state);
+          assert.strictEqual(
+            format(result),
+            '{<CustomCondition:Symbol(123):"foo":Symbol(0)>,<CustomCondition:Symbol(456):"bar":Symbol(0)>}',
+          );
+          assert.strictEqual(
+            format(dependencies),
+            '((<CustomCondition:Symbol(456):"bar":Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):"foo":Symbol(0)> . NULL))',
+          );
+        }
+        {
+          const state = createHashmap([
+            [
+              createCustomCondition(createSymbol(123), createString('foo'), createSymbol(0)),
+              createInt(3),
+            ],
+          ]);
+          const [result, dependencies] = evaluate(expression, state);
+          assert.strictEqual(format(result), '{<CustomCondition:Symbol(456):"bar":Symbol(0)>}');
+          assert.strictEqual(
+            format(dependencies),
+            '((<CustomCondition:Symbol(456):"bar":Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):"foo":Symbol(0)> . NULL))',
+          );
+        }
+        {
+          const state = createHashmap([
+            [
+              createCustomCondition(createSymbol(123), createString('foo'), createSymbol(0)),
+              createInt(3),
+            ],
+          ]);
+          const [result, dependencies] = evaluate(expression, state);
+          assert.strictEqual(format(result), '{<CustomCondition:Symbol(456):"bar":Symbol(0)>}');
+          assert.strictEqual(
+            format(dependencies),
+            '((<CustomCondition:Symbol(456):"bar":Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):"foo":Symbol(0)> . NULL))',
+          );
+        }
+        {
+          const state = createHashmap([
+            [
+              createCustomCondition(createSymbol(123), createString('foo'), createSymbol(0)),
+              createInt(3),
+            ],
+            [
+              createCustomCondition(createSymbol(789), createString('baz'), createSymbol(0)),
+              createInt(5),
+            ],
+          ]);
+          const [result, dependencies] = evaluate(expression, state);
+          assert.strictEqual(format(result), '{<CustomCondition:Symbol(456):"bar":Symbol(0)>}');
+          assert.strictEqual(
+            format(dependencies),
+            '((<CustomCondition:Symbol(456):"bar":Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):"foo":Symbol(0)> . NULL))',
+          );
+        }
+        {
+          const state = NULL;
+          const [result, dependencies] = evaluate(expression, state);
+          assert.strictEqual(
+            format(result),
+            '{<CustomCondition:Symbol(123):"foo":Symbol(0)>,<CustomCondition:Symbol(456):"bar":Symbol(0)>}',
+          );
+          assert.strictEqual(
+            format(dependencies),
+            '((<CustomCondition:Symbol(456):"bar":Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):"foo":Symbol(0)> . NULL))',
+          );
+        }
+        {
+          const state = createHashmap([
+            [
+              createCustomCondition(createSymbol(123), createString('foo'), createSymbol(0)),
+              createInt(3),
+            ],
+            [
+              createCustomCondition(createSymbol(456), createString('bar'), createSymbol(0)),
+              createInt(4),
+            ],
+          ]);
+          const [result, dependencies] = evaluate(expression, state);
+          assert.strictEqual(format(result), `${3 + 4}`);
+          assert.strictEqual(
+            format(dependencies),
+            '((<CustomCondition:Symbol(456):"bar":Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):"foo":Symbol(0)> . NULL))',
+          );
+        }
+        {
+          const state = createHashmap([
+            [
+              createCustomCondition(createSymbol(123), createString('foo'), createSymbol(0)),
+              createInt(3),
+            ],
+            [
+              createCustomCondition(createSymbol(456), createString('bar'), createSymbol(0)),
+              createInt(4),
+            ],
+          ]);
+          const [result, dependencies] = evaluate(expression, state);
+          assert.strictEqual(format(result), `${3 + 4}`);
+          assert.strictEqual(
+            format(dependencies),
+            '((<CustomCondition:Symbol(456):"bar":Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):"foo":Symbol(0)> . NULL))',
+          );
+        }
+        {
+          const state = createHashmap([
+            [
+              createCustomCondition(createSymbol(123), createString('foo'), createSymbol(0)),
+              createInt(3),
+            ],
+            [
+              createCustomCondition(createSymbol(456), createString('bar'), createSymbol(0)),
+              createInt(4),
+            ],
+            [
+              createCustomCondition(createSymbol(789), createString('baz'), createSymbol(0)),
+              createInt(5),
+            ],
+          ]);
+          const [result, dependencies] = evaluate(expression, state);
+          assert.strictEqual(format(result), `${3 + 4}`);
+          assert.strictEqual(
+            format(dependencies),
+            '((<CustomCondition:Symbol(456):"bar":Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):"foo":Symbol(0)> . NULL))',
+          );
+        }
+      })();
+    });
   });
 };

@@ -2,23 +2,50 @@
 ;; SPDX-License-Identifier: Apache-2.0
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 (module
-  (@let $Application
-    (@struct $Application
-      (@field $target (@ref $Term))
-      (@field $args (@ref $Term)))
+  (@let $ApplicationCache
+    (@struct $ApplicationCache
+      (@field $value (@ref $Term @optional))
+      (@field $dependencies (@ref $Term @optional))
+      (@field $overall_state_hash i32)
+      (@field $minimal_state_hash i32))
 
-    (@derive $size (@get $Application))
-    (@derive $equals (@get $Application))
-    (@derive $hash (@get $Application))
+    (@derive $size (@get $ApplicationCache))
+    (@derive $equals (@get $ApplicationCache))
+    (@derive $hash (@get $ApplicationCache))
 
-    (@export $Application (@get $Application)))
+
+    (@let $Application
+      (@struct $Application
+        (@field $target (@ref $Term))
+        (@field $args (@ref $Term))
+        (@field $cache (@get $ApplicationCache)))
+
+      (@derive $size (@get $Application))
+      (@derive $equals (@get $Application))
+      (@derive $hash (@get $Application))
+
+      (@export $Application (@get $Application))))
+
 
   (export "isApplication" (func $Term::Application::is))
   (export "getApplicationTarget" (func $Term::Application::get::target))
   (export "getApplicationArgs" (func $Term::Application::get::args))
+  (export "getApplicationCache" (func $Term::Application::pointer::cache))
+
+  (export "getApplicationCacheValue" (func $ApplicationCache::get::value))
+  (export "getApplicationCacheDependencies" (func $ApplicationCache::get::dependencies))
+  (export "getApplicationCacheOverallStateId" (func $ApplicationCache::get::overall_state_hash))
+  (export "getApplicationCacheMinimalStateId" (func $ApplicationCache::get::minimal_state_hash))
 
   (func $Term::Application::new (export "createApplication") (param $target i32) (param $args i32) (result i32)
-    (call $Term::TermType::Application::new (local.get $target) (local.get $args)))
+    (local $instance i32)
+    (local.tee $instance (call $Term::TermType::Application::new (local.get $target) (local.get $args)))
+    (call $ApplicationCache::construct
+      (call $Term::Application::pointer::cache (local.get $instance))
+      (global.get $NULL)
+      (global.get $NULL)
+      (global.get $NULL)
+      (global.get $NULL)))
 
   (func $Term::Application::traits::is_atomic (param $self i32) (result i32)
     (global.get $FALSE))
@@ -100,17 +127,111 @@
             (i32.eq (global.get $NULL) (local.get $substituted_args)))))))
 
   (func $Term::Application::traits::evaluate (param $self i32) (param $state i32) (result i32 i32)
+    (local $value i32)
     (local $dependencies i32)
-    ;; TODO: Cache thunk evaluation results
-    ;; Evaluate the application target
-    (call $Term::traits::evaluate (call $Term::Application::get::target (local.get $self)) (local.get $state))
-    ;; Pop the target dependencies from the stack, leaving just the target
+    ;; Retrieve the cached value if one exists for the current state object
+    (call $ApplicationCache::get_cached_value
+      (call $Term::Application::pointer::cache (local.get $self))
+      (local.get $state))
+    ;; Pop the cached dependencies from the stack, leaving just the cached value
     (local.set $dependencies)
-    ;; Apply the target to the arguments
-    (call $Term::traits::apply (call $Term::Application::get::args (local.get $self)) (local.get $state))
-    ;; Pop the result dependencies and combine them with the accumulated dependencies
-    (local.set $dependencies (call $Dependencies::traits::union (local.get $dependencies)))
-    ;; Evaluate the result
-    (call $Term::traits::evaluate (local.get $state))
-    ;; Pop the result dependencies and combine them with the accumulated dependencies
-    (call $Dependencies::traits::union (local.get $dependencies))))
+    (if (result i32 i32)
+      ;; If a cached result exists, return the cached value and dependencies
+      (i32.ne (local.tee $value) (global.get $NULL))
+      (then
+        (local.get $value)
+        (local.get $dependencies))
+      ;; Otherwise evaluate the expression and cache the result
+      (else
+        ;; Push the cache pointer and state pointer onto the stack (for use later when caching the evaluation result)
+        (call $Term::Application::pointer::cache (local.get $self))
+        (local.get $state)
+        ;; Evaluate the application target
+        (call $Term::traits::evaluate (call $Term::Application::get::target (local.get $self)) (local.get $state))
+        ;; Pop the target dependencies from the stack, leaving just the target
+        (local.set $dependencies)
+        ;; Apply the target to the arguments
+        (call $Term::traits::apply (call $Term::Application::get::args (local.get $self)) (local.get $state))
+        ;; Pop the result dependencies and combine them with the accumulated dependencies
+        (local.set $dependencies (call $Dependencies::traits::union (local.get $dependencies)))
+        ;; Evaluate the result
+        (call $Term::traits::evaluate (local.get $state))
+        ;; Pop the result dependencies and combine them with the accumulated dependencies
+        (local.set $dependencies (call $Dependencies::traits::union (local.get $dependencies)))
+        ;; Update the cached value (the instance pointer and state pointer arguments are already on the stack from
+        ;; earlier in the block), leaving a copy of the value on the stack
+        (call $ApplicationCache::set_cached_value (local.tee $value) (local.get $dependencies))
+        ;; Push the result back onto the stack
+        (local.get $value)
+        ;; Push the combined dependencies onto the stack
+        (local.get $dependencies))))
+
+  (func $ApplicationCache::get_cached_value (param $self i32) (param $state i32) (result i32 i32)
+    (local $overall_state_hash i32)
+    (local $minimal_state_hash i32)
+    (local $cached_value i32)
+    (local $cached_dependencies i32)
+    (if (result i32 i32)
+      ;; If there is no cached value, return the null pointer
+      (i32.eq
+        (local.tee $cached_value (call $ApplicationCache::get::value (local.get $self)))
+        (global.get $NULL))
+      (then
+        (global.get $NULL)
+        (global.get $NULL))
+      (else
+        (if (result i32 i32)
+          ;; Otherwise if the current state object is identical to the cached state, return the cached value
+          (i32.eq
+            (local.tee $overall_state_hash (call $ApplicationCache::get_state_hash (local.get $state)))
+            (call $ApplicationCache::get::overall_state_hash (local.get $self)))
+          (then
+            (local.get $cached_value)
+            (call $ApplicationCache::get::dependencies (local.get $self)))
+          (else
+            ;; Otherwise determine whether the subset of required state dependency values from the cached result is
+            ;; identical to the corresponding state values from the current state object
+            (if (result i32 i32)
+              (i32.eq
+                (local.tee $minimal_state_hash
+                  (call $Dependencies::get_state_value_hash
+                    (local.tee $cached_dependencies (call $ApplicationCache::get::dependencies (local.get $self)))
+                    (local.get $state)))
+                (call $ApplicationCache::get::minimal_state_hash (local.get $self)))
+              (then
+                ;; If the subset of required state dependency values is unchanged,
+                ;; update the overall state hash and return the cached result
+                (call $ApplicationCache::set::overall_state_hash (local.get $self) (local.get $overall_state_hash))
+                (local.get $cached_value)
+                (local.get $cached_dependencies))
+              (else
+                ;; Otherwise clear the cached result and return the null pointer
+                ;; (we clear the cached result due to the assumption that the state advances monotonically,
+                ;; making it pointless to retain outdated values that are unlikely to become valid again)
+                (call $ApplicationCache::construct
+                  (local.get $self)
+                  (global.get $NULL)
+                  (global.get $NULL)
+                  (global.get $NULL)
+                  (global.get $NULL))
+                (global.get $NULL)
+                (global.get $NULL))))))))
+
+  (func $ApplicationCache::get_state_hash (param $state i32) (result i32)
+    (if (result i32)
+      (i32.eq (local.get $state) (global.get $NULL))
+      (then
+        (global.get $NULL))
+      (else
+        (call $Term::get_hash (local.get $state)))))
+
+  (func $ApplicationCache::set_cached_value (param $self i32) (param $state i32) (param $value i32) (param $dependencies i32)
+    (call $ApplicationCache::set::value (local.get $self) (local.get $value))
+    (call $ApplicationCache::set::dependencies (local.get $self) (local.get $dependencies))
+    (call $ApplicationCache::set::overall_state_hash
+      (local.get $self)
+      (call $ApplicationCache::get_state_hash (local.get $state)))
+    (call $ApplicationCache::set::minimal_state_hash
+      (local.get $self)
+      ;; Compute the hash of the subset of state values that are required by the result
+      (call $Dependencies::get_state_value_hash (local.get $dependencies) (local.get $state)))))

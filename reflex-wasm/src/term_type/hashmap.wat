@@ -976,7 +976,7 @@
                     ;; Ensure that empty buckets are not counted as matches
                     (global.get $FALSE))
                   (else
-                    (call $Term::traits::equals(local.get $stored_key) (local.get $key))))
+                    (call $Term::traits::equals (local.get $stored_key) (local.get $key))))
                 (then
                   ;; Key matches; return bucket index
                   (local.get $bucket_index))

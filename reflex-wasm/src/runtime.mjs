@@ -387,6 +387,21 @@ export function createRuntime(runtime) {
     getApplicationArgs(value) {
       return runtime.getApplicationArgs(value);
     },
+    getApplicationCache(value) {
+      return runtime.getApplicationCache(value);
+    },
+    getApplicationCacheValue(value) {
+      return runtime.getApplicationCacheValue(value);
+    },
+    getApplicationCacheDependencies(value) {
+      return runtime.getApplicationCacheDependencies(value);
+    },
+    getApplicationCacheOverallStateId(value) {
+      return runtime.getApplicationCacheOverallStateId(value);
+    },
+    getApplicationCacheMinimalStateId(value) {
+      return runtime.getApplicationCacheMinimalStateId(value);
+    },
     createList(items) {
       const instance = runtime.allocateList(items.length);
       const offset = runtime.getListItems(instance);
