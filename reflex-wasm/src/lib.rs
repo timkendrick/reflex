@@ -452,7 +452,9 @@ pub trait PointerIter {
     where
         Self: 'a;
 
-    fn iter<'a>(&'a self) -> Self::Iter<'a>;
+    fn iter<'a>(&'a self) -> Self::Iter<'a>
+    where
+        Self: 'a;
 }
 
 #[cfg(test)]

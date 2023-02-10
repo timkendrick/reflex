@@ -431,7 +431,10 @@ impl<A: Arena + Clone> PointerIter for ArenaRef<Term, A> {
     where
         Self: 'a;
 
-    fn iter(&self) -> Self::Iter<'_> {
+    fn iter<'a>(&'a self) -> Self::Iter<'a>
+    where
+        Self: 'a,
+    {
         match self.read_value(|term| term.type_id()) {
             TermTypeDiscriminants::Application => TermPointerIterator::Application(
                 self.as_typed_term::<ApplicationTerm>().as_inner().iter(),

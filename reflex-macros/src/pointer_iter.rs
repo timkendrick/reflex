@@ -60,9 +60,13 @@ fn impl_pointer_iter_struct(
         #[automatically_derived]
         impl<A: crate::Arena> crate::PointerIter for crate::ArenaRef<#name, A> {
             type Iter<'a> = #iter_name
-            where Self: 'a;
+            where
+                Self: 'a;
 
-            fn iter(&self) -> Self::Iter<'_> {
+            fn iter<'a>(&'a self) -> Self::Iter<'a>
+            where
+                Self: 'a
+            {
                 [#(self.inner_pointer(|term| &term.#fields)),*].into_iter()
             }
         }

@@ -37,7 +37,10 @@ impl<A: Arena> PointerIter for ArenaRef<ListTerm, A> {
     where
         Self: 'a;
 
-    fn iter(&self) -> Self::Iter<'_> {
+    fn iter<'a>(&self) -> Self::Iter<'a>
+    where
+        Self: 'a,
+    {
         self.read_value(|term| {
             let ptr = term as *const ListTerm as u32;
 

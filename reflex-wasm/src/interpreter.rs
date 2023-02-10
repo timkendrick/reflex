@@ -42,7 +42,10 @@ impl PointerIter for Rc<RefCell<WasmInterpreter>> {
     where
         Self: 'a;
 
-    fn iter<'a>(&'a self) -> Self::Iter<'a> {
+    fn iter<'a>(&'a self) -> Self::Iter<'a>
+    where
+        Self: 'a,
+    {
         let (start_offset, end_offset) = {
             let interpreter = self.borrow();
             let interpreter = interpreter.deref();

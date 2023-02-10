@@ -34,7 +34,10 @@ impl<A: Arena> PointerIter for ArenaRef<HashmapTerm, A> {
     where
         Self: 'a;
 
-    fn iter(&self) -> Self::Iter<'_> {
+    fn iter<'a>(&'a self) -> Self::Iter<'a>
+    where
+        Self: 'a,
+    {
         let items_pointer = self.inner_pointer(|term| &term.buckets.items);
         self.read_value(|term| {
             term.buckets

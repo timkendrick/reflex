@@ -149,7 +149,10 @@ impl<A: Arena + Clone> PointerIter for ArenaRef<ConditionTerm, A> {
     type Iter<'a> = ConditionTermPointerIter
     where
         Self: 'a;
-    fn iter(&self) -> Self::Iter<'_> {
+    fn iter<'a>(&'a self) -> Self::Iter<'a>
+    where
+        Self: 'a,
+    {
         match self.condition_type() {
             ConditionTermDiscriminants::Custom => ConditionTermPointerIter::Custom(
                 self.as_typed_condition::<CustomCondition>()
