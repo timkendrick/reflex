@@ -246,7 +246,9 @@ function createDeriveStructSizeNodes(identifier, fields, location) {
                       NodeType.Term({ source: 'call', location }),
                       NodeType.Whitespace({ source: ' ', location }),
                       NodeType.Term({
-                        source: `${identifier.source}::get::${field.name.source}`,
+                        source: `${identifier.source}::pointer::${field.name.source.slice(
+                          '$'.length,
+                        )}`,
                         location,
                       }),
                       NodeType.Whitespace({ source: ' ', location }),
