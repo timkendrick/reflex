@@ -40,7 +40,17 @@ use crate::{
 pub struct WasmTermFactory<A: Arena> {
     arena: Rc<RefCell<A>>,
 }
-impl<A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static + Clone> WasmTermFactory<A> {
+
+impl<A: Arena> From<Rc<RefCell<A>>> for WasmTermFactory<A> {
+    fn from(value: Rc<RefCell<A>>) -> Self {
+        Self { arena: value }
+    }
+}
+
+impl<A: Arena> WasmTermFactory<A>
+where
+    A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static,
+{
     pub fn import<T: Expression>(
         &self,
         expression: &T,
@@ -196,7 +206,170 @@ impl<A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static + Clone> WasmTerm
             Err(expression.clone())
         }
     }
+    pub fn export<T: Expression>(
+        &self,
+        expression: &WasmExpression<Rc<RefCell<A>>>,
+        factory: &impl ExpressionFactory<T>,
+        allocator: &impl HeapAllocator<T>,
+    ) -> Result<T, WasmExpression<Rc<RefCell<A>>>>
+    where
+        T::Builtin: From<Stdlib>,
+    {
+        if let Some(term) = expression.as_nil_term() {
+            let _term = term.as_inner();
+            Ok(factory.create_nil_term())
+        } else if let Some(term) = expression.as_boolean_term() {
+            let term = term.as_inner();
+            Ok(factory.create_boolean_term(term.value()))
+        } else if let Some(term) = expression.as_int_term() {
+            let term = term.as_inner();
+            Ok(factory.create_int_term(term.value()))
+        } else if let Some(term) = expression.as_float_term() {
+            let term = term.as_inner();
+            Ok(factory.create_float_term(term.value()))
+        } else if let Some(term) = expression.as_string_term() {
+            let value = allocator.create_string(term.value().as_deref().as_str());
+            Ok(factory.create_string_term(value))
+        } else if let Some(term) = expression.as_symbol_term() {
+            Ok(factory.create_symbol_term(term.id()))
+        } else if let Some(term) = expression.as_variable_term() {
+            let term = term.as_inner();
+            Ok(factory.create_variable_term(term.offset()))
+        } else if let Some(term) = expression.as_effect_term() {
+            let term = term.as_inner();
+            let condition = {
+                let condition = term.condition();
+                let condition = condition.as_deref();
+                let signal_type = condition.signal_type();
+                let payload = self.export(condition.payload().as_deref(), factory, allocator)?;
+                let token = self.export(condition.token().as_deref(), factory, allocator)?;
+                allocator.create_signal(signal_type, payload, token)
+            };
+            Ok(factory.create_effect_term(condition))
+        } else if let Some(term) = expression.as_let_term() {
+            let term = term.as_inner();
+            let initializer = self.export(term.initializer().as_deref(), factory, allocator)?;
+            let body = self.export(term.body().as_deref(), factory, allocator)?;
+            Ok(factory.create_let_term(initializer, body))
+        } else if let Some(term) = expression.as_lambda_term() {
+            let num_args = term.num_args();
+            let body = self.export(term.body().as_deref(), factory, allocator)?;
+            Ok(factory.create_lambda_term(num_args, body))
+        } else if let Some(term) = expression.as_application_term() {
+            let term = term.as_inner();
+            let target = self.export(term.target().as_deref(), factory, allocator)?;
+            let args = term
+                .args()
+                .as_deref()
+                .iter()
+                .map(|arg| self.export(arg.as_deref(), factory, allocator))
+                .collect::<Result<Vec<_>, _>>()?;
+            let args = allocator.create_list(args);
+            Ok(factory.create_application_term(target, args))
+        } else if let Some(term) = expression.as_partial_term() {
+            let term = term.as_inner();
+            let target = self.export(term.target().as_deref(), factory, allocator)?;
+            let args = term
+                .args()
+                .as_deref()
+                .iter()
+                .map(|arg| self.export(arg.as_deref(), factory, allocator))
+                .collect::<Result<Vec<_>, _>>()?;
+            let args = allocator.create_list(args);
+            Ok(factory.create_partial_application_term(target, args))
+        } else if let Some(term) = expression.as_builtin_term() {
+            let term = term.as_inner();
+            let target: Stdlib = term.target().into();
+            Ok(factory.create_builtin_term(target))
+        } else if let Some(term) = expression.as_record_term() {
+            let term = term.as_inner();
+            let keys = term
+                .prototype()
+                .as_deref()
+                .keys()
+                .as_deref()
+                .iter()
+                .map(|key| self.export(key.as_deref(), factory, allocator))
+                .collect::<Result<Vec<_>, _>>()?;
+            let keys = allocator.create_list(keys);
+            let prototype = allocator.create_struct_prototype(keys);
+            let values = term
+                .values()
+                .as_deref()
+                .iter()
+                .map(|key| self.export(key.as_deref(), factory, allocator))
+                .collect::<Result<Vec<_>, _>>()?;
+            let values = allocator.create_list(values);
+            Ok(factory.create_record_term(prototype, values))
+        } else if let Some(term) = expression.as_constructor_term() {
+            let term = term.as_inner();
+            let keys = term
+                .prototype()
+                .as_deref()
+                .keys()
+                .as_deref()
+                .iter()
+                .map(|key| self.export(key.as_deref(), factory, allocator))
+                .collect::<Result<Vec<_>, _>>()?;
+            let keys = allocator.create_list(keys);
+            let prototype = allocator.create_struct_prototype(keys);
+            Ok(factory.create_constructor_term(prototype))
+        } else if let Some(term) = expression.as_list_term() {
+            let items = term
+                .items()
+                .as_deref()
+                .iter()
+                .map(|key| self.export(key.as_deref(), factory, allocator))
+                .collect::<Result<Vec<_>, _>>()?;
+            let items = allocator.create_list(items);
+            Ok(factory.create_list_term(items))
+        } else if let Some(term) = expression.as_hashmap_term() {
+            let term = term.as_inner();
+            let keys = term
+                .keys()
+                .map(|term| self.export(term.as_deref(), factory, allocator));
+            let values = term
+                .values()
+                .map(|term| self.export(term.as_deref(), factory, allocator));
+            let entries = keys
+                .zip(values)
+                .map(|(key, value)| {
+                    let key = key?;
+                    let value = value?;
+                    Ok((key, value))
+                })
+                .collect::<Result<Vec<_>, WasmExpression<Rc<RefCell<A>>>>>()?;
+            Ok(factory.create_hashmap_term(entries))
+        } else if let Some(term) = expression.as_hashset_term() {
+            let term = term.as_inner();
+            let values = term
+                .values()
+                .map(|term| self.export(term.as_deref(), factory, allocator))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(factory.create_hashset_term(values))
+        } else if let Some(term) = expression.as_signal_term() {
+            let term = term.as_inner();
+            let conditions = term
+                .signals()
+                .as_deref()
+                .iter()
+                .map(|condition| {
+                    let condition = condition.as_deref();
+                    let effect_type = condition.signal_type();
+                    let payload =
+                        self.export(condition.payload().as_deref(), factory, allocator)?;
+                    let token = self.export(condition.token().as_deref(), factory, allocator)?;
+                    Ok(allocator.create_signal(effect_type, payload, token))
+                })
+                .collect::<Result<Vec<_>, WasmExpression<Rc<RefCell<A>>>>>()?;
+            let conditions = allocator.create_signal_list(conditions);
+            Ok(factory.create_signal_term(conditions))
+        } else {
+            Err(expression.clone())
+        }
+    }
 }
+
 impl<A: Arena> Clone for WasmTermFactory<A> {
     fn clone(&self) -> Self {
         Self {
@@ -205,7 +378,10 @@ impl<A: Arena> Clone for WasmTermFactory<A> {
     }
 }
 
-impl<A: for<'a> Arena<Slice<'a> = &'a [u8]> + 'static> Arena for WasmTermFactory<A> {
+impl<A: Arena> Arena for WasmTermFactory<A>
+where
+    A: for<'a> Arena<Slice<'a> = &'a [u8]> + 'static,
+{
     type Slice<'a> = Ref<'a, [u8]>
     where
         Self: 'a;
@@ -227,8 +403,9 @@ impl<A: for<'a> Arena<Slice<'a> = &'a [u8]> + 'static> Arena for WasmTermFactory
     }
 }
 
-impl<A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static> ArenaAllocator
-    for WasmTermFactory<A>
+impl<A: Arena> ArenaAllocator for WasmTermFactory<A>
+where
+    A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static,
 {
     fn allocate<T: TermSize>(&mut self, value: T) -> ArenaPointer {
         self.arena.allocate(value)
@@ -244,8 +421,9 @@ impl<A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static> ArenaAllocator
     }
 }
 
-impl<A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static + Clone>
-    HeapAllocator<ArenaRef<Term, Self>> for WasmTermFactory<A>
+impl<A: Arena> HeapAllocator<ArenaRef<Term, Self>> for WasmTermFactory<A>
+where
+    A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static,
 {
     fn create_list(
         &self,
@@ -446,8 +624,9 @@ impl<A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static + Clone>
     }
 }
 
-impl<A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static + Clone>
-    ExpressionFactory<ArenaRef<Term, Self>> for WasmTermFactory<A>
+impl<A: Arena> ExpressionFactory<ArenaRef<Term, Self>> for WasmTermFactory<A>
+where
+    A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static,
 {
     fn create_nil_term(&self) -> ArenaRef<Term, Self> {
         let term = Term::new(TermType::Nil(NilTerm), &*self.arena.borrow());
