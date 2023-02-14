@@ -32,6 +32,7 @@ pub enum ConditionTerm {
     InvalidPointer(InvalidPointerCondition),
 }
 
+#[derive(Clone, Debug)]
 pub enum ConditionTermPointerIter {
     Custom(CustomConditionPointerIter),
     Pending(PendingConditionPointerIter),

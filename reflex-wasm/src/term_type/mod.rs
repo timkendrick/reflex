@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
-use std::{collections::HashSet, marker::PhantomData};
+use std::collections::HashSet;
 
 use reflex::{
     core::{
@@ -336,6 +336,7 @@ impl TermHash for TermType {
     }
 }
 
+#[derive(Clone, Debug)]
 pub enum TermPointerIterator {
     Application(ApplicationTermPointerIter),
     Boolean(BooleanTermPointerIter),
@@ -3325,9 +3326,546 @@ impl<A: Arena + Clone, V> ArenaRef<TypedTerm<V>, A> {
     }
 }
 
+impl<A: Arena + Clone, V> NodeId for ArenaRef<TypedTerm<V>, A> {
+    fn id(&self) -> HashId {
+        self.read_value(|term| term.id())
+    }
+}
+
 impl<A: Arena + Clone> ArenaRef<Term, A> {
     pub(crate) fn as_typed_term<V>(&self) -> &ArenaRef<TypedTerm<V>, A> {
         unsafe { std::mem::transmute::<&ArenaRef<Term, A>, &ArenaRef<TypedTerm<V>, A>>(self) }
+    }
+    pub(crate) fn into_typed_term<V>(self) -> ArenaRef<TypedTerm<V>, A> {
+        let term = unsafe {
+            std::mem::transmute_copy::<ArenaRef<Term, A>, ArenaRef<TypedTerm<V>, A>>(&self)
+        };
+        std::mem::forget(self);
+        term
+    }
+    pub fn as_application_term(&self) -> Option<&ArenaRef<TypedTerm<ApplicationTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Application => Some(self.as_typed_term::<ApplicationTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_application_term(self) -> Option<ArenaRef<TypedTerm<ApplicationTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Application => Some(self.into_typed_term::<ApplicationTerm>()),
+            _ => None,
+        }
+    }
+    pub fn as_boolean_term(&self) -> Option<&ArenaRef<TypedTerm<BooleanTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Boolean => Some(self.as_typed_term::<BooleanTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_boolean_term(self) -> Option<ArenaRef<TypedTerm<BooleanTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Boolean => Some(self.into_typed_term::<BooleanTerm>()),
+            _ => None,
+        }
+    }
+    pub fn as_builtin_term(&self) -> Option<&ArenaRef<TypedTerm<BuiltinTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Builtin => Some(self.as_typed_term::<BuiltinTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_builtin_term(self) -> Option<ArenaRef<TypedTerm<BuiltinTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Builtin => Some(self.into_typed_term::<BuiltinTerm>()),
+            _ => None,
+        }
+    }
+    pub fn as_cell_term(&self) -> Option<&ArenaRef<TypedTerm<CellTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Cell => Some(self.as_typed_term::<CellTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_cell_term(self) -> Option<ArenaRef<TypedTerm<CellTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Cell => Some(self.into_typed_term::<CellTerm>()),
+            _ => None,
+        }
+    }
+    pub fn as_condition_term(&self) -> Option<&ArenaRef<TypedTerm<ConditionTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Condition => Some(self.as_typed_term::<ConditionTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_condition_term(self) -> Option<ArenaRef<TypedTerm<ConditionTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Condition => Some(self.into_typed_term::<ConditionTerm>()),
+            _ => None,
+        }
+    }
+    pub fn as_constructor_term(&self) -> Option<&ArenaRef<TypedTerm<ConstructorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Constructor => Some(self.as_typed_term::<ConstructorTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_constructor_term(self) -> Option<ArenaRef<TypedTerm<ConstructorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Constructor => Some(self.into_typed_term::<ConstructorTerm>()),
+            _ => None,
+        }
+    }
+    pub fn as_date_term(&self) -> Option<&ArenaRef<TypedTerm<DateTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Date => Some(self.as_typed_term::<DateTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_date_term(self) -> Option<ArenaRef<TypedTerm<DateTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Date => Some(self.into_typed_term::<DateTerm>()),
+            _ => None,
+        }
+    }
+    pub fn as_effect_term(&self) -> Option<&ArenaRef<TypedTerm<EffectTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Effect => Some(self.as_typed_term::<EffectTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_effect_term(self) -> Option<ArenaRef<TypedTerm<EffectTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Effect => Some(self.into_typed_term::<EffectTerm>()),
+            _ => None,
+        }
+    }
+    pub fn as_float_term(&self) -> Option<&ArenaRef<TypedTerm<FloatTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Float => Some(self.as_typed_term::<FloatTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_float_term(self) -> Option<ArenaRef<TypedTerm<FloatTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Float => Some(self.into_typed_term::<FloatTerm>()),
+            _ => None,
+        }
+    }
+    pub fn as_hashmap_term(&self) -> Option<&ArenaRef<TypedTerm<HashmapTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Hashmap => Some(self.as_typed_term::<HashmapTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_hashmap_term(self) -> Option<ArenaRef<TypedTerm<HashmapTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Hashmap => Some(self.into_typed_term::<HashmapTerm>()),
+            _ => None,
+        }
+    }
+    pub fn as_hashset_term(&self) -> Option<&ArenaRef<TypedTerm<HashsetTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Hashset => Some(self.as_typed_term::<HashsetTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_hashset_term(self) -> Option<ArenaRef<TypedTerm<HashsetTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Hashset => Some(self.into_typed_term::<HashsetTerm>()),
+            _ => None,
+        }
+    }
+    pub fn as_int_term(&self) -> Option<&ArenaRef<TypedTerm<IntTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Int => Some(self.as_typed_term::<IntTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_int_term(self) -> Option<ArenaRef<TypedTerm<IntTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Int => Some(self.into_typed_term::<IntTerm>()),
+            _ => None,
+        }
+    }
+    pub fn as_lambda_term(&self) -> Option<&ArenaRef<TypedTerm<LambdaTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Lambda => Some(self.as_typed_term::<LambdaTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_lambda_term(self) -> Option<ArenaRef<TypedTerm<LambdaTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Lambda => Some(self.into_typed_term::<LambdaTerm>()),
+            _ => None,
+        }
+    }
+    pub fn as_let_term(&self) -> Option<&ArenaRef<TypedTerm<LetTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Let => Some(self.as_typed_term::<LetTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_let_term(self) -> Option<ArenaRef<TypedTerm<LetTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Let => Some(self.into_typed_term::<LetTerm>()),
+            _ => None,
+        }
+    }
+    pub fn as_list_term(&self) -> Option<&ArenaRef<TypedTerm<ListTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::List => Some(self.as_typed_term::<ListTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_list_term(self) -> Option<ArenaRef<TypedTerm<ListTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::List => Some(self.into_typed_term::<ListTerm>()),
+            _ => None,
+        }
+    }
+    pub fn as_nil_term(&self) -> Option<&ArenaRef<TypedTerm<NilTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Nil => Some(self.as_typed_term::<NilTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_nil_term(self) -> Option<ArenaRef<TypedTerm<NilTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Nil => Some(self.into_typed_term::<NilTerm>()),
+            _ => None,
+        }
+    }
+    pub fn as_partial_term(&self) -> Option<&ArenaRef<TypedTerm<PartialTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Partial => Some(self.as_typed_term::<PartialTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_partial_term(self) -> Option<ArenaRef<TypedTerm<PartialTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Partial => Some(self.into_typed_term::<PartialTerm>()),
+            _ => None,
+        }
+    }
+    pub fn as_pointer_term(&self) -> Option<&ArenaRef<TypedTerm<PointerTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Pointer => Some(self.as_typed_term::<PointerTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_pointer_term(self) -> Option<ArenaRef<TypedTerm<PointerTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Pointer => Some(self.into_typed_term::<PointerTerm>()),
+            _ => None,
+        }
+    }
+    pub fn as_record_term(&self) -> Option<&ArenaRef<TypedTerm<RecordTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Record => Some(self.as_typed_term::<RecordTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_record_term(self) -> Option<ArenaRef<TypedTerm<RecordTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Record => Some(self.into_typed_term::<RecordTerm>()),
+            _ => None,
+        }
+    }
+    pub fn as_signal_term(&self) -> Option<&ArenaRef<TypedTerm<SignalTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Signal => Some(self.as_typed_term::<SignalTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_signal_term(self) -> Option<ArenaRef<TypedTerm<SignalTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Signal => Some(self.into_typed_term::<SignalTerm>()),
+            _ => None,
+        }
+    }
+    pub fn as_string_term(&self) -> Option<&ArenaRef<TypedTerm<StringTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::String => Some(self.as_typed_term::<StringTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_string_term(self) -> Option<ArenaRef<TypedTerm<StringTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::String => Some(self.into_typed_term::<StringTerm>()),
+            _ => None,
+        }
+    }
+    pub fn as_symbol_term(&self) -> Option<&ArenaRef<TypedTerm<SymbolTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Symbol => Some(self.as_typed_term::<SymbolTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_symbol_term(self) -> Option<ArenaRef<TypedTerm<SymbolTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Symbol => Some(self.into_typed_term::<SymbolTerm>()),
+            _ => None,
+        }
+    }
+    pub fn as_tree_term(&self) -> Option<&ArenaRef<TypedTerm<TreeTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Tree => Some(self.as_typed_term::<TreeTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_tree_term(self) -> Option<ArenaRef<TypedTerm<TreeTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Tree => Some(self.into_typed_term::<TreeTerm>()),
+            _ => None,
+        }
+    }
+    pub fn as_variable_term(&self) -> Option<&ArenaRef<TypedTerm<VariableTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Variable => Some(self.as_typed_term::<VariableTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_variable_term(self) -> Option<ArenaRef<TypedTerm<VariableTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Variable => Some(self.into_typed_term::<VariableTerm>()),
+            _ => None,
+        }
+    }
+    pub fn as_empty_iterator_term(&self) -> Option<&ArenaRef<TypedTerm<EmptyIteratorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::EmptyIterator => Some(self.as_typed_term::<EmptyIteratorTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_empty_iterator_term(self) -> Option<ArenaRef<TypedTerm<EmptyIteratorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::EmptyIterator => {
+                Some(self.into_typed_term::<EmptyIteratorTerm>())
+            }
+            _ => None,
+        }
+    }
+    pub fn as_evaluate_iterator_term(
+        &self,
+    ) -> Option<&ArenaRef<TypedTerm<EvaluateIteratorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::EvaluateIterator => {
+                Some(self.as_typed_term::<EvaluateIteratorTerm>())
+            }
+            _ => None,
+        }
+    }
+    pub fn into_evaluate_iterator_term(
+        self,
+    ) -> Option<ArenaRef<TypedTerm<EvaluateIteratorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::EvaluateIterator => {
+                Some(self.into_typed_term::<EvaluateIteratorTerm>())
+            }
+            _ => None,
+        }
+    }
+    pub fn as_filter_iterator_term(&self) -> Option<&ArenaRef<TypedTerm<FilterIteratorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::FilterIterator => {
+                Some(self.as_typed_term::<FilterIteratorTerm>())
+            }
+            _ => None,
+        }
+    }
+    pub fn into_filter_iterator_term(self) -> Option<ArenaRef<TypedTerm<FilterIteratorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::FilterIterator => {
+                Some(self.into_typed_term::<FilterIteratorTerm>())
+            }
+            _ => None,
+        }
+    }
+    pub fn as_flatten_iterator_term(&self) -> Option<&ArenaRef<TypedTerm<FlattenIteratorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::FlattenIterator => {
+                Some(self.as_typed_term::<FlattenIteratorTerm>())
+            }
+            _ => None,
+        }
+    }
+    pub fn into_flatten_iterator_term(self) -> Option<ArenaRef<TypedTerm<FlattenIteratorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::FlattenIterator => {
+                Some(self.into_typed_term::<FlattenIteratorTerm>())
+            }
+            _ => None,
+        }
+    }
+    pub fn as_hashmap_keys_iterator_term(
+        &self,
+    ) -> Option<&ArenaRef<TypedTerm<HashmapKeysIteratorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::HashmapKeysIterator => {
+                Some(self.as_typed_term::<HashmapKeysIteratorTerm>())
+            }
+            _ => None,
+        }
+    }
+    pub fn into_hashmap_keys_iterator_term(
+        self,
+    ) -> Option<ArenaRef<TypedTerm<HashmapKeysIteratorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::HashmapKeysIterator => {
+                Some(self.into_typed_term::<HashmapKeysIteratorTerm>())
+            }
+            _ => None,
+        }
+    }
+    pub fn as_hashmap_values_iterator_term(
+        &self,
+    ) -> Option<&ArenaRef<TypedTerm<HashmapValuesIteratorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::HashmapValuesIterator => {
+                Some(self.as_typed_term::<HashmapValuesIteratorTerm>())
+            }
+            _ => None,
+        }
+    }
+    pub fn into_hashmap_values_iterator_term(
+        self,
+    ) -> Option<ArenaRef<TypedTerm<HashmapValuesIteratorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::HashmapValuesIterator => {
+                Some(self.into_typed_term::<HashmapValuesIteratorTerm>())
+            }
+            _ => None,
+        }
+    }
+    pub fn as_integers_iterator_term(
+        &self,
+    ) -> Option<&ArenaRef<TypedTerm<IntegersIteratorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::IntegersIterator => {
+                Some(self.as_typed_term::<IntegersIteratorTerm>())
+            }
+            _ => None,
+        }
+    }
+    pub fn into_integers_iterator_term(
+        self,
+    ) -> Option<ArenaRef<TypedTerm<IntegersIteratorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::IntegersIterator => {
+                Some(self.into_typed_term::<IntegersIteratorTerm>())
+            }
+            _ => None,
+        }
+    }
+    pub fn as_intersperse_iterator_term(
+        &self,
+    ) -> Option<&ArenaRef<TypedTerm<IntersperseIteratorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::IntersperseIterator => {
+                Some(self.as_typed_term::<IntersperseIteratorTerm>())
+            }
+            _ => None,
+        }
+    }
+    pub fn into_intersperse_iterator_term(
+        self,
+    ) -> Option<ArenaRef<TypedTerm<IntersperseIteratorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::IntersperseIterator => {
+                Some(self.into_typed_term::<IntersperseIteratorTerm>())
+            }
+            _ => None,
+        }
+    }
+    pub fn as_map_iterator_term(&self) -> Option<&ArenaRef<TypedTerm<MapIteratorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::MapIterator => Some(self.as_typed_term::<MapIteratorTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_map_iterator_term(self) -> Option<ArenaRef<TypedTerm<MapIteratorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::MapIterator => Some(self.into_typed_term::<MapIteratorTerm>()),
+            _ => None,
+        }
+    }
+    pub fn as_once_iterator_term(&self) -> Option<&ArenaRef<TypedTerm<OnceIteratorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::OnceIterator => Some(self.as_typed_term::<OnceIteratorTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_once_iterator_term(self) -> Option<ArenaRef<TypedTerm<OnceIteratorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::OnceIterator => Some(self.into_typed_term::<OnceIteratorTerm>()),
+            _ => None,
+        }
+    }
+    pub fn as_range_iterator_term(&self) -> Option<&ArenaRef<TypedTerm<RangeIteratorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::RangeIterator => Some(self.as_typed_term::<RangeIteratorTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_range_iterator_term(self) -> Option<ArenaRef<TypedTerm<RangeIteratorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::RangeIterator => {
+                Some(self.into_typed_term::<RangeIteratorTerm>())
+            }
+            _ => None,
+        }
+    }
+    pub fn as_repeat_iterator_term(&self) -> Option<&ArenaRef<TypedTerm<RepeatIteratorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::RepeatIterator => {
+                Some(self.as_typed_term::<RepeatIteratorTerm>())
+            }
+            _ => None,
+        }
+    }
+    pub fn into_repeat_iterator_term(self) -> Option<ArenaRef<TypedTerm<RepeatIteratorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::RepeatIterator => {
+                Some(self.into_typed_term::<RepeatIteratorTerm>())
+            }
+            _ => None,
+        }
+    }
+    pub fn as_skip_iterator_term(&self) -> Option<&ArenaRef<TypedTerm<SkipIteratorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::SkipIterator => Some(self.as_typed_term::<SkipIteratorTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_skip_iterator_term(self) -> Option<ArenaRef<TypedTerm<SkipIteratorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::SkipIterator => Some(self.into_typed_term::<SkipIteratorTerm>()),
+            _ => None,
+        }
+    }
+    pub fn as_take_iterator_term(&self) -> Option<&ArenaRef<TypedTerm<TakeIteratorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::TakeIterator => Some(self.as_typed_term::<TakeIteratorTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_take_iterator_term(self) -> Option<ArenaRef<TypedTerm<TakeIteratorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::TakeIterator => Some(self.into_typed_term::<TakeIteratorTerm>()),
+            _ => None,
+        }
+    }
+    pub fn as_zip_iterator_term(&self) -> Option<&ArenaRef<TypedTerm<ZipIteratorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::ZipIterator => Some(self.as_typed_term::<ZipIteratorTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_zip_iterator_term(self) -> Option<ArenaRef<TypedTerm<ZipIteratorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::ZipIterator => Some(self.into_typed_term::<ZipIteratorTerm>()),
+            _ => None,
+        }
     }
 }
 
