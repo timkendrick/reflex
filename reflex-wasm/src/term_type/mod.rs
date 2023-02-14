@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
-use std::collections::HashSet;
+use std::{collections::HashSet, marker::PhantomData};
 
 use reflex::{
     core::{
@@ -14,31 +14,38 @@ use reflex::{
 use serde_json::Value as JsonValue;
 use strum_macros::EnumDiscriminants;
 
-mod application;
-mod boolean;
-mod builtin;
-mod cell;
-mod condition;
-mod constructor;
-mod date;
-mod effect;
-mod float;
-mod hashmap;
-mod hashset;
-mod int;
-mod iterator;
-mod lambda;
-mod r#let;
-mod list;
-mod nil;
-mod partial;
-mod pointer;
-mod record;
-mod signal;
-mod string;
-mod symbol;
-mod tree;
-mod variable;
+use crate::{
+    allocator::Arena,
+    hash::{TermHash, TermHasher, TermSize},
+    stdlib::Stdlib,
+    ArenaPointer, ArenaRef, PointerIter, Term,
+};
+
+pub mod application;
+pub mod boolean;
+pub mod builtin;
+pub mod cell;
+pub mod condition;
+pub mod constructor;
+pub mod date;
+pub mod effect;
+pub mod float;
+pub mod hashmap;
+pub mod hashset;
+pub mod int;
+pub mod iterator;
+pub mod lambda;
+pub mod r#let;
+pub mod list;
+pub mod nil;
+pub mod partial;
+pub mod pointer;
+pub mod record;
+pub mod signal;
+pub mod string;
+pub mod symbol;
+pub mod tree;
+pub mod variable;
 
 pub use application::*;
 pub use boolean::*;
@@ -65,13 +72,6 @@ pub use string::*;
 pub use symbol::*;
 pub use tree::*;
 pub use variable::*;
-
-use crate::{
-    allocator::Arena,
-    hash::{TermHash, TermHasher, TermSize},
-    stdlib::Stdlib,
-    ArenaPointer, ArenaRef, PointerIter, Term,
-};
 
 const TERM_TYPE_DISCRIMINANT_SIZE: usize = std::mem::size_of::<u32>();
 
@@ -118,6 +118,7 @@ pub enum TermType {
     TakeIterator(TakeIteratorTerm),
     ZipIterator(ZipIteratorTerm),
 }
+
 impl TryFrom<u32> for TermTypeDiscriminants {
     type Error = ();
     fn try_from(value: u32) -> Result<Self, Self::Error> {
@@ -165,6 +166,7 @@ impl TryFrom<u32> for TermTypeDiscriminants {
         }
     }
 }
+
 impl TermSize for TermType {
     fn size_of(&self) -> usize {
         let discriminant_size = TERM_TYPE_DISCRIMINANT_SIZE;
@@ -212,6 +214,7 @@ impl TermSize for TermType {
         discriminant_size + value_size
     }
 }
+
 impl TermHash for TermType {
     fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         match self {
@@ -381,7 +384,6 @@ pub enum TermPointerIterator {
 
 impl Iterator for TermPointerIterator {
     type Item = ArenaPointer;
-
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             TermPointerIterator::Application(inner) => inner.next(),
@@ -1068,7 +1070,6 @@ impl<A: Arena + Clone> ArenaRef<Term, A> {
     }
 }
 
-impl<A: Arena + Clone> Eq for ArenaRef<Term, A> {}
 impl<A: Arena + Clone> PartialEq for ArenaRef<Term, A> {
     fn eq(&self, other: &Self) -> bool {
         if self.read_value(|term| term.header.hash) != other.read_value(|term| term.header.hash) {
@@ -1250,6 +1251,8 @@ impl<A: Arena + Clone> PartialEq for ArenaRef<Term, A> {
     }
 }
 
+impl<A: Arena + Clone> Eq for ArenaRef<Term, A> {}
+
 pub type WasmExpression<A> = ArenaRef<Term, A>;
 
 impl<A: Arena + Clone> Expression for ArenaRef<Term, A> {
@@ -1301,1246 +1304,1199 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
     fn size(&self) -> usize {
         match self.read_value(|term| term.type_id()) {
             TermTypeDiscriminants::Application => {
-                self.as_typed_term::<ApplicationTerm>().as_inner().size()
+                GraphNode::size(&self.as_typed_term::<ApplicationTerm>().as_inner())
             }
-            TermTypeDiscriminants::Boolean => self.as_typed_term::<BooleanTerm>().as_inner().size(),
-            TermTypeDiscriminants::Builtin => self.as_typed_term::<BuiltinTerm>().as_inner().size(),
-            TermTypeDiscriminants::Cell => self.as_typed_term::<CellTerm>().as_inner().size(),
+            TermTypeDiscriminants::Boolean => {
+                GraphNode::size(&self.as_typed_term::<BooleanTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Builtin => {
+                GraphNode::size(&self.as_typed_term::<BuiltinTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Cell => {
+                GraphNode::size(&self.as_typed_term::<CellTerm>().as_inner())
+            }
             TermTypeDiscriminants::Condition => {
-                self.as_typed_term::<ConditionTerm>().as_inner().size()
+                GraphNode::size(&self.as_typed_term::<ConditionTerm>().as_inner())
             }
             TermTypeDiscriminants::Constructor => {
-                self.as_typed_term::<ConstructorTerm>().as_inner().size()
+                GraphNode::size(&self.as_typed_term::<ConstructorTerm>().as_inner())
             }
-            TermTypeDiscriminants::Date => self.as_typed_term::<DateTerm>().as_inner().size(),
-            TermTypeDiscriminants::Effect => self.as_typed_term::<EffectTerm>().as_inner().size(),
-            TermTypeDiscriminants::Float => self.as_typed_term::<FloatTerm>().as_inner().size(),
-            TermTypeDiscriminants::Hashmap => self.as_typed_term::<HashmapTerm>().as_inner().size(),
-            TermTypeDiscriminants::Hashset => self.as_typed_term::<HashsetTerm>().as_inner().size(),
-            TermTypeDiscriminants::Int => self.as_typed_term::<IntTerm>().as_inner().size(),
-            TermTypeDiscriminants::Lambda => self.as_typed_term::<LambdaTerm>().as_inner().size(),
-            TermTypeDiscriminants::Let => self.as_typed_term::<LetTerm>().as_inner().size(),
-            TermTypeDiscriminants::List => self.as_typed_term::<ListTerm>().as_inner().size(),
-            TermTypeDiscriminants::Nil => self.as_typed_term::<NilTerm>().as_inner().size(),
-            TermTypeDiscriminants::Partial => self.as_typed_term::<PartialTerm>().as_inner().size(),
-            TermTypeDiscriminants::Pointer => self.as_typed_term::<PointerTerm>().as_inner().size(),
-            TermTypeDiscriminants::Record => self.as_typed_term::<RecordTerm>().as_inner().size(),
-            TermTypeDiscriminants::Signal => self.as_typed_term::<SignalTerm>().as_inner().size(),
-            TermTypeDiscriminants::String => self.as_typed_term::<StringTerm>().as_inner().size(),
-            TermTypeDiscriminants::Symbol => self.as_typed_term::<SymbolTerm>().as_inner().size(),
-            TermTypeDiscriminants::Tree => self.as_typed_term::<TreeTerm>().as_inner().size(),
+            TermTypeDiscriminants::Date => {
+                GraphNode::size(&self.as_typed_term::<DateTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Effect => {
+                GraphNode::size(&self.as_typed_term::<EffectTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Float => {
+                GraphNode::size(&self.as_typed_term::<FloatTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Hashmap => {
+                GraphNode::size(&self.as_typed_term::<HashmapTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Hashset => {
+                GraphNode::size(&self.as_typed_term::<HashsetTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Int => {
+                GraphNode::size(&self.as_typed_term::<IntTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Lambda => {
+                GraphNode::size(&self.as_typed_term::<LambdaTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Let => {
+                GraphNode::size(&self.as_typed_term::<LetTerm>().as_inner())
+            }
+            TermTypeDiscriminants::List => {
+                GraphNode::size(&self.as_typed_term::<ListTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Nil => {
+                GraphNode::size(&self.as_typed_term::<NilTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Partial => {
+                GraphNode::size(&self.as_typed_term::<PartialTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Pointer => {
+                GraphNode::size(&self.as_typed_term::<PointerTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Record => {
+                GraphNode::size(&self.as_typed_term::<RecordTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Signal => {
+                GraphNode::size(&self.as_typed_term::<SignalTerm>().as_inner())
+            }
+            TermTypeDiscriminants::String => {
+                GraphNode::size(&self.as_typed_term::<StringTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Symbol => {
+                GraphNode::size(&self.as_typed_term::<SymbolTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Tree => {
+                GraphNode::size(&self.as_typed_term::<TreeTerm>().as_inner())
+            }
             TermTypeDiscriminants::Variable => {
-                self.as_typed_term::<VariableTerm>().as_inner().size()
+                GraphNode::size(&self.as_typed_term::<VariableTerm>().as_inner())
             }
             TermTypeDiscriminants::EmptyIterator => {
-                self.as_typed_term::<EmptyIteratorTerm>().as_inner().size()
+                GraphNode::size(&self.as_typed_term::<EmptyIteratorTerm>().as_inner())
             }
-            TermTypeDiscriminants::EvaluateIterator => self
-                .as_typed_term::<EvaluateIteratorTerm>()
-                .as_inner()
-                .size(),
+            TermTypeDiscriminants::EvaluateIterator => {
+                GraphNode::size(&self.as_typed_term::<EvaluateIteratorTerm>().as_inner())
+            }
             TermTypeDiscriminants::FilterIterator => {
-                self.as_typed_term::<FilterIteratorTerm>().as_inner().size()
+                GraphNode::size(&self.as_typed_term::<FilterIteratorTerm>().as_inner())
             }
-            TermTypeDiscriminants::FlattenIterator => self
-                .as_typed_term::<FlattenIteratorTerm>()
-                .as_inner()
-                .size(),
-            TermTypeDiscriminants::HashmapKeysIterator => self
-                .as_typed_term::<HashmapKeysIteratorTerm>()
-                .as_inner()
-                .size(),
-            TermTypeDiscriminants::HashmapValuesIterator => self
-                .as_typed_term::<HashmapValuesIteratorTerm>()
-                .as_inner()
-                .size(),
-            TermTypeDiscriminants::IntegersIterator => self
-                .as_typed_term::<IntegersIteratorTerm>()
-                .as_inner()
-                .size(),
-            TermTypeDiscriminants::IntersperseIterator => self
-                .as_typed_term::<IntersperseIteratorTerm>()
-                .as_inner()
-                .size(),
+            TermTypeDiscriminants::FlattenIterator => {
+                GraphNode::size(&self.as_typed_term::<FlattenIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::HashmapKeysIterator => {
+                GraphNode::size(&self.as_typed_term::<HashmapKeysIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::HashmapValuesIterator => {
+                GraphNode::size(&self.as_typed_term::<HashmapValuesIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::IntegersIterator => {
+                GraphNode::size(&self.as_typed_term::<IntegersIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::IntersperseIterator => {
+                GraphNode::size(&self.as_typed_term::<IntersperseIteratorTerm>().as_inner())
+            }
             TermTypeDiscriminants::MapIterator => {
-                self.as_typed_term::<MapIteratorTerm>().as_inner().size()
+                GraphNode::size(&self.as_typed_term::<MapIteratorTerm>().as_inner())
             }
             TermTypeDiscriminants::OnceIterator => {
-                self.as_typed_term::<OnceIteratorTerm>().as_inner().size()
+                GraphNode::size(&self.as_typed_term::<OnceIteratorTerm>().as_inner())
             }
             TermTypeDiscriminants::RangeIterator => {
-                self.as_typed_term::<RangeIteratorTerm>().as_inner().size()
+                GraphNode::size(&self.as_typed_term::<RangeIteratorTerm>().as_inner())
             }
             TermTypeDiscriminants::RepeatIterator => {
-                self.as_typed_term::<RepeatIteratorTerm>().as_inner().size()
+                GraphNode::size(&self.as_typed_term::<RepeatIteratorTerm>().as_inner())
             }
             TermTypeDiscriminants::SkipIterator => {
-                self.as_typed_term::<SkipIteratorTerm>().as_inner().size()
+                GraphNode::size(&self.as_typed_term::<SkipIteratorTerm>().as_inner())
             }
             TermTypeDiscriminants::TakeIterator => {
-                self.as_typed_term::<TakeIteratorTerm>().as_inner().size()
+                GraphNode::size(&self.as_typed_term::<TakeIteratorTerm>().as_inner())
             }
             TermTypeDiscriminants::ZipIterator => {
-                self.as_typed_term::<ZipIteratorTerm>().as_inner().size()
+                GraphNode::size(&self.as_typed_term::<ZipIteratorTerm>().as_inner())
             }
         }
     }
     fn capture_depth(&self) -> StackOffset {
         match self.read_value(|term| term.type_id()) {
-            TermTypeDiscriminants::Application => self
-                .as_typed_term::<ApplicationTerm>()
-                .as_inner()
-                .capture_depth(),
-            TermTypeDiscriminants::Boolean => self
-                .as_typed_term::<BooleanTerm>()
-                .as_inner()
-                .capture_depth(),
-            TermTypeDiscriminants::Builtin => self
-                .as_typed_term::<BuiltinTerm>()
-                .as_inner()
-                .capture_depth(),
+            TermTypeDiscriminants::Application => {
+                GraphNode::capture_depth(&self.as_typed_term::<ApplicationTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Boolean => {
+                GraphNode::capture_depth(&self.as_typed_term::<BooleanTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Builtin => {
+                GraphNode::capture_depth(&self.as_typed_term::<BuiltinTerm>().as_inner())
+            }
             TermTypeDiscriminants::Cell => {
-                self.as_typed_term::<CellTerm>().as_inner().capture_depth()
+                GraphNode::capture_depth(&self.as_typed_term::<CellTerm>().as_inner())
             }
-            TermTypeDiscriminants::Condition => self
-                .as_typed_term::<ConditionTerm>()
-                .as_inner()
-                .capture_depth(),
-            TermTypeDiscriminants::Constructor => self
-                .as_typed_term::<ConstructorTerm>()
-                .as_inner()
-                .capture_depth(),
+            TermTypeDiscriminants::Condition => {
+                GraphNode::capture_depth(&self.as_typed_term::<ConditionTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Constructor => {
+                GraphNode::capture_depth(&self.as_typed_term::<ConstructorTerm>().as_inner())
+            }
             TermTypeDiscriminants::Date => {
-                self.as_typed_term::<DateTerm>().as_inner().capture_depth()
+                GraphNode::capture_depth(&self.as_typed_term::<DateTerm>().as_inner())
             }
-            TermTypeDiscriminants::Effect => self
-                .as_typed_term::<EffectTerm>()
-                .as_inner()
-                .capture_depth(),
+            TermTypeDiscriminants::Effect => {
+                GraphNode::capture_depth(&self.as_typed_term::<EffectTerm>().as_inner())
+            }
             TermTypeDiscriminants::Float => {
-                self.as_typed_term::<FloatTerm>().as_inner().capture_depth()
+                GraphNode::capture_depth(&self.as_typed_term::<FloatTerm>().as_inner())
             }
-            TermTypeDiscriminants::Hashmap => self
-                .as_typed_term::<HashmapTerm>()
-                .as_inner()
-                .capture_depth(),
-            TermTypeDiscriminants::Hashset => self
-                .as_typed_term::<HashsetTerm>()
-                .as_inner()
-                .capture_depth(),
+            TermTypeDiscriminants::Hashmap => {
+                GraphNode::capture_depth(&self.as_typed_term::<HashmapTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Hashset => {
+                GraphNode::capture_depth(&self.as_typed_term::<HashsetTerm>().as_inner())
+            }
             TermTypeDiscriminants::Int => {
-                self.as_typed_term::<IntTerm>().as_inner().capture_depth()
+                GraphNode::capture_depth(&self.as_typed_term::<IntTerm>().as_inner())
             }
-            TermTypeDiscriminants::Lambda => self
-                .as_typed_term::<LambdaTerm>()
-                .as_inner()
-                .capture_depth(),
+            TermTypeDiscriminants::Lambda => {
+                GraphNode::capture_depth(&self.as_typed_term::<LambdaTerm>().as_inner())
+            }
             TermTypeDiscriminants::Let => {
-                self.as_typed_term::<LetTerm>().as_inner().capture_depth()
+                GraphNode::capture_depth(&self.as_typed_term::<LetTerm>().as_inner())
             }
             TermTypeDiscriminants::List => {
-                self.as_typed_term::<ListTerm>().as_inner().capture_depth()
+                GraphNode::capture_depth(&self.as_typed_term::<ListTerm>().as_inner())
             }
             TermTypeDiscriminants::Nil => {
-                self.as_typed_term::<NilTerm>().as_inner().capture_depth()
+                GraphNode::capture_depth(&self.as_typed_term::<NilTerm>().as_inner())
             }
-            TermTypeDiscriminants::Partial => self
-                .as_typed_term::<PartialTerm>()
-                .as_inner()
-                .capture_depth(),
-            TermTypeDiscriminants::Pointer => self
-                .as_typed_term::<PointerTerm>()
-                .as_inner()
-                .capture_depth(),
-            TermTypeDiscriminants::Record => self
-                .as_typed_term::<RecordTerm>()
-                .as_inner()
-                .capture_depth(),
-            TermTypeDiscriminants::Signal => self
-                .as_typed_term::<SignalTerm>()
-                .as_inner()
-                .capture_depth(),
-            TermTypeDiscriminants::String => self
-                .as_typed_term::<StringTerm>()
-                .as_inner()
-                .capture_depth(),
-            TermTypeDiscriminants::Symbol => self
-                .as_typed_term::<SymbolTerm>()
-                .as_inner()
-                .capture_depth(),
+            TermTypeDiscriminants::Partial => {
+                GraphNode::capture_depth(&self.as_typed_term::<PartialTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Pointer => {
+                GraphNode::capture_depth(&self.as_typed_term::<PointerTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Record => {
+                GraphNode::capture_depth(&self.as_typed_term::<RecordTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Signal => {
+                GraphNode::capture_depth(&self.as_typed_term::<SignalTerm>().as_inner())
+            }
+            TermTypeDiscriminants::String => {
+                GraphNode::capture_depth(&self.as_typed_term::<StringTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Symbol => {
+                GraphNode::capture_depth(&self.as_typed_term::<SymbolTerm>().as_inner())
+            }
             TermTypeDiscriminants::Tree => {
-                self.as_typed_term::<TreeTerm>().as_inner().capture_depth()
+                GraphNode::capture_depth(&self.as_typed_term::<TreeTerm>().as_inner())
             }
-            TermTypeDiscriminants::Variable => self
-                .as_typed_term::<VariableTerm>()
-                .as_inner()
-                .capture_depth(),
-            TermTypeDiscriminants::EmptyIterator => self
-                .as_typed_term::<EmptyIteratorTerm>()
-                .as_inner()
-                .capture_depth(),
-            TermTypeDiscriminants::EvaluateIterator => self
-                .as_typed_term::<EvaluateIteratorTerm>()
-                .as_inner()
-                .capture_depth(),
-            TermTypeDiscriminants::FilterIterator => self
-                .as_typed_term::<FilterIteratorTerm>()
-                .as_inner()
-                .capture_depth(),
-            TermTypeDiscriminants::FlattenIterator => self
-                .as_typed_term::<FlattenIteratorTerm>()
-                .as_inner()
-                .capture_depth(),
-            TermTypeDiscriminants::HashmapKeysIterator => self
-                .as_typed_term::<HashmapKeysIteratorTerm>()
-                .as_inner()
-                .capture_depth(),
-            TermTypeDiscriminants::HashmapValuesIterator => self
-                .as_typed_term::<HashmapValuesIteratorTerm>()
-                .as_inner()
-                .capture_depth(),
-            TermTypeDiscriminants::IntegersIterator => self
-                .as_typed_term::<IntegersIteratorTerm>()
-                .as_inner()
-                .capture_depth(),
-            TermTypeDiscriminants::IntersperseIterator => self
-                .as_typed_term::<IntersperseIteratorTerm>()
-                .as_inner()
-                .capture_depth(),
-            TermTypeDiscriminants::MapIterator => self
-                .as_typed_term::<MapIteratorTerm>()
-                .as_inner()
-                .capture_depth(),
-            TermTypeDiscriminants::OnceIterator => self
-                .as_typed_term::<OnceIteratorTerm>()
-                .as_inner()
-                .capture_depth(),
-            TermTypeDiscriminants::RangeIterator => self
-                .as_typed_term::<RangeIteratorTerm>()
-                .as_inner()
-                .capture_depth(),
-            TermTypeDiscriminants::RepeatIterator => self
-                .as_typed_term::<RepeatIteratorTerm>()
-                .as_inner()
-                .capture_depth(),
-            TermTypeDiscriminants::SkipIterator => self
-                .as_typed_term::<SkipIteratorTerm>()
-                .as_inner()
-                .capture_depth(),
-            TermTypeDiscriminants::TakeIterator => self
-                .as_typed_term::<TakeIteratorTerm>()
-                .as_inner()
-                .capture_depth(),
-            TermTypeDiscriminants::ZipIterator => self
-                .as_typed_term::<ZipIteratorTerm>()
-                .as_inner()
-                .capture_depth(),
+            TermTypeDiscriminants::Variable => {
+                GraphNode::capture_depth(&self.as_typed_term::<VariableTerm>().as_inner())
+            }
+            TermTypeDiscriminants::EmptyIterator => {
+                GraphNode::capture_depth(&self.as_typed_term::<EmptyIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::EvaluateIterator => {
+                GraphNode::capture_depth(&self.as_typed_term::<EvaluateIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::FilterIterator => {
+                GraphNode::capture_depth(&self.as_typed_term::<FilterIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::FlattenIterator => {
+                GraphNode::capture_depth(&self.as_typed_term::<FlattenIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::HashmapKeysIterator => GraphNode::capture_depth(
+                &self.as_typed_term::<HashmapKeysIteratorTerm>().as_inner(),
+            ),
+            TermTypeDiscriminants::HashmapValuesIterator => GraphNode::capture_depth(
+                &self.as_typed_term::<HashmapValuesIteratorTerm>().as_inner(),
+            ),
+            TermTypeDiscriminants::IntegersIterator => {
+                GraphNode::capture_depth(&self.as_typed_term::<IntegersIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::IntersperseIterator => GraphNode::capture_depth(
+                &self.as_typed_term::<IntersperseIteratorTerm>().as_inner(),
+            ),
+            TermTypeDiscriminants::MapIterator => {
+                GraphNode::capture_depth(&self.as_typed_term::<MapIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::OnceIterator => {
+                GraphNode::capture_depth(&self.as_typed_term::<OnceIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::RangeIterator => {
+                GraphNode::capture_depth(&self.as_typed_term::<RangeIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::RepeatIterator => {
+                GraphNode::capture_depth(&self.as_typed_term::<RepeatIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::SkipIterator => {
+                GraphNode::capture_depth(&self.as_typed_term::<SkipIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::TakeIterator => {
+                GraphNode::capture_depth(&self.as_typed_term::<TakeIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::ZipIterator => {
+                GraphNode::capture_depth(&self.as_typed_term::<ZipIteratorTerm>().as_inner())
+            }
         }
     }
     fn free_variables(&self) -> HashSet<StackOffset> {
         match self.read_value(|term| term.type_id()) {
-            TermTypeDiscriminants::Application => self
-                .as_typed_term::<ApplicationTerm>()
-                .as_inner()
-                .free_variables(),
-            TermTypeDiscriminants::Boolean => self
-                .as_typed_term::<BooleanTerm>()
-                .as_inner()
-                .free_variables(),
-            TermTypeDiscriminants::Builtin => self
-                .as_typed_term::<BuiltinTerm>()
-                .as_inner()
-                .free_variables(),
+            TermTypeDiscriminants::Application => {
+                GraphNode::free_variables(&self.as_typed_term::<ApplicationTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Boolean => {
+                GraphNode::free_variables(&self.as_typed_term::<BooleanTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Builtin => {
+                GraphNode::free_variables(&self.as_typed_term::<BuiltinTerm>().as_inner())
+            }
             TermTypeDiscriminants::Cell => {
-                self.as_typed_term::<CellTerm>().as_inner().free_variables()
+                GraphNode::free_variables(&self.as_typed_term::<CellTerm>().as_inner())
             }
-            TermTypeDiscriminants::Condition => self
-                .as_typed_term::<ConditionTerm>()
-                .as_inner()
-                .free_variables(),
-            TermTypeDiscriminants::Constructor => self
-                .as_typed_term::<ConstructorTerm>()
-                .as_inner()
-                .free_variables(),
+            TermTypeDiscriminants::Condition => {
+                GraphNode::free_variables(&self.as_typed_term::<ConditionTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Constructor => {
+                GraphNode::free_variables(&self.as_typed_term::<ConstructorTerm>().as_inner())
+            }
             TermTypeDiscriminants::Date => {
-                self.as_typed_term::<DateTerm>().as_inner().free_variables()
+                GraphNode::free_variables(&self.as_typed_term::<DateTerm>().as_inner())
             }
-            TermTypeDiscriminants::Effect => self
-                .as_typed_term::<EffectTerm>()
-                .as_inner()
-                .free_variables(),
-            TermTypeDiscriminants::Float => self
-                .as_typed_term::<FloatTerm>()
-                .as_inner()
-                .free_variables(),
-            TermTypeDiscriminants::Hashmap => self
-                .as_typed_term::<HashmapTerm>()
-                .as_inner()
-                .free_variables(),
-            TermTypeDiscriminants::Hashset => self
-                .as_typed_term::<HashsetTerm>()
-                .as_inner()
-                .free_variables(),
+            TermTypeDiscriminants::Effect => {
+                GraphNode::free_variables(&self.as_typed_term::<EffectTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Float => {
+                GraphNode::free_variables(&self.as_typed_term::<FloatTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Hashmap => {
+                GraphNode::free_variables(&self.as_typed_term::<HashmapTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Hashset => {
+                GraphNode::free_variables(&self.as_typed_term::<HashsetTerm>().as_inner())
+            }
             TermTypeDiscriminants::Int => {
-                self.as_typed_term::<IntTerm>().as_inner().free_variables()
+                GraphNode::free_variables(&self.as_typed_term::<IntTerm>().as_inner())
             }
-            TermTypeDiscriminants::Lambda => self
-                .as_typed_term::<LambdaTerm>()
-                .as_inner()
-                .free_variables(),
+            TermTypeDiscriminants::Lambda => {
+                GraphNode::free_variables(&self.as_typed_term::<LambdaTerm>().as_inner())
+            }
             TermTypeDiscriminants::Let => {
-                self.as_typed_term::<LetTerm>().as_inner().free_variables()
+                GraphNode::free_variables(&self.as_typed_term::<LetTerm>().as_inner())
             }
             TermTypeDiscriminants::List => {
-                self.as_typed_term::<ListTerm>().as_inner().free_variables()
+                GraphNode::free_variables(&self.as_typed_term::<ListTerm>().as_inner())
             }
             TermTypeDiscriminants::Nil => {
-                self.as_typed_term::<NilTerm>().as_inner().free_variables()
+                GraphNode::free_variables(&self.as_typed_term::<NilTerm>().as_inner())
             }
-            TermTypeDiscriminants::Partial => self
-                .as_typed_term::<PartialTerm>()
-                .as_inner()
-                .free_variables(),
-            TermTypeDiscriminants::Pointer => self
-                .as_typed_term::<PointerTerm>()
-                .as_inner()
-                .free_variables(),
-            TermTypeDiscriminants::Record => self
-                .as_typed_term::<RecordTerm>()
-                .as_inner()
-                .free_variables(),
-            TermTypeDiscriminants::Signal => self
-                .as_typed_term::<SignalTerm>()
-                .as_inner()
-                .free_variables(),
-            TermTypeDiscriminants::String => self
-                .as_typed_term::<StringTerm>()
-                .as_inner()
-                .free_variables(),
-            TermTypeDiscriminants::Symbol => self
-                .as_typed_term::<SymbolTerm>()
-                .as_inner()
-                .free_variables(),
+            TermTypeDiscriminants::Partial => {
+                GraphNode::free_variables(&self.as_typed_term::<PartialTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Pointer => {
+                GraphNode::free_variables(&self.as_typed_term::<PointerTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Record => {
+                GraphNode::free_variables(&self.as_typed_term::<RecordTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Signal => {
+                GraphNode::free_variables(&self.as_typed_term::<SignalTerm>().as_inner())
+            }
+            TermTypeDiscriminants::String => {
+                GraphNode::free_variables(&self.as_typed_term::<StringTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Symbol => {
+                GraphNode::free_variables(&self.as_typed_term::<SymbolTerm>().as_inner())
+            }
             TermTypeDiscriminants::Tree => {
-                self.as_typed_term::<TreeTerm>().as_inner().free_variables()
+                GraphNode::free_variables(&self.as_typed_term::<TreeTerm>().as_inner())
             }
-            TermTypeDiscriminants::Variable => self
-                .as_typed_term::<VariableTerm>()
-                .as_inner()
-                .free_variables(),
-            TermTypeDiscriminants::EmptyIterator => self
-                .as_typed_term::<EmptyIteratorTerm>()
-                .as_inner()
-                .free_variables(),
-            TermTypeDiscriminants::EvaluateIterator => self
-                .as_typed_term::<EvaluateIteratorTerm>()
-                .as_inner()
-                .free_variables(),
-            TermTypeDiscriminants::FilterIterator => self
-                .as_typed_term::<FilterIteratorTerm>()
-                .as_inner()
-                .free_variables(),
-            TermTypeDiscriminants::FlattenIterator => self
-                .as_typed_term::<FlattenIteratorTerm>()
-                .as_inner()
-                .free_variables(),
-            TermTypeDiscriminants::HashmapKeysIterator => self
-                .as_typed_term::<HashmapKeysIteratorTerm>()
-                .as_inner()
-                .free_variables(),
-            TermTypeDiscriminants::HashmapValuesIterator => self
-                .as_typed_term::<HashmapValuesIteratorTerm>()
-                .as_inner()
-                .free_variables(),
-            TermTypeDiscriminants::IntegersIterator => self
-                .as_typed_term::<IntegersIteratorTerm>()
-                .as_inner()
-                .free_variables(),
-            TermTypeDiscriminants::IntersperseIterator => self
-                .as_typed_term::<IntersperseIteratorTerm>()
-                .as_inner()
-                .free_variables(),
-            TermTypeDiscriminants::MapIterator => self
-                .as_typed_term::<MapIteratorTerm>()
-                .as_inner()
-                .free_variables(),
-            TermTypeDiscriminants::OnceIterator => self
-                .as_typed_term::<OnceIteratorTerm>()
-                .as_inner()
-                .free_variables(),
-            TermTypeDiscriminants::RangeIterator => self
-                .as_typed_term::<RangeIteratorTerm>()
-                .as_inner()
-                .free_variables(),
-            TermTypeDiscriminants::RepeatIterator => self
-                .as_typed_term::<RepeatIteratorTerm>()
-                .as_inner()
-                .free_variables(),
-            TermTypeDiscriminants::SkipIterator => self
-                .as_typed_term::<SkipIteratorTerm>()
-                .as_inner()
-                .free_variables(),
-            TermTypeDiscriminants::TakeIterator => self
-                .as_typed_term::<TakeIteratorTerm>()
-                .as_inner()
-                .free_variables(),
-            TermTypeDiscriminants::ZipIterator => self
-                .as_typed_term::<ZipIteratorTerm>()
-                .as_inner()
-                .free_variables(),
+            TermTypeDiscriminants::Variable => {
+                GraphNode::free_variables(&self.as_typed_term::<VariableTerm>().as_inner())
+            }
+            TermTypeDiscriminants::EmptyIterator => {
+                GraphNode::free_variables(&self.as_typed_term::<EmptyIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::EvaluateIterator => {
+                GraphNode::free_variables(&self.as_typed_term::<EvaluateIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::FilterIterator => {
+                GraphNode::free_variables(&self.as_typed_term::<FilterIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::FlattenIterator => {
+                GraphNode::free_variables(&self.as_typed_term::<FlattenIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::HashmapKeysIterator => GraphNode::free_variables(
+                &self.as_typed_term::<HashmapKeysIteratorTerm>().as_inner(),
+            ),
+            TermTypeDiscriminants::HashmapValuesIterator => GraphNode::free_variables(
+                &self.as_typed_term::<HashmapValuesIteratorTerm>().as_inner(),
+            ),
+            TermTypeDiscriminants::IntegersIterator => {
+                GraphNode::free_variables(&self.as_typed_term::<IntegersIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::IntersperseIterator => GraphNode::free_variables(
+                &self.as_typed_term::<IntersperseIteratorTerm>().as_inner(),
+            ),
+            TermTypeDiscriminants::MapIterator => {
+                GraphNode::free_variables(&self.as_typed_term::<MapIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::OnceIterator => {
+                GraphNode::free_variables(&self.as_typed_term::<OnceIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::RangeIterator => {
+                GraphNode::free_variables(&self.as_typed_term::<RangeIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::RepeatIterator => {
+                GraphNode::free_variables(&self.as_typed_term::<RepeatIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::SkipIterator => {
+                GraphNode::free_variables(&self.as_typed_term::<SkipIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::TakeIterator => {
+                GraphNode::free_variables(&self.as_typed_term::<TakeIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::ZipIterator => {
+                GraphNode::free_variables(&self.as_typed_term::<ZipIteratorTerm>().as_inner())
+            }
         }
     }
     fn count_variable_usages(&self, offset: StackOffset) -> usize {
         match self.read_value(|term| term.type_id()) {
-            TermTypeDiscriminants::Application => self
-                .as_typed_term::<ApplicationTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::Boolean => self
-                .as_typed_term::<BooleanTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::Builtin => self
-                .as_typed_term::<BuiltinTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::Cell => self
-                .as_typed_term::<CellTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::Condition => self
-                .as_typed_term::<ConditionTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::Constructor => self
-                .as_typed_term::<ConstructorTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::Date => self
-                .as_typed_term::<DateTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::Effect => self
-                .as_typed_term::<EffectTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::Float => self
-                .as_typed_term::<FloatTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::Hashmap => self
-                .as_typed_term::<HashmapTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::Hashset => self
-                .as_typed_term::<HashsetTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::Int => self
-                .as_typed_term::<IntTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::Lambda => self
-                .as_typed_term::<LambdaTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::Let => self
-                .as_typed_term::<LetTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::List => self
-                .as_typed_term::<ListTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::Nil => self
-                .as_typed_term::<NilTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::Partial => self
-                .as_typed_term::<PartialTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::Pointer => self
-                .as_typed_term::<PointerTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::Record => self
-                .as_typed_term::<RecordTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::Signal => self
-                .as_typed_term::<SignalTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::String => self
-                .as_typed_term::<StringTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::Symbol => self
-                .as_typed_term::<SymbolTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::Tree => self
-                .as_typed_term::<TreeTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::Variable => self
-                .as_typed_term::<VariableTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::EmptyIterator => self
-                .as_typed_term::<EmptyIteratorTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::EvaluateIterator => self
-                .as_typed_term::<EvaluateIteratorTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::FilterIterator => self
-                .as_typed_term::<FilterIteratorTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::FlattenIterator => self
-                .as_typed_term::<FlattenIteratorTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::HashmapKeysIterator => self
-                .as_typed_term::<HashmapKeysIteratorTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::HashmapValuesIterator => self
-                .as_typed_term::<HashmapValuesIteratorTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::IntegersIterator => self
-                .as_typed_term::<IntegersIteratorTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::IntersperseIterator => self
-                .as_typed_term::<IntersperseIteratorTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::MapIterator => self
-                .as_typed_term::<MapIteratorTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::OnceIterator => self
-                .as_typed_term::<OnceIteratorTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::RangeIterator => self
-                .as_typed_term::<RangeIteratorTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::RepeatIterator => self
-                .as_typed_term::<RepeatIteratorTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::SkipIterator => self
-                .as_typed_term::<SkipIteratorTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::TakeIterator => self
-                .as_typed_term::<TakeIteratorTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
-            TermTypeDiscriminants::ZipIterator => self
-                .as_typed_term::<ZipIteratorTerm>()
-                .as_inner()
-                .count_variable_usages(offset),
+            TermTypeDiscriminants::Application => GraphNode::count_variable_usages(
+                &self.as_typed_term::<ApplicationTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::Boolean => GraphNode::count_variable_usages(
+                &self.as_typed_term::<BooleanTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::Builtin => GraphNode::count_variable_usages(
+                &self.as_typed_term::<BuiltinTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::Cell => GraphNode::count_variable_usages(
+                &self.as_typed_term::<CellTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::Condition => GraphNode::count_variable_usages(
+                &self.as_typed_term::<ConditionTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::Constructor => GraphNode::count_variable_usages(
+                &self.as_typed_term::<ConstructorTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::Date => GraphNode::count_variable_usages(
+                &self.as_typed_term::<DateTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::Effect => GraphNode::count_variable_usages(
+                &self.as_typed_term::<EffectTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::Float => GraphNode::count_variable_usages(
+                &self.as_typed_term::<FloatTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::Hashmap => GraphNode::count_variable_usages(
+                &self.as_typed_term::<HashmapTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::Hashset => GraphNode::count_variable_usages(
+                &self.as_typed_term::<HashsetTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::Int => GraphNode::count_variable_usages(
+                &self.as_typed_term::<IntTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::Lambda => GraphNode::count_variable_usages(
+                &self.as_typed_term::<LambdaTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::Let => GraphNode::count_variable_usages(
+                &self.as_typed_term::<LetTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::List => GraphNode::count_variable_usages(
+                &self.as_typed_term::<ListTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::Nil => GraphNode::count_variable_usages(
+                &self.as_typed_term::<NilTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::Partial => GraphNode::count_variable_usages(
+                &self.as_typed_term::<PartialTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::Pointer => GraphNode::count_variable_usages(
+                &self.as_typed_term::<PointerTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::Record => GraphNode::count_variable_usages(
+                &self.as_typed_term::<RecordTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::Signal => GraphNode::count_variable_usages(
+                &self.as_typed_term::<SignalTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::String => GraphNode::count_variable_usages(
+                &self.as_typed_term::<StringTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::Symbol => GraphNode::count_variable_usages(
+                &self.as_typed_term::<SymbolTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::Tree => GraphNode::count_variable_usages(
+                &self.as_typed_term::<TreeTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::Variable => GraphNode::count_variable_usages(
+                &self.as_typed_term::<VariableTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::EmptyIterator => GraphNode::count_variable_usages(
+                &self.as_typed_term::<EmptyIteratorTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::EvaluateIterator => GraphNode::count_variable_usages(
+                &self.as_typed_term::<EvaluateIteratorTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::FilterIterator => GraphNode::count_variable_usages(
+                &self.as_typed_term::<FilterIteratorTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::FlattenIterator => GraphNode::count_variable_usages(
+                &self.as_typed_term::<FlattenIteratorTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::HashmapKeysIterator => GraphNode::count_variable_usages(
+                &self.as_typed_term::<HashmapKeysIteratorTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::HashmapValuesIterator => GraphNode::count_variable_usages(
+                &self.as_typed_term::<HashmapValuesIteratorTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::IntegersIterator => GraphNode::count_variable_usages(
+                &self.as_typed_term::<IntegersIteratorTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::IntersperseIterator => GraphNode::count_variable_usages(
+                &self.as_typed_term::<IntersperseIteratorTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::MapIterator => GraphNode::count_variable_usages(
+                &self.as_typed_term::<MapIteratorTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::OnceIterator => GraphNode::count_variable_usages(
+                &self.as_typed_term::<OnceIteratorTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::RangeIterator => GraphNode::count_variable_usages(
+                &self.as_typed_term::<RangeIteratorTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::RepeatIterator => GraphNode::count_variable_usages(
+                &self.as_typed_term::<RepeatIteratorTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::SkipIterator => GraphNode::count_variable_usages(
+                &self.as_typed_term::<SkipIteratorTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::TakeIterator => GraphNode::count_variable_usages(
+                &self.as_typed_term::<TakeIteratorTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::ZipIterator => GraphNode::count_variable_usages(
+                &self.as_typed_term::<ZipIteratorTerm>().as_inner(),
+                offset,
+            ),
         }
     }
     fn dynamic_dependencies(&self, deep: bool) -> DependencyList {
         match self.read_value(|term| term.type_id()) {
-            TermTypeDiscriminants::Application => self
-                .as_typed_term::<ApplicationTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::Boolean => self
-                .as_typed_term::<BooleanTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::Builtin => self
-                .as_typed_term::<BuiltinTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::Cell => self
-                .as_typed_term::<CellTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::Condition => self
-                .as_typed_term::<ConditionTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::Constructor => self
-                .as_typed_term::<ConstructorTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::Date => self
-                .as_typed_term::<DateTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::Effect => self
-                .as_typed_term::<EffectTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::Float => self
-                .as_typed_term::<FloatTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::Hashmap => self
-                .as_typed_term::<HashmapTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::Hashset => self
-                .as_typed_term::<HashsetTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::Int => self
-                .as_typed_term::<IntTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::Lambda => self
-                .as_typed_term::<LambdaTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::Let => self
-                .as_typed_term::<LetTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::List => self
-                .as_typed_term::<ListTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::Nil => self
-                .as_typed_term::<NilTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::Partial => self
-                .as_typed_term::<PartialTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::Pointer => self
-                .as_typed_term::<PointerTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::Record => self
-                .as_typed_term::<RecordTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::Signal => self
-                .as_typed_term::<SignalTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::String => self
-                .as_typed_term::<StringTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::Symbol => self
-                .as_typed_term::<SymbolTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::Tree => self
-                .as_typed_term::<TreeTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::Variable => self
-                .as_typed_term::<VariableTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::EmptyIterator => self
-                .as_typed_term::<EmptyIteratorTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::EvaluateIterator => self
-                .as_typed_term::<EvaluateIteratorTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::FilterIterator => self
-                .as_typed_term::<FilterIteratorTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::FlattenIterator => self
-                .as_typed_term::<FlattenIteratorTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::HashmapKeysIterator => self
-                .as_typed_term::<HashmapKeysIteratorTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::HashmapValuesIterator => self
-                .as_typed_term::<HashmapValuesIteratorTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::IntegersIterator => self
-                .as_typed_term::<IntegersIteratorTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::IntersperseIterator => self
-                .as_typed_term::<IntersperseIteratorTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::MapIterator => self
-                .as_typed_term::<MapIteratorTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::OnceIterator => self
-                .as_typed_term::<OnceIteratorTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::RangeIterator => self
-                .as_typed_term::<RangeIteratorTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::RepeatIterator => self
-                .as_typed_term::<RepeatIteratorTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::SkipIterator => self
-                .as_typed_term::<SkipIteratorTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::TakeIterator => self
-                .as_typed_term::<TakeIteratorTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
-            TermTypeDiscriminants::ZipIterator => self
-                .as_typed_term::<ZipIteratorTerm>()
-                .as_inner()
-                .dynamic_dependencies(deep),
+            TermTypeDiscriminants::Application => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<ApplicationTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Boolean => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<BooleanTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Builtin => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<BuiltinTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Cell => {
+                GraphNode::dynamic_dependencies(&self.as_typed_term::<CellTerm>().as_inner(), deep)
+            }
+            TermTypeDiscriminants::Condition => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<ConditionTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Constructor => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<ConstructorTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Date => {
+                GraphNode::dynamic_dependencies(&self.as_typed_term::<DateTerm>().as_inner(), deep)
+            }
+            TermTypeDiscriminants::Effect => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<EffectTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Float => {
+                GraphNode::dynamic_dependencies(&self.as_typed_term::<FloatTerm>().as_inner(), deep)
+            }
+            TermTypeDiscriminants::Hashmap => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<HashmapTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Hashset => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<HashsetTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Int => {
+                GraphNode::dynamic_dependencies(&self.as_typed_term::<IntTerm>().as_inner(), deep)
+            }
+            TermTypeDiscriminants::Lambda => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<LambdaTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Let => {
+                GraphNode::dynamic_dependencies(&self.as_typed_term::<LetTerm>().as_inner(), deep)
+            }
+            TermTypeDiscriminants::List => {
+                GraphNode::dynamic_dependencies(&self.as_typed_term::<ListTerm>().as_inner(), deep)
+            }
+            TermTypeDiscriminants::Nil => {
+                GraphNode::dynamic_dependencies(&self.as_typed_term::<NilTerm>().as_inner(), deep)
+            }
+            TermTypeDiscriminants::Partial => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<PartialTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Pointer => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<PointerTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Record => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<RecordTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Signal => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<SignalTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::String => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<StringTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Symbol => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<SymbolTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Tree => {
+                GraphNode::dynamic_dependencies(&self.as_typed_term::<TreeTerm>().as_inner(), deep)
+            }
+            TermTypeDiscriminants::Variable => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<VariableTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::EmptyIterator => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<EmptyIteratorTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::EvaluateIterator => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<EvaluateIteratorTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::FilterIterator => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<FilterIteratorTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::FlattenIterator => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<FlattenIteratorTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::HashmapKeysIterator => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<HashmapKeysIteratorTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::HashmapValuesIterator => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<HashmapValuesIteratorTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::IntegersIterator => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<IntegersIteratorTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::IntersperseIterator => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<IntersperseIteratorTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::MapIterator => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<MapIteratorTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::OnceIterator => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<OnceIteratorTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::RangeIterator => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<RangeIteratorTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::RepeatIterator => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<RepeatIteratorTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::SkipIterator => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<SkipIteratorTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::TakeIterator => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<TakeIteratorTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::ZipIterator => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<ZipIteratorTerm>().as_inner(),
+                deep,
+            ),
         }
     }
     fn has_dynamic_dependencies(&self, deep: bool) -> bool {
         match self.read_value(|term| term.type_id()) {
-            TermTypeDiscriminants::Application => self
-                .as_typed_term::<ApplicationTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::Boolean => self
-                .as_typed_term::<BooleanTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::Builtin => self
-                .as_typed_term::<BuiltinTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::Cell => self
-                .as_typed_term::<CellTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::Condition => self
-                .as_typed_term::<ConditionTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::Constructor => self
-                .as_typed_term::<ConstructorTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::Date => self
-                .as_typed_term::<DateTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::Effect => self
-                .as_typed_term::<EffectTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::Float => self
-                .as_typed_term::<FloatTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::Hashmap => self
-                .as_typed_term::<HashmapTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::Hashset => self
-                .as_typed_term::<HashsetTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::Int => self
-                .as_typed_term::<IntTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::Lambda => self
-                .as_typed_term::<LambdaTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::Let => self
-                .as_typed_term::<LetTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::List => self
-                .as_typed_term::<ListTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::Nil => self
-                .as_typed_term::<NilTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::Partial => self
-                .as_typed_term::<PartialTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::Pointer => self
-                .as_typed_term::<PointerTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::Record => self
-                .as_typed_term::<RecordTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::Signal => self
-                .as_typed_term::<SignalTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::String => self
-                .as_typed_term::<StringTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::Symbol => self
-                .as_typed_term::<SymbolTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::Tree => self
-                .as_typed_term::<TreeTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::Variable => self
-                .as_typed_term::<VariableTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::EmptyIterator => self
-                .as_typed_term::<EmptyIteratorTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::EvaluateIterator => self
-                .as_typed_term::<EvaluateIteratorTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::FilterIterator => self
-                .as_typed_term::<FilterIteratorTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::FlattenIterator => self
-                .as_typed_term::<FlattenIteratorTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::HashmapKeysIterator => self
-                .as_typed_term::<HashmapKeysIteratorTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::HashmapValuesIterator => self
-                .as_typed_term::<HashmapValuesIteratorTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::IntegersIterator => self
-                .as_typed_term::<IntegersIteratorTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::IntersperseIterator => self
-                .as_typed_term::<IntersperseIteratorTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::MapIterator => self
-                .as_typed_term::<MapIteratorTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::OnceIterator => self
-                .as_typed_term::<OnceIteratorTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::RangeIterator => self
-                .as_typed_term::<RangeIteratorTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::RepeatIterator => self
-                .as_typed_term::<RepeatIteratorTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::SkipIterator => self
-                .as_typed_term::<SkipIteratorTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::TakeIterator => self
-                .as_typed_term::<TakeIteratorTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
-            TermTypeDiscriminants::ZipIterator => self
-                .as_typed_term::<ZipIteratorTerm>()
-                .as_inner()
-                .has_dynamic_dependencies(deep),
+            TermTypeDiscriminants::Application => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<ApplicationTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Boolean => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<BooleanTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Builtin => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<BuiltinTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Cell => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<CellTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Condition => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<ConditionTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Constructor => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<ConstructorTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Date => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<DateTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Effect => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<EffectTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Float => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<FloatTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Hashmap => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<HashmapTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Hashset => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<HashsetTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Int => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<IntTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Lambda => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<LambdaTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Let => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<LetTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::List => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<ListTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Nil => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<NilTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Partial => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<PartialTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Pointer => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<PointerTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Record => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<RecordTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Signal => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<SignalTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::String => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<StringTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Symbol => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<SymbolTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Tree => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<TreeTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Variable => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<VariableTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::EmptyIterator => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<EmptyIteratorTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::EvaluateIterator => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<EvaluateIteratorTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::FilterIterator => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<FilterIteratorTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::FlattenIterator => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<FlattenIteratorTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::HashmapKeysIterator => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<HashmapKeysIteratorTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::HashmapValuesIterator => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<HashmapValuesIteratorTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::IntegersIterator => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<IntegersIteratorTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::IntersperseIterator => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<IntersperseIteratorTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::MapIterator => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<MapIteratorTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::OnceIterator => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<OnceIteratorTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::RangeIterator => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<RangeIteratorTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::RepeatIterator => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<RepeatIteratorTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::SkipIterator => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<SkipIteratorTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::TakeIterator => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<TakeIteratorTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::ZipIterator => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<ZipIteratorTerm>().as_inner(),
+                deep,
+            ),
         }
     }
     fn is_static(&self) -> bool {
         match self.read_value(|term| term.type_id()) {
-            TermTypeDiscriminants::Application => self
-                .as_typed_term::<ApplicationTerm>()
-                .as_inner()
-                .is_static(),
+            TermTypeDiscriminants::Application => {
+                GraphNode::is_static(&self.as_typed_term::<ApplicationTerm>().as_inner())
+            }
             TermTypeDiscriminants::Boolean => {
-                self.as_typed_term::<BooleanTerm>().as_inner().is_static()
+                GraphNode::is_static(&self.as_typed_term::<BooleanTerm>().as_inner())
             }
             TermTypeDiscriminants::Builtin => {
-                self.as_typed_term::<BuiltinTerm>().as_inner().is_static()
+                GraphNode::is_static(&self.as_typed_term::<BuiltinTerm>().as_inner())
             }
-            TermTypeDiscriminants::Cell => self.as_typed_term::<CellTerm>().as_inner().is_static(),
+            TermTypeDiscriminants::Cell => {
+                GraphNode::is_static(&self.as_typed_term::<CellTerm>().as_inner())
+            }
             TermTypeDiscriminants::Condition => {
-                self.as_typed_term::<ConditionTerm>().as_inner().is_static()
+                GraphNode::is_static(&self.as_typed_term::<ConditionTerm>().as_inner())
             }
-            TermTypeDiscriminants::Constructor => self
-                .as_typed_term::<ConstructorTerm>()
-                .as_inner()
-                .is_static(),
-            TermTypeDiscriminants::Date => self.as_typed_term::<DateTerm>().as_inner().is_static(),
+            TermTypeDiscriminants::Constructor => {
+                GraphNode::is_static(&self.as_typed_term::<ConstructorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Date => {
+                GraphNode::is_static(&self.as_typed_term::<DateTerm>().as_inner())
+            }
             TermTypeDiscriminants::Effect => {
-                self.as_typed_term::<EffectTerm>().as_inner().is_static()
+                GraphNode::is_static(&self.as_typed_term::<EffectTerm>().as_inner())
             }
             TermTypeDiscriminants::Float => {
-                self.as_typed_term::<FloatTerm>().as_inner().is_static()
+                GraphNode::is_static(&self.as_typed_term::<FloatTerm>().as_inner())
             }
             TermTypeDiscriminants::Hashmap => {
-                self.as_typed_term::<HashmapTerm>().as_inner().is_static()
+                GraphNode::is_static(&self.as_typed_term::<HashmapTerm>().as_inner())
             }
             TermTypeDiscriminants::Hashset => {
-                self.as_typed_term::<HashsetTerm>().as_inner().is_static()
+                GraphNode::is_static(&self.as_typed_term::<HashsetTerm>().as_inner())
             }
-            TermTypeDiscriminants::Int => self.as_typed_term::<IntTerm>().as_inner().is_static(),
+            TermTypeDiscriminants::Int => {
+                GraphNode::is_static(&self.as_typed_term::<IntTerm>().as_inner())
+            }
             TermTypeDiscriminants::Lambda => {
-                self.as_typed_term::<LambdaTerm>().as_inner().is_static()
+                GraphNode::is_static(&self.as_typed_term::<LambdaTerm>().as_inner())
             }
-            TermTypeDiscriminants::Let => self.as_typed_term::<LetTerm>().as_inner().is_static(),
-            TermTypeDiscriminants::List => self.as_typed_term::<ListTerm>().as_inner().is_static(),
-            TermTypeDiscriminants::Nil => self.as_typed_term::<NilTerm>().as_inner().is_static(),
+            TermTypeDiscriminants::Let => {
+                GraphNode::is_static(&self.as_typed_term::<LetTerm>().as_inner())
+            }
+            TermTypeDiscriminants::List => {
+                GraphNode::is_static(&self.as_typed_term::<ListTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Nil => {
+                GraphNode::is_static(&self.as_typed_term::<NilTerm>().as_inner())
+            }
             TermTypeDiscriminants::Partial => {
-                self.as_typed_term::<PartialTerm>().as_inner().is_static()
+                GraphNode::is_static(&self.as_typed_term::<PartialTerm>().as_inner())
             }
             TermTypeDiscriminants::Pointer => {
-                self.as_typed_term::<PointerTerm>().as_inner().is_static()
+                GraphNode::is_static(&self.as_typed_term::<PointerTerm>().as_inner())
             }
             TermTypeDiscriminants::Record => {
-                self.as_typed_term::<RecordTerm>().as_inner().is_static()
+                GraphNode::is_static(&self.as_typed_term::<RecordTerm>().as_inner())
             }
             TermTypeDiscriminants::Signal => {
-                self.as_typed_term::<SignalTerm>().as_inner().is_static()
+                GraphNode::is_static(&self.as_typed_term::<SignalTerm>().as_inner())
             }
             TermTypeDiscriminants::String => {
-                self.as_typed_term::<StringTerm>().as_inner().is_static()
+                GraphNode::is_static(&self.as_typed_term::<StringTerm>().as_inner())
             }
             TermTypeDiscriminants::Symbol => {
-                self.as_typed_term::<SymbolTerm>().as_inner().is_static()
+                GraphNode::is_static(&self.as_typed_term::<SymbolTerm>().as_inner())
             }
-            TermTypeDiscriminants::Tree => self.as_typed_term::<TreeTerm>().as_inner().is_static(),
+            TermTypeDiscriminants::Tree => {
+                GraphNode::is_static(&self.as_typed_term::<TreeTerm>().as_inner())
+            }
             TermTypeDiscriminants::Variable => {
-                self.as_typed_term::<VariableTerm>().as_inner().is_static()
+                GraphNode::is_static(&self.as_typed_term::<VariableTerm>().as_inner())
             }
-            TermTypeDiscriminants::EmptyIterator => self
-                .as_typed_term::<EmptyIteratorTerm>()
-                .as_inner()
-                .is_static(),
-            TermTypeDiscriminants::EvaluateIterator => self
-                .as_typed_term::<EvaluateIteratorTerm>()
-                .as_inner()
-                .is_static(),
-            TermTypeDiscriminants::FilterIterator => self
-                .as_typed_term::<FilterIteratorTerm>()
-                .as_inner()
-                .is_static(),
-            TermTypeDiscriminants::FlattenIterator => self
-                .as_typed_term::<FlattenIteratorTerm>()
-                .as_inner()
-                .is_static(),
-            TermTypeDiscriminants::HashmapKeysIterator => self
-                .as_typed_term::<HashmapKeysIteratorTerm>()
-                .as_inner()
-                .is_static(),
-            TermTypeDiscriminants::HashmapValuesIterator => self
-                .as_typed_term::<HashmapValuesIteratorTerm>()
-                .as_inner()
-                .is_static(),
-            TermTypeDiscriminants::IntegersIterator => self
-                .as_typed_term::<IntegersIteratorTerm>()
-                .as_inner()
-                .is_static(),
-            TermTypeDiscriminants::IntersperseIterator => self
-                .as_typed_term::<IntersperseIteratorTerm>()
-                .as_inner()
-                .is_static(),
-            TermTypeDiscriminants::MapIterator => self
-                .as_typed_term::<MapIteratorTerm>()
-                .as_inner()
-                .is_static(),
-            TermTypeDiscriminants::OnceIterator => self
-                .as_typed_term::<OnceIteratorTerm>()
-                .as_inner()
-                .is_static(),
-            TermTypeDiscriminants::RangeIterator => self
-                .as_typed_term::<RangeIteratorTerm>()
-                .as_inner()
-                .is_static(),
-            TermTypeDiscriminants::RepeatIterator => self
-                .as_typed_term::<RepeatIteratorTerm>()
-                .as_inner()
-                .is_static(),
-            TermTypeDiscriminants::SkipIterator => self
-                .as_typed_term::<SkipIteratorTerm>()
-                .as_inner()
-                .is_static(),
-            TermTypeDiscriminants::TakeIterator => self
-                .as_typed_term::<TakeIteratorTerm>()
-                .as_inner()
-                .is_static(),
-            TermTypeDiscriminants::ZipIterator => self
-                .as_typed_term::<ZipIteratorTerm>()
-                .as_inner()
-                .is_static(),
+            TermTypeDiscriminants::EmptyIterator => {
+                GraphNode::is_static(&self.as_typed_term::<EmptyIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::EvaluateIterator => {
+                GraphNode::is_static(&self.as_typed_term::<EvaluateIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::FilterIterator => {
+                GraphNode::is_static(&self.as_typed_term::<FilterIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::FlattenIterator => {
+                GraphNode::is_static(&self.as_typed_term::<FlattenIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::HashmapKeysIterator => {
+                GraphNode::is_static(&self.as_typed_term::<HashmapKeysIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::HashmapValuesIterator => {
+                GraphNode::is_static(&self.as_typed_term::<HashmapValuesIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::IntegersIterator => {
+                GraphNode::is_static(&self.as_typed_term::<IntegersIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::IntersperseIterator => {
+                GraphNode::is_static(&self.as_typed_term::<IntersperseIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::MapIterator => {
+                GraphNode::is_static(&self.as_typed_term::<MapIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::OnceIterator => {
+                GraphNode::is_static(&self.as_typed_term::<OnceIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::RangeIterator => {
+                GraphNode::is_static(&self.as_typed_term::<RangeIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::RepeatIterator => {
+                GraphNode::is_static(&self.as_typed_term::<RepeatIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::SkipIterator => {
+                GraphNode::is_static(&self.as_typed_term::<SkipIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::TakeIterator => {
+                GraphNode::is_static(&self.as_typed_term::<TakeIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::ZipIterator => {
+                GraphNode::is_static(&self.as_typed_term::<ZipIteratorTerm>().as_inner())
+            }
         }
     }
     fn is_atomic(&self) -> bool {
         match self.read_value(|term| term.type_id()) {
-            TermTypeDiscriminants::Application => self
-                .as_typed_term::<ApplicationTerm>()
-                .as_inner()
-                .is_atomic(),
+            TermTypeDiscriminants::Application => {
+                GraphNode::is_atomic(&self.as_typed_term::<ApplicationTerm>().as_inner())
+            }
             TermTypeDiscriminants::Boolean => {
-                self.as_typed_term::<BooleanTerm>().as_inner().is_atomic()
+                GraphNode::is_atomic(&self.as_typed_term::<BooleanTerm>().as_inner())
             }
             TermTypeDiscriminants::Builtin => {
-                self.as_typed_term::<BuiltinTerm>().as_inner().is_atomic()
+                GraphNode::is_atomic(&self.as_typed_term::<BuiltinTerm>().as_inner())
             }
-            TermTypeDiscriminants::Cell => self.as_typed_term::<CellTerm>().as_inner().is_atomic(),
+            TermTypeDiscriminants::Cell => {
+                GraphNode::is_atomic(&self.as_typed_term::<CellTerm>().as_inner())
+            }
             TermTypeDiscriminants::Condition => {
-                self.as_typed_term::<ConditionTerm>().as_inner().is_atomic()
+                GraphNode::is_atomic(&self.as_typed_term::<ConditionTerm>().as_inner())
             }
-            TermTypeDiscriminants::Constructor => self
-                .as_typed_term::<ConstructorTerm>()
-                .as_inner()
-                .is_atomic(),
-            TermTypeDiscriminants::Date => self.as_typed_term::<DateTerm>().as_inner().is_atomic(),
+            TermTypeDiscriminants::Constructor => {
+                GraphNode::is_atomic(&self.as_typed_term::<ConstructorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Date => {
+                GraphNode::is_atomic(&self.as_typed_term::<DateTerm>().as_inner())
+            }
             TermTypeDiscriminants::Effect => {
-                self.as_typed_term::<EffectTerm>().as_inner().is_atomic()
+                GraphNode::is_atomic(&self.as_typed_term::<EffectTerm>().as_inner())
             }
             TermTypeDiscriminants::Float => {
-                self.as_typed_term::<FloatTerm>().as_inner().is_atomic()
+                GraphNode::is_atomic(&self.as_typed_term::<FloatTerm>().as_inner())
             }
             TermTypeDiscriminants::Hashmap => {
-                self.as_typed_term::<HashmapTerm>().as_inner().is_atomic()
+                GraphNode::is_atomic(&self.as_typed_term::<HashmapTerm>().as_inner())
             }
             TermTypeDiscriminants::Hashset => {
-                self.as_typed_term::<HashsetTerm>().as_inner().is_atomic()
+                GraphNode::is_atomic(&self.as_typed_term::<HashsetTerm>().as_inner())
             }
-            TermTypeDiscriminants::Int => self.as_typed_term::<IntTerm>().as_inner().is_atomic(),
+            TermTypeDiscriminants::Int => {
+                GraphNode::is_atomic(&self.as_typed_term::<IntTerm>().as_inner())
+            }
             TermTypeDiscriminants::Lambda => {
-                self.as_typed_term::<LambdaTerm>().as_inner().is_atomic()
+                GraphNode::is_atomic(&self.as_typed_term::<LambdaTerm>().as_inner())
             }
-            TermTypeDiscriminants::Let => self.as_typed_term::<LetTerm>().as_inner().is_atomic(),
-            TermTypeDiscriminants::List => self.as_typed_term::<ListTerm>().as_inner().is_atomic(),
-            TermTypeDiscriminants::Nil => self.as_typed_term::<NilTerm>().as_inner().is_atomic(),
+            TermTypeDiscriminants::Let => {
+                GraphNode::is_atomic(&self.as_typed_term::<LetTerm>().as_inner())
+            }
+            TermTypeDiscriminants::List => {
+                GraphNode::is_atomic(&self.as_typed_term::<ListTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Nil => {
+                GraphNode::is_atomic(&self.as_typed_term::<NilTerm>().as_inner())
+            }
             TermTypeDiscriminants::Partial => {
-                self.as_typed_term::<PartialTerm>().as_inner().is_atomic()
+                GraphNode::is_atomic(&self.as_typed_term::<PartialTerm>().as_inner())
             }
             TermTypeDiscriminants::Pointer => {
-                self.as_typed_term::<PointerTerm>().as_inner().is_atomic()
+                GraphNode::is_atomic(&self.as_typed_term::<PointerTerm>().as_inner())
             }
             TermTypeDiscriminants::Record => {
-                self.as_typed_term::<RecordTerm>().as_inner().is_atomic()
+                GraphNode::is_atomic(&self.as_typed_term::<RecordTerm>().as_inner())
             }
             TermTypeDiscriminants::Signal => {
-                self.as_typed_term::<SignalTerm>().as_inner().is_atomic()
+                GraphNode::is_atomic(&self.as_typed_term::<SignalTerm>().as_inner())
             }
             TermTypeDiscriminants::String => {
-                self.as_typed_term::<StringTerm>().as_inner().is_atomic()
+                GraphNode::is_atomic(&self.as_typed_term::<StringTerm>().as_inner())
             }
             TermTypeDiscriminants::Symbol => {
-                self.as_typed_term::<SymbolTerm>().as_inner().is_atomic()
+                GraphNode::is_atomic(&self.as_typed_term::<SymbolTerm>().as_inner())
             }
-            TermTypeDiscriminants::Tree => self.as_typed_term::<TreeTerm>().as_inner().is_atomic(),
+            TermTypeDiscriminants::Tree => {
+                GraphNode::is_atomic(&self.as_typed_term::<TreeTerm>().as_inner())
+            }
             TermTypeDiscriminants::Variable => {
-                self.as_typed_term::<VariableTerm>().as_inner().is_atomic()
+                GraphNode::is_atomic(&self.as_typed_term::<VariableTerm>().as_inner())
             }
-            TermTypeDiscriminants::EmptyIterator => self
-                .as_typed_term::<EmptyIteratorTerm>()
-                .as_inner()
-                .is_atomic(),
-            TermTypeDiscriminants::EvaluateIterator => self
-                .as_typed_term::<EvaluateIteratorTerm>()
-                .as_inner()
-                .is_atomic(),
-            TermTypeDiscriminants::FilterIterator => self
-                .as_typed_term::<FilterIteratorTerm>()
-                .as_inner()
-                .is_atomic(),
-            TermTypeDiscriminants::FlattenIterator => self
-                .as_typed_term::<FlattenIteratorTerm>()
-                .as_inner()
-                .is_atomic(),
-            TermTypeDiscriminants::HashmapKeysIterator => self
-                .as_typed_term::<HashmapKeysIteratorTerm>()
-                .as_inner()
-                .is_atomic(),
-            TermTypeDiscriminants::HashmapValuesIterator => self
-                .as_typed_term::<HashmapValuesIteratorTerm>()
-                .as_inner()
-                .is_atomic(),
-            TermTypeDiscriminants::IntegersIterator => self
-                .as_typed_term::<IntegersIteratorTerm>()
-                .as_inner()
-                .is_atomic(),
-            TermTypeDiscriminants::IntersperseIterator => self
-                .as_typed_term::<IntersperseIteratorTerm>()
-                .as_inner()
-                .is_atomic(),
-            TermTypeDiscriminants::MapIterator => self
-                .as_typed_term::<MapIteratorTerm>()
-                .as_inner()
-                .is_atomic(),
-            TermTypeDiscriminants::OnceIterator => self
-                .as_typed_term::<OnceIteratorTerm>()
-                .as_inner()
-                .is_atomic(),
-            TermTypeDiscriminants::RangeIterator => self
-                .as_typed_term::<RangeIteratorTerm>()
-                .as_inner()
-                .is_atomic(),
-            TermTypeDiscriminants::RepeatIterator => self
-                .as_typed_term::<RepeatIteratorTerm>()
-                .as_inner()
-                .is_atomic(),
-            TermTypeDiscriminants::SkipIterator => self
-                .as_typed_term::<SkipIteratorTerm>()
-                .as_inner()
-                .is_atomic(),
-            TermTypeDiscriminants::TakeIterator => self
-                .as_typed_term::<TakeIteratorTerm>()
-                .as_inner()
-                .is_atomic(),
-            TermTypeDiscriminants::ZipIterator => self
-                .as_typed_term::<ZipIteratorTerm>()
-                .as_inner()
-                .is_static(),
+            TermTypeDiscriminants::EmptyIterator => {
+                GraphNode::is_atomic(&self.as_typed_term::<EmptyIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::EvaluateIterator => {
+                GraphNode::is_atomic(&self.as_typed_term::<EvaluateIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::FilterIterator => {
+                GraphNode::is_atomic(&self.as_typed_term::<FilterIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::FlattenIterator => {
+                GraphNode::is_atomic(&self.as_typed_term::<FlattenIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::HashmapKeysIterator => {
+                GraphNode::is_atomic(&self.as_typed_term::<HashmapKeysIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::HashmapValuesIterator => {
+                GraphNode::is_atomic(&self.as_typed_term::<HashmapValuesIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::IntegersIterator => {
+                GraphNode::is_atomic(&self.as_typed_term::<IntegersIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::IntersperseIterator => {
+                GraphNode::is_atomic(&self.as_typed_term::<IntersperseIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::MapIterator => {
+                GraphNode::is_atomic(&self.as_typed_term::<MapIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::OnceIterator => {
+                GraphNode::is_atomic(&self.as_typed_term::<OnceIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::RangeIterator => {
+                GraphNode::is_atomic(&self.as_typed_term::<RangeIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::RepeatIterator => {
+                GraphNode::is_atomic(&self.as_typed_term::<RepeatIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::SkipIterator => {
+                GraphNode::is_atomic(&self.as_typed_term::<SkipIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::TakeIterator => {
+                GraphNode::is_atomic(&self.as_typed_term::<TakeIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::ZipIterator => {
+                GraphNode::is_atomic(&self.as_typed_term::<ZipIteratorTerm>().as_inner())
+            }
         }
     }
     fn is_complex(&self) -> bool {
         match self.read_value(|term| term.type_id()) {
-            TermTypeDiscriminants::Application => self
-                .as_typed_term::<ApplicationTerm>()
-                .as_inner()
-                .is_complex(),
+            TermTypeDiscriminants::Application => {
+                GraphNode::is_complex(&self.as_typed_term::<ApplicationTerm>().as_inner())
+            }
             TermTypeDiscriminants::Boolean => {
-                self.as_typed_term::<BooleanTerm>().as_inner().is_complex()
+                GraphNode::is_complex(&self.as_typed_term::<BooleanTerm>().as_inner())
             }
             TermTypeDiscriminants::Builtin => {
-                self.as_typed_term::<BuiltinTerm>().as_inner().is_complex()
+                GraphNode::is_complex(&self.as_typed_term::<BuiltinTerm>().as_inner())
             }
-            TermTypeDiscriminants::Cell => self.as_typed_term::<CellTerm>().as_inner().is_complex(),
-            TermTypeDiscriminants::Condition => self
-                .as_typed_term::<ConditionTerm>()
-                .as_inner()
-                .is_complex(),
-            TermTypeDiscriminants::Constructor => self
-                .as_typed_term::<ConstructorTerm>()
-                .as_inner()
-                .is_complex(),
-            TermTypeDiscriminants::Date => self.as_typed_term::<DateTerm>().as_inner().is_complex(),
+            TermTypeDiscriminants::Cell => {
+                GraphNode::is_complex(&self.as_typed_term::<CellTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Condition => {
+                GraphNode::is_complex(&self.as_typed_term::<ConditionTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Constructor => {
+                GraphNode::is_complex(&self.as_typed_term::<ConstructorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Date => {
+                GraphNode::is_complex(&self.as_typed_term::<DateTerm>().as_inner())
+            }
             TermTypeDiscriminants::Effect => {
-                self.as_typed_term::<EffectTerm>().as_inner().is_complex()
+                GraphNode::is_complex(&self.as_typed_term::<EffectTerm>().as_inner())
             }
             TermTypeDiscriminants::Float => {
-                self.as_typed_term::<FloatTerm>().as_inner().is_complex()
+                GraphNode::is_complex(&self.as_typed_term::<FloatTerm>().as_inner())
             }
             TermTypeDiscriminants::Hashmap => {
-                self.as_typed_term::<HashmapTerm>().as_inner().is_complex()
+                GraphNode::is_complex(&self.as_typed_term::<HashmapTerm>().as_inner())
             }
             TermTypeDiscriminants::Hashset => {
-                self.as_typed_term::<HashsetTerm>().as_inner().is_complex()
+                GraphNode::is_complex(&self.as_typed_term::<HashsetTerm>().as_inner())
             }
-            TermTypeDiscriminants::Int => self.as_typed_term::<IntTerm>().as_inner().is_complex(),
+            TermTypeDiscriminants::Int => {
+                GraphNode::is_complex(&self.as_typed_term::<IntTerm>().as_inner())
+            }
             TermTypeDiscriminants::Lambda => {
-                self.as_typed_term::<LambdaTerm>().as_inner().is_complex()
+                GraphNode::is_complex(&self.as_typed_term::<LambdaTerm>().as_inner())
             }
-            TermTypeDiscriminants::Let => self.as_typed_term::<LetTerm>().as_inner().is_complex(),
-            TermTypeDiscriminants::List => self.as_typed_term::<ListTerm>().as_inner().is_complex(),
-            TermTypeDiscriminants::Nil => self.as_typed_term::<NilTerm>().as_inner().is_complex(),
+            TermTypeDiscriminants::Let => {
+                GraphNode::is_complex(&self.as_typed_term::<LetTerm>().as_inner())
+            }
+            TermTypeDiscriminants::List => {
+                GraphNode::is_complex(&self.as_typed_term::<ListTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Nil => {
+                GraphNode::is_complex(&self.as_typed_term::<NilTerm>().as_inner())
+            }
             TermTypeDiscriminants::Partial => {
-                self.as_typed_term::<PartialTerm>().as_inner().is_complex()
+                GraphNode::is_complex(&self.as_typed_term::<PartialTerm>().as_inner())
             }
             TermTypeDiscriminants::Pointer => {
-                self.as_typed_term::<PointerTerm>().as_inner().is_complex()
+                GraphNode::is_complex(&self.as_typed_term::<PointerTerm>().as_inner())
             }
             TermTypeDiscriminants::Record => {
-                self.as_typed_term::<RecordTerm>().as_inner().is_complex()
+                GraphNode::is_complex(&self.as_typed_term::<RecordTerm>().as_inner())
             }
             TermTypeDiscriminants::Signal => {
-                self.as_typed_term::<SignalTerm>().as_inner().is_complex()
+                GraphNode::is_complex(&self.as_typed_term::<SignalTerm>().as_inner())
             }
             TermTypeDiscriminants::String => {
-                self.as_typed_term::<StringTerm>().as_inner().is_complex()
+                GraphNode::is_complex(&self.as_typed_term::<StringTerm>().as_inner())
             }
             TermTypeDiscriminants::Symbol => {
-                self.as_typed_term::<SymbolTerm>().as_inner().is_complex()
+                GraphNode::is_complex(&self.as_typed_term::<SymbolTerm>().as_inner())
             }
-            TermTypeDiscriminants::Tree => self.as_typed_term::<TreeTerm>().as_inner().is_complex(),
+            TermTypeDiscriminants::Tree => {
+                GraphNode::is_complex(&self.as_typed_term::<TreeTerm>().as_inner())
+            }
             TermTypeDiscriminants::Variable => {
-                self.as_typed_term::<VariableTerm>().as_inner().is_complex()
+                GraphNode::is_complex(&self.as_typed_term::<VariableTerm>().as_inner())
             }
-            TermTypeDiscriminants::EmptyIterator => self
-                .as_typed_term::<EmptyIteratorTerm>()
-                .as_inner()
-                .is_complex(),
-            TermTypeDiscriminants::EvaluateIterator => self
-                .as_typed_term::<EvaluateIteratorTerm>()
-                .as_inner()
-                .is_complex(),
-            TermTypeDiscriminants::FilterIterator => self
-                .as_typed_term::<FilterIteratorTerm>()
-                .as_inner()
-                .is_complex(),
-            TermTypeDiscriminants::FlattenIterator => self
-                .as_typed_term::<FlattenIteratorTerm>()
-                .as_inner()
-                .is_complex(),
-            TermTypeDiscriminants::HashmapKeysIterator => self
-                .as_typed_term::<HashmapKeysIteratorTerm>()
-                .as_inner()
-                .is_complex(),
-            TermTypeDiscriminants::HashmapValuesIterator => self
-                .as_typed_term::<HashmapValuesIteratorTerm>()
-                .as_inner()
-                .is_complex(),
-            TermTypeDiscriminants::IntegersIterator => self
-                .as_typed_term::<IntegersIteratorTerm>()
-                .as_inner()
-                .is_complex(),
-            TermTypeDiscriminants::IntersperseIterator => self
-                .as_typed_term::<IntersperseIteratorTerm>()
-                .as_inner()
-                .is_complex(),
-            TermTypeDiscriminants::MapIterator => self
-                .as_typed_term::<MapIteratorTerm>()
-                .as_inner()
-                .is_complex(),
-            TermTypeDiscriminants::OnceIterator => self
-                .as_typed_term::<OnceIteratorTerm>()
-                .as_inner()
-                .is_complex(),
-            TermTypeDiscriminants::RangeIterator => self
-                .as_typed_term::<RangeIteratorTerm>()
-                .as_inner()
-                .is_complex(),
-            TermTypeDiscriminants::RepeatIterator => self
-                .as_typed_term::<RepeatIteratorTerm>()
-                .as_inner()
-                .is_complex(),
-            TermTypeDiscriminants::SkipIterator => self
-                .as_typed_term::<SkipIteratorTerm>()
-                .as_inner()
-                .is_complex(),
-            TermTypeDiscriminants::TakeIterator => self
-                .as_typed_term::<TakeIteratorTerm>()
-                .as_inner()
-                .is_complex(),
-            TermTypeDiscriminants::ZipIterator => self
-                .as_typed_term::<ZipIteratorTerm>()
-                .as_inner()
-                .is_complex(),
+            TermTypeDiscriminants::EmptyIterator => {
+                GraphNode::is_complex(&self.as_typed_term::<EmptyIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::EvaluateIterator => {
+                GraphNode::is_complex(&self.as_typed_term::<EvaluateIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::FilterIterator => {
+                GraphNode::is_complex(&self.as_typed_term::<FilterIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::FlattenIterator => {
+                GraphNode::is_complex(&self.as_typed_term::<FlattenIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::HashmapKeysIterator => {
+                GraphNode::is_complex(&self.as_typed_term::<HashmapKeysIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::HashmapValuesIterator => {
+                GraphNode::is_complex(&self.as_typed_term::<HashmapValuesIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::IntegersIterator => {
+                GraphNode::is_complex(&self.as_typed_term::<IntegersIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::IntersperseIterator => {
+                GraphNode::is_complex(&self.as_typed_term::<IntersperseIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::MapIterator => {
+                GraphNode::is_complex(&self.as_typed_term::<MapIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::OnceIterator => {
+                GraphNode::is_complex(&self.as_typed_term::<OnceIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::RangeIterator => {
+                GraphNode::is_complex(&self.as_typed_term::<RangeIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::RepeatIterator => {
+                GraphNode::is_complex(&self.as_typed_term::<RepeatIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::SkipIterator => {
+                GraphNode::is_complex(&self.as_typed_term::<SkipIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::TakeIterator => {
+                GraphNode::is_complex(&self.as_typed_term::<TakeIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::ZipIterator => {
+                GraphNode::is_complex(&self.as_typed_term::<ZipIteratorTerm>().as_inner())
+            }
         }
     }
 }
@@ -2549,118 +2505,121 @@ impl<A: Arena + Clone> SerializeJson for ArenaRef<Term, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         match self.read_value(|term| term.type_id()) {
             TermTypeDiscriminants::Application => {
-                self.as_typed_term::<ApplicationTerm>().as_inner().to_json()
+                SerializeJson::to_json(&self.as_typed_term::<ApplicationTerm>().as_inner())
             }
             TermTypeDiscriminants::Boolean => {
-                self.as_typed_term::<BooleanTerm>().as_inner().to_json()
+                SerializeJson::to_json(&self.as_typed_term::<BooleanTerm>().as_inner())
             }
             TermTypeDiscriminants::Builtin => {
-                self.as_typed_term::<BuiltinTerm>().as_inner().to_json()
+                SerializeJson::to_json(&self.as_typed_term::<BuiltinTerm>().as_inner())
             }
-            TermTypeDiscriminants::Cell => self.as_typed_term::<CellTerm>().as_inner().to_json(),
+            TermTypeDiscriminants::Cell => {
+                SerializeJson::to_json(&self.as_typed_term::<CellTerm>().as_inner())
+            }
             TermTypeDiscriminants::Condition => {
-                self.as_typed_term::<ConditionTerm>().as_inner().to_json()
+                SerializeJson::to_json(&self.as_typed_term::<ConditionTerm>().as_inner())
             }
             TermTypeDiscriminants::Constructor => {
-                self.as_typed_term::<ConstructorTerm>().as_inner().to_json()
+                SerializeJson::to_json(&self.as_typed_term::<ConstructorTerm>().as_inner())
             }
-            TermTypeDiscriminants::Date => self.as_typed_term::<DateTerm>().as_inner().to_json(),
+            TermTypeDiscriminants::Date => {
+                SerializeJson::to_json(&self.as_typed_term::<DateTerm>().as_inner())
+            }
             TermTypeDiscriminants::Effect => {
-                self.as_typed_term::<EffectTerm>().as_inner().to_json()
+                SerializeJson::to_json(&self.as_typed_term::<EffectTerm>().as_inner())
             }
-            TermTypeDiscriminants::Float => self.as_typed_term::<FloatTerm>().as_inner().to_json(),
+            TermTypeDiscriminants::Float => {
+                SerializeJson::to_json(&self.as_typed_term::<FloatTerm>().as_inner())
+            }
             TermTypeDiscriminants::Hashmap => {
-                self.as_typed_term::<HashmapTerm>().as_inner().to_json()
+                SerializeJson::to_json(&self.as_typed_term::<HashmapTerm>().as_inner())
             }
             TermTypeDiscriminants::Hashset => {
-                self.as_typed_term::<HashsetTerm>().as_inner().to_json()
+                SerializeJson::to_json(&self.as_typed_term::<HashsetTerm>().as_inner())
             }
-            TermTypeDiscriminants::Int => self.as_typed_term::<IntTerm>().as_inner().to_json(),
+            TermTypeDiscriminants::Int => {
+                SerializeJson::to_json(&self.as_typed_term::<IntTerm>().as_inner())
+            }
             TermTypeDiscriminants::Lambda => {
-                self.as_typed_term::<LambdaTerm>().as_inner().to_json()
+                SerializeJson::to_json(&self.as_typed_term::<LambdaTerm>().as_inner())
             }
-            TermTypeDiscriminants::Let => self.as_typed_term::<LetTerm>().as_inner().to_json(),
-            TermTypeDiscriminants::List => self.as_typed_term::<ListTerm>().as_inner().to_json(),
-            TermTypeDiscriminants::Nil => self.as_typed_term::<NilTerm>().as_inner().to_json(),
+            TermTypeDiscriminants::Let => {
+                SerializeJson::to_json(&self.as_typed_term::<LetTerm>().as_inner())
+            }
+            TermTypeDiscriminants::List => {
+                SerializeJson::to_json(&self.as_typed_term::<ListTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Nil => {
+                SerializeJson::to_json(&self.as_typed_term::<NilTerm>().as_inner())
+            }
             TermTypeDiscriminants::Partial => {
-                self.as_typed_term::<PartialTerm>().as_inner().to_json()
+                SerializeJson::to_json(&self.as_typed_term::<PartialTerm>().as_inner())
             }
             TermTypeDiscriminants::Pointer => {
-                self.as_typed_term::<PointerTerm>().as_inner().to_json()
+                SerializeJson::to_json(&self.as_typed_term::<PointerTerm>().as_inner())
             }
             TermTypeDiscriminants::Record => {
-                self.as_typed_term::<RecordTerm>().as_inner().to_json()
+                SerializeJson::to_json(&self.as_typed_term::<RecordTerm>().as_inner())
             }
             TermTypeDiscriminants::Signal => {
-                self.as_typed_term::<SignalTerm>().as_inner().to_json()
+                SerializeJson::to_json(&self.as_typed_term::<SignalTerm>().as_inner())
             }
             TermTypeDiscriminants::String => {
-                self.as_typed_term::<StringTerm>().as_inner().to_json()
+                SerializeJson::to_json(&self.as_typed_term::<StringTerm>().as_inner())
             }
             TermTypeDiscriminants::Symbol => {
-                self.as_typed_term::<SymbolTerm>().as_inner().to_json()
+                SerializeJson::to_json(&self.as_typed_term::<SymbolTerm>().as_inner())
             }
-            TermTypeDiscriminants::Tree => self.as_typed_term::<TreeTerm>().as_inner().to_json(),
+            TermTypeDiscriminants::Tree => {
+                SerializeJson::to_json(&self.as_typed_term::<TreeTerm>().as_inner())
+            }
             TermTypeDiscriminants::Variable => {
-                self.as_typed_term::<VariableTerm>().as_inner().to_json()
+                SerializeJson::to_json(&self.as_typed_term::<VariableTerm>().as_inner())
             }
-            TermTypeDiscriminants::EmptyIterator => self
-                .as_typed_term::<EmptyIteratorTerm>()
-                .as_inner()
-                .to_json(),
-            TermTypeDiscriminants::EvaluateIterator => self
-                .as_typed_term::<EvaluateIteratorTerm>()
-                .as_inner()
-                .to_json(),
-            TermTypeDiscriminants::FilterIterator => self
-                .as_typed_term::<FilterIteratorTerm>()
-                .as_inner()
-                .to_json(),
-            TermTypeDiscriminants::FlattenIterator => self
-                .as_typed_term::<FlattenIteratorTerm>()
-                .as_inner()
-                .to_json(),
-            TermTypeDiscriminants::HashmapKeysIterator => self
-                .as_typed_term::<HashmapKeysIteratorTerm>()
-                .as_inner()
-                .to_json(),
-            TermTypeDiscriminants::HashmapValuesIterator => self
-                .as_typed_term::<HashmapValuesIteratorTerm>()
-                .as_inner()
-                .to_json(),
-            TermTypeDiscriminants::IntegersIterator => self
-                .as_typed_term::<IntegersIteratorTerm>()
-                .as_inner()
-                .to_json(),
-            TermTypeDiscriminants::IntersperseIterator => self
-                .as_typed_term::<IntersperseIteratorTerm>()
-                .as_inner()
-                .to_json(),
+            TermTypeDiscriminants::EmptyIterator => {
+                SerializeJson::to_json(&self.as_typed_term::<EmptyIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::EvaluateIterator => {
+                SerializeJson::to_json(&self.as_typed_term::<EvaluateIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::FilterIterator => {
+                SerializeJson::to_json(&self.as_typed_term::<FilterIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::FlattenIterator => {
+                SerializeJson::to_json(&self.as_typed_term::<FlattenIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::HashmapKeysIterator => {
+                SerializeJson::to_json(&self.as_typed_term::<HashmapKeysIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::HashmapValuesIterator => SerializeJson::to_json(
+                &self.as_typed_term::<HashmapValuesIteratorTerm>().as_inner(),
+            ),
+            TermTypeDiscriminants::IntegersIterator => {
+                SerializeJson::to_json(&self.as_typed_term::<IntegersIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::IntersperseIterator => {
+                SerializeJson::to_json(&self.as_typed_term::<IntersperseIteratorTerm>().as_inner())
+            }
             TermTypeDiscriminants::MapIterator => {
-                self.as_typed_term::<MapIteratorTerm>().as_inner().to_json()
+                SerializeJson::to_json(&self.as_typed_term::<MapIteratorTerm>().as_inner())
             }
-            TermTypeDiscriminants::OnceIterator => self
-                .as_typed_term::<OnceIteratorTerm>()
-                .as_inner()
-                .to_json(),
-            TermTypeDiscriminants::RangeIterator => self
-                .as_typed_term::<RangeIteratorTerm>()
-                .as_inner()
-                .to_json(),
-            TermTypeDiscriminants::RepeatIterator => self
-                .as_typed_term::<RepeatIteratorTerm>()
-                .as_inner()
-                .to_json(),
-            TermTypeDiscriminants::SkipIterator => self
-                .as_typed_term::<SkipIteratorTerm>()
-                .as_inner()
-                .to_json(),
-            TermTypeDiscriminants::TakeIterator => self
-                .as_typed_term::<TakeIteratorTerm>()
-                .as_inner()
-                .to_json(),
+            TermTypeDiscriminants::OnceIterator => {
+                SerializeJson::to_json(&self.as_typed_term::<OnceIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::RangeIterator => {
+                SerializeJson::to_json(&self.as_typed_term::<RangeIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::RepeatIterator => {
+                SerializeJson::to_json(&self.as_typed_term::<RepeatIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::SkipIterator => {
+                SerializeJson::to_json(&self.as_typed_term::<SkipIteratorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::TakeIterator => {
+                SerializeJson::to_json(&self.as_typed_term::<TakeIteratorTerm>().as_inner())
+            }
             TermTypeDiscriminants::ZipIterator => {
-                self.as_typed_term::<ZipIteratorTerm>().as_inner().to_json()
+                SerializeJson::to_json(&self.as_typed_term::<ZipIteratorTerm>().as_inner())
             }
         }
     }
@@ -2672,115 +2631,139 @@ impl<A: Arena + Clone> SerializeJson for ArenaRef<Term, A> {
             &self.read_value(|term| term.type_id()),
             &target.read_value(|term| term.type_id()),
         ) {
-            (TermTypeDiscriminants::Application, TermTypeDiscriminants::Application) => self
-                .as_typed_term::<ApplicationTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<ApplicationTerm>().as_inner()),
-            (TermTypeDiscriminants::Boolean, TermTypeDiscriminants::Boolean) => self
-                .as_typed_term::<BooleanTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<BooleanTerm>().as_inner()),
-            (TermTypeDiscriminants::Builtin, TermTypeDiscriminants::Builtin) => self
-                .as_typed_term::<BuiltinTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<BuiltinTerm>().as_inner()),
-            (TermTypeDiscriminants::Cell, TermTypeDiscriminants::Cell) => self
-                .as_typed_term::<CellTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<CellTerm>().as_inner()),
-            (TermTypeDiscriminants::Condition, TermTypeDiscriminants::Condition) => self
-                .as_typed_term::<ConditionTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<ConditionTerm>().as_inner()),
-            (TermTypeDiscriminants::Constructor, TermTypeDiscriminants::Constructor) => self
-                .as_typed_term::<ConstructorTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<ConstructorTerm>().as_inner()),
-            (TermTypeDiscriminants::Date, TermTypeDiscriminants::Date) => self
-                .as_typed_term::<DateTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<DateTerm>().as_inner()),
-            (TermTypeDiscriminants::Effect, TermTypeDiscriminants::Effect) => self
-                .as_typed_term::<EffectTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<EffectTerm>().as_inner()),
-            (TermTypeDiscriminants::Float, TermTypeDiscriminants::Float) => self
-                .as_typed_term::<FloatTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<FloatTerm>().as_inner()),
-            (TermTypeDiscriminants::Hashmap, TermTypeDiscriminants::Hashmap) => self
-                .as_typed_term::<HashmapTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<HashmapTerm>().as_inner()),
-            (TermTypeDiscriminants::Hashset, TermTypeDiscriminants::Hashset) => self
-                .as_typed_term::<HashsetTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<HashsetTerm>().as_inner()),
-            (TermTypeDiscriminants::Int, TermTypeDiscriminants::Int) => self
-                .as_typed_term::<IntTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<IntTerm>().as_inner()),
-            (TermTypeDiscriminants::Lambda, TermTypeDiscriminants::Lambda) => self
-                .as_typed_term::<LambdaTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<LambdaTerm>().as_inner()),
-            (TermTypeDiscriminants::Let, TermTypeDiscriminants::Let) => self
-                .as_typed_term::<LetTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<LetTerm>().as_inner()),
-            (TermTypeDiscriminants::List, TermTypeDiscriminants::List) => self
-                .as_typed_term::<ListTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<ListTerm>().as_inner()),
-            (TermTypeDiscriminants::Nil, TermTypeDiscriminants::Nil) => self
-                .as_typed_term::<NilTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<NilTerm>().as_inner()),
-            (TermTypeDiscriminants::Partial, TermTypeDiscriminants::Partial) => self
-                .as_typed_term::<PartialTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<PartialTerm>().as_inner()),
-            (TermTypeDiscriminants::Pointer, TermTypeDiscriminants::Pointer) => self
-                .as_typed_term::<PointerTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<PointerTerm>().as_inner()),
-            (TermTypeDiscriminants::Record, TermTypeDiscriminants::Record) => self
-                .as_typed_term::<RecordTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<RecordTerm>().as_inner()),
-            (TermTypeDiscriminants::Signal, TermTypeDiscriminants::Signal) => self
-                .as_typed_term::<SignalTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<SignalTerm>().as_inner()),
-            (TermTypeDiscriminants::String, TermTypeDiscriminants::String) => self
-                .as_typed_term::<StringTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<StringTerm>().as_inner()),
-            (TermTypeDiscriminants::Symbol, TermTypeDiscriminants::Symbol) => self
-                .as_typed_term::<SymbolTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<SymbolTerm>().as_inner()),
-            (TermTypeDiscriminants::Tree, TermTypeDiscriminants::Tree) => self
-                .as_typed_term::<TreeTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<TreeTerm>().as_inner()),
-            (TermTypeDiscriminants::Variable, TermTypeDiscriminants::Variable) => self
-                .as_typed_term::<VariableTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<VariableTerm>().as_inner()),
-            (TermTypeDiscriminants::EmptyIterator, TermTypeDiscriminants::EmptyIterator) => self
-                .as_typed_term::<EmptyIteratorTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<EmptyIteratorTerm>().as_inner()),
+            (TermTypeDiscriminants::Application, TermTypeDiscriminants::Application) => {
+                SerializeJson::patch(
+                    &self.as_typed_term::<ApplicationTerm>().as_inner(),
+                    &target.as_typed_term::<ApplicationTerm>().as_inner(),
+                )
+            }
+            (TermTypeDiscriminants::Boolean, TermTypeDiscriminants::Boolean) => {
+                SerializeJson::patch(
+                    &self.as_typed_term::<BooleanTerm>().as_inner(),
+                    &target.as_typed_term::<BooleanTerm>().as_inner(),
+                )
+            }
+            (TermTypeDiscriminants::Builtin, TermTypeDiscriminants::Builtin) => {
+                SerializeJson::patch(
+                    &self.as_typed_term::<BuiltinTerm>().as_inner(),
+                    &target.as_typed_term::<BuiltinTerm>().as_inner(),
+                )
+            }
+            (TermTypeDiscriminants::Cell, TermTypeDiscriminants::Cell) => SerializeJson::patch(
+                &self.as_typed_term::<CellTerm>().as_inner(),
+                &target.as_typed_term::<CellTerm>().as_inner(),
+            ),
+            (TermTypeDiscriminants::Condition, TermTypeDiscriminants::Condition) => {
+                SerializeJson::patch(
+                    &self.as_typed_term::<ConditionTerm>().as_inner(),
+                    &target.as_typed_term::<ConditionTerm>().as_inner(),
+                )
+            }
+            (TermTypeDiscriminants::Constructor, TermTypeDiscriminants::Constructor) => {
+                SerializeJson::patch(
+                    &self.as_typed_term::<ConstructorTerm>().as_inner(),
+                    &target.as_typed_term::<ConstructorTerm>().as_inner(),
+                )
+            }
+            (TermTypeDiscriminants::Date, TermTypeDiscriminants::Date) => SerializeJson::patch(
+                &self.as_typed_term::<DateTerm>().as_inner(),
+                &target.as_typed_term::<DateTerm>().as_inner(),
+            ),
+            (TermTypeDiscriminants::Effect, TermTypeDiscriminants::Effect) => SerializeJson::patch(
+                &self.as_typed_term::<EffectTerm>().as_inner(),
+                &target.as_typed_term::<EffectTerm>().as_inner(),
+            ),
+            (TermTypeDiscriminants::Float, TermTypeDiscriminants::Float) => SerializeJson::patch(
+                &self.as_typed_term::<FloatTerm>().as_inner(),
+                &target.as_typed_term::<FloatTerm>().as_inner(),
+            ),
+            (TermTypeDiscriminants::Hashmap, TermTypeDiscriminants::Hashmap) => {
+                SerializeJson::patch(
+                    &self.as_typed_term::<HashmapTerm>().as_inner(),
+                    &target.as_typed_term::<HashmapTerm>().as_inner(),
+                )
+            }
+            (TermTypeDiscriminants::Hashset, TermTypeDiscriminants::Hashset) => {
+                SerializeJson::patch(
+                    &self.as_typed_term::<HashsetTerm>().as_inner(),
+                    &target.as_typed_term::<HashsetTerm>().as_inner(),
+                )
+            }
+            (TermTypeDiscriminants::Int, TermTypeDiscriminants::Int) => SerializeJson::patch(
+                &self.as_typed_term::<IntTerm>().as_inner(),
+                &target.as_typed_term::<IntTerm>().as_inner(),
+            ),
+            (TermTypeDiscriminants::Lambda, TermTypeDiscriminants::Lambda) => SerializeJson::patch(
+                &self.as_typed_term::<LambdaTerm>().as_inner(),
+                &target.as_typed_term::<LambdaTerm>().as_inner(),
+            ),
+            (TermTypeDiscriminants::Let, TermTypeDiscriminants::Let) => SerializeJson::patch(
+                &self.as_typed_term::<LetTerm>().as_inner(),
+                &target.as_typed_term::<LetTerm>().as_inner(),
+            ),
+            (TermTypeDiscriminants::List, TermTypeDiscriminants::List) => SerializeJson::patch(
+                &self.as_typed_term::<ListTerm>().as_inner(),
+                &target.as_typed_term::<ListTerm>().as_inner(),
+            ),
+            (TermTypeDiscriminants::Nil, TermTypeDiscriminants::Nil) => SerializeJson::patch(
+                &self.as_typed_term::<NilTerm>().as_inner(),
+                &target.as_typed_term::<NilTerm>().as_inner(),
+            ),
+            (TermTypeDiscriminants::Partial, TermTypeDiscriminants::Partial) => {
+                SerializeJson::patch(
+                    &self.as_typed_term::<PartialTerm>().as_inner(),
+                    &target.as_typed_term::<PartialTerm>().as_inner(),
+                )
+            }
+            (TermTypeDiscriminants::Pointer, TermTypeDiscriminants::Pointer) => {
+                SerializeJson::patch(
+                    &self.as_typed_term::<PointerTerm>().as_inner(),
+                    &target.as_typed_term::<PointerTerm>().as_inner(),
+                )
+            }
+            (TermTypeDiscriminants::Record, TermTypeDiscriminants::Record) => SerializeJson::patch(
+                &self.as_typed_term::<RecordTerm>().as_inner(),
+                &target.as_typed_term::<RecordTerm>().as_inner(),
+            ),
+            (TermTypeDiscriminants::Signal, TermTypeDiscriminants::Signal) => SerializeJson::patch(
+                &self.as_typed_term::<SignalTerm>().as_inner(),
+                &target.as_typed_term::<SignalTerm>().as_inner(),
+            ),
+            (TermTypeDiscriminants::String, TermTypeDiscriminants::String) => SerializeJson::patch(
+                &self.as_typed_term::<StringTerm>().as_inner(),
+                &target.as_typed_term::<StringTerm>().as_inner(),
+            ),
+            (TermTypeDiscriminants::Symbol, TermTypeDiscriminants::Symbol) => SerializeJson::patch(
+                &self.as_typed_term::<SymbolTerm>().as_inner(),
+                &target.as_typed_term::<SymbolTerm>().as_inner(),
+            ),
+            (TermTypeDiscriminants::Tree, TermTypeDiscriminants::Tree) => SerializeJson::patch(
+                &self.as_typed_term::<TreeTerm>().as_inner(),
+                &target.as_typed_term::<TreeTerm>().as_inner(),
+            ),
+            (TermTypeDiscriminants::Variable, TermTypeDiscriminants::Variable) => {
+                SerializeJson::patch(
+                    &self.as_typed_term::<VariableTerm>().as_inner(),
+                    &target.as_typed_term::<VariableTerm>().as_inner(),
+                )
+            }
+            (TermTypeDiscriminants::EmptyIterator, TermTypeDiscriminants::EmptyIterator) => {
+                SerializeJson::patch(
+                    &self.as_typed_term::<EmptyIteratorTerm>().as_inner(),
+                    &target.as_typed_term::<EmptyIteratorTerm>().as_inner(),
+                )
+            }
             (TermTypeDiscriminants::EvaluateIterator, TermTypeDiscriminants::EvaluateIterator) => {
                 self.as_typed_term::<EvaluateIteratorTerm>()
                     .as_inner()
                     .patch(&target.as_typed_term::<EvaluateIteratorTerm>().as_inner())
             }
-            (TermTypeDiscriminants::FilterIterator, TermTypeDiscriminants::FilterIterator) => self
-                .as_typed_term::<FilterIteratorTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<FilterIteratorTerm>().as_inner()),
+            (TermTypeDiscriminants::FilterIterator, TermTypeDiscriminants::FilterIterator) => {
+                SerializeJson::patch(
+                    &self.as_typed_term::<FilterIteratorTerm>().as_inner(),
+                    &target.as_typed_term::<FilterIteratorTerm>().as_inner(),
+                )
+            }
             (TermTypeDiscriminants::FlattenIterator, TermTypeDiscriminants::FlattenIterator) => {
                 self.as_typed_term::<FlattenIteratorTerm>()
                     .as_inner()
@@ -2789,21 +2772,19 @@ impl<A: Arena + Clone> SerializeJson for ArenaRef<Term, A> {
             (
                 TermTypeDiscriminants::HashmapKeysIterator,
                 TermTypeDiscriminants::HashmapKeysIterator,
-            ) => self
-                .as_typed_term::<HashmapKeysIteratorTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<HashmapKeysIteratorTerm>().as_inner()),
+            ) => SerializeJson::patch(
+                &self.as_typed_term::<HashmapKeysIteratorTerm>().as_inner(),
+                &target.as_typed_term::<HashmapKeysIteratorTerm>().as_inner(),
+            ),
             (
                 TermTypeDiscriminants::HashmapValuesIterator,
                 TermTypeDiscriminants::HashmapValuesIterator,
-            ) => self
-                .as_typed_term::<HashmapValuesIteratorTerm>()
-                .as_inner()
-                .patch(
-                    &target
-                        .as_typed_term::<HashmapValuesIteratorTerm>()
-                        .as_inner(),
-                ),
+            ) => SerializeJson::patch(
+                &self.as_typed_term::<HashmapValuesIteratorTerm>().as_inner(),
+                &target
+                    .as_typed_term::<HashmapValuesIteratorTerm>()
+                    .as_inner(),
+            ),
             (TermTypeDiscriminants::IntegersIterator, TermTypeDiscriminants::IntegersIterator) => {
                 self.as_typed_term::<IntegersIteratorTerm>()
                     .as_inner()
@@ -2812,38 +2793,52 @@ impl<A: Arena + Clone> SerializeJson for ArenaRef<Term, A> {
             (
                 TermTypeDiscriminants::IntersperseIterator,
                 TermTypeDiscriminants::IntersperseIterator,
-            ) => self
-                .as_typed_term::<IntersperseIteratorTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<IntersperseIteratorTerm>().as_inner()),
-            (TermTypeDiscriminants::MapIterator, TermTypeDiscriminants::MapIterator) => self
-                .as_typed_term::<MapIteratorTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<MapIteratorTerm>().as_inner()),
-            (TermTypeDiscriminants::OnceIterator, TermTypeDiscriminants::OnceIterator) => self
-                .as_typed_term::<OnceIteratorTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<OnceIteratorTerm>().as_inner()),
-            (TermTypeDiscriminants::RangeIterator, TermTypeDiscriminants::RangeIterator) => self
-                .as_typed_term::<RangeIteratorTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<RangeIteratorTerm>().as_inner()),
-            (TermTypeDiscriminants::RepeatIterator, TermTypeDiscriminants::RepeatIterator) => self
-                .as_typed_term::<RepeatIteratorTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<RepeatIteratorTerm>().as_inner()),
-            (TermTypeDiscriminants::SkipIterator, TermTypeDiscriminants::SkipIterator) => self
-                .as_typed_term::<SkipIteratorTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<SkipIteratorTerm>().as_inner()),
-            (TermTypeDiscriminants::TakeIterator, TermTypeDiscriminants::TakeIterator) => self
-                .as_typed_term::<TakeIteratorTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<TakeIteratorTerm>().as_inner()),
-            (TermTypeDiscriminants::ZipIterator, TermTypeDiscriminants::ZipIterator) => self
-                .as_typed_term::<ZipIteratorTerm>()
-                .as_inner()
-                .patch(&target.as_typed_term::<ZipIteratorTerm>().as_inner()),
+            ) => SerializeJson::patch(
+                &self.as_typed_term::<IntersperseIteratorTerm>().as_inner(),
+                &target.as_typed_term::<IntersperseIteratorTerm>().as_inner(),
+            ),
+            (TermTypeDiscriminants::MapIterator, TermTypeDiscriminants::MapIterator) => {
+                SerializeJson::patch(
+                    &self.as_typed_term::<MapIteratorTerm>().as_inner(),
+                    &target.as_typed_term::<MapIteratorTerm>().as_inner(),
+                )
+            }
+            (TermTypeDiscriminants::OnceIterator, TermTypeDiscriminants::OnceIterator) => {
+                SerializeJson::patch(
+                    &self.as_typed_term::<OnceIteratorTerm>().as_inner(),
+                    &target.as_typed_term::<OnceIteratorTerm>().as_inner(),
+                )
+            }
+            (TermTypeDiscriminants::RangeIterator, TermTypeDiscriminants::RangeIterator) => {
+                SerializeJson::patch(
+                    &self.as_typed_term::<RangeIteratorTerm>().as_inner(),
+                    &target.as_typed_term::<RangeIteratorTerm>().as_inner(),
+                )
+            }
+            (TermTypeDiscriminants::RepeatIterator, TermTypeDiscriminants::RepeatIterator) => {
+                SerializeJson::patch(
+                    &self.as_typed_term::<RepeatIteratorTerm>().as_inner(),
+                    &target.as_typed_term::<RepeatIteratorTerm>().as_inner(),
+                )
+            }
+            (TermTypeDiscriminants::SkipIterator, TermTypeDiscriminants::SkipIterator) => {
+                SerializeJson::patch(
+                    &self.as_typed_term::<SkipIteratorTerm>().as_inner(),
+                    &target.as_typed_term::<SkipIteratorTerm>().as_inner(),
+                )
+            }
+            (TermTypeDiscriminants::TakeIterator, TermTypeDiscriminants::TakeIterator) => {
+                SerializeJson::patch(
+                    &self.as_typed_term::<TakeIteratorTerm>().as_inner(),
+                    &target.as_typed_term::<TakeIteratorTerm>().as_inner(),
+                )
+            }
+            (TermTypeDiscriminants::ZipIterator, TermTypeDiscriminants::ZipIterator) => {
+                SerializeJson::patch(
+                    &self.as_typed_term::<ZipIteratorTerm>().as_inner(),
+                    &target.as_typed_term::<ZipIteratorTerm>().as_inner(),
+                )
+            }
             _ => target.to_json().map(Some),
         }
     }
