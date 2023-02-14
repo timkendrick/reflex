@@ -15,7 +15,8 @@ use serde_json::Value as JsonValue;
 use strum_macros::EnumDiscriminants;
 
 use crate::{
-    allocator::Arena,
+    allocator::{Arena, ArenaAllocator},
+    factory::WasmTermFactory,
     hash::{TermHash, TermHasher, TermSize},
     stdlib::Stdlib,
     ArenaPointer, ArenaRef, PointerIter, Term,
@@ -733,6 +734,114 @@ impl<A: Arena + Clone> Internable for ArenaRef<Term, A> {
                 .as_typed_term::<ZipIteratorTerm>()
                 .as_inner()
                 .should_intern(eager),
+        }
+    }
+}
+
+pub trait IteratorExpression: Expression {
+    type IteratorTerm<'a>: IteratorTermType<Self>;
+}
+
+pub trait IteratorTermType<T: Expression> {}
+
+pub trait IteratorExpressionFactory<T: Expression + IteratorExpression> {
+    fn match_iterator_term<'a>(&self, expression: &'a T) -> Option<T::IteratorTerm<'a>>;
+}
+
+impl<A: Arena + Clone> IteratorExpression for WasmExpression<A> {
+    type IteratorTerm<'a> = WasmIteratorTerm<A>;
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum WasmIteratorTerm<A: Arena + Clone> {
+    EmptyIterator(ArenaRef<EmptyIteratorTerm, A>),
+    EvaluateIterator(ArenaRef<EvaluateIteratorTerm, A>),
+    FilterIterator(ArenaRef<FilterIteratorTerm, A>),
+    FlattenIterator(ArenaRef<FlattenIteratorTerm, A>),
+    HashmapKeysIterator(ArenaRef<HashmapKeysIteratorTerm, A>),
+    HashmapValuesIterator(ArenaRef<HashmapValuesIteratorTerm, A>),
+    IntegersIterator(ArenaRef<IntegersIteratorTerm, A>),
+    IntersperseIterator(ArenaRef<IntersperseIteratorTerm, A>),
+    MapIterator(ArenaRef<MapIteratorTerm, A>),
+    OnceIterator(ArenaRef<OnceIteratorTerm, A>),
+    RangeIterator(ArenaRef<RangeIteratorTerm, A>),
+    RepeatIterator(ArenaRef<RepeatIteratorTerm, A>),
+    SkipIterator(ArenaRef<SkipIteratorTerm, A>),
+    TakeIterator(ArenaRef<TakeIteratorTerm, A>),
+    ZipIterator(ArenaRef<ZipIteratorTerm, A>),
+}
+
+impl<A: Arena + Clone> IteratorTermType<WasmExpression<A>> for WasmIteratorTerm<A> {}
+
+impl<A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static + Clone>
+    IteratorExpressionFactory<ArenaRef<Term, Self>> for WasmTermFactory<A>
+{
+    fn match_iterator_term<'a>(
+        &self,
+        expression: &'a ArenaRef<Term, Self>,
+    ) -> Option<<ArenaRef<Term, Self> as IteratorExpression>::IteratorTerm<'a>> {
+        match expression.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::EmptyIterator => expression
+                .as_empty_iterator_term()
+                .map(|term| term.as_inner())
+                .map(WasmIteratorTerm::EmptyIterator),
+            TermTypeDiscriminants::EvaluateIterator => expression
+                .as_evaluate_iterator_term()
+                .map(|term| term.as_inner())
+                .map(WasmIteratorTerm::EvaluateIterator),
+            TermTypeDiscriminants::FilterIterator => expression
+                .as_filter_iterator_term()
+                .map(|term| term.as_inner())
+                .map(WasmIteratorTerm::FilterIterator),
+            TermTypeDiscriminants::FlattenIterator => expression
+                .as_flatten_iterator_term()
+                .map(|term| term.as_inner())
+                .map(WasmIteratorTerm::FlattenIterator),
+            TermTypeDiscriminants::HashmapKeysIterator => expression
+                .as_hashmap_keys_iterator_term()
+                .map(|term| term.as_inner())
+                .map(WasmIteratorTerm::HashmapKeysIterator),
+            TermTypeDiscriminants::HashmapValuesIterator => expression
+                .as_hashmap_values_iterator_term()
+                .map(|term| term.as_inner())
+                .map(WasmIteratorTerm::HashmapValuesIterator),
+            TermTypeDiscriminants::IntegersIterator => expression
+                .as_integers_iterator_term()
+                .map(|term| term.as_inner())
+                .map(WasmIteratorTerm::IntegersIterator),
+            TermTypeDiscriminants::IntersperseIterator => expression
+                .as_intersperse_iterator_term()
+                .map(|term| term.as_inner())
+                .map(WasmIteratorTerm::IntersperseIterator),
+            TermTypeDiscriminants::MapIterator => expression
+                .as_map_iterator_term()
+                .map(|term| term.as_inner())
+                .map(WasmIteratorTerm::MapIterator),
+            TermTypeDiscriminants::OnceIterator => expression
+                .as_once_iterator_term()
+                .map(|term| term.as_inner())
+                .map(WasmIteratorTerm::OnceIterator),
+            TermTypeDiscriminants::RangeIterator => expression
+                .as_range_iterator_term()
+                .map(|term| term.as_inner())
+                .map(WasmIteratorTerm::RangeIterator),
+            TermTypeDiscriminants::RepeatIterator => expression
+                .as_repeat_iterator_term()
+                .map(|term| term.as_inner())
+                .map(WasmIteratorTerm::RepeatIterator),
+            TermTypeDiscriminants::SkipIterator => expression
+                .as_skip_iterator_term()
+                .map(|term| term.as_inner())
+                .map(WasmIteratorTerm::SkipIterator),
+            TermTypeDiscriminants::TakeIterator => expression
+                .as_take_iterator_term()
+                .map(|term| term.as_inner())
+                .map(WasmIteratorTerm::TakeIterator),
+            TermTypeDiscriminants::ZipIterator => expression
+                .as_zip_iterator_term()
+                .map(|term| term.as_inner())
+                .map(WasmIteratorTerm::ZipIterator),
+            _ => None,
         }
     }
 }
