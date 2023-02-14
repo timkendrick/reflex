@@ -33,7 +33,7 @@ pub(crate) fn chunks_to_i64(value: [u32; 2]) -> i64 {
 }
 
 #[allow(dead_code)]
-pub(crate) fn into_twos_complement(value: i32) -> u32 {
+pub fn into_twos_complement(value: i32) -> u32 {
     if value >= 0 {
         value as u32
     } else {
@@ -41,7 +41,7 @@ pub(crate) fn into_twos_complement(value: i32) -> u32 {
     }
 }
 
-pub(crate) fn from_twos_complement(value: u32) -> i32 {
+pub fn from_twos_complement(value: u32) -> i32 {
     if value <= 0x7FFFFFFF {
         value as i32
     } else {
