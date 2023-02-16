@@ -55,7 +55,7 @@ impl StringTerm {
         let hash = arena.read_value::<Term, _>(instance, |term| {
             TermHasher::default().hash(term, arena).finish()
         });
-        arena.write::<u32>(Term::get_hash_pointer(instance), u32::from(hash));
+        arena.write::<u64>(Term::get_hash_pointer(instance), u64::from(hash));
         instance
     }
     pub fn as_str(&self) -> &str {
@@ -108,10 +108,7 @@ impl<A: Arena + Clone> ArenaRef<StringTerm, A> {
         self.inner_ref(|term| &term.data)
     }
     pub fn string_hash(&self) -> HashId {
-        self.read_value(|term| {
-            // FIXME: Convert to 64-bit hashes
-            u32::from(term.hash(TermHasher::default(), &self.arena).finish()) as HashId
-        })
+        self.read_value(|term| HashId::from(term.hash(TermHasher::default(), &self.arena).finish()))
     }
     fn offset(&self) -> ArenaPointer {
         self.inner_pointer(|term| &term.data.items[0])
@@ -280,6 +277,7 @@ mod tests {
         allocator::VecAllocator,
         pad_to_4_byte_offset,
         term_type::{TermType, TermTypeDiscriminants},
+        utils::chunks_to_u64,
     };
 
     use super::*;
@@ -300,12 +298,12 @@ mod tests {
             let instance = StringTerm::allocate(value, &mut allocator);
             let result = allocator.get_ref::<Term>(instance).as_bytes();
             // TODO: Test term hashing
-            let _hash = result[0];
-            let discriminant = result[1];
-            let length = result[2];
-            let data_length = result[3];
-            let data_capacity = result[4];
-            let data = &result[5..];
+            let _hash = chunks_to_u64([result[0], result[1]]);
+            let discriminant = result[2];
+            let length = result[3];
+            let data_length = result[4];
+            let data_capacity = result[5];
+            let data = &result[6..];
             assert_eq!(discriminant, TermTypeDiscriminants::String as u32);
             assert_eq!(length, value.len() as u32);
             assert_eq!(data_length, (pad_to_4_byte_offset(value.len()) / 4) as u32);

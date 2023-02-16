@@ -110,7 +110,7 @@ impl HashmapTerm {
             let key_hash = arena.read_value::<Term, TermHashState>(key, |term| {
                 TermHasher::default().hash(term, arena).finish()
             });
-            let mut bucket_index = (u32::from(key_hash) as usize) % capacity;
+            let mut bucket_index = (u64::from(key_hash) % capacity as u64) as usize;
             while !ArenaPointer::is_uninitialized(arena.read_value::<HashmapBucket, ArenaPointer>(
                 Array::<HashmapBucket>::get_item_offset(list, bucket_index),
                 |bucket| bucket.key,
@@ -123,7 +123,7 @@ impl HashmapTerm {
         let hash = arena.read_value::<Term, _>(instance, |term| {
             TermHasher::default().hash(term, arena).finish()
         });
-        arena.write::<u32>(Term::get_hash_pointer(instance), u32::from(hash));
+        arena.write::<u64>(Term::get_hash_pointer(instance), u64::from(hash));
         instance
     }
     fn default_capacity(num_entries: usize) -> usize {
@@ -581,6 +581,7 @@ mod tests {
     use crate::{
         allocator::VecAllocator,
         term_type::{IntTerm, TermType, TermTypeDiscriminants},
+        utils::chunks_to_u64,
     };
 
     use super::*;
@@ -610,12 +611,12 @@ mod tests {
             let instance = HashmapTerm::allocate(entries.clone(), &mut allocator);
             let result = allocator.get_ref::<Term>(instance).as_bytes();
             // TODO: Test term hashing
-            let _hash = result[0];
-            let discriminant = result[1];
-            let num_entries = result[2];
-            let buckets_length = result[3];
-            let buckets_capacity = result[4];
-            let buckets_data = &result[5..];
+            let _hash = chunks_to_u64([result[0], result[1]]);
+            let discriminant = result[2];
+            let num_entries = result[3];
+            let buckets_length = result[4];
+            let buckets_capacity = result[5];
+            let buckets_data = &result[6..];
             let expected_capacity = HashmapTerm::default_capacity(entries.len());
             assert_eq!(discriminant, TermTypeDiscriminants::Hashmap as u32);
             assert_eq!(num_entries, entries.len() as u32);

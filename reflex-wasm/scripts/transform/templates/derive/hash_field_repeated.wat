@@ -1,21 +1,21 @@
 ;; SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 ;; SPDX-License-Identifier: Apache-2.0
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-  (func (@concat "$" (@get $type_name) "::hash::" (@get $field_name)) (param $self i32) (param $state i32) (result i32)
+  (func (@concat "$" (@get $type_name) "::hash::" (@get $field_name)) (param $self i32) (param $state i64) (result i64)
     (local $length i32)
     (local $index i32)
     ;; Hash the array length
     (call $Hash::write_i32 (local.get $state) (local.tee $length (i32.load offset=4 (local.get $self))))
     (local.set $state)
     ;; Hash the array items
-    (if (result i32)
+    (if (result i64)
       (i32.eq (local.get $length) (i32.const 0))
       ;; If the array is empty, nothing more to do
       (then
         (local.get $state))
       (else
         ;; Otherwise hash each of the array items
-        (loop $LOOP (result i32)
+        (loop $LOOP (result i64)
           (call (@concat "$" (@get $type_name) "::hash::" (@get $field_name) "::item")
             (i32.add
               (local.get $self)

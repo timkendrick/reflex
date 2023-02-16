@@ -27,7 +27,7 @@
       (call $Hashmap::get::num_entries (local.get $self))
       (call $Hashmap::get::num_entries (local.get $other))))
 
-  (func $Hashmap::traits::hash (param $self i32) (param $state i32) (result i32)
+  (func $Hashmap::traits::hash (param $self i32) (param $state i64) (result i64)
     ;; FIXME: Two instances of an equivalent hashmap might return different hashes if keys were added in a different order
     ;; Consider e.g. insertion sort when initializing the buckets to ensure consistent hash
     (local $num_entries i32)
@@ -39,7 +39,7 @@
     (local.tee $num_entries (call $Hashmap::get::num_entries (local.get $self)))
     (local.set $state (call $Hash::write_i32))
     ;; Hash the hashmap items
-    (if (result i32)
+    (if (result i64)
       (i32.eqz (local.get $num_entries))
       ;; If the hashmap is empty, nothing more to do
       (then
@@ -47,12 +47,12 @@
       (else
         ;; Hash each of the hashmap buckets
         (local.set $capacity (call $Hashmap::get::buckets::capacity (local.get $self)))
-        (loop $LOOP (result i32)
+        (loop $LOOP (result i64)
           (if
             (i32.eqz
               (local.tee $key
                 (call $HashmapBucket::get::key
-                  (call $Hashmap::get::buckets::pointer (local.get $self) (local.get $index))) ))
+                  (call $Hashmap::get::buckets::pointer (local.get $self) (local.get $index)))))
             ;; If this is an empty bucket then skip the hashing
             (then)
             (else
@@ -67,7 +67,7 @@
               (call $Term::traits::hash)
               (local.set $state)))
           ;; If this was the final bucket return the hash, otherwise continue with the next bucket
-          (if (result i32)
+          (if (result i64)
             (i32.eq (local.tee $index (i32.add (local.get $index) (i32.const 1))) (local.get $capacity))
             (then
               (local.get $state))
@@ -903,7 +903,7 @@
         ;; If the entire hashmap was iterated without finding a dynamic entry, return false
         (global.get $FALSE))))
 
-  (func $Term::Hashmap::find_empty_bucket_index (param $self i32) (param $hash i32) (result i32)
+  (func $Term::Hashmap::find_empty_bucket_index (param $self i32) (param $hash i64) (result i32)
     (local $capacity i32)
     (local $bucket_index i32)
     (local.set $capacity (call $Term::Hashmap::get_capacity (local.get $self)))
@@ -921,9 +921,9 @@
           (local.set $bucket_index (i32.rem_u (i32.add (local.get $bucket_index) (i32.const 1)) (local.get $capacity)))
           (br $LOOP)))))
 
-  (func $Term::Hashmap::get_hash_bucket (param $capacity i32) (param $hash i32) (result i32)
+  (func $Term::Hashmap::get_hash_bucket (param $capacity i32) (param $hash i64) (result i32)
     ;; Divide hashes evenly across the total bucket capacity via the modulo operation
-    (i32.rem_u (local.get $hash) (local.get $capacity)))
+    (i32.wrap_i64 (i64.rem_u (local.get $hash) (i64.extend_i32_u (local.get $capacity)))))
 
   (func $Term::Hashmap::get_bucket_key (param $self i32) (param $index i32) (result i32)
     (call $HashmapBucket::get::key

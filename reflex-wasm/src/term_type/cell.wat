@@ -16,7 +16,7 @@
     ;; Cells are mutable and therefore cells with different addresses cannot be equal
     (global.get $FALSE))
 
-  (func $Cell::traits::hash (param $self i32) (param $state i32) (result i32)
+  (func $Cell::traits::hash (param $self i32) (param $state i64) (result i64)
     ;; Cells are mutable and therefore cells with different addresses must hash to unique values
     (local.get $state)
     (local.get $self)

@@ -91,10 +91,7 @@ impl<A: Arena + Clone> ConditionListType<WasmExpression<A>> for ArenaRef<TreeTer
         WasmExpression<A>: 'a,
         Self: 'a;
     fn id(&self) -> HashId {
-        self.read_value(|term| {
-            // FIXME: convert to 64-bit term hashes
-            u32::from(term.hash(TermHasher::default(), &self.arena).finish()) as HashId
-        })
+        self.read_value(|term| HashId::from(term.hash(TermHasher::default(), &self.arena).finish()))
     }
     fn len(&self) -> usize {
         self.iter().count()

@@ -4,7 +4,7 @@
 (module
   (@export $Term
     (@struct $Term
-      (@field $hash i32)
+      (@field $hash i64)
       (@field $value (@import $TermType "./term_type/index.wat"))))
 
   ;; Declare term type wrapper methods
@@ -90,7 +90,7 @@
       (else
         (if (result i32)
           ;; If the hashes differ, we can confidently say the terms are not equal
-          (i32.ne
+          (i64.ne
             (call $Term::get::hash (local.get $self))
             (call $Term::get::hash (local.get $other)))
           (then
@@ -101,7 +101,7 @@
               (call $Term::pointer::value (local.get $self))
               (call $Term::pointer::value (local.get $other))))))))
 
-  (func $Term::traits::hash (param $self i32) (param $state i32) (result i32)
+  (func $Term::traits::hash (param $self i32) (param $state i64) (result i64)
     ;; Compute the hash according to the term type implementation
     (call $TermType::traits::hash (call $Term::pointer::value (local.get $self)) (local.get $state)))
 
@@ -120,10 +120,10 @@
     (local.get $self))
 
   (func $Term::header_size (result i32)
-    ;; 4 bytes for the term hash
-    (i32.const 4))
+    ;; 8 bytes for the 64-bit term hash
+    (i32.const 8))
 
-  (func $Term::get_hash (export "getTermHash") (param $self i32) (result i32)
+  (func $Term::get_hash (export "getTermHash") (param $self i32) (result i64)
     (call $Term::get::hash (local.get $self)))
 
   (func $Term::get_type (export "getTermType") (param $self i32) (result i32)

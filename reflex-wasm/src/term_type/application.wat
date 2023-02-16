@@ -6,8 +6,8 @@
     (@struct $ApplicationCache
       (@field $value (@ref $Term @optional))
       (@field $dependencies (@ref $Term @optional))
-      (@field $overall_state_hash i32)
-      (@field $minimal_state_hash i32))
+      (@field $overall_state_hash i64)
+      (@field $minimal_state_hash i64))
 
     (@derive $size (@get $ApplicationCache))
     (@derive $equals (@get $ApplicationCache))
@@ -44,8 +44,8 @@
       (call $Term::Application::pointer::cache (local.get $instance))
       (global.get $NULL)
       (global.get $NULL)
-      (global.get $NULL)
-      (global.get $NULL)))
+      (i64.const -1)
+      (i64.const -1)))
 
   (func $Term::Application::traits::is_atomic (param $self i32) (result i32)
     (global.get $FALSE))
@@ -167,8 +167,8 @@
         (local.get $dependencies))))
 
   (func $ApplicationCache::get_cached_value (param $self i32) (param $state i32) (result i32 i32)
-    (local $overall_state_hash i32)
-    (local $minimal_state_hash i32)
+    (local $overall_state_hash i64)
+    (local $minimal_state_hash i64)
     (local $cached_value i32)
     (local $cached_dependencies i32)
     (if (result i32 i32)
@@ -182,7 +182,7 @@
       (else
         (if (result i32 i32)
           ;; Otherwise if the current state object is identical to the cached state, return the cached value
-          (i32.eq
+          (i64.eq
             (local.tee $overall_state_hash (call $ApplicationCache::get_state_hash (local.get $state)))
             (call $ApplicationCache::get::overall_state_hash (local.get $self)))
           (then
@@ -192,7 +192,7 @@
             ;; Otherwise determine whether the subset of required state dependency values from the cached result is
             ;; identical to the corresponding state values from the current state object
             (if (result i32 i32)
-              (i32.eq
+              (i64.eq
                 (local.tee $minimal_state_hash
                   (call $Dependencies::get_state_value_hash
                     (local.tee $cached_dependencies (call $ApplicationCache::get::dependencies (local.get $self)))
@@ -212,16 +212,16 @@
                   (local.get $self)
                   (global.get $NULL)
                   (global.get $NULL)
-                  (global.get $NULL)
-                  (global.get $NULL))
+                  (i64.const -1)
+                  (i64.const -1))
                 (global.get $NULL)
                 (global.get $NULL))))))))
 
-  (func $ApplicationCache::get_state_hash (param $state i32) (result i32)
-    (if (result i32)
+  (func $ApplicationCache::get_state_hash (param $state i32) (result i64)
+    (if (result i64)
       (i32.eq (local.get $state) (global.get $NULL))
       (then
-        (global.get $NULL))
+        (i64.const -1))
       (else
         (call $Term::get_hash (local.get $state)))))
 

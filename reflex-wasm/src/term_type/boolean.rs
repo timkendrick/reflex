@@ -136,6 +136,7 @@ impl<A: Arena + Clone> Internable for ArenaRef<BooleanTerm, A> {
 mod tests {
     use crate::{
         allocator::VecAllocator,
+        hash::TermHashState,
         term_type::{TermType, TermTypeDiscriminants},
         Term,
     };
@@ -157,14 +158,27 @@ mod tests {
     #[test]
     fn size() {
         assert_eq!(BooleanTerm { value: 0 }.size_of(), 4);
-        assert_eq!(TermType::Boolean(BooleanTerm::from(true)).size_of(), 8);
+        assert_eq!(
+            TermType::Boolean(BooleanTerm::from(true)).size_of(),
+            std::mem::size_of_val(&(TermTypeDiscriminants::Boolean as u32)) + 4
+        );
         assert_eq!(
             Term::new(
                 TermType::Boolean(BooleanTerm::from(true)),
                 &VecAllocator::default()
             )
             .size_of(),
-            12
+            std::mem::size_of::<TermHashState>()
+                + std::mem::size_of_val(&(TermTypeDiscriminants::Boolean as u32))
+                + 4
+        );
+        assert_eq!(
+            Term::new(
+                TermType::Boolean(BooleanTerm::from(true)),
+                &VecAllocator::default()
+            )
+            .size_of(),
+            16
         );
     }
 }

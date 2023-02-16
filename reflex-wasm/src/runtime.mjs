@@ -10,6 +10,11 @@ function u32(value) {
   return value >= 0 ? value : 0xffffffff + 1 + value;
 }
 
+function u64(value) {
+  // Convert 64-bit two's complement signed integer to unsigned integer
+  return value >= 0 ? value : BigInt('0xffffffffffffffff') + BigInt(1) + value;
+}
+
 function createTermTypes(runtime) {
   return {
     Application: runtime.TermType_Application.value,
@@ -555,7 +560,7 @@ export function createRuntime(runtime) {
       return runtime.createHashmapValuesIterator(source);
     },
     hash(value) {
-      return u32(runtime.getTermHash(value));
+      return u64(runtime.getTermHash(value));
     },
     equals(left, right) {
       return runtime.equals(left, right) === 1;

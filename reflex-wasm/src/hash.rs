@@ -107,15 +107,15 @@ impl TermHash for f64 {
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug, Hash)]
 #[repr(transparent)]
-pub struct TermHashState(u32);
-impl From<TermHashState> for u32 {
+pub struct TermHashState(u64);
+impl From<TermHashState> for u64 {
     fn from(value: TermHashState) -> Self {
         let TermHashState(value) = value;
         value
     }
 }
-impl From<u32> for TermHashState {
-    fn from(value: u32) -> Self {
+impl From<u64> for TermHashState {
+    fn from(value: u64) -> Self {
         Self(value)
     }
 }
@@ -127,7 +127,7 @@ pub struct TermHasher {
 impl Default for TermHasher {
     fn default() -> Self {
         Self {
-            state: TermHashState(2166136261),
+            state: TermHashState(0xcbf29ce484222325),
         }
     }
 }
@@ -146,7 +146,7 @@ impl TermHasher {
         let Self { state } = self;
         let TermHashState(state) = state;
         Self {
-            state: TermHashState((state ^ value as u32).wrapping_mul(0x1000193_u32)),
+            state: TermHashState((state ^ value as u64).wrapping_mul(0x100000001b3)),
         }
     }
     pub fn write_u32(self, value: u32) -> Self {
@@ -178,6 +178,6 @@ impl TermHasher {
         self.write_u64(unsafe { std::mem::transmute::<f64, u64>(value) })
     }
     pub fn write_hash(self, value: TermHashState) -> Self {
-        self.write_u32(value.into())
+        self.write_u64(value.into())
     }
 }

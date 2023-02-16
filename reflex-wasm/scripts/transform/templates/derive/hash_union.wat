@@ -1,7 +1,7 @@
 ;; SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 ;; SPDX-License-Identifier: Apache-2.0
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-  (func (@concat "$" (@get $union_name) "::traits::hash") (param $self i32) (param $state i32) (result i32)
+  (func (@concat "$" (@get $union_name) "::traits::hash") (param $self i32) (param $state i64) (result i64)
     (local $type i32)
     ;; Write the discriminant to the hash
     (call $Hash::write_byte

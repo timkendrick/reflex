@@ -32,6 +32,29 @@ pub(crate) fn chunks_to_i64(value: [u32; 2]) -> i64 {
     ])
 }
 
+pub(crate) fn u64_to_chunks(value: u64) -> [u32; 2] {
+    let bytes = value.to_le_bytes();
+    let low_word = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+    let high_word = u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
+    [low_word, high_word]
+}
+
+pub(crate) fn chunks_to_u64(value: [u32; 2]) -> u64 {
+    let [low_word, high_word] = value;
+    let low_bytes = low_word.to_le_bytes();
+    let high_bytes = high_word.to_le_bytes();
+    u64::from_le_bytes([
+        low_bytes[0],
+        low_bytes[1],
+        low_bytes[2],
+        low_bytes[3],
+        high_bytes[0],
+        high_bytes[1],
+        high_bytes[2],
+        high_bytes[3],
+    ])
+}
+
 #[allow(dead_code)]
 pub fn into_twos_complement_i32(value: i32) -> u32 {
     if value >= 0 {

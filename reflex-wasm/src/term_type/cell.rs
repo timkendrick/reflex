@@ -46,8 +46,8 @@ impl CellTerm {
         let instance = arena.allocate(term);
         let list = instance.offset((term_size - std::mem::size_of::<Array<u32>>()) as u32);
         Array::<u32>::extend(list, values, arena);
-        let hash = TermHashState::from(u32::from(instance));
-        arena.write::<u32>(Term::get_hash_pointer(instance), u32::from(hash));
+        let hash = TermHashState::from(u32::from(instance) as u64);
+        arena.write::<u64>(Term::get_hash_pointer(instance), u64::from(hash));
         instance
     }
 }
@@ -140,6 +140,7 @@ mod tests {
     use crate::{
         allocator::VecAllocator,
         term_type::{TermType, TermTypeDiscriminants},
+        utils::chunks_to_u64,
     };
 
     use super::*;
@@ -158,12 +159,12 @@ mod tests {
             let entries = [0x54321, 0x98765];
             let instance = CellTerm::allocate(entries, &mut allocator);
             let result = allocator.get_ref::<Term>(instance).as_bytes();
-            let hash = result[0];
-            let discriminant = result[1];
-            let data_length = result[2];
-            let data_capacity = result[3];
-            let data = &result[4..];
-            assert_eq!(hash, u32::from(instance));
+            let hash = chunks_to_u64([result[0], result[1]]);
+            let discriminant = result[2];
+            let data_length = result[3];
+            let data_capacity = result[4];
+            let data = &result[5..];
+            assert_eq!(hash, u32::from(instance) as u64);
             assert_eq!(discriminant, TermTypeDiscriminants::Cell as u32);
             assert_eq!(data_length, entries.len() as u32);
             assert_eq!(data_capacity, entries.len() as u32);

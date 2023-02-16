@@ -14,6 +14,7 @@ use crate::{
     allocator::Arena,
     hash::{TermHash, TermHashState, TermHasher, TermSize},
     term_type::TypedTerm,
+    utils::{chunks_to_u64, u64_to_chunks},
     ArenaPointer, ArenaRef, PointerIter, Term,
 };
 
@@ -34,8 +35,8 @@ pub struct ApplicationTerm {
 pub struct ApplicationCache {
     pub value: ArenaPointer,
     pub dependencies: ArenaPointer,
-    pub overall_state_hash: u32,
-    pub minimal_state_hash: u32,
+    pub overall_state_hash: [u32; 2],
+    pub minimal_state_hash: [u32; 2],
 }
 
 pub type ApplicationTermPointerIter =
@@ -81,8 +82,8 @@ impl Default for ApplicationCache {
         Self {
             value: ArenaPointer::null(),
             dependencies: ArenaPointer::null(),
-            overall_state_hash: u32::from(ArenaPointer::null()),
-            minimal_state_hash: u32::from(ArenaPointer::null()),
+            overall_state_hash: u64_to_chunks(0xFFFFFFFFFFFFFFFF),
+            minimal_state_hash: u64_to_chunks(0xFFFFFFFFFFFFFFFF),
         }
     }
 }
@@ -115,16 +116,16 @@ impl<A: Arena + Clone> ArenaRef<ApplicationCache, A> {
         ))
     }
     pub fn overall_state_hash(&self) -> Option<TermHashState> {
-        let value = self.read_value(|value| value.overall_state_hash);
-        if value == u32::from(ArenaPointer::null()) {
+        let value = self.read_value(|value| chunks_to_u64(value.overall_state_hash));
+        if value == 0xFFFFFFFFFFFFFFFF {
             None
         } else {
             Some(TermHashState::from(value))
         }
     }
     pub fn minimal_state_hash(&self) -> Option<TermHashState> {
-        let value = self.read_value(|value| value.minimal_state_hash);
-        if value == u32::from(ArenaPointer::null()) {
+        let value = self.read_value(|value| chunks_to_u64(value.minimal_state_hash));
+        if value == 0xFFFFFFFFFFFFFFFF {
             None
         } else {
             Some(TermHashState::from(value))
@@ -292,7 +293,10 @@ impl<A: Arena + Clone> Internable for ArenaRef<ApplicationTerm, A> {
 
 #[cfg(test)]
 mod tests {
-    use crate::term_type::{TermType, TermTypeDiscriminants};
+    use crate::{
+        term_type::{TermType, TermTypeDiscriminants},
+        utils::u64_to_chunks,
+    };
 
     use super::*;
 
@@ -305,8 +309,8 @@ mod tests {
                 cache: ApplicationCache {
                     value: ArenaPointer::null(),
                     dependencies: ArenaPointer::null(),
-                    overall_state_hash: u32::from(ArenaPointer::null()),
-                    minimal_state_hash: u32::from(ArenaPointer::null()),
+                    overall_state_hash: u64_to_chunks(0xFFFFFFFFFFFFFFFF),
+                    minimal_state_hash: u64_to_chunks(0xFFFFFFFFFFFFFFFF),
                 },
             })
             .as_bytes(),
@@ -314,6 +318,8 @@ mod tests {
                 TermTypeDiscriminants::Application as u32,
                 0x54321,
                 0x98765,
+                0xFFFFFFFF,
+                0xFFFFFFFF,
                 0xFFFFFFFF,
                 0xFFFFFFFF,
                 0xFFFFFFFF,

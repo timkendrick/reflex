@@ -34,7 +34,7 @@
         (call $Record::get::values (local.get $self))
         (call $Record::get::values (local.get $other)))))
 
-  (func $Record::traits::hash (param $self i32) (param $state i32) (result i32)
+  (func $Record::traits::hash (param $self i32) (param $state i64) (result i64)
     (call $Record::get::values (local.get $self))
     (call $Record::get::keys (local.get $self))
     (local.get $state)

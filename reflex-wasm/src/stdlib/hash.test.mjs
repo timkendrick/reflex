@@ -15,21 +15,39 @@ export default (describe) => {
       Stdlib,
     }) => {
       (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Hash), createUnitList(createInt(0)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Hash),
+          createUnitList(createInt(0)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), `Symbol(${hash(createInt(0))})`);
+        assert.strictEqual(
+          format(result),
+          `Symbol(${Number(hash(createInt(0)) & BigInt(0x00000000ffffffff))})`,
+        );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Hash), createUnitList(createInt(3)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Hash),
+          createUnitList(createInt(3)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), `Symbol(${hash(createInt(3))})`);
+        assert.strictEqual(
+          format(result),
+          `Symbol(${Number(hash(createInt(3)) & BigInt(0x00000000ffffffff))})`,
+        );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Hash), createUnitList(createInt(-3)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Hash),
+          createUnitList(createInt(-3)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), `Symbol(${hash(createInt(-3))})`);
+        assert.strictEqual(
+          format(result),
+          `Symbol(${Number(hash(createInt(-3)) & BigInt(0x00000000ffffffff))})`,
+        );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });
@@ -46,15 +64,27 @@ export default (describe) => {
       Stdlib,
     }) => {
       (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Hash), createUnitList(createString('')));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Hash),
+          createUnitList(createString('')),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), `Symbol(${hash(createString(''))})`);
+        assert.strictEqual(
+          format(result),
+          `Symbol(${Number(hash(createString('')) & BigInt(0x00000000ffffffff))})`,
+        );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Hash), createUnitList(createString('foo')));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Hash),
+          createUnitList(createString('foo')),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), `Symbol(${hash(createString('foo'))})`);
+        assert.strictEqual(
+          format(result),
+          `Symbol(${Number(hash(createString('foo')) & BigInt(0x00000000ffffffff))})`,
+        );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });

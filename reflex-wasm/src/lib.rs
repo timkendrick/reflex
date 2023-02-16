@@ -166,8 +166,7 @@ impl Term {
         }
     }
     pub fn id(self) -> HashId {
-        // FIXME: 64-bit term hash
-        u32::from(self.header.hash) as HashId
+        HashId::from(self.header.hash)
     }
     pub fn get_hash_pointer(term: ArenaPointer) -> ArenaPointer {
         term.offset(0)

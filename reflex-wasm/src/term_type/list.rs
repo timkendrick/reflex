@@ -89,7 +89,7 @@ impl ListTerm {
         let hash = arena.read_value::<Term, _>(instance, |term| {
             TermHasher::default().hash(term, arena).finish()
         });
-        arena.write::<u32>(Term::get_hash_pointer(instance), u32::from(hash));
+        arena.write::<u64>(Term::get_hash_pointer(instance), u64::from(hash));
         instance
     }
 }
@@ -307,6 +307,7 @@ mod tests {
     use crate::{
         allocator::VecAllocator,
         term_type::{IntTerm, TermType, TermTypeDiscriminants},
+        utils::chunks_to_u64,
     };
 
     use super::*;
@@ -330,11 +331,11 @@ mod tests {
             let instance = ListTerm::allocate(entries, &mut allocator);
             let result = allocator.get_ref::<Term>(instance).as_bytes();
             // TODO: Test term hashing
-            let _hash = result[0];
-            let discriminant = result[1];
-            let data_length = result[2];
-            let data_capacity = result[3];
-            let data = &result[4..];
+            let _hash = chunks_to_u64([result[0], result[1]]);
+            let discriminant = result[2];
+            let data_length = result[3];
+            let data_capacity = result[4];
+            let data = &result[5..];
             assert_eq!(discriminant, TermTypeDiscriminants::List as u32);
             assert_eq!(data_length, entries.len() as u32);
             assert_eq!(data_capacity, entries.len() as u32);
