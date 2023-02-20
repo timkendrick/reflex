@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 use std::{
-    cell::{Ref, RefCell},
+    cell::RefCell,
     iter::{empty, once},
     ops::{Deref, DerefMut},
     rc::Rc,
@@ -10,13 +10,13 @@ use std::{
 
 use reflex::{
     core::{
-        ApplicationTermType, BooleanTermType, BuiltinTermType, CompiledFunctionTermType,
-        ConditionListType, ConditionType, ConstructorTermType, EffectTermType, Expression,
-        ExpressionFactory, ExpressionListType, FloatTermType, FloatValue, HashmapTermType,
-        HashsetTermType, HeapAllocator, InstructionPointer, IntTermType, IntValue, LambdaTermType,
-        LetTermType, ListTermType, PartialApplicationTermType, RecordTermType, RecursiveTermType,
-        RefType, SignalTermType, SignalType, StackOffset, StringTermType, StringValue,
-        StructPrototypeType, SymbolId, SymbolTermType, VariableTermType,
+        ApplicationTermType, BooleanTermType, CompiledFunctionTermType, ConditionListType,
+        ConditionType, ConstructorTermType, EffectTermType, Expression, ExpressionFactory,
+        ExpressionListType, FloatTermType, FloatValue, HashmapTermType, HashsetTermType,
+        HeapAllocator, InstructionPointer, IntTermType, IntValue, LambdaTermType, LetTermType,
+        ListTermType, PartialApplicationTermType, RecordTermType, RecursiveTermType, RefType,
+        SignalTermType, SignalType, StackOffset, StringTermType, StringValue, StructPrototypeType,
+        SymbolId, SymbolTermType, VariableTermType,
     },
     hash::HashId,
 };
@@ -25,7 +25,6 @@ use reflex_utils::WithExactSizeIterator;
 use crate::{
     allocator::{Arena, ArenaAllocator},
     hash::TermSize,
-    stdlib::Stdlib,
     term_type::{
         ApplicationTerm, BooleanTerm, BuiltinTerm, ConditionTerm, ConstructorTerm, CustomCondition,
         EffectTerm, ErrorCondition, FloatTerm, HashmapTerm, HashsetTerm, IntTerm, LambdaTerm,
@@ -49,16 +48,14 @@ impl<A: Arena> From<Rc<RefCell<A>>> for WasmTermFactory<A> {
 
 impl<A: Arena> WasmTermFactory<A>
 where
-    A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static,
+    A: ArenaAllocator,
+    Rc<RefCell<A>>: Arena,
 {
     pub fn import<T: Expression>(
         &self,
         expression: &T,
         factory: &impl ExpressionFactory<T>,
-    ) -> Result<WasmExpression<Self>, T>
-    where
-        T::Builtin: Into<Stdlib>,
-    {
+    ) -> Result<WasmExpression<Self>, T> {
         if let Some(_) = factory.match_nil_term(expression) {
             Ok(self.create_nil_term())
         } else if let Some(term) = factory.match_boolean_term(expression) {
@@ -115,9 +112,9 @@ where
         } else if let Some(term) = factory.match_recursive_term(expression) {
             let body = self.import(term.factory().as_deref(), factory)?;
             Ok(self.create_recursive_term(body))
-        } else if let Some(term) = factory.match_builtin_term(expression) {
-            let target: Stdlib = term.target().into();
-            Ok(self.create_builtin_term(target))
+        } else if let Some(_) = factory.match_builtin_term(expression) {
+            // TODO: Allow converting builtin terms across factories
+            Err(expression.clone())
         } else if let Some(term) = factory.match_compiled_function_term(expression) {
             let term = term.as_deref();
             let address = term.address();
@@ -211,10 +208,7 @@ where
         expression: &WasmExpression<Rc<RefCell<A>>>,
         factory: &impl ExpressionFactory<T>,
         allocator: &impl HeapAllocator<T>,
-    ) -> Result<T, WasmExpression<Rc<RefCell<A>>>>
-    where
-        T::Builtin: From<Stdlib>,
-    {
+    ) -> Result<T, WasmExpression<Rc<RefCell<A>>>> {
         if let Some(term) = expression.as_nil_term() {
             let _term = term.as_inner();
             Ok(factory.create_nil_term())
@@ -277,10 +271,9 @@ where
                 .collect::<Result<Vec<_>, _>>()?;
             let args = allocator.create_list(args);
             Ok(factory.create_partial_application_term(target, args))
-        } else if let Some(term) = expression.as_builtin_term() {
-            let term = term.as_inner();
-            let target: Stdlib = term.target().into();
-            Ok(factory.create_builtin_term(target))
+        } else if let Some(_) = expression.as_builtin_term() {
+            // TODO: Allow converting builtin terms across factories
+            Err(expression.clone())
         } else if let Some(term) = expression.as_record_term() {
             let term = term.as_inner();
             let keys = term
@@ -380,9 +373,9 @@ impl<A: Arena> Clone for WasmTermFactory<A> {
 
 impl<A: Arena> Arena for WasmTermFactory<A>
 where
-    A: for<'a> Arena<Slice<'a> = &'a [u8]> + 'static,
+    Rc<RefCell<A>>: Arena,
 {
-    type Slice<'a> = Ref<'a, [u8]>
+    type Slice<'a> = <Rc<RefCell<A>> as Arena>::Slice<'a>
     where
         Self: 'a;
     fn read_value<T, V>(&self, offset: ArenaPointer, selector: impl FnOnce(&T) -> V) -> V {
@@ -398,6 +391,7 @@ where
     fn as_slice<'a>(&'a self, offset: ArenaPointer, length: usize) -> Self::Slice<'a>
     where
         Self::Slice<'a>: 'a,
+        Self: 'a,
     {
         self.arena.as_slice(offset, length)
     }
@@ -405,25 +399,27 @@ where
 
 impl<A: Arena> ArenaAllocator for WasmTermFactory<A>
 where
-    A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static,
+    A: ArenaAllocator,
+    Rc<RefCell<A>>: Arena,
 {
     fn allocate<T: TermSize>(&mut self, value: T) -> ArenaPointer {
-        self.arena.allocate(value)
+        self.arena.borrow_mut().deref_mut().allocate(value)
     }
     fn extend(&mut self, offset: ArenaPointer, size: usize) {
-        self.arena.extend(offset, size)
+        self.arena.borrow_mut().deref_mut().extend(offset, size)
     }
     fn shrink(&mut self, offset: ArenaPointer, size: usize) {
-        self.arena.shrink(offset, size)
+        self.arena.borrow_mut().deref_mut().shrink(offset, size)
     }
     fn write<T: Sized>(&mut self, offset: ArenaPointer, value: T) {
-        self.arena.write(offset, value)
+        self.arena.borrow_mut().deref_mut().write(offset, value)
     }
 }
 
 impl<A: Arena> HeapAllocator<ArenaRef<Term, Self>> for WasmTermFactory<A>
 where
-    A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static,
+    A: ArenaAllocator,
+    Rc<RefCell<A>>: Arena,
 {
     fn create_list(
         &self,
@@ -638,11 +634,12 @@ where
 
 impl<A: Arena> ExpressionFactory<ArenaRef<Term, Self>> for WasmTermFactory<A>
 where
-    A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static,
+    A: ArenaAllocator,
+    Rc<RefCell<A>>: Arena,
 {
     fn create_nil_term(&self) -> ArenaRef<Term, Self> {
         let term = Term::new(TermType::Nil(NilTerm), &*self.arena.borrow());
-        let pointer = self.arena.borrow_mut().allocate(term);
+        let pointer = self.arena.borrow_mut().deref_mut().allocate(term);
         ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
@@ -651,13 +648,13 @@ where
             TermType::Boolean(BooleanTerm::from(value)),
             &*self.arena.borrow(),
         );
-        let pointer = self.arena.borrow_mut().allocate(term);
+        let pointer = self.arena.borrow_mut().deref_mut().allocate(term);
         ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
     fn create_int_term(&self, value: IntValue) -> ArenaRef<Term, Self> {
         let term = Term::new(TermType::Int(IntTerm::from(value)), &*self.arena.borrow());
-        let pointer = self.arena.borrow_mut().allocate(term);
+        let pointer = self.arena.borrow_mut().deref_mut().allocate(term);
         ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
@@ -666,7 +663,7 @@ where
             TermType::Float(FloatTerm::from(value)),
             &*self.arena.borrow(),
         );
-        let pointer = self.arena.borrow_mut().allocate(term);
+        let pointer = self.arena.borrow_mut().deref_mut().allocate(term);
         ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
@@ -689,7 +686,7 @@ where
             }),
             &*self.arena.borrow(),
         );
-        let pointer = self.arena.borrow_mut().allocate(term);
+        let pointer = self.arena.borrow_mut().deref_mut().allocate(term);
         ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
@@ -700,7 +697,7 @@ where
             }),
             &*self.arena.borrow(),
         );
-        let pointer = self.arena.borrow_mut().allocate(term);
+        let pointer = self.arena.borrow_mut().deref_mut().allocate(term);
         ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
@@ -718,7 +715,7 @@ where
             }),
             &*self.arena.borrow(),
         );
-        let pointer = self.arena.borrow_mut().allocate(term);
+        let pointer = self.arena.borrow_mut().deref_mut().allocate(term);
         ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
@@ -738,7 +735,7 @@ where
             }),
             &*self.arena.borrow(),
         );
-        let pointer = self.arena.borrow_mut().allocate(term);
+        let pointer = self.arena.borrow_mut().deref_mut().allocate(term);
         ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
@@ -758,7 +755,7 @@ where
             }),
             &*self.arena.borrow(),
         );
-        let pointer = self.arena.borrow_mut().allocate(term);
+        let pointer = self.arena.borrow_mut().deref_mut().allocate(term);
         ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
@@ -779,7 +776,7 @@ where
             }),
             &*self.arena.borrow(),
         );
-        let pointer = self.arena.borrow_mut().allocate(term);
+        let pointer = self.arena.borrow_mut().deref_mut().allocate(term);
         ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
@@ -799,7 +796,7 @@ where
             }),
             &*self.arena.borrow(),
         );
-        let pointer = self.arena.borrow_mut().allocate(term);
+        let pointer = self.arena.borrow_mut().deref_mut().allocate(term);
         ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
@@ -819,7 +816,7 @@ where
             })),
             &*self.arena.borrow(),
         );
-        let condition_pointer = self.arena.borrow_mut().allocate(condition_term);
+        let condition_pointer = self.arena.borrow_mut().deref_mut().allocate(condition_term);
         let signal_list_term = Term::new(
             TermType::Tree(TreeTerm {
                 left: condition_pointer,
@@ -828,7 +825,11 @@ where
             }),
             &*self.arena.borrow(),
         );
-        let signal_list_pointer = self.arena.borrow_mut().allocate(signal_list_term);
+        let signal_list_pointer = self
+            .arena
+            .borrow_mut()
+            .deref_mut()
+            .allocate(signal_list_term);
         let signal_list =
             ArenaRef::<TypedTerm<TreeTerm>, _>::new(self.clone(), signal_list_pointer);
         self.create_signal_term(signal_list)
@@ -843,7 +844,7 @@ where
             TermType::Builtin(BuiltinTerm::from(target)),
             &*self.arena.borrow(),
         );
-        let pointer = self.arena.borrow_mut().allocate(term);
+        let pointer = self.arena.borrow_mut().deref_mut().allocate(term);
         ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
@@ -893,7 +894,7 @@ where
             }),
             &*self.arena.borrow(),
         );
-        let pointer = self.arena.borrow_mut().allocate(term);
+        let pointer = self.arena.borrow_mut().deref_mut().allocate(term);
         ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
@@ -911,7 +912,7 @@ where
             }),
             &*self.arena.borrow(),
         );
-        let pointer = self.arena.borrow_mut().allocate(term);
+        let pointer = self.arena.borrow_mut().deref_mut().allocate(term);
         ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
@@ -954,7 +955,7 @@ where
             .create_hashmap_term(values.into_iter().map(|value| (value, nil.clone())))
             .as_pointer();
         let term = HashsetTerm { entries };
-        let pointer = self.arena.borrow_mut().allocate(term);
+        let pointer = self.arena.borrow_mut().deref_mut().allocate(term);
         ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
@@ -972,7 +973,7 @@ where
             }),
             &*self.arena.borrow(),
         );
-        let pointer = self.arena.borrow_mut().allocate(term);
+        let pointer = self.arena.borrow_mut().deref_mut().allocate(term);
         ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 

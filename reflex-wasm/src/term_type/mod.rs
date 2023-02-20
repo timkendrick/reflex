@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
-use std::{collections::HashSet, marker::PhantomData};
+use std::{cell::RefCell, collections::HashSet, marker::PhantomData, rc::Rc};
 
 use reflex::{
     core::{
@@ -773,8 +773,10 @@ pub enum WasmIteratorTerm<A: Arena + Clone> {
 
 impl<A: Arena + Clone> IteratorTermType<WasmExpression<A>> for WasmIteratorTerm<A> {}
 
-impl<A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static + Clone>
-    IteratorExpressionFactory<ArenaRef<Term, Self>> for WasmTermFactory<A>
+impl<A: Arena> IteratorExpressionFactory<ArenaRef<Term, Self>> for WasmTermFactory<A>
+where
+    A: ArenaAllocator,
+    Rc<RefCell<A>>: Arena,
 {
     fn match_iterator_term<'a>(
         &self,

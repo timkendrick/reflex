@@ -44,7 +44,7 @@ fn main() -> Result<()> {
     // TODO: allow compiling user-provided expressions
     let mut arena = VecAllocator::default();
     let term_pointer = arena.allocate(Term::new(TermType::Int(IntTerm::from(5)), &arena));
-    let arena = Rc::new(RefCell::new(arena));
+    let arena = Rc::new(RefCell::new(&mut arena));
     let expression: ArenaRef<Term, _> = ArenaRef::new(arena.clone(), term_pointer);
 
     // Compile the expression into a WASM module

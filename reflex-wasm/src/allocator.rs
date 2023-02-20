@@ -25,7 +25,8 @@ pub trait Arena {
     ) -> ArenaPointer;
     fn as_slice<'a>(&'a self, offset: ArenaPointer, length: usize) -> Self::Slice<'a>
     where
-        Self::Slice<'a>: 'a;
+        Self::Slice<'a>: 'a,
+        Self: 'a;
 }
 
 pub trait ArenaAllocator: Arena {
@@ -33,106 +34,6 @@ pub trait ArenaAllocator: Arena {
     fn extend(&mut self, offset: ArenaPointer, size: usize);
     fn shrink(&mut self, offset: ArenaPointer, size: usize);
     fn write<T: Sized>(&mut self, offset: ArenaPointer, value: T);
-}
-
-impl<'heap, A: Arena> Arena for &'heap A {
-    type Slice<'a> = A::Slice<'a>
-    where
-        Self: 'a;
-    fn read_value<T, V>(&self, offset: ArenaPointer, selector: impl FnOnce(&T) -> V) -> V {
-        self.deref().read_value::<T, V>(offset, selector)
-    }
-    fn inner_pointer<T, V>(
-        &self,
-        offset: ArenaPointer,
-        selector: impl FnOnce(&T) -> &V,
-    ) -> ArenaPointer {
-        self.deref().inner_pointer::<T, V>(offset, selector)
-    }
-    fn as_slice<'a>(&'a self, offset: ArenaPointer, length: usize) -> Self::Slice<'a>
-    where
-        Self::Slice<'a>: 'a,
-    {
-        self.deref().as_slice(offset, length)
-    }
-}
-
-impl<'heap, A: Arena> Arena for &'heap mut A {
-    type Slice<'a> = A::Slice<'a>
-    where
-        Self: 'a;
-    fn read_value<T, V>(&self, offset: ArenaPointer, selector: impl FnOnce(&T) -> V) -> V {
-        self.deref().read_value::<T, V>(offset, selector)
-    }
-    fn inner_pointer<T, V>(
-        &self,
-        offset: ArenaPointer,
-        selector: impl FnOnce(&T) -> &V,
-    ) -> ArenaPointer {
-        self.deref().inner_pointer::<T, V>(offset, selector)
-    }
-    fn as_slice<'a>(&'a self, offset: ArenaPointer, length: usize) -> Self::Slice<'a>
-    where
-        Self::Slice<'a>: 'a,
-    {
-        self.deref().as_slice(offset, length)
-    }
-}
-
-impl<'heap, A: ArenaAllocator> ArenaAllocator for &'heap mut A {
-    fn allocate<T: TermSize>(&mut self, value: T) -> ArenaPointer {
-        self.deref_mut().allocate(value)
-    }
-    fn extend(&mut self, offset: ArenaPointer, size: usize) {
-        self.deref_mut().extend(offset, size)
-    }
-    fn shrink(&mut self, offset: ArenaPointer, size: usize) {
-        self.deref_mut().shrink(offset, size)
-    }
-    fn write<T: Sized>(&mut self, offset: ArenaPointer, value: T) {
-        self.deref_mut().write(offset, value)
-    }
-}
-
-impl<A: for<'a> Arena<Slice<'a> = &'a [u8]> + 'static> Arena for Rc<RefCell<A>> {
-    type Slice<'a> = Ref<'a, [u8]>
-        where
-            Self: 'a;
-    fn read_value<T, V>(&self, offset: ArenaPointer, selector: impl FnOnce(&T) -> V) -> V {
-        self.deref().borrow().read_value::<T, V>(offset, selector)
-    }
-    fn inner_pointer<T, V>(
-        &self,
-        offset: ArenaPointer,
-        selector: impl FnOnce(&T) -> &V,
-    ) -> ArenaPointer {
-        self.deref()
-            .borrow()
-            .inner_pointer::<T, V>(offset, selector)
-    }
-    fn as_slice<'a>(&'a self, offset: ArenaPointer, length: usize) -> Self::Slice<'a>
-    where
-        Self::Slice<'a>: 'a,
-    {
-        Ref::map(self.deref().borrow(), |arena| {
-            arena.as_slice(offset, length)
-        })
-    }
-}
-
-impl<A: for<'a> ArenaAllocator<Slice<'a> = &'a [u8]> + 'static> ArenaAllocator for Rc<RefCell<A>> {
-    fn allocate<T: TermSize>(&mut self, value: T) -> ArenaPointer {
-        self.deref().borrow_mut().allocate(value)
-    }
-    fn extend(&mut self, offset: ArenaPointer, size: usize) {
-        self.deref().borrow_mut().extend(offset, size)
-    }
-    fn shrink(&mut self, offset: ArenaPointer, size: usize) {
-        self.deref().borrow_mut().shrink(offset, size)
-    }
-    fn write<T: Sized>(&mut self, offset: ArenaPointer, value: T) {
-        self.deref().borrow_mut().write(offset, value)
-    }
 }
 
 pub struct VecAllocator(Vec<u32>);
@@ -291,6 +192,111 @@ impl ArenaAllocator for VecAllocator {
     }
     fn write<T: Sized>(&mut self, offset: ArenaPointer, value: T) {
         *self.get_mut::<T>(offset) = value
+    }
+}
+
+// TODO: Abstract reference-wrapped arena types into blanket trait implementation
+
+impl<'heap> Arena for &'heap VecAllocator {
+    type Slice<'a> = &'a [u8]
+    where
+        Self: 'a;
+    fn read_value<T, V>(&self, offset: ArenaPointer, selector: impl FnOnce(&T) -> V) -> V {
+        self.deref().read_value::<T, V>(offset, selector)
+    }
+    fn inner_pointer<T, V>(
+        &self,
+        offset: ArenaPointer,
+        selector: impl FnOnce(&T) -> &V,
+    ) -> ArenaPointer {
+        self.deref().inner_pointer::<T, V>(offset, selector)
+    }
+    fn as_slice<'a>(&'a self, offset: ArenaPointer, length: usize) -> Self::Slice<'a>
+    where
+        Self::Slice<'a>: 'a,
+        Self: 'a,
+    {
+        self.deref().as_slice(offset, length)
+    }
+}
+
+impl<'heap> Arena for &'heap mut VecAllocator {
+    type Slice<'a> = &'a [u8]
+    where
+        Self: 'a;
+    fn read_value<T, V>(&self, offset: ArenaPointer, selector: impl FnOnce(&T) -> V) -> V {
+        self.deref().read_value::<T, V>(offset, selector)
+    }
+    fn inner_pointer<T, V>(
+        &self,
+        offset: ArenaPointer,
+        selector: impl FnOnce(&T) -> &V,
+    ) -> ArenaPointer {
+        self.deref().inner_pointer::<T, V>(offset, selector)
+    }
+    fn as_slice<'a>(&'a self, offset: ArenaPointer, length: usize) -> Self::Slice<'a>
+    where
+        Self::Slice<'a>: 'a,
+        Self: 'a,
+    {
+        self.deref().as_slice(offset, length)
+    }
+}
+
+impl<'heap> ArenaAllocator for &'heap mut VecAllocator {
+    fn allocate<T: TermSize>(&mut self, value: T) -> ArenaPointer {
+        self.deref_mut().allocate(value)
+    }
+    fn extend(&mut self, offset: ArenaPointer, size: usize) {
+        self.deref_mut().extend(offset, size)
+    }
+    fn shrink(&mut self, offset: ArenaPointer, size: usize) {
+        self.deref_mut().shrink(offset, size)
+    }
+    fn write<T: Sized>(&mut self, offset: ArenaPointer, value: T) {
+        self.deref_mut().write(offset, value)
+    }
+}
+
+impl<'heap> Arena for Rc<RefCell<&'heap mut VecAllocator>> {
+    type Slice<'a> = Ref<'a, [u8]>
+        where
+            Self: 'a;
+    fn read_value<T, V>(&self, offset: ArenaPointer, selector: impl FnOnce(&T) -> V) -> V {
+        self.deref().borrow().read_value::<T, V>(offset, selector)
+    }
+    fn inner_pointer<T, V>(
+        &self,
+        offset: ArenaPointer,
+        selector: impl FnOnce(&T) -> &V,
+    ) -> ArenaPointer {
+        self.deref()
+            .borrow()
+            .inner_pointer::<T, V>(offset, selector)
+    }
+    fn as_slice<'a>(&'a self, offset: ArenaPointer, length: usize) -> Self::Slice<'a>
+    where
+        Self::Slice<'a>: 'a,
+        Self: 'a,
+    {
+        Ref::map(self.deref().borrow(), |arena| {
+            arena.as_slice(offset, length)
+        })
+    }
+}
+
+impl<'heap> ArenaAllocator for Rc<RefCell<&'heap mut VecAllocator>> {
+    fn allocate<T: TermSize>(&mut self, value: T) -> ArenaPointer {
+        self.deref().borrow_mut().allocate(value)
+    }
+    fn extend(&mut self, offset: ArenaPointer, size: usize) {
+        self.deref().borrow_mut().extend(offset, size)
+    }
+    fn shrink(&mut self, offset: ArenaPointer, size: usize) {
+        self.deref().borrow_mut().shrink(offset, size)
+    }
+    fn write<T: Sized>(&mut self, offset: ArenaPointer, value: T) {
+        self.deref().borrow_mut().write(offset, value)
     }
 }
 

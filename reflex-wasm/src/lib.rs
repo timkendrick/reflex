@@ -10,6 +10,11 @@ use hash::{TermHash, TermHashState, TermHasher, TermSize};
 use reflex::{core::RefType, hash::HashId};
 use term_type::*;
 
+pub use anyhow;
+pub use wasi_common;
+pub use wasmtime;
+pub use wasmtime_wasi;
+
 pub mod allocator;
 pub mod cli;
 pub mod compiler;

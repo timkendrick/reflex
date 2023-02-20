@@ -134,7 +134,7 @@ mod tests {
             &source_arena,
         ));
 
-        let source_arena = Rc::new(RefCell::new(source_arena));
+        let source_arena = Rc::new(RefCell::new(&mut source_arena));
         let root_ref = ArenaRef::<Term, _>::new(source_arena.clone(), root);
 
         let leaf_ref = ArenaRef::<Term, _>::new(source_arena.clone(), leaf);
@@ -161,7 +161,7 @@ mod tests {
             SerializerState::new(heap_values, next_offset)
         };
 
-        let mut target_arena = Rc::new(RefCell::new(target_arena));
+        let mut target_arena = Rc::new(RefCell::new(&mut target_arena));
 
         let serialized_expression = root_ref.serialize(&mut target_arena, &mut serializer_state);
 

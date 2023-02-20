@@ -517,16 +517,16 @@ mod tests {
         let mut arena = VecAllocator::default();
         let term_pointer = arena.allocate(Term::new(TermType::Int(IntTerm::from(5)), &arena));
 
-        let arena = Rc::new(RefCell::new(arena));
+        let arena = Rc::new(RefCell::new(&mut arena));
         let expression = WasmExpression::new(arena.clone(), term_pointer);
 
         let wasm_bytes = compile_module([("foo".into(), expression)], RUNTIME_BYTES).unwrap();
 
-        let interpreter = create_mock_wasm_interpreter(&wasm_bytes).unwrap();
+        let mut interpreter = create_mock_wasm_interpreter(&wasm_bytes).unwrap();
 
         let state = ArenaPointer::null();
 
-        let interpreter = Rc::new(RefCell::new(interpreter));
+        let interpreter = Rc::new(RefCell::new(&mut interpreter));
         let result = interpreter
             .deref()
             .borrow_mut()
@@ -574,16 +574,16 @@ mod tests {
             ));
         }
 
-        let arena = Rc::new(RefCell::new(arena));
+        let arena = Rc::new(RefCell::new(&mut arena));
         let expression = WasmExpression::new(arena.clone(), current);
 
         let wasm_bytes = compile_module([("foo".into(), expression)], RUNTIME_BYTES).unwrap();
 
-        let interpreter = create_mock_wasm_interpreter(&wasm_bytes).unwrap();
+        let mut interpreter = create_mock_wasm_interpreter(&wasm_bytes).unwrap();
 
         let state = ArenaPointer::null();
 
-        let interpreter = Rc::new(RefCell::new(interpreter));
+        let interpreter = Rc::new(RefCell::new(&mut interpreter));
 
         let result = interpreter
             .deref()

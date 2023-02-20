@@ -2,7 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
-use std::{cell::RefCell, ops::Deref, path::Path, rc::Rc};
+use std::{
+    cell::{Ref, RefCell},
+    ops::{Deref, DerefMut},
+    path::Path,
+    rc::Rc,
+};
 
 use wasmtime::{
     Engine, ExternType, Instance, IntoFunc, Linker, Memory, Module, Store, Val, WasmParams,
@@ -23,8 +28,8 @@ use crate::{
 const WASM_PAGE_SIZE: usize = 64 * 1024;
 
 pub struct UnboundEvaluationResult {
-    result_pointer: ArenaPointer,
-    dependencies_pointer: Option<ArenaPointer>,
+    pub result_pointer: ArenaPointer,
+    pub dependencies_pointer: Option<ArenaPointer>,
 }
 
 impl UnboundEvaluationResult {
@@ -37,7 +42,7 @@ impl UnboundEvaluationResult {
     }
 }
 
-impl PointerIter for Rc<RefCell<WasmInterpreter>> {
+impl<'heap> PointerIter for Rc<RefCell<&'heap mut WasmInterpreter>> {
     type Iter<'a> = ArenaIterator<'a, Term, Self>
     where
         Self: 'a;
@@ -403,6 +408,7 @@ impl Arena for WasmContext {
     fn as_slice<'a>(&'a self, offset: ArenaPointer, length: usize) -> Self::Slice<'a>
     where
         Self::Slice<'a>: 'a,
+        Self: 'a,
     {
         let data = self.data();
         let offset = u32::from(offset) as usize;
@@ -474,6 +480,7 @@ impl Arena for WasmInterpreter {
     fn as_slice<'a>(&'a self, offset: ArenaPointer, length: usize) -> Self::Slice<'a>
     where
         Self::Slice<'a>: 'a,
+        Self: 'a,
     {
         <WasmContext as Arena>::as_slice(&self.0, offset, length)
     }
@@ -494,6 +501,111 @@ impl ArenaAllocator for WasmInterpreter {
     }
 }
 
+// TODO: Abstract reference-wrapped arena types into blanket trait implementation
+
+impl<'heap> Arena for &'heap WasmInterpreter {
+    type Slice<'a> = &'a [u8]
+    where
+        Self: 'a;
+    fn read_value<T, V>(&self, offset: ArenaPointer, selector: impl FnOnce(&T) -> V) -> V {
+        self.deref().read_value::<T, V>(offset, selector)
+    }
+    fn inner_pointer<T, V>(
+        &self,
+        offset: ArenaPointer,
+        selector: impl FnOnce(&T) -> &V,
+    ) -> ArenaPointer {
+        self.deref().inner_pointer::<T, V>(offset, selector)
+    }
+    fn as_slice<'a>(&'a self, offset: ArenaPointer, length: usize) -> Self::Slice<'a>
+    where
+        Self::Slice<'a>: 'a,
+        Self: 'a,
+    {
+        self.deref().as_slice(offset, length)
+    }
+}
+
+impl<'heap> Arena for &'heap mut WasmInterpreter {
+    type Slice<'a> = &'a [u8]
+    where
+        Self: 'a;
+    fn read_value<T, V>(&self, offset: ArenaPointer, selector: impl FnOnce(&T) -> V) -> V {
+        self.deref().read_value::<T, V>(offset, selector)
+    }
+    fn inner_pointer<T, V>(
+        &self,
+        offset: ArenaPointer,
+        selector: impl FnOnce(&T) -> &V,
+    ) -> ArenaPointer {
+        self.deref().inner_pointer::<T, V>(offset, selector)
+    }
+    fn as_slice<'a>(&'a self, offset: ArenaPointer, length: usize) -> Self::Slice<'a>
+    where
+        Self::Slice<'a>: 'a,
+        Self: 'a,
+    {
+        self.deref().as_slice(offset, length)
+    }
+}
+
+impl<'heap> ArenaAllocator for &'heap mut WasmInterpreter {
+    fn allocate<T: TermSize>(&mut self, value: T) -> ArenaPointer {
+        self.deref_mut().allocate(value)
+    }
+    fn extend(&mut self, offset: ArenaPointer, size: usize) {
+        self.deref_mut().extend(offset, size)
+    }
+    fn shrink(&mut self, offset: ArenaPointer, size: usize) {
+        self.deref_mut().shrink(offset, size)
+    }
+    fn write<T: Sized>(&mut self, offset: ArenaPointer, value: T) {
+        self.deref_mut().write(offset, value)
+    }
+}
+
+impl<'heap> Arena for Rc<RefCell<&'heap mut WasmInterpreter>> {
+    type Slice<'a> = Ref<'a, [u8]>
+        where
+            Self: 'a;
+    fn read_value<T, V>(&self, offset: ArenaPointer, selector: impl FnOnce(&T) -> V) -> V {
+        self.deref().borrow().read_value::<T, V>(offset, selector)
+    }
+    fn inner_pointer<T, V>(
+        &self,
+        offset: ArenaPointer,
+        selector: impl FnOnce(&T) -> &V,
+    ) -> ArenaPointer {
+        self.deref()
+            .borrow()
+            .inner_pointer::<T, V>(offset, selector)
+    }
+    fn as_slice<'a>(&'a self, offset: ArenaPointer, length: usize) -> Self::Slice<'a>
+    where
+        Self::Slice<'a>: 'a,
+        Self: 'a,
+    {
+        Ref::map(self.deref().borrow(), |arena| {
+            arena.as_slice(offset, length)
+        })
+    }
+}
+
+impl<'heap> ArenaAllocator for Rc<RefCell<&'heap mut WasmInterpreter>> {
+    fn allocate<T: TermSize>(&mut self, value: T) -> ArenaPointer {
+        self.deref().borrow_mut().allocate(value)
+    }
+    fn extend(&mut self, offset: ArenaPointer, size: usize) {
+        self.deref().borrow_mut().extend(offset, size)
+    }
+    fn shrink(&mut self, offset: ArenaPointer, size: usize) {
+        self.deref().borrow_mut().shrink(offset, size)
+    }
+    fn write<T: Sized>(&mut self, offset: ArenaPointer, value: T) {
+        self.deref().borrow_mut().write(offset, value)
+    }
+}
+
 pub mod mocks {
 
     use super::{InterpreterError, WasmContextBuilder};
@@ -503,7 +615,7 @@ pub mod mocks {
     ) -> Result<WasmContextBuilder, InterpreterError> {
         builder
             .add_import("Date", "parse", |_: u32, _: u32| 0u64)?
-            .add_import("Date", "toISOString", |_: u64, _: u32| 0u32)?
+            .add_import("Date", "toISOString", |_: i64, _: u32| 0u32)?
             .add_import("Number", "toString", |_: f64, _: u32| 0u32)?
             .add_import("Math", "remainder", |_: f64, _: f64| 0f64)?
             .add_import("Math", "acos", |_: f64| 0f64)?
@@ -527,8 +639,8 @@ pub mod mocks {
             .add_import("Math", "sin", |_: f64| 0f64)?
             .add_import("Math", "sinh", |_: f64| 0f64)?
             .add_import("Math", "sqrt", |_: f64| 0f64)?
-            .add_import("Math", "tan", |_: f64, _: f64| 0f64)?
-            .add_import("Math", "tanh", |_: f64, _: f64| 0f64)
+            .add_import("Math", "tan", |_: f64| 0f64)?
+            .add_import("Math", "tanh", |_: f64| 0f64)
     }
 }
 
@@ -571,7 +683,7 @@ mod tests {
 
         let state = HashmapTerm::allocate(std::iter::empty(), &mut interpreter);
 
-        let interpreter = Rc::new(RefCell::new(interpreter));
+        let interpreter = Rc::new(RefCell::new(&mut interpreter));
 
         let interpreter_result = interpreter
             .deref()
@@ -624,7 +736,7 @@ mod tests {
 
         let state = HashmapTerm::allocate(std::iter::empty(), &mut interpreter);
 
-        let interpreter = Rc::new(RefCell::new(interpreter));
+        let interpreter = Rc::new(RefCell::new(&mut interpreter));
 
         let interpreter_result = interpreter
             .deref()
@@ -722,7 +834,7 @@ mod tests {
         );
         let expected_result = interpreter.allocate(expected_result);
 
-        let interpreter = Rc::new(RefCell::new(interpreter));
+        let interpreter = Rc::new(RefCell::new(&mut interpreter));
 
         let interpreter_result = interpreter
             .deref()
