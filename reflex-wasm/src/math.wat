@@ -25,5 +25,5 @@
   (func $Utils::f64::sin (import "Math" "sin") (param f64) (result f64))
   (func $Utils::f64::sinh (import "Math" "sinh") (param f64) (result f64))
   (func $Utils::f64::sqrt (import "Math" "sqrt") (param f64) (result f64))
-  (func $Utils::f64::tan (import "Math" "tan") (param f64 f64) (result f64))
-  (func $Utils::f64::tanh (import "Math" "tanh") (param f64 f64) (result f64)))
+  (func $Utils::f64::tan (import "Math" "tan") (param f64) (result f64))
+  (func $Utils::f64::tanh (import "Math" "tanh") (param f64) (result f64)))
