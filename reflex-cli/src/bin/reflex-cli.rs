@@ -81,7 +81,7 @@ use reflex_runtime::{
     runtime_actors,
     task::{
         bytecode_worker::BytecodeWorkerTaskFactory, evaluate_handler::EffectThrottleTaskFactory,
-        RuntimeTask, RuntimeTaskAction, RuntimeTaskFactory,
+        wasm_worker::WasmWorkerTaskFactory, RuntimeTask, RuntimeTaskAction, RuntimeTaskFactory,
     },
     AsyncExpression, AsyncExpressionFactory, AsyncHeapAllocator, QueryEvaluationMode,
     QueryInvalidationStrategy,
@@ -1207,6 +1207,28 @@ where
     TMetricLabels: BytecodeInterpreterMetricLabels + Send + 'static,
 {
     fn from(value: BytecodeWorkerTaskFactory<T, TFactory, TAllocator>) -> Self {
+        Self::from(CliTaskFactory::Runtime(RuntimeTaskFactory::from(value)))
+    }
+}
+
+impl<T, TFactory, TAllocator, TConnect, TReconnect, TMetricLabels>
+    From<WasmWorkerTaskFactory<T, TFactory, TAllocator>>
+    for CliActorFactory<T, TFactory, TAllocator, TConnect, TReconnect, TMetricLabels>
+where
+    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
+    T::String: Send,
+    T::Builtin: Send,
+    T::Signal: Send,
+    T::SignalList: Send,
+    T::StructPrototype: Send,
+    T::ExpressionList: Send,
+    TFactory: AsyncExpressionFactory<T> + Default,
+    TAllocator: AsyncHeapAllocator<T> + Default,
+    TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
+    TReconnect: ReconnectTimeout + Send + Clone + 'static,
+    TMetricLabels: BytecodeInterpreterMetricLabels + Send + 'static,
+{
+    fn from(value: WasmWorkerTaskFactory<T, TFactory, TAllocator>) -> Self {
         Self::from(CliTaskFactory::Runtime(RuntimeTaskFactory::from(value)))
     }
 }

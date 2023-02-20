@@ -2951,6 +2951,7 @@ dependencies = [
  "reflex-json",
  "reflex-macros",
  "reflex-utils",
+ "reflex-wasm",
  "serde",
 ]
 

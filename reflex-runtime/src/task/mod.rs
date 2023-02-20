@@ -12,25 +12,30 @@ use reflex_macros::{blanket_trait, task_factory_enum, Matcher};
 use crate::{
     task::{
         bytecode_worker::{BytecodeWorkerAction, BytecodeWorkerTask, BytecodeWorkerTaskFactory},
-        evaluate_handler::EffectThrottleTaskFactory,
+        evaluate_handler::{
+            EffectThrottleTaskFactory, EvaluateHandlerTask, EvaluateHandlerTaskAction,
+        },
+        wasm_worker::{WasmWorkerAction, WasmWorkerTask, WasmWorkerTaskFactory},
     },
     AsyncExpression, AsyncExpressionFactory, AsyncHeapAllocator,
 };
 
-use self::evaluate_handler::{EvaluateHandlerTask, EvaluateHandlerTaskAction};
-
 pub mod bytecode_worker;
 pub mod evaluate_handler;
+pub mod wasm_worker;
 
 blanket_trait!(
     pub trait RuntimeTaskAction<T: Expression>:
-        BytecodeWorkerAction<T> + EvaluateHandlerTaskAction
+        BytecodeWorkerAction<T> + WasmWorkerAction<T> + EvaluateHandlerTaskAction
     {
     }
 );
+
 blanket_trait!(
     pub trait RuntimeTask<T, TFactory, TAllocator>:
-        EvaluateHandlerTask + BytecodeWorkerTask<T, TFactory, TAllocator>
+        EvaluateHandlerTask
+        + BytecodeWorkerTask<T, TFactory, TAllocator>
+        + WasmWorkerTask<T, TFactory, TAllocator>
     where
         T: Expression,
         TFactory: ExpressionFactory<T>,
@@ -49,6 +54,7 @@ task_factory_enum!({
         TAllocator: HeapAllocator<T>,
     {
         BytecodeWorker(BytecodeWorkerTaskFactory<T, TFactory, TAllocator>),
+        WasmWorker(WasmWorkerTaskFactory<T, TFactory, TAllocator>),
         EvaluateHandler(EffectThrottleTaskFactory),
     }
     impl<T, TFactory, TAllocator, TAction, TTask> TaskFactory<TAction, TTask>

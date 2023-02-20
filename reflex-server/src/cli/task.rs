@@ -21,12 +21,15 @@ use reflex_handlers::{
 use reflex_interpreter::compiler::Compile;
 use reflex_macros::{blanket_trait, task_factory_enum, Matcher};
 use reflex_runtime::{
-    actor::bytecode_interpreter::{
-        BytecodeInterpreter, BytecodeInterpreterAction, BytecodeInterpreterMetricLabels,
+    actor::{
+        bytecode_interpreter::{
+            BytecodeInterpreter, BytecodeInterpreterAction, BytecodeInterpreterMetricLabels,
+        },
+        wasm_interpreter::WasmInterpreter,
     },
     task::{
         bytecode_worker::BytecodeWorkerTaskFactory, evaluate_handler::EffectThrottleTaskFactory,
-        RuntimeTask, RuntimeTaskFactory,
+        wasm_worker::WasmWorkerTaskFactory, RuntimeTask, RuntimeTaskFactory,
     },
     AsyncExpression, AsyncExpressionFactory, AsyncHeapAllocator,
 };
@@ -131,6 +134,7 @@ task_factory_enum!({
             >,
         ),
         BytecodeInterpreter(BytecodeInterpreter<T, TFactory, TAllocator, TWorkerMetricLabels>),
+        WasmInterpreter(WasmInterpreter<T, TFactory, TAllocator, TWorkerMetricLabels>),
         Handler(HandlerActor<T, TFactory, TAllocator, TConnect, TReconnect>),
         Main(Redispatcher),
     }
@@ -357,6 +361,67 @@ where
 {
     fn from(value: BytecodeInterpreter<T, TFactory, TAllocator, TWorkerMetricLabels>) -> Self {
         Self::BytecodeInterpreter(value)
+    }
+}
+
+impl<
+        T,
+        TFactory,
+        TAllocator,
+        TConnect,
+        TReconnect,
+        TTransformHttp,
+        TTransformWs,
+        TGraphQlQueryLabel,
+        THttpMetricLabels,
+        TConnectionMetricLabels,
+        TWorkerMetricLabels,
+        TOperationMetricLabels,
+        TTracer,
+        TAction,
+    > From<WasmInterpreter<T, TFactory, TAllocator, TWorkerMetricLabels>>
+    for ServerCliTaskActor<
+        T,
+        TFactory,
+        TAllocator,
+        TConnect,
+        TReconnect,
+        TTransformHttp,
+        TTransformWs,
+        TGraphQlQueryLabel,
+        THttpMetricLabels,
+        TConnectionMetricLabels,
+        TWorkerMetricLabels,
+        TOperationMetricLabels,
+        TTracer,
+        TAction,
+    >
+where
+    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
+    T::String: Send,
+    T::Builtin: Send,
+    T::Signal: Send,
+    T::SignalList: Send,
+    T::StructPrototype: Send,
+    T::ExpressionList: Send,
+    T::Builtin: GraphQlParserBuiltin,
+    TFactory: AsyncExpressionFactory<T> + Default,
+    TAllocator: AsyncHeapAllocator<T> + Default,
+    TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
+    TReconnect: ReconnectTimeout + Send + Clone + 'static,
+    TTransformHttp: HttpGraphQlServerQueryTransform,
+    TTransformWs: WebSocketGraphQlServerQueryTransform,
+    TGraphQlQueryLabel: GraphQlServerQueryLabel,
+    THttpMetricLabels: HttpGraphQlServerQueryMetricLabels,
+    TConnectionMetricLabels: WebSocketGraphQlServerConnectionMetricLabels,
+    TOperationMetricLabels: GraphQlServerOperationMetricLabels,
+    TWorkerMetricLabels: BytecodeInterpreterMetricLabels,
+    TTracer: Tracer,
+    TTracer::Span: Send + Sync + 'static,
+    TAction: Action + ServerCliTaskAction<T> + Send + 'static,
+{
+    fn from(value: WasmInterpreter<T, TFactory, TAllocator, TWorkerMetricLabels>) -> Self {
+        Self::WasmInterpreter(value)
     }
 }
 
@@ -710,6 +775,64 @@ where
     TTracer::Span: Send + Sync + 'static,
 {
     fn from(value: BytecodeWorkerTaskFactory<T, TFactory, TAllocator>) -> Self {
+        Self::ServerTask(ServerTaskFactory::from(value))
+    }
+}
+
+impl<
+        T,
+        TFactory,
+        TAllocator,
+        TConnect,
+        TReconnect,
+        TTransformHttp,
+        TTransformWs,
+        TGraphQlQueryLabel,
+        THttpMetricLabels,
+        TConnectionMetricLabels,
+        TWorkerMetricLabels,
+        TOperationMetricLabels,
+        TTracer,
+    > From<WasmWorkerTaskFactory<T, TFactory, TAllocator>>
+    for ServerCliTaskFactory<
+        T,
+        TFactory,
+        TAllocator,
+        TConnect,
+        TReconnect,
+        TTransformHttp,
+        TTransformWs,
+        TGraphQlQueryLabel,
+        THttpMetricLabels,
+        TConnectionMetricLabels,
+        TWorkerMetricLabels,
+        TOperationMetricLabels,
+        TTracer,
+    >
+where
+    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
+    T::String: Send,
+    T::Builtin: Send,
+    T::Signal: Send,
+    T::SignalList: Send,
+    T::StructPrototype: Send,
+    T::ExpressionList: Send,
+    T::Builtin: GraphQlParserBuiltin,
+    TFactory: AsyncExpressionFactory<T> + Default,
+    TAllocator: AsyncHeapAllocator<T> + Default,
+    TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
+    TReconnect: ReconnectTimeout + Send + Clone + 'static,
+    TTransformHttp: HttpGraphQlServerQueryTransform,
+    TTransformWs: WebSocketGraphQlServerQueryTransform,
+    TGraphQlQueryLabel: GraphQlServerQueryLabel,
+    THttpMetricLabels: HttpGraphQlServerQueryMetricLabels,
+    TConnectionMetricLabels: WebSocketGraphQlServerConnectionMetricLabels,
+    TOperationMetricLabels: GraphQlServerOperationMetricLabels,
+    TWorkerMetricLabels: BytecodeInterpreterMetricLabels,
+    TTracer: Tracer,
+    TTracer::Span: Send + Sync + 'static,
+{
+    fn from(value: WasmWorkerTaskFactory<T, TFactory, TAllocator>) -> Self {
         Self::ServerTask(ServerTaskFactory::from(value))
     }
 }
