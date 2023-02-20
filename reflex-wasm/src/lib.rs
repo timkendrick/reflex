@@ -13,6 +13,7 @@ use term_type::*;
 pub mod allocator;
 pub mod cli;
 pub mod compiler;
+pub mod exports;
 pub mod factory;
 pub mod hash;
 pub mod interpreter;

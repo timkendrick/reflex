@@ -109,7 +109,22 @@ impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<DateTerm, A> {
 
 impl<A: Arena + Clone> std::fmt::Display for ArenaRef<DateTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let timestamp = self.timestamp();
+        std::fmt::Display::fmt(&DateTimestamp(self.timestamp()), f)
+    }
+}
+
+impl<A: Arena + Clone> Internable for ArenaRef<DateTerm, A> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        self.capture_depth() == 0
+    }
+}
+
+#[derive(Hash, PartialEq, Eq, Clone, Copy, Debug)]
+pub struct DateTimestamp(pub i64);
+
+impl std::fmt::Display for DateTimestamp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self(timestamp) = *self;
         let seconds = timestamp / 1000;
         let millis = timestamp % 10;
         let nanos = millis * 1000;
@@ -122,12 +137,6 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<DateTerm, A> {
             )
             .to_rfc3339_opts(SecondsFormat::AutoSi, true)
         )
-    }
-}
-
-impl<A: Arena + Clone> Internable for ArenaRef<DateTerm, A> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        self.capture_depth() == 0
     }
 }
 
