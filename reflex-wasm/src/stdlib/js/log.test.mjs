@@ -3,14 +3,10 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 export default (describe) => {
   describe('Stdlib_Log', (test) => {
-    test('(List)', (assert, {
+    test('(Int)', (assert, {
       createApplication,
       createBuiltin,
-      createErrorCondition,
       createInt,
-      createString,
-      createSignal,
-      createTriple,
       createUnitList,
       evaluate,
       format,
@@ -20,25 +16,7 @@ export default (describe) => {
       (() => {
         const expression = createApplication(
           createBuiltin(Stdlib.Log),
-          createUnitList(createTriple(createInt(3), createInt(4), createInt(5))),
-        );
-        const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '3');
-        assert.strictEqual(format(dependencies), 'NULL');
-      })();
-      (() => {
-        const expression = createApplication(
-          createBuiltin(Stdlib.Log),
-          createUnitList(
-            createTriple(
-              createInt(3),
-              createInt(4),
-              createApplication(
-                createBuiltin(Stdlib.Identity),
-                createUnitList(createSignal(createErrorCondition(createString('foo')))),
-              ),
-            ),
-          ),
+          createUnitList(createInt(3)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '3');
@@ -46,12 +24,11 @@ export default (describe) => {
       })();
     });
 
-    test('(Iterator)', (assert, {
+    test('(Int, Int, Signal)', (assert, {
       createApplication,
       createBuiltin,
       createErrorCondition,
       createInt,
-      createMapIterator,
       createString,
       createSignal,
       createTriple,
@@ -64,21 +41,15 @@ export default (describe) => {
       (() => {
         const expression = createApplication(
           createBuiltin(Stdlib.Log),
-          createUnitList(
-            createMapIterator(
-              createTriple(
-                createInt(3),
-                createInt(4),
-                createApplication(
-                  createBuiltin(Stdlib.Identity),
-                  createUnitList(createSignal(createErrorCondition(createString('foo')))),
-                ),
-              ),
+          createTriple(
+            createInt(3),
+            createInt(4),
+            createApplication(
               createBuiltin(Stdlib.Identity),
+              createUnitList(createSignal(createErrorCondition(createString('foo')))),
             ),
           ),
         );
-        debugger;
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '3');
         assert.strictEqual(format(dependencies), 'NULL');

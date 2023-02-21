@@ -29,6 +29,7 @@ export default (describe) => {
       assert.deepEqual(arity(createBuiltin(Stdlib.Abs)), [1, FALSE]);
       assert.deepEqual(arity(createBuiltin(Stdlib.Add)), [2, FALSE]);
       assert.deepEqual(arity(createBuiltin(Stdlib.Fold)), [3, FALSE]);
+      assert.deepEqual(arity(createBuiltin(Stdlib.Log)), [1, TRUE]);
     });
 
     test('builtin function applications', (assert, {

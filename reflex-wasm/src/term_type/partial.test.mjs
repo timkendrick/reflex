@@ -77,6 +77,13 @@ export default (describe) => {
         ),
         [0, FALSE],
       );
+      assert.deepEqual(arity(createPartial(createBuiltin(Stdlib.Log), createEmptyList())), [
+        1,
+        TRUE,
+      ]);
+      assert.deepEqual(
+        arity(createPartial(createBuiltin(Stdlib.Log), createUnitList(createInt(3)))),
+        [0, TRUE],
       );
     });
 
