@@ -158,20 +158,21 @@ export default (describe) => {
       createTriple,
       createUnitList,
       arity,
+      FALSE,
     }) => {
-      assert.strictEqual(arity(createConstructor(createEmptyList())), 0);
-      assert.strictEqual(arity(createConstructor(createUnitList(createString('foo')))), 1);
-      assert.strictEqual(
+      assert.deepEqual(arity(createConstructor(createEmptyList())), [0, FALSE]);
+      assert.deepEqual(arity(createConstructor(createUnitList(createString('foo')))), [1, FALSE]);
+      assert.deepEqual(
         arity(createConstructor(createPair(createString('foo'), createString('bar')))),
-        2,
+        [2, FALSE],
       );
-      assert.strictEqual(
+      assert.deepEqual(
         arity(
           createConstructor(
             createTriple(createString('foo'), createString('bar'), createString('baz')),
           ),
         ),
-        3,
+        [3, FALSE],
       );
     });
 

@@ -35,7 +35,10 @@
       (func $Stdlib_GraphQlResolver::impl::<apply> (param $self i32) (param $state i32) (result i32 i32)
         ;; TODO: Support resolver factories with optional/variadic arguments
         (local $arity i32)
-        (local.set $arity (call $Term::traits::arity (local.get $self)))
+        (call $Term::traits::arity (local.get $self))
+        ;; Ignore the variadic arity flag
+        (drop)
+        (local.set $arity)
         (@branch
           (local.get $arity)
           (@list

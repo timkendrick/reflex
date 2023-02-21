@@ -46,21 +46,39 @@ export default function builtinDirective(node, context) {
         $builtin_name: builtinIdentifier,
         $name: name,
         $arg_names: createListDirective({
-          elements: argDefinitions.map(({ identifier }) => identifier),
+          elements: argDefinitions
+            .filter(({ variadic }) => !variadic)
+            .map(({ identifier }) => identifier),
+          location: node.location,
+        }),
+        $vararg_names: createListDirective({
+          elements: argDefinitions
+            .filter(({ variadic }) => variadic)
+            .map(({ identifier }) => identifier),
           location: node.location,
         }),
         $eager_arg_names: createListDirective({
           elements: argDefinitions
-            .map(({ identifier, type }) =>
-              type === 'strict' || type === 'eager' ? identifier : null,
-            )
-            .filter(Boolean),
+            .filter(({ type, variadic }) => type === 'eager' && !variadic)
+            .map(({ identifier }) => identifier),
           location: node.location,
         }),
         $strict_arg_names: createListDirective({
           elements: argDefinitions
-            .map(({ identifier, type }) => (type === 'strict' ? identifier : null))
-            .filter(Boolean),
+            .filter(({ type, variadic }) => type === 'strict' && !variadic)
+            .map(({ identifier }) => identifier),
+          location: node.location,
+        }),
+        $eager_vararg_names: createListDirective({
+          elements: argDefinitions
+            .filter(({ type, variadic }) => type === 'eager' && variadic)
+            .map(({ identifier }) => identifier),
+          location: node.location,
+        }),
+        $strict_vararg_names: createListDirective({
+          elements: argDefinitions
+            .filter(({ type, variadic }) => type === 'strict' && variadic)
+            .map(({ identifier }) => identifier),
           location: node.location,
         }),
         $implementation_names: createListDirective({
@@ -90,10 +108,21 @@ function parseArgDefinitions(node) {
   const [_instruction, ...varArgs] = node.elements.filter((arg) => !isNonFunctionalNode(arg));
   const argTypes = varArgs.map((arg) => parseArgSignatureNode(arg));
   if (!argTypes.every(Boolean)) return null;
+  const variadicArgs = argTypes.filter(({ variadic }) => variadic);
+  if (
+    variadicArgs.length > 1 ||
+    (variadicArgs.length > 0 && !argTypes[argTypes.length - 1].variadic)
+  ) {
+    return null;
+  }
   return argTypes;
 }
 
 function parseArgSignatureNode(node) {
+  return parsePositionalArgSignatureNode(node) || parseVariadicArgSignatureNode(node);
+}
+
+function parsePositionalArgSignatureNode(node) {
   return (
     parseStrictArgSignatureNode(node) ||
     parseEagerArgSignatureNode(node) ||
@@ -107,7 +136,7 @@ function parseStrictArgSignatureNode(node) {
     (node) => !isNonFunctionalNode(node),
   );
   if (!argName || !isTermNode(argName) || varArgs.length > 0) return null;
-  return { identifier: argName, type: 'strict' };
+  return { identifier: argName, type: 'strict', variadic: false, location: node.location };
 }
 
 function parseEagerArgSignatureNode(node) {
@@ -116,7 +145,7 @@ function parseEagerArgSignatureNode(node) {
     (node) => !isNonFunctionalNode(node),
   );
   if (!argName || !isTermNode(argName) || varArgs.length > 0) return null;
-  return { identifier: argName, type: 'eager' };
+  return { identifier: argName, type: 'eager', variadic: false, location: node.location };
 }
 
 function parseLazyArgSignatureNode(node) {
@@ -125,7 +154,18 @@ function parseLazyArgSignatureNode(node) {
     (node) => !isNonFunctionalNode(node),
   );
   if (!argName || !isTermNode(argName) || varArgs.length > 0) return null;
-  return { identifier: argName, type: 'lazy', location: node.location };
+  return { identifier: argName, type: 'lazy', variadic: false, location: node.location };
+}
+
+function parseVariadicArgSignatureNode(node) {
+  if (!isNamedAnnotationNode('variadic', node)) return null;
+  const [_instruction, arg, ...varArgs] = node.elements.filter(
+    (node) => !isNonFunctionalNode(node),
+  );
+  if (!arg || varArgs.length > 0) return null;
+  const parsedArg = parsePositionalArgSignatureNode(arg);
+  if (!parsedArg) return null;
+  return { ...parsedArg, variadic: true, location: node.location };
 }
 
 function parseMethodImplementations(nodes, signature, context) {

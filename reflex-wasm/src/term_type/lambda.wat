@@ -54,8 +54,9 @@
           (call $Term::Lambda::get::num_args (local.get $self))
           (local.get $substituted_body)))))
 
-  (func $Term::Lambda::traits::arity (param $self i32) (result i32)
-    (call $Term::Lambda::get::num_args (local.get $self)))
+  (func $Term::Lambda::traits::arity (param $self i32) (result i32 i32)
+    (call $Term::Lambda::get::num_args (local.get $self))
+    (global.get $FALSE))
 
   (func $Term::Lambda::traits::apply (param $self i32) (param $args i32) (param $state i32) (result i32 i32)
     (local $result i32)

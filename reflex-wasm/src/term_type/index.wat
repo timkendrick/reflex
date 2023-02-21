@@ -215,7 +215,7 @@
       (func $Term::implements::apply (param $self i32) (result i32)
         (call $TermType::implements::apply (call $Term::get_type (local.get $self))))
 
-      (func $Term::traits::arity (export "arity") (param $self i32) (result i32)
+      (func $Term::traits::arity (export "arity") (param $self i32) (result i32 i32)
         (local $self_type i32)
         (local.set $self_type (call $Term::get_type (local.get $self)))
         (@switch
@@ -227,7 +227,8 @@
                 (i32.eq (local.get $self_type) (global.get (@concat "$TermType::" (@get $typename))))
                 (return (call (@concat "$Term::" (@get $typename) "::traits::arity") (local.get $self))))))
           ;; Default implementation
-          (i32.const 0)))
+          (i32.const 0)
+          (global.get $FALSE)))
 
       (func $Term::traits::apply (param $self i32) (param $args i32) (param $state i32) (result i32 i32)
         (local $self_type i32)

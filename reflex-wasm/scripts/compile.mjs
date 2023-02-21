@@ -11,6 +11,7 @@ import addDirective, { ADD_DIRECTIVE } from './transform/directives/add.mjs';
 import blockDirective, { BLOCK_DIRECTIVE } from './transform/directives/block.mjs';
 import branchDirective, { BRANCH_DIRECTIVE } from './transform/directives/branch.mjs';
 import builtinDirective, { BUILTIN_DIRECTIVE } from './transform/directives/builtin.mjs';
+import chainDirective, { CHAIN_DIRECTIVE } from './transform/directives/chain.mjs';
 import charDirective, { CHAR_DIRECTIVE } from './transform/directives/char.mjs';
 import concatDirective, { CONCAT_DIRECTIVE } from './transform/directives/concat.mjs';
 import constDirective, { CONST_DIRECTIVE } from './transform/directives/const.mjs';
@@ -58,6 +59,7 @@ try {
         [BLOCK_DIRECTIVE]: blockDirective,
         [BRANCH_DIRECTIVE]: branchDirective,
         [BUILTIN_DIRECTIVE]: builtinDirective,
+        [CHAIN_DIRECTIVE]: chainDirective,
         [CHAR_DIRECTIVE]: charDirective,
         [CONCAT_DIRECTIVE]: concatDirective,
         [CONST_DIRECTIVE]: constDirective,

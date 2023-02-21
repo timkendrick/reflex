@@ -25,10 +25,10 @@ export default (describe) => {
       assert.strictEqual(equals(createBuiltin(Stdlib.Add), createBuiltin(Stdlib.Subtract)), false);
     });
 
-    test('arity', (assert, { createBuiltin, arity, Stdlib }) => {
-      assert.strictEqual(arity(createBuiltin(Stdlib.Abs)), 1);
-      assert.strictEqual(arity(createBuiltin(Stdlib.Add)), 2);
-      assert.strictEqual(arity(createBuiltin(Stdlib.Fold)), 3);
+    test('arity', (assert, { createBuiltin, arity, Stdlib, FALSE, TRUE }) => {
+      assert.deepEqual(arity(createBuiltin(Stdlib.Abs)), [1, FALSE]);
+      assert.deepEqual(arity(createBuiltin(Stdlib.Add)), [2, FALSE]);
+      assert.deepEqual(arity(createBuiltin(Stdlib.Fold)), [3, FALSE]);
     });
 
     test('builtin function applications', (assert, {

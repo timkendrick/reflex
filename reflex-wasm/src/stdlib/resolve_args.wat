@@ -24,8 +24,13 @@
         (local $num_args i32)
         (local $arg_list i32)
         (local $index i32)
+        ;; TODO: Support resolving arguments for functions with optional/variadic arguments
+        (call $Term::traits::arity (local.get $self))
+        ;; Ignore the variadic arity flag
+        (drop)
+        (local.set $num_args)
         (@branch
-          (local.tee $num_args (call $Term::traits::arity (local.get $self)))
+          (local.get $num_args)
           (@list
             ;; If the provided function is nullary, return it as-is
             (return

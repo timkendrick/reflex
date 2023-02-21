@@ -177,16 +177,18 @@
         (local.get $state)
         (local.get $target)))
 
-    (func $Builtin::arity (param $target i32) (result i32)
+    (func $Builtin::arity (param $target i32) (result i32 i32)
       (@branch
         (local.get $target)
         (@list
           (@map $builtin
             (@get $builtins)
             (return (call (@concat "$" (@get $builtin) "::arity")))))
-        (i32.const 0)))
+        (i32.const 0)
+        (global.get $FALSE)))
 
     (func $Builtin::display (param $target i32) (param $offset i32) (result i32)
+      (local $variadic i32)
       (@branch
         (local.get $target)
         (@list
@@ -197,10 +199,16 @@
         (@store-bytes $offset "<function:")
         (local.set $offset (i32.add (local.get $offset)))
         ;; Write the number of arguments to the output
-        (call $Utils::u32::write_string
-          (call $Builtin::arity (local.get $target))
-          (local.get $offset))
+        (call $Builtin::arity (local.get $target))
+        (local.set $variadic)
+        (call $Utils::u32::write_string (local.get $offset))
         (local.set $offset (i32.add (local.get $offset)))
+        (if
+          (local.get $variadic)
+          (then
+            (@store-bytes $offset "+")
+            (local.set $offset (i32.add (local.get $offset))))
+          (else))
         (@store-bytes $offset ">")
         (i32.add (local.get $offset))))
 

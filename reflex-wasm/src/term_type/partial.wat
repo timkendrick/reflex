@@ -101,10 +101,13 @@
             (local.get $substituted_args)
             (i32.eq (global.get $NULL) (local.get $substituted_args)))))))
 
-  (func $Term::Partial::traits::arity (param $self i32) (result i32)
+  (func $Term::Partial::traits::arity (param $self i32) (result i32 i32)
+    (local $variadic i32)
+    (call $Term::traits::arity (call $Term::Partial::get::target (local.get $self)))
+    (local.set $variadic)
     (call $Utils::i32::saturating_sub_u
-      (call $Term::traits::arity (call $Term::Partial::get::target (local.get $self)))
-      (call $Term::List::get_length (call $Term::Partial::get::args (local.get $self)))))
+      (call $Term::List::get_length (call $Term::Partial::get::args (local.get $self))))
+    (local.get $variadic))
 
   (func $Term::Partial::traits::apply (param $self i32) (param $args i32) (param $state i32) (result i32 i32)
     (call $Term::traits::apply

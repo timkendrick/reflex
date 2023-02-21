@@ -27,50 +27,56 @@ export default (describe) => {
       createUnitList,
       arity,
       Stdlib,
+      FALSE,
+      TRUE,
     }) => {
-      assert.strictEqual(
+      assert.deepEqual(
         arity(createPartial(createLambda(2, createBoolean(true)), createEmptyList())),
-        2,
+        [2, FALSE],
       );
-      assert.strictEqual(
+      assert.deepEqual(
         arity(createPartial(createLambda(2, createBoolean(true)), createUnitList(createInt(3)))),
-        1,
+        [1, FALSE],
       );
-      assert.strictEqual(
+      assert.deepEqual(
         arity(
           createPartial(
             createLambda(2, createBoolean(true)),
             createPair(createInt(3), createInt(4)),
           ),
         ),
-        0,
+        [0, FALSE],
       );
-      assert.strictEqual(
+      assert.deepEqual(
         arity(
           createPartial(
             createLambda(2, createBoolean(true)),
             createTriple(createInt(3), createInt(4), createInt(5)),
           ),
         ),
-        0,
+        [0, FALSE],
       );
-      assert.strictEqual(arity(createPartial(createBuiltin(Stdlib.Add), createEmptyList())), 2);
-      assert.strictEqual(
+      assert.deepEqual(arity(createPartial(createBuiltin(Stdlib.Add), createEmptyList())), [
+        2,
+        FALSE,
+      ]);
+      assert.deepEqual(
         arity(createPartial(createBuiltin(Stdlib.Add), createUnitList(createInt(3)))),
-        1,
+        [1, FALSE],
       );
-      assert.strictEqual(
+      assert.deepEqual(
         arity(createPartial(createBuiltin(Stdlib.Add), createPair(createInt(3), createInt(4)))),
-        0,
+        [0, FALSE],
       );
-      assert.strictEqual(
+      assert.deepEqual(
         arity(
           createPartial(
             createBuiltin(Stdlib.Add),
             createTriple(createInt(3), createInt(4), createInt(5)),
           ),
         ),
-        0,
+        [0, FALSE],
+      );
       );
     });
 

@@ -46,19 +46,10 @@ export default (describe) => {
       );
     });
 
-    test('arity', (assert, { createBoolean, createLambda, arity }) => {
-      assert.strictEqual(
-        arity(createLambda(0, createBoolean(true))),
-        0,
-      );
-      assert.strictEqual(
-        arity(createLambda(1, createBoolean(true))),
-        1,
-      );
-      assert.strictEqual(
-        arity(createLambda(2, createBoolean(true))),
-        2,
-      );
+    test('arity', (assert, { createBoolean, createLambda, arity, FALSE }) => {
+      assert.deepEqual(arity(createLambda(0, createBoolean(true))), [0, FALSE]);
+      assert.deepEqual(arity(createLambda(1, createBoolean(true))), [1, FALSE]);
+      assert.deepEqual(arity(createLambda(2, createBoolean(true))), [2, FALSE]);
     });
 
     test('basic lambda application', (assert, {
