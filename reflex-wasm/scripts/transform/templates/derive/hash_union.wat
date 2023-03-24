@@ -16,5 +16,6 @@
       (@list
         (@map $variant
           (@get $union_variants)
-          (return (call (@concat "$" (@get $variant) "::traits::hash") (local.get $self) (local.get $state)))))
+          (@block
+            (return (call (@concat "$" (@get $variant) "::traits::hash") (local.get $self) (local.get $state))))))
       (local.get $state)))

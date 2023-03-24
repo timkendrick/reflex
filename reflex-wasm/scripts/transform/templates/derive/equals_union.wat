@@ -20,5 +20,6 @@
           (@list
             (@map $variant
               (@get $union_variants)
-              (return (call (@concat "$" (@get $variant) "::traits::equals") (local.get $self) (local.get $other)))))
+              (@block
+                (return (call (@concat "$" (@get $variant) "::traits::equals") (local.get $self) (local.get $other))))))
           (i32.const 0)))))
