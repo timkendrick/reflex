@@ -224,19 +224,11 @@
             (@get $builtins)
             (return (call (@concat "$" (@get $builtin) "::display") (local.get $offset)))))
         ;; Default implementation
-        (@store-bytes $offset "<function:")
+        (@store-bytes $offset "<compiled:")
         (local.set $offset (i32.add (local.get $offset)))
-        ;; Write the number of arguments to the output
-        (call $Builtin::arity (local.get $target))
-        (local.set $variadic)
-        (call $Utils::u32::write_string (local.get $offset))
+        ;; Write the function index to the output
+        (call $Utils::u32::write_string (local.get $target) (local.get $offset))
         (local.set $offset (i32.add (local.get $offset)))
-        (if
-          (local.get $variadic)
-          (then
-            (@store-bytes $offset "+")
-            (local.set $offset (i32.add (local.get $offset))))
-          (else))
         (@store-bytes $offset ">")
         (i32.add (local.get $offset))))
 

@@ -1194,7 +1194,16 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<InvalidFunctionArgsConditi
             Some(target) => write!(f, "{}", target)?,
             None => write!(f, "NULL")?,
         }
-        write!(f, ":{}>", self.args())
+        write!(
+            f,
+            ":({})>",
+            self.args()
+                .as_inner()
+                .iter()
+                .map(|arg| format!("{}", arg))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
     }
 }
 

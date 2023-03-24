@@ -47,8 +47,8 @@ impl From<Stdlib> for FunctionIndex {
 impl std::fmt::Display for FunctionIndex {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match Stdlib::try_from(self.0) {
-            Ok(stdlib) => write!(f, "{}", stdlib),
-            Err(_) => write!(f, "<unknown:{}>", self.0),
+            Ok(stdlib) => write!(f, "<stdlib:{}>", stdlib),
+            Err(_) => write!(f, "<fn:{}>", self.0),
         }
     }
 }
@@ -75,10 +75,7 @@ impl From<Stdlib> for BuiltinTerm {
 }
 impl std::fmt::Display for BuiltinTerm {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match Stdlib::try_from(u32::from(self.uid)) {
-            Ok(builtin) => std::fmt::Display::fmt(&builtin, f),
-            Err(_) => std::fmt::Debug::fmt(self, f),
-        }
+        std::fmt::Display::fmt(&self.uid, f)
     }
 }
 
@@ -176,7 +173,7 @@ impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<BuiltinTerm, A> {
 
 impl<A: Arena + Clone> std::fmt::Display for ArenaRef<BuiltinTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<stdlib:{}>", self.target())
+        std::fmt::Display::fmt(&self.target(), f)
     }
 }
 
