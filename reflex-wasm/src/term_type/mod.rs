@@ -348,7 +348,7 @@ impl TermHash for TermType {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub enum TermPointerIterator {
     Application(ApplicationTermPointerIter),
     Boolean(BooleanTermPointerIter),
@@ -1447,12 +1447,6 @@ impl<A: Arena + Clone> Expression for ArenaRef<Term, A> {
     type SignalListRef<'a> = ArenaRef<TypedTerm<TreeTerm>, A> where Self::SignalList: 'a, Self: 'a;
     type ExpressionListRef<'a> = ArenaRef<TypedTerm<ListTerm>, A> where Self::ExpressionList: 'a, Self: 'a;
     type ExpressionRef<'a> = ArenaRef<Term, A> where Self: 'a;
-}
-
-impl<A: Arena + Clone> NodeId for ArenaRef<Term, A> {
-    fn id(&self) -> HashId {
-        self.read_value(|term| term.id())
-    }
 }
 
 impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
@@ -3540,6 +3534,9 @@ impl<V> TypedTerm<V> {
             }
         }
     }
+    pub fn as_term(&self) -> &Term {
+        unsafe { std::mem::transmute::<&TypedTerm<V>, &Term>(self) }
+    }
 }
 
 impl<A: Arena + Clone, V> ArenaRef<TypedTerm<V>, A> {
@@ -3550,17 +3547,11 @@ impl<A: Arena + Clone, V> ArenaRef<TypedTerm<V>, A> {
                 .offset(TERM_TYPE_DISCRIMINANT_SIZE as u32),
         )
     }
-    pub(crate) fn as_term(&self) -> &ArenaRef<Term, A> {
+    pub fn as_term(&self) -> &ArenaRef<Term, A> {
         unsafe { std::mem::transmute::<&ArenaRef<TypedTerm<V>, A>, &ArenaRef<Term, A>>(self) }
     }
     pub(crate) fn get_value_pointer(&self) -> ArenaPointer {
         self.as_term().get_value_pointer()
-    }
-}
-
-impl<A: Arena + Clone, V> NodeId for ArenaRef<TypedTerm<V>, A> {
-    fn id(&self) -> HashId {
-        self.read_value(|term| term.id())
     }
 }
 
@@ -4118,6 +4109,12 @@ impl<A: Arena + Clone> ArenaRef<Term, A> {
             TermTypeDiscriminants::ZipIterator => Some(self.into_typed_term::<ZipIteratorTerm>()),
             _ => None,
         }
+    }
+}
+
+impl<A: Arena + Clone, V> NodeId for ArenaRef<TypedTerm<V>, A> {
+    fn id(&self) -> HashId {
+        self.read_value(|term| term.id())
     }
 }
 

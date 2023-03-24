@@ -54,7 +54,7 @@
         ;; Default implementation
         (global.get $TRUE)))
 
-    (func $Term::traits::is_truthy (param $self i32) (result i32)
+    (func $Term::traits::is_truthy (export "isTruthy") (param $self i32) (result i32)
       (@branch
         ;; Delegate method to underlying term type implementations
         (call $Term::get_type (local.get $self))

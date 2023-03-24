@@ -62,6 +62,11 @@ const TEMPLATE_HASH_FIELD_OPTIONAL_REFERENCE = path.join(
   __dirname,
   '../templates/derive/hash_field_optional_reference.wat',
 );
+const TEMPLATE_HASH_FIELD_TERM = path.join(__dirname, '../templates/derive/hash_field_term.wat');
+const TEMPLATE_HASH_FIELD_OPTIONAL_TERM = path.join(
+  __dirname,
+  '../templates/derive/hash_field_optional_term.wat',
+);
 const TEMPLATE_HASH_FIELD_REPEATED = path.join(
   __dirname,
   '../templates/derive/hash_field_repeated.wat',
@@ -590,18 +595,30 @@ function createDeriveStructFieldHashMethodNodes(
         }).module,
       );
     case 'reference':
-      return getTemplateElements(
-        context.import(
-          fieldType.optional
-            ? TEMPLATE_HASH_FIELD_OPTIONAL_REFERENCE
-            : TEMPLATE_HASH_FIELD_REFERENCE,
-          {
-            $type_name: identifier,
-            $field_name: fieldIdentifier,
-            $target_type: fieldType.target,
-          },
-        ).module,
-      );
+      if (fieldType.target.source === '$Term') {
+        return getTemplateElements(
+          context.import(
+            fieldType.optional ? TEMPLATE_HASH_FIELD_OPTIONAL_TERM : TEMPLATE_HASH_FIELD_TERM,
+            {
+              $type_name: identifier,
+              $field_name: fieldIdentifier,
+            },
+          ).module,
+        );
+      } else {
+        return getTemplateElements(
+          context.import(
+            fieldType.optional
+              ? TEMPLATE_HASH_FIELD_OPTIONAL_REFERENCE
+              : TEMPLATE_HASH_FIELD_REFERENCE,
+            {
+              $type_name: identifier,
+              $field_name: fieldIdentifier,
+              $target_type: fieldType.target,
+            },
+          ).module,
+        );
+      }
     case 'struct':
     case 'union':
       return getTemplateElements(

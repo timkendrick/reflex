@@ -11,18 +11,20 @@ use reflex::{
     },
     hash::HashId,
 };
+use reflex_macros::PointerIter;
 use reflex_utils::{MapIntoIterator, WithExactSizeIterator};
 use serde_json::Value as JsonValue;
 
 use crate::{
     allocator::Arena,
+    compiler::{
+        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
+        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings, ValueType,
+    },
     hash::{TermHash, TermHasher, TermSize},
-    term_type::{TermTypeDiscriminants, TypedTerm},
+    term_type::{ConditionTerm, TermTypeDiscriminants, TypedTerm, WasmExpression},
     ArenaPointer, ArenaRef, IntoArenaRefIter, Term,
 };
-use reflex_macros::PointerIter;
-
-use super::{ConditionTerm, WasmExpression};
 
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
@@ -39,14 +41,16 @@ impl TermSize for TreeTerm {
 impl TermHash for TreeTerm {
     fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         let hasher = if self.left.is_null() {
-            hasher.write_bool(false)
+            hasher.write_u8(0)
         } else {
-            arena.read_value::<Term, _>(self.left, |term| hasher.hash(term, arena))
+            let left_hash = arena.read_value::<Term, _>(self.left, |term| term.id());
+            hasher.hash(&left_hash, arena)
         };
         let hasher = if self.right.is_null() {
-            hasher.write_bool(false)
+            hasher.write_u8(0)
         } else {
-            arena.read_value::<Term, _>(self.right, |term| hasher.hash(term, arena))
+            let right_hash = arena.read_value::<Term, _>(self.right, |term| term.id());
+            hasher.hash(&right_hash, arena)
         };
         hasher.hash(&self.length, arena)
     }
@@ -457,8 +461,49 @@ enum TreeIteratorCursor {
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<TreeTerm, A> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        self.capture_depth() == 0
+    fn should_intern(&self, eager: Eagerness) -> bool {
+        self.left()
+            .map(|term| term.should_intern(eager))
+            .unwrap_or(true)
+            && self
+                .right()
+                .map(|term| term.should_intern(eager))
+                .unwrap_or(true)
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<TreeTerm, A> {
+    fn compile(
+        &self,
+        state: &mut CompilerState,
+        bindings: &CompilerVariableBindings,
+        options: &CompilerOptions,
+        stack: &CompilerStack,
+    ) -> CompilerResult<A> {
+        let left = self.left();
+        let right = self.right();
+        let mut instructions = CompiledBlock::default();
+        // Push the left argument onto the stack
+        // => [Option<Term>]
+        if let Some(term) = left {
+            instructions.append_block(term.compile(state, bindings, options, stack)?);
+        } else {
+            instructions.push(CompiledInstruction::NullPointer);
+        }
+        let stack = stack.push_lazy(ValueType::HeapPointer);
+        // Push the right argument onto the stack
+        // => [Option<Term>, Option<Term>]
+        if let Some(term) = right {
+            instructions.append_block(term.compile(state, bindings, options, &stack)?);
+        } else {
+            instructions.push(CompiledInstruction::NullPointer);
+        }
+        // Invoke the term constructor
+        // => [TreeTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+            RuntimeBuiltin::CreateTree,
+        ));
+        Ok(instructions)
     }
 }
 

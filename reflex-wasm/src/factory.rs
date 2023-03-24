@@ -76,20 +76,7 @@ where
         } else if let Some(term) = factory.match_variable_term(expression) {
             Ok(self.create_variable_term(term.offset()))
         } else if let Some(term) = factory.match_effect_term(expression) {
-            let condition = {
-                let condition = term.condition();
-                let condition = condition.as_deref();
-                let signal_type = match condition.signal_type() {
-                    SignalType::Custom(effect_type) => {
-                        self.import(&effect_type, factory).map(SignalType::Custom)
-                    }
-                    SignalType::Pending => Ok(SignalType::Pending),
-                    SignalType::Error => Ok(SignalType::Error),
-                }?;
-                let payload = self.import(condition.payload().as_deref(), factory)?;
-                let token = self.import(condition.token().as_deref(), factory)?;
-                self.create_signal(signal_type, payload, token)
-            };
+            let condition = self.import_condition(term.condition().as_deref().deref(), factory)?;
             Ok(self.create_effect_term(condition))
         } else if let Some(term) = factory.match_let_term(expression) {
             let initializer = self.import(term.initializer().as_deref(), factory)?;
@@ -138,7 +125,7 @@ where
                 .keys()
                 .as_deref()
                 .iter()
-                .map(|key| self.import(key.as_deref(), factory))
+                .map(|item| self.import(item.as_deref(), factory))
                 .collect::<Result<Vec<_>, _>>()?;
             let keys = self.create_list(keys);
             let prototype = self.create_struct_prototype(keys);
@@ -146,7 +133,7 @@ where
                 .values()
                 .as_deref()
                 .iter()
-                .map(|key| self.import(key.as_deref(), factory))
+                .map(|item| self.import(item.as_deref(), factory))
                 .collect::<Result<Vec<_>, _>>()?;
             let values = self.create_list(values);
             Ok(self.create_record_term(prototype, values))
@@ -198,19 +185,7 @@ where
                 .signals()
                 .as_deref()
                 .iter()
-                .map(|condition| {
-                    let condition = condition.as_deref();
-                    let signal_type = match condition.signal_type() {
-                        SignalType::Custom(effect_type) => {
-                            self.import(&effect_type, factory).map(SignalType::Custom)
-                        }
-                        SignalType::Pending => Ok(SignalType::Pending),
-                        SignalType::Error => Ok(SignalType::Error),
-                    }?;
-                    let payload = self.import(condition.payload().as_deref(), factory)?;
-                    let token = self.import(condition.token().as_deref(), factory)?;
-                    Ok(self.create_signal(signal_type, payload, token))
-                })
+                .map(|condition| self.import_condition(condition.as_deref().deref(), factory))
                 .collect::<Result<Vec<_>, _>>()?;
             let conditions = self.create_signal_list(conditions);
             Ok(self.create_signal_term(conditions))
@@ -246,20 +221,8 @@ where
             Ok(factory.create_variable_term(term.offset()))
         } else if let Some(term) = expression.as_effect_term() {
             let term = term.as_inner();
-            let condition = {
-                let condition = term.condition();
-                let condition = condition.as_deref();
-                let signal_type = match condition.signal_type() {
-                    SignalType::Custom(effect_type) => self
-                        .export(&effect_type, factory, allocator)
-                        .map(SignalType::Custom),
-                    SignalType::Pending => Ok(SignalType::Pending),
-                    SignalType::Error => Ok(SignalType::Error),
-                }?;
-                let payload = self.export(condition.payload().as_deref(), factory, allocator)?;
-                let token = self.export(condition.token().as_deref(), factory, allocator)?;
-                allocator.create_signal(signal_type, payload, token)
-            };
+            let condition =
+                self.export_condition(term.condition().as_deref(), factory, allocator)?;
             Ok(factory.create_effect_term(condition))
         } else if let Some(term) = expression.as_let_term() {
             let term = term.as_inner();
@@ -367,26 +330,49 @@ where
                 .signals()
                 .as_deref()
                 .iter()
-                .map(|condition| {
-                    let condition = condition.as_deref();
-                    let signal_type = match condition.signal_type() {
-                        SignalType::Custom(effect_type) => self
-                            .export(&effect_type, factory, allocator)
-                            .map(SignalType::Custom),
-                        SignalType::Pending => Ok(SignalType::Pending),
-                        SignalType::Error => Ok(SignalType::Error),
-                    }?;
-                    let payload =
-                        self.export(condition.payload().as_deref(), factory, allocator)?;
-                    let token = self.export(condition.token().as_deref(), factory, allocator)?;
-                    Ok(allocator.create_signal(signal_type, payload, token))
-                })
+                .map(|condition| self.export_condition(condition.as_deref(), factory, allocator))
                 .collect::<Result<Vec<_>, WasmExpression<Rc<RefCell<A>>>>>()?;
             let conditions = allocator.create_signal_list(conditions);
             Ok(factory.create_signal_term(conditions))
         } else {
             Err(expression.clone())
         }
+    }
+    pub fn import_condition<T: Expression>(
+        &self,
+        condition: &T::Signal,
+        factory: &impl ExpressionFactory<T>,
+    ) -> Result<ArenaRef<TypedTerm<ConditionTerm>, Self>, T>
+    where
+        T::Builtin: Into<crate::stdlib::Stdlib>,
+    {
+        let signal_type = match condition.signal_type() {
+            SignalType::Custom(effect_type) => {
+                self.import(&effect_type, factory).map(SignalType::Custom)
+            }
+            SignalType::Pending => Ok(SignalType::Pending),
+            SignalType::Error => Ok(SignalType::Error),
+        }?;
+        let payload = self.import(condition.payload().as_deref(), factory)?;
+        let token = self.import(condition.token().as_deref(), factory)?;
+        Ok(self.create_signal(signal_type, payload, token))
+    }
+    pub fn export_condition<T: Expression>(
+        &self,
+        condition: &ArenaRef<TypedTerm<ConditionTerm>, Rc<RefCell<A>>>,
+        factory: &impl ExpressionFactory<T>,
+        allocator: &impl HeapAllocator<T>,
+    ) -> Result<T::Signal, WasmExpression<Rc<RefCell<A>>>> {
+        let signal_type = match condition.signal_type() {
+            SignalType::Custom(effect_type) => self
+                .export(&effect_type, factory, allocator)
+                .map(SignalType::Custom),
+            SignalType::Pending => Ok(SignalType::Pending),
+            SignalType::Error => Ok(SignalType::Error),
+        }?;
+        let payload = self.export(condition.payload().as_deref(), factory, allocator)?;
+        let token = self.export(condition.token().as_deref(), factory, allocator)?;
+        Ok(allocator.create_signal(signal_type, payload, token))
     }
 }
 
@@ -529,14 +515,12 @@ where
             condition.pointer
         });
         let first = children.next();
-        let second = children.next();
         let remaining = children;
-
-        let root_size = first.as_ref().into_iter().chain(second.as_ref()).count();
+        let root_size = first.as_ref().into_iter().count();
         let root_term = Term::new(
             TermType::Tree(TreeTerm {
-                left: second.unwrap_or(ArenaPointer::null()),
-                right: first.unwrap_or(ArenaPointer::null()),
+                left: first.unwrap_or(ArenaPointer::null()),
+                right: ArenaPointer::null(),
                 length: root_size as u32,
             }),
             self.arena.deref().borrow().deref(),
@@ -975,8 +959,13 @@ where
             .into_iter()
             .map(|value| (value, nil.clone()))
             .collect::<Vec<_>>();
-        let entries = self.create_hashmap_term(entries).as_pointer();
-        let term = HashsetTerm { entries };
+        let entries = self.create_hashmap_term(entries);
+        let term = Term::new(
+            TermType::Hashset(HashsetTerm {
+                entries: entries.as_pointer(),
+            }),
+            &self.arena,
+        );
         let pointer = self.arena.borrow_mut().deref_mut().allocate(term);
         ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }

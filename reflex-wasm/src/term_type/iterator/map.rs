@@ -5,14 +5,18 @@
 use std::collections::HashSet;
 
 use reflex::core::{DependencyList, Eagerness, GraphNode, Internable, SerializeJson, StackOffset};
+use reflex_macros::PointerIter;
 use serde_json::Value as JsonValue;
 
 use crate::{
     allocator::Arena,
+    compiler::{
+        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
+        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings, ValueType,
+    },
     hash::{TermHash, TermHasher, TermSize},
     ArenaPointer, ArenaRef, Term,
 };
-use reflex_macros::PointerIter;
 
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
@@ -27,7 +31,9 @@ impl TermSize for MapIteratorTerm {
 }
 impl TermHash for MapIteratorTerm {
     fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
-        hasher.hash(&self.source, arena).hash(&self.iteratee, arena)
+        let source_hash = arena.read_value::<Term, _>(self.source, |term| term.id());
+        let iteratee_hash = arena.read_value::<Term, _>(self.iteratee, |term| term.id());
+        hasher.hash(&source_hash, arena).hash(&iteratee_hash, arena)
     }
 }
 
@@ -117,10 +123,38 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<MapIteratorTerm, A> {
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<MapIteratorTerm, A> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        self.capture_depth() == 0
+    fn should_intern(&self, eager: Eagerness) -> bool {
+        self.source().should_intern(eager) && self.iteratee().should_intern(eager)
     }
 }
+
+impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<MapIteratorTerm, A> {
+    fn compile(
+        &self,
+        state: &mut CompilerState,
+        bindings: &CompilerVariableBindings,
+        options: &CompilerOptions,
+        stack: &CompilerStack,
+    ) -> CompilerResult<A> {
+        let source = self.source();
+        let iteratee = self.iteratee();
+        let mut instructions = CompiledBlock::default();
+        // Push the source argument onto the stack
+        // => [Term]
+        instructions.append_block(source.compile(state, bindings, options, stack)?);
+        let stack = stack.push_lazy(ValueType::HeapPointer);
+        // Push the predicate argument onto the stack
+        // => [Term, Term]
+        instructions.append_block(iteratee.compile(state, bindings, options, &stack)?);
+        // Invoke the term constructor
+        // => [MapIteratorTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+            RuntimeBuiltin::CreateMapIterator,
+        ));
+        Ok(instructions)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::term_type::{TermType, TermTypeDiscriminants};

@@ -8,55 +8,25 @@ use reflex::core::{
     Arity, BuiltinTermType, DependencyList, Eagerness, Expression, GraphNode, Internable,
     SerializeJson, StackOffset,
 };
+use reflex_macros::PointerIter;
 use serde_json::Value as JsonValue;
 
 use crate::{
     allocator::Arena,
+    compiler::{
+        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerError,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings,
+    },
     hash::{TermHash, TermHasher, TermSize},
     stdlib::Stdlib,
     term_type::TypedTerm,
-    ArenaRef,
+    ArenaRef, FunctionIndex,
 };
-use reflex_macros::PointerIter;
-
-#[derive(PartialEq, Eq, Clone, Copy, Debug, PointerIter)]
-#[repr(C)]
-pub struct FunctionIndex(u32);
-impl TermSize for FunctionIndex {
-    fn size_of(&self) -> usize {
-        std::mem::size_of::<Self>()
-    }
-}
-impl TermHash for FunctionIndex {
-    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
-        let Self(uid) = self;
-        hasher.hash(uid, arena)
-    }
-}
-impl From<FunctionIndex> for u32 {
-    fn from(value: FunctionIndex) -> Self {
-        let FunctionIndex(value) = value;
-        value
-    }
-}
-impl From<Stdlib> for FunctionIndex {
-    fn from(value: Stdlib) -> Self {
-        Self(u32::from(value))
-    }
-}
-impl std::fmt::Display for FunctionIndex {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match Stdlib::try_from(self.0) {
-            Ok(stdlib) => write!(f, "<stdlib:{}>", stdlib),
-            Err(_) => write!(f, "<fn:{}>", self.0),
-        }
-    }
-}
 
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct BuiltinTerm {
-    pub uid: FunctionIndex,
+    pub uid: u32,
 }
 impl TermSize for BuiltinTerm {
     fn size_of(&self) -> usize {
@@ -81,7 +51,7 @@ impl std::fmt::Display for BuiltinTerm {
 
 impl<A: Arena + Clone> ArenaRef<BuiltinTerm, A> {
     pub fn target(&self) -> FunctionIndex {
-        self.read_value(|term| term.uid)
+        self.read_value(|term| FunctionIndex::from(term.uid))
     }
     pub fn arity(&self) -> Option<Arity> {
         Stdlib::try_from(u32::from(self.target()))
@@ -92,20 +62,20 @@ impl<A: Arena + Clone> ArenaRef<BuiltinTerm, A> {
 
 impl<T: Expression, A: Arena + Clone> BuiltinTermType<T> for ArenaRef<BuiltinTerm, A>
 where
-    T::Builtin: From<FunctionIndex>,
+    T::Builtin: From<Stdlib>,
 {
     fn target<'a>(&'a self) -> T::Builtin
     where
         T: 'a,
         T::Builtin: 'a,
     {
-        T::Builtin::from(self.target())
+        T::Builtin::from(self.target().as_stdlib().expect("Invalid function index"))
     }
 }
 
 impl<T: Expression, A: Arena + Clone> BuiltinTermType<T> for ArenaRef<TypedTerm<BuiltinTerm>, A>
 where
-    T::Builtin: From<FunctionIndex>,
+    T::Builtin: From<Stdlib>,
 {
     fn target<'a>(&'a self) -> T::Builtin
     where
@@ -179,7 +149,32 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<BuiltinTerm, A> {
 
 impl<A: Arena + Clone> Internable for ArenaRef<BuiltinTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
-        self.capture_depth() == 0
+        true
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<BuiltinTerm, A> {
+    fn compile(
+        &self,
+        _state: &mut CompilerState,
+        _bindings: &CompilerVariableBindings,
+        _options: &CompilerOptions,
+        _stack: &CompilerStack,
+    ) -> CompilerResult<A> {
+        let target = self.target();
+        let stdlib = target
+            .as_stdlib()
+            .ok_or_else(|| CompilerError::InvalidFunctionTarget(target))?;
+        let mut instructions = CompiledBlock::default();
+        // Push the function index argument onto the stack
+        // => [index]
+        instructions.push(CompiledInstruction::function_pointer(stdlib));
+        // Invoke the term constructor
+        // => [BuiltinTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+            RuntimeBuiltin::CreateBuiltin,
+        ));
+        Ok(instructions)
     }
 }
 

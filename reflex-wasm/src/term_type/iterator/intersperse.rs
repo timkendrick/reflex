@@ -5,14 +5,18 @@
 use std::collections::HashSet;
 
 use reflex::core::{DependencyList, Eagerness, GraphNode, Internable, SerializeJson, StackOffset};
+use reflex_macros::PointerIter;
 use serde_json::Value as JsonValue;
 
 use crate::{
     allocator::Arena,
+    compiler::{
+        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
+        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings, ValueType,
+    },
     hash::{TermHash, TermHasher, TermSize},
     ArenaPointer, ArenaRef, Term,
 };
-use reflex_macros::PointerIter;
 
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
@@ -27,9 +31,11 @@ impl TermSize for IntersperseIteratorTerm {
 }
 impl TermHash for IntersperseIteratorTerm {
     fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
+        let source_hash = arena.read_value::<Term, _>(self.source, |term| term.id());
+        let separator_hash = arena.read_value::<Term, _>(self.separator, |term| term.id());
         hasher
-            .hash(&self.source, arena)
-            .hash(&self.separator, arena)
+            .hash(&source_hash, arena)
+            .hash(&separator_hash, arena)
     }
 }
 
@@ -119,8 +125,35 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<IntersperseIteratorTerm, A> {
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<IntersperseIteratorTerm, A> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        self.capture_depth() == 0
+    fn should_intern(&self, eager: Eagerness) -> bool {
+        self.source().should_intern(eager) && self.separator().should_intern(eager)
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<IntersperseIteratorTerm, A> {
+    fn compile(
+        &self,
+        state: &mut CompilerState,
+        bindings: &CompilerVariableBindings,
+        options: &CompilerOptions,
+        stack: &CompilerStack,
+    ) -> CompilerResult<A> {
+        let source = self.source();
+        let separator = self.separator();
+        let mut instructions = CompiledBlock::default();
+        // Push the source argument onto the stack
+        // => [Term]
+        instructions.append_block(source.compile(state, bindings, options, stack)?);
+        let stack = stack.push_lazy(ValueType::HeapPointer);
+        // Push the separator argument onto the stack
+        // => [Term, Term]
+        instructions.append_block(separator.compile(state, bindings, options, &stack)?);
+        // Invoke the term constructor
+        // => [IntersperseIteratorTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+            RuntimeBuiltin::CreateIntersperseIterator,
+        ));
+        Ok(instructions)
     }
 }
 

@@ -3,6 +3,7 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 use std::marker::PhantomData;
 
+#[derive(Debug)]
 pub struct WithExactSizeIterator<T: Iterator> {
     remaining: usize,
     iter: T,
@@ -12,6 +13,17 @@ impl<T: Iterator> WithExactSizeIterator<T> {
         Self {
             remaining: len,
             iter,
+        }
+    }
+}
+impl<T: Iterator> Clone for WithExactSizeIterator<T>
+where
+    T: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            remaining: self.remaining,
+            iter: self.iter.clone(),
         }
     }
 }

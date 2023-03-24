@@ -5,15 +5,19 @@
 use std::collections::HashSet;
 
 use reflex::core::{DependencyList, Eagerness, GraphNode, Internable, SerializeJson, StackOffset};
+use reflex_macros::PointerIter;
 use serde_json::Value as JsonValue;
 
 use crate::{
     allocator::{Arena, ArenaAllocator},
+    compiler::{
+        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
+        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings, ValueType,
+    },
     hash::{TermHash, TermHashState, TermHasher, TermSize},
     term_type::TermType,
     ArenaPointer, ArenaRef, Array, Term,
 };
-use reflex_macros::PointerIter;
 
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
@@ -131,7 +135,47 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<CellTerm, A> {
 
 impl<A: Arena + Clone> Internable for ArenaRef<CellTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
-        self.capture_depth() == 0
+        true
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<CellTerm, A> {
+    fn compile(
+        &self,
+        _state: &mut CompilerState,
+        _bindings: &CompilerVariableBindings,
+        _options: &CompilerOptions,
+        _stack: &CompilerStack,
+    ) -> CompilerResult<A> {
+        let capacity = self.capacity();
+        let fields = self.fields();
+        let mut instructions = CompiledBlock::default();
+        // Push the capacity argument onto the stack
+        // => [capacity]
+        instructions.push(CompiledInstruction::u32_const(capacity));
+        // Allocate the cell term
+        // => [CellTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+            RuntimeBuiltin::AllocateCell,
+        ));
+        // Write the cell contents into the newly-allocated cell term
+        for (index, value) in fields.enumerate() {
+            instructions.extend([
+                // Duplicate the cell term pointer onto the stack
+                // => [CellTerm, CellTerm]
+                CompiledInstruction::Duplicate(ValueType::HeapPointer),
+                // Push the field index onto the stack
+                // => [CellTerm, CellTerm, index]
+                CompiledInstruction::u32_const(index as u32),
+                // Push the cell value onto the stack
+                // => [CellTerm, CellTerm, index, value]
+                CompiledInstruction::u32_const(value),
+                // Update the cell term's field at the given index
+                // => [CellTerm]
+                CompiledInstruction::CallRuntimeBuiltin(RuntimeBuiltin::SetCellField),
+            ]);
+        }
+        Ok(instructions)
     }
 }
 

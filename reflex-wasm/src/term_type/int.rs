@@ -8,17 +8,20 @@ use reflex::core::{
     DependencyList, Eagerness, GraphNode, IntTermType, IntValue, Internable, SerializeJson,
     StackOffset,
 };
+use reflex_macros::PointerIter;
 use serde_json::Value as JsonValue;
 
 use crate::{
     allocator::Arena,
+    compiler::{
+        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
+        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings,
+    },
     hash::{TermHash, TermHasher, TermSize},
     term_type::TypedTerm,
     utils::{chunks_to_i64, i64_to_chunks},
     ArenaRef,
 };
-
-use reflex_macros::PointerIter;
 
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
@@ -131,7 +134,29 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<IntTerm, A> {
 
 impl<A: Arena + Clone> Internable for ArenaRef<IntTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
-        self.capture_depth() == 0
+        true
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<IntTerm, A> {
+    fn compile(
+        &self,
+        _state: &mut CompilerState,
+        _bindings: &CompilerVariableBindings,
+        _options: &CompilerOptions,
+        _stack: &CompilerStack,
+    ) -> CompilerResult<A> {
+        let value = self.value();
+        let mut instructions = CompiledBlock::default();
+        // Push the value argument onto the stack
+        // => [value]
+        instructions.push(CompiledInstruction::i64_const(value));
+        // Invoke the term constructor
+        // => [IntTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+            RuntimeBuiltin::CreateInt,
+        ));
+        Ok(instructions)
     }
 }
 
@@ -150,6 +175,6 @@ mod tests {
         assert_eq!(TermType::Int(IntTerm::from(-0x987654321)).as_bytes(), {
             let [low, high] = i64_to_chunks(-0x987654321);
             [TermTypeDiscriminants::Int as u32, low, high]
-        },);
+        });
     }
 }

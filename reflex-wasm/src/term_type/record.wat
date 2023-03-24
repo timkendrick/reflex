@@ -35,11 +35,17 @@
         (call $Record::get::values (local.get $other)))))
 
   (func $Record::traits::hash (param $self i32) (param $state i64) (result i64)
-    (call $Record::get::values (local.get $self))
-    (call $Record::get::keys (local.get $self))
+    (call $Record::pointer::values (local.get $self))
+    (call $Record::pointer::keys (local.get $self))
     (local.get $state)
-    (call $Term::traits::hash)
-    (call $Term::traits::hash))
+    (call $Record::hash::keys)
+    (call $Record::hash::values))
+
+  (func $Record::hash::keys (param $self i32) (param $state i64) (result i64)
+    (call $Hash::write_i64 (local.get $state) (call $Term::get_hash (i32.load (local.get $self)))))
+
+  (func $Record::hash::values (param $self i32) (param $state i64) (result i64)
+    (call $Hash::write_i64 (local.get $state) (call $Term::get_hash (i32.load (local.get $self)))))
 
   (func $Term::Record::new (export "createRecord") (param $keys i32) (param $values i32) (result i32)
     (local $self i32)

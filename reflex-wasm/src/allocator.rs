@@ -91,6 +91,12 @@ impl VecAllocator {
         let Self(data) = self;
         data
     }
+    pub fn into_bytes(self) -> Vec<u8> {
+        let Self(data) = self;
+        data.into_iter()
+            .flat_map(|word| word.to_le_bytes())
+            .collect()
+    }
     pub(crate) fn start_offset(&self) -> ArenaPointer {
         // Skip over the initial 4-byte length marker
         ArenaPointer::from(std::mem::size_of::<u32>() as u32)
@@ -265,6 +271,56 @@ impl<'heap> ArenaAllocator for &'heap mut VecAllocator {
     }
     fn write<T: Sized>(&mut self, offset: ArenaPointer, value: T) {
         self.deref_mut().write(offset, value)
+    }
+}
+
+impl<'heap> Arena for Rc<VecAllocator> {
+    type Slice<'a> = &'a [u8]
+    where
+        Self: 'a;
+    fn read_value<T, V>(&self, offset: ArenaPointer, selector: impl FnOnce(&T) -> V) -> V {
+        self.deref().read_value::<T, V>(offset, selector)
+    }
+    fn inner_pointer<T, V>(
+        &self,
+        offset: ArenaPointer,
+        selector: impl FnOnce(&T) -> &V,
+    ) -> ArenaPointer {
+        self.deref().inner_pointer::<T, V>(offset, selector)
+    }
+    fn as_slice<'a>(&'a self, offset: ArenaPointer, length: usize) -> Self::Slice<'a>
+    where
+        Self::Slice<'a>: 'a,
+        Self: 'a,
+    {
+        self.deref().as_slice(offset, length)
+    }
+}
+
+impl<'heap> Arena for Rc<RefCell<VecAllocator>> {
+    type Slice<'a> = Ref<'a, [u8]>
+        where
+            Self: 'a;
+    fn read_value<T, V>(&self, offset: ArenaPointer, selector: impl FnOnce(&T) -> V) -> V {
+        self.deref().borrow().read_value::<T, V>(offset, selector)
+    }
+    fn inner_pointer<T, V>(
+        &self,
+        offset: ArenaPointer,
+        selector: impl FnOnce(&T) -> &V,
+    ) -> ArenaPointer {
+        self.deref()
+            .borrow()
+            .inner_pointer::<T, V>(offset, selector)
+    }
+    fn as_slice<'a>(&'a self, offset: ArenaPointer, length: usize) -> Self::Slice<'a>
+    where
+        Self::Slice<'a>: 'a,
+        Self: 'a,
+    {
+        Ref::map(self.deref().borrow(), |arena| {
+            arena.as_slice(offset, length)
+        })
     }
 }
 

@@ -4,15 +4,18 @@
 use std::collections::HashSet;
 
 use reflex::core::{DependencyList, Eagerness, GraphNode, Internable, SerializeJson, StackOffset};
+use reflex_macros::PointerIter;
 use serde_json::Value as JsonValue;
 
 use crate::{
     allocator::Arena,
+    compiler::{
+        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
+        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings,
+    },
     hash::{TermHash, TermHasher, TermSize},
     ArenaPointer, ArenaRef, Term,
 };
-
-use reflex_macros::PointerIter;
 
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
@@ -28,7 +31,8 @@ impl TermSize for IndexedAccessorIteratorTerm {
 }
 impl TermHash for IndexedAccessorIteratorTerm {
     fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
-        hasher.hash(&self.source, arena)
+        let source_hash = arena.read_value::<Term, _>(self.source, |term| term.id());
+        hasher.hash(&source_hash, arena).hash(&self.index, arena)
     }
 }
 
@@ -113,6 +117,32 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<IndexedAccessorIteratorTerm, A> {
 impl<A: Arena + Clone> Internable for ArenaRef<IndexedAccessorIteratorTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
         self.capture_depth() == 0
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<IndexedAccessorIteratorTerm, A> {
+    fn compile(
+        &self,
+        state: &mut CompilerState,
+        bindings: &CompilerVariableBindings,
+        options: &CompilerOptions,
+        stack: &CompilerStack,
+    ) -> CompilerResult<A> {
+        let source = self.source();
+        let index = self.index();
+        let mut instructions = CompiledBlock::default();
+        // Push the source argument onto the stack
+        // => [Term]
+        instructions.extend(source.compile(state, bindings, options, stack)?);
+        // Push the index argument onto the stack
+        // => [Term, index]
+        instructions.push(CompiledInstruction::u32_const(index as u32));
+        // Invoke the term constructor
+        // => [IndexedAccessorIteratorTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+            RuntimeBuiltin::CreateIndexedAccessorIterator,
+        ));
+        Ok(instructions)
     }
 }
 

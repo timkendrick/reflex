@@ -5,14 +5,18 @@
 use std::collections::HashSet;
 
 use reflex::core::{DependencyList, Eagerness, GraphNode, Internable, SerializeJson, StackOffset};
+use reflex_macros::PointerIter;
 use serde_json::Value as JsonValue;
 
 use crate::{
     allocator::Arena,
+    compiler::{
+        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
+        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings,
+    },
     hash::{TermHash, TermHasher, TermSize},
     ArenaPointer, ArenaRef, Term,
 };
-use reflex_macros::PointerIter;
 
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
@@ -26,7 +30,8 @@ impl TermSize for RepeatIteratorTerm {
 }
 impl TermHash for RepeatIteratorTerm {
     fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
-        hasher.hash(&self.value, arena)
+        let value_hash = arena.read_value::<Term, _>(self.value, |term| term.id());
+        hasher.hash(&value_hash, arena)
     }
 }
 
@@ -106,8 +111,30 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<RepeatIteratorTerm, A> {
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<RepeatIteratorTerm, A> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        self.capture_depth() == 0
+    fn should_intern(&self, eager: Eagerness) -> bool {
+        self.value().should_intern(eager)
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<RepeatIteratorTerm, A> {
+    fn compile(
+        &self,
+        state: &mut CompilerState,
+        bindings: &CompilerVariableBindings,
+        options: &CompilerOptions,
+        stack: &CompilerStack,
+    ) -> CompilerResult<A> {
+        let value = self.value();
+        let mut instructions = CompiledBlock::default();
+        // Push the value argument onto the stack
+        // => [Term]
+        instructions.append_block(value.compile(state, bindings, options, stack)?);
+        // Invoke the term constructor
+        // => [RepeatIteratorTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+            RuntimeBuiltin::CreateRepeatIterator,
+        ));
+        Ok(instructions)
     }
 }
 

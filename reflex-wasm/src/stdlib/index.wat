@@ -237,9 +237,9 @@
       (@map $builtin
         (@get $builtins)
         (@block
-          (global (@get $builtin) (export (@concat "\"" (@get $builtin) "\"")) i32 (i32.const (@get $_)))))
+          (global (@get $builtin) (export (@concat "\"__" (@get $builtin) "\"")) i32 (i32.const (@get $_)))))
 
-      (table (export "__indirect_function_table") (@length (@get $builtins)) funcref)
+      (table (export "__indirect_function_table") (@length (@get $builtins)) (@length (@get $builtins)) funcref)
       (elem (i32.const 0)
         (@map $builtin
           (@get $builtins)

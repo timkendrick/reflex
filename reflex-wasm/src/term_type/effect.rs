@@ -8,17 +8,20 @@ use reflex::core::{
     DependencyList, Eagerness, EffectTermType, Expression, GraphNode, Internable, SerializeJson,
     StackOffset,
 };
+use reflex_macros::PointerIter;
 use serde_json::Value as JsonValue;
 
 use crate::{
     allocator::Arena,
+    compiler::{
+        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
+        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings, ParamsSignature,
+        TypeSignature, ValueType,
+    },
     hash::{TermHash, TermHasher, TermSize},
-    term_type::TypedTerm,
-    ArenaPointer, ArenaRef,
+    term_type::{ConditionTerm, TypedTerm, WasmExpression},
+    ArenaPointer, ArenaRef, Term,
 };
-use reflex_macros::PointerIter;
-
-use super::{ConditionTerm, WasmExpression};
 
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
@@ -32,7 +35,8 @@ impl TermSize for EffectTerm {
 }
 impl TermHash for EffectTerm {
     fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
-        hasher.hash(&self.condition, arena)
+        let condition_hash = arena.read_value::<Term, _>(self.condition, |term| term.id());
+        hasher.hash(&condition_hash, arena)
     }
 }
 
@@ -128,7 +132,97 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<EffectTerm, A> {
 
 impl<A: Arena + Clone> Internable for ArenaRef<EffectTerm, A> {
     fn should_intern(&self, eager: Eagerness) -> bool {
-        eager == Eagerness::Lazy && self.capture_depth() == 0
+        eager == Eagerness::Lazy && self.condition().as_inner().should_intern(eager)
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<EffectTerm, A> {
+    fn compile(
+        &self,
+        state: &mut CompilerState,
+        bindings: &CompilerVariableBindings,
+        options: &CompilerOptions,
+        stack: &CompilerStack,
+    ) -> CompilerResult<A> {
+        let condition = self.condition();
+        let mut instructions = CompiledBlock::default();
+        // Yield the condition onto the stack (this will be used as the state key)
+        // => [ConditionTerm]
+        instructions.append_block(
+            condition
+                .as_inner()
+                .compile(state, bindings, options, stack)?,
+        );
+        // Duplicate the condition on the stack so that it can be assigned to a local variable
+        // => [ConditionTerm, ConditionTerm]
+        instructions.push(CompiledInstruction::Duplicate(ValueType::HeapPointer));
+        // Enter a new temporary scope with the key assigned to a variable
+        // => [ConditionTerm]
+        instructions.push(CompiledInstruction::ScopeStart(ValueType::HeapPointer));
+        // Attempt to load the corresponding value from global state
+        // => [Option<Term>]
+        instructions.push(CompiledInstruction::LoadStateValue);
+        // Enter a new temporary scope with the result assigned to a variable
+        // => []
+        instructions.push(CompiledInstruction::ScopeStart(ValueType::HeapPointer));
+        // Load the result back from the temporary scope variable
+        // => [Option<Term>]
+        instructions.push(CompiledInstruction::GetScopeValue {
+            value_type: ValueType::HeapPointer,
+            scope_offset: 0,
+        });
+        // Push the null pointer onto the stack
+        // => [Option<Term>, Null]
+        instructions.push(CompiledInstruction::NullPointer);
+        // Compare the pointers to determine whether a corresponding state value exists for the given key
+        // => [bool]
+        instructions.push(CompiledInstruction::Eq(ValueType::HeapPointer));
+        // Branch based on whether a corresponding state value exists,
+        // pushing the value onto the stack if the key was present, or a signal term if not
+        // => [Term]
+        instructions.push(CompiledInstruction::If {
+            block_type: TypeSignature {
+                params: ParamsSignature::Void,
+                results: ParamsSignature::Single(ValueType::HeapPointer),
+            },
+            // If there was no corresponding value for the given key, construct a signal from the condition
+            consequent: {
+                let mut instructions = CompiledBlock::default();
+                // Load the condition from the outer temporary scope and push onto the stack
+                // => [ConditionTerm]
+                instructions.push(CompiledInstruction::GetScopeValue {
+                    value_type: ValueType::HeapPointer,
+                    scope_offset: 1,
+                });
+                // Construct a new signal term from the condition and push it onto the stack
+                // => [SignalTerm]
+                instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+                    RuntimeBuiltin::CreateSignal,
+                ));
+                instructions
+            },
+            // Otherwise if there was a corresponding value for the given key, return the value
+            alternative: {
+                let mut instructions = CompiledBlock::default();
+                // Load the value from the inner temporary scope and push onto the stack
+                // => [Term]
+                instructions.push(CompiledInstruction::GetScopeValue {
+                    value_type: ValueType::HeapPointer,
+                    scope_offset: 0,
+                });
+                // Evaluate the term if necessary
+                // => [Term]
+                instructions.push(CompiledInstruction::Evaluate);
+                instructions
+            },
+        });
+        // Drop the inner temporary scope that was used to store the value
+        // => [Term]
+        instructions.push(CompiledInstruction::ScopeEnd(ValueType::HeapPointer));
+        // Drop the outer temporary scope that was used to store the key
+        // => [Term]
+        instructions.push(CompiledInstruction::ScopeEnd(ValueType::HeapPointer));
+        Ok(instructions)
     }
 }
 

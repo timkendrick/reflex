@@ -1,8 +1,11 @@
 #/usr/bin/env bash
 cd $(dirname $0)/..
-# Clear screen
-echo "\x1b[2J\x1b[3J\x1b[H"
 
 ./scripts/build
-fswatch --one-per-batch --exclude ".*" --include "\\.wat$" ./src \
-  | xargs -n1 -I{} ./scripts/build
+echo "Watching for filesystem changes..."
+fswatch --one-per-batch --exclude ".*" --include "\\.wat$" ./src | (
+  while read; do
+    echo "Filesystem changes detected, rebuilding..."
+    ./scripts/build
+  done
+)

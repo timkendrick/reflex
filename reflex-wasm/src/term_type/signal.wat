@@ -39,7 +39,7 @@
     (call $Term::TermType::Signal::new)
     (local.get $dependencies))
 
-  (func $Term::Signal::traits::union (param $self i32) (param $other i32) (result i32)
+  (func $Term::Signal::traits::union (export "combineSignals") (param $self i32) (param $other i32) (result i32)
     (if (result i32)
       (i32.eq (global.get $NULL) (local.get $self))
       (then

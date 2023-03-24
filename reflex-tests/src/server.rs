@@ -6,6 +6,7 @@ use std::{
     convert::Infallible,
     future,
     net::{IpAddr, Ipv4Addr, SocketAddr},
+    ops::{Deref, DerefMut},
     path::PathBuf,
     rc::Rc,
     str::FromStr,
@@ -52,10 +53,15 @@ use reflex_server::{
     GraphQlWebServerActorFactory,
 };
 use reflex_utils::reconnect::NoopReconnectTimeout;
-use reflex_wasm::cli::compile::WasmProgram;
+use reflex_wasm::{
+    allocator::ArenaAllocator,
+    cli::compile::{WasmCompilerOptions, WasmProgram},
+    term_type::{LambdaTerm, TermType, TypedTerm},
+    ArenaRef, Term,
+};
 use reflex_wasm::{
     allocator::VecAllocator,
-    cli::compile::{compile_module, EntryPointType, WasmCompilerMode},
+    cli::compile::{compile_module, WasmCompilerMode},
     factory::WasmTermFactory,
 };
 use tokio::sync::oneshot;
@@ -92,7 +98,6 @@ pub fn serve_graphql(
     let entry_point_export_name = "__graphql_root__";
     let wasm_module = compile_graphql_module(
         entry_point_export_name,
-        EntryPointType::Factory,
         graph_definition,
         &factory,
         &allocator,
@@ -195,7 +200,6 @@ pub fn serve_graphql(
 
 fn compile_graphql_module<T: Expression + 'static>(
     export_name: &str,
-    export_type: EntryPointType,
     graph_definition: &str,
     factory: &(impl ExpressionFactory<T> + Clone + 'static),
     allocator: &(impl HeapAllocator<T> + Clone + 'static),
@@ -239,13 +243,32 @@ where
 
     let mut arena = VecAllocator::default();
     let arena = Rc::new(RefCell::new(&mut arena));
-    let entry_point = WasmTermFactory::from(Rc::clone(&arena))
+    let graph_root = WasmTermFactory::from(Rc::clone(&arena))
         .import(&graph_root, factory)
         .map_err(WasmTestError::TranspileError)?;
+    let graph_factory = {
+        let term = Term::new(
+            TermType::Lambda(LambdaTerm {
+                num_args: 0,
+                body: graph_root.as_pointer(),
+            }),
+            &arena,
+        );
+        let pointer = arena
+            .deref()
+            .borrow_mut()
+            .deref_mut()
+            .deref_mut()
+            .allocate(term);
+        ArenaRef::<TypedTerm<LambdaTerm>, _>::new(Rc::clone(&arena), pointer)
+    };
+
     let wasm_module = compile_module(
-        [(String::from(export_name), export_type, entry_point)],
+        [(String::from(export_name), graph_factory)],
         RUNTIME_BYTES,
         compiler_mode,
+        None,
+        &WasmCompilerOptions::default(),
         true,
     )
     .map_err(WasmTestError::Compiler)?;

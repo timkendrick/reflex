@@ -11,16 +11,19 @@ use reflex::{
     },
     hash::HashId,
 };
+use reflex_macros::PointerIter;
 use serde_json::Value as JsonValue;
 
-use super::WasmExpression;
 use crate::{
     allocator::{Arena, ArenaAllocator},
+    compiler::{
+        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
+        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings, ValueType,
+    },
     hash::{TermHash, TermHasher, TermSize},
-    term_type::{TermType, TypedTerm},
+    term_type::{TermType, TypedTerm, WasmExpression},
     ArenaPointer, ArenaRef, Array, Term,
 };
-use reflex_macros::PointerIter;
 
 #[derive(Clone, Copy, PointerIter)]
 #[repr(C)]
@@ -267,7 +270,59 @@ fn get_string_chunks(value: &str) -> Vec<u32> {
 
 impl<A: Arena + Clone> Internable for ArenaRef<StringTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
-        self.capture_depth() == 0
+        true
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<StringTerm, A> {
+    fn compile(
+        &self,
+        _state: &mut CompilerState,
+        _bindings: &CompilerVariableBindings,
+        _options: &CompilerOptions,
+        _stack: &CompilerStack,
+    ) -> CompilerResult<A> {
+        let num_chars = self.len();
+        let data = self.data();
+        let mut instructions = CompiledBlock::default();
+        // Push the string length onto the stack
+        // => [length]
+        instructions.push(CompiledInstruction::u32_const(num_chars as u32));
+        // Allocate the string term
+        // => [StringTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+            RuntimeBuiltin::AllocateString,
+        ));
+        // Assign the string contents
+        for (chunk_index, chunk) in data.iter().enumerate() {
+            let char_index = chunk_index * std::mem::size_of::<u32>();
+            // Duplicate the string term pointer onto the stack
+            // => [StringTerm, StringTerm]
+            instructions.push(CompiledInstruction::Duplicate(ValueType::HeapPointer));
+            // Push the chunk index onto the stack
+            // => [StringTerm, StringTerm, index]
+            instructions.push(CompiledInstruction::u32_const(char_index as u32));
+            // Get the character offset for the chunk at the given index
+            // => [StringTerm, offset]
+            instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+                RuntimeBuiltin::GetStringCharOffset,
+            ));
+            // Push the chunk onto the stack
+            // => [StringTerm, offset, chunk]
+            instructions.push(CompiledInstruction::u32_const(chunk));
+            // Write the chunk value to the string contents
+            // => [StringTerm]
+            instructions.push(CompiledInstruction::WriteHeapValue(ValueType::U32));
+        }
+        // Now that the string contents has been added, push the string length onto the stack
+        // => [StringTerm, length]
+        instructions.push(CompiledInstruction::u32_const(num_chars as u32));
+        // Initialize the string term with the length that is on the stack
+        // => [StringTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+            RuntimeBuiltin::InitString,
+        ));
+        Ok(instructions)
     }
 }
 

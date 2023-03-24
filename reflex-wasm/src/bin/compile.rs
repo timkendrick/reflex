@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
-use std::{io::Write, iter::empty, path::PathBuf, str::FromStr};
+use std::{io::Write, iter::empty, path::PathBuf};
 
 use anyhow::{Context, Result};
 use clap::Parser;
 use reflex_lang::{allocator::DefaultAllocator, SharedTermFactory};
 use reflex_parser::Syntax;
 use reflex_wasm::cli::compile::{
-    loader::create_loader, parse_and_compile_module, EntryPointType, WasmCompilerMode,
+    loader::create_loader, parse_and_compile_module, WasmCompilerMode, WasmCompilerOptions,
 };
 
 // Reflex WebAssembly compiler
@@ -24,9 +24,6 @@ struct Args {
     /// Name of the exported WASM function
     #[arg(short, long)]
     export_name: String,
-    /// Whether to precompile the resulting module as a graphql entry point
-    #[arg(long)]
-    export_type: WasmCompilerExportType,
     /// Path to runtime library module
     #[arg(short, long)]
     runtime: PathBuf,
@@ -41,32 +38,6 @@ struct Args {
     unoptimized: bool,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-enum WasmCompilerExportType {
-    Expression,
-    Factory,
-}
-
-impl From<WasmCompilerExportType> for EntryPointType {
-    fn from(value: WasmCompilerExportType) -> Self {
-        match value {
-            WasmCompilerExportType::Expression => Self::Expression,
-            WasmCompilerExportType::Factory => Self::Factory,
-        }
-    }
-}
-
-impl FromStr for WasmCompilerExportType {
-    type Err = anyhow::Error;
-    fn from_str(input: &str) -> Result<Self, Self::Err> {
-        match input.to_lowercase().as_str() {
-            "expression" => Ok(Self::Expression),
-            "factory" => Ok(Self::Factory),
-            _ => Err(anyhow::anyhow!("Unknown export type: {}", input)),
-        }
-    }
-}
-
 fn main() -> Result<()> {
     // Parse CLI args
     let args = Args::parse();
@@ -74,7 +45,6 @@ fn main() -> Result<()> {
     let input_path = args.entry_point;
     let syntax = args.syntax;
     let export_name = args.export_name;
-    let export_type = EntryPointType::from(args.export_type);
     let compiler_mode = if args.precompile {
         WasmCompilerMode::Cranelift
     } else {
@@ -92,19 +62,25 @@ fn main() -> Result<()> {
     let source =
         std::fs::read_to_string(&input_path).with_context(|| "Failed to read input file")?;
 
+    let mut compiler_options = WasmCompilerOptions::default();
+    if !unoptimized {
+        // wasm-opt doesn't currently support block params
+        compiler_options.generator.disable_block_params = true;
+    }
+
     // Parse the input file and compile to WASM
     let wasm_module = parse_and_compile_module(
         &source,
         syntax,
         &input_path,
         &export_name,
-        export_type,
         &runtime_bytes,
         create_loader(empty(), &factory, &allocator),
         std::env::vars(),
         &factory,
         &allocator,
         compiler_mode,
+        &compiler_options,
         unoptimized,
     )
     .with_context(|| "Failed to compile WebAssembly module")?;

@@ -1,6 +1,4 @@
 #/usr/bin/env bash
 cd $(dirname $0)/..
-# Clear screen
-echo "\x1b[2J\x1b[3J\x1b[H"
 
 node --experimental-wasi-unstable-preview1 ./src/node.perf.mjs

@@ -22,7 +22,7 @@
   (func (export "_initialize")
     (@const-init))
 
-  (func $Runtime::get_state_value (param $state_token i32) (param $state i32) (result i32 i32)
+  (func $Runtime::get_state_value (export "getStateValue") (param $state_token i32) (param $state i32) (result i32 i32)
     (if (result i32)
       (i32.eq (global.get $NULL) (local.get $state))
       (then
@@ -34,7 +34,7 @@
   (func $Dependencies::of (param $state_token i32) (result i32)
     (call $Term::Tree::of (local.get $state_token)))
 
-  (func $Dependencies::traits::union (param $self i32) (param $other i32) (result i32)
+  (func $Dependencies::traits::union (export "combineDependencies") (param $self i32) (param $other i32) (result i32)
     (call $Term::Tree::traits::union (local.get $self) (local.get $other)))
 
   (func $Dependencies::get_state_value_hash (param $self i32) (param $state i32) (result i64)

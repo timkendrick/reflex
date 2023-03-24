@@ -4,22 +4,27 @@
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use std::collections::HashSet;
 
-use reflex::core::{
-    Arity, DependencyList, Eagerness, Expression, GraphNode, Internable, LambdaTermType,
-    SerializeJson, StackOffset,
+use reflex::{
+    core::{
+        Arity, DependencyList, Eagerness, Expression, GraphNode, Internable, LambdaTermType,
+        SerializeJson, StackOffset,
+    },
+    hash::IntMap,
 };
+use reflex_macros::PointerIter;
 use serde_json::Value as JsonValue;
 
 use crate::{
     allocator::Arena,
+    compiler::{
+        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledFunctionId,
+        CompiledInstruction, CompiledLambda, CompilerError, CompilerOptions, CompilerResult,
+        CompilerStack, CompilerState, CompilerVariableBindings, ParamsSignature, ValueType,
+    },
     hash::{TermHash, TermHasher, TermSize},
-    term_type::TypedTerm,
+    term_type::{TypedTerm, WasmExpression},
     ArenaPointer, ArenaRef, Term,
 };
-
-use reflex_macros::PointerIter;
-
-use super::WasmExpression;
 
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
@@ -34,7 +39,8 @@ impl TermSize for LambdaTerm {
 }
 impl TermHash for LambdaTerm {
     fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
-        hasher.hash(&self.num_args, arena).hash(&self.body, arena)
+        let body_hash = arena.read_value::<Term, _>(self.body, |term| term.id());
+        hasher.hash(&self.num_args, arena).hash(&body_hash, arena)
     }
 }
 
@@ -155,8 +161,62 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<LambdaTerm, A> {
 
 impl<A: Arena + Clone> Internable for ArenaRef<LambdaTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
-        // FIXME: Lambda terms should always be compiled
-        self.capture_depth() == 0
+        false
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<LambdaTerm, A> {
+    fn compile(
+        &self,
+        state: &mut CompilerState,
+        _bindings: &CompilerVariableBindings,
+        options: &CompilerOptions,
+        _stack: &CompilerStack,
+    ) -> CompilerResult<A> {
+        // Ensure there are no free variable references within the lambda body
+        // (any free variables should have been extracted out by an earlier compiler pass)
+        // TODO: Consider relaxing restriction on compiled lambdas having been lambda-lifted (this would entail implementing 'sparse' binding mappings to combine separate chunks of variables bindings separated by offsets)
+        if let Some(scope_offset) = self.free_variables().into_iter().next() {
+            return Err(CompilerError::UnboundVariable(scope_offset));
+        }
+        // Note that all lambda functions will be linked into the main module in a later compiler phase,
+        // which means they can be invoked similarly to the standard library builtins,
+        // using the function lookup table to perform an indirect call to the compiled function wrapper.
+        let compiled_function_id = CompiledFunctionId::from(self);
+        // Compile the lambda body if it has not yet already been compiled
+        if !state.compiled_lambdas.contains_key(&compiled_function_id) {
+            let num_args = self.num_args() as StackOffset;
+            let body = self.body();
+            let params = ParamsSignature::from_iter((0..num_args).map(|_| ValueType::HeapPointer));
+            let param_bindings = (0..num_args)
+                .map(|scope_offset| (scope_offset, scope_offset))
+                .collect::<IntMap<_, _>>();
+            let param_bindings = if num_args == 0 {
+                CompilerVariableBindings::default()
+            } else {
+                CompilerVariableBindings::from_mappings(&param_bindings)
+            };
+            let compiled_body =
+                body.compile(state, &param_bindings, options, &CompilerStack::default())?;
+            // Add the compiled lambda to the compiler cache
+            state.compiled_lambdas.insert(
+                compiled_function_id,
+                CompiledLambda {
+                    params,
+                    body: compiled_body,
+                },
+            );
+        }
+        let mut instructions = CompiledBlock::default();
+        // Push a pointer to the compiled function onto the stack
+        // => [FunctionPointer]
+        instructions.push(CompiledInstruction::function_pointer(compiled_function_id));
+        // Invoke the term constructor
+        // => [BuiltinTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+            RuntimeBuiltin::CreateBuiltin,
+        ));
+        Ok(instructions)
     }
 }
 

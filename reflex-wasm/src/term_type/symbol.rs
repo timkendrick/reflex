@@ -8,15 +8,19 @@ use reflex::core::{
     DependencyList, Eagerness, GraphNode, Internable, SerializeJson, StackOffset, SymbolId,
     SymbolTermType,
 };
+use reflex_macros::PointerIter;
 use serde_json::Value as JsonValue;
 
 use crate::{
     allocator::Arena,
+    compiler::{
+        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
+        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings,
+    },
     hash::{TermHash, TermHasher, TermSize},
     term_type::TypedTerm,
     ArenaRef,
 };
-use reflex_macros::PointerIter;
 
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
@@ -115,7 +119,29 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<SymbolTerm, A> {
 
 impl<A: Arena + Clone> Internable for ArenaRef<SymbolTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
-        self.capture_depth() == 0
+        true
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<SymbolTerm, A> {
+    fn compile(
+        &self,
+        _state: &mut CompilerState,
+        _bindings: &CompilerVariableBindings,
+        _options: &CompilerOptions,
+        _stack: &CompilerStack,
+    ) -> CompilerResult<A> {
+        let id = self.id();
+        let mut instructions = CompiledBlock::default();
+        // Push the id argument onto the stack
+        // => [id]
+        instructions.push(CompiledInstruction::u32_const(id));
+        // Invoke the term constructor
+        // => [IntTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+            RuntimeBuiltin::CreateInt,
+        ));
+        Ok(instructions)
     }
 }
 

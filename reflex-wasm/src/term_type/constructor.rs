@@ -6,19 +6,21 @@ use std::collections::HashSet;
 
 use reflex::core::{
     Arity, ConstructorTermType, DependencyList, Eagerness, Expression, GraphNode, Internable,
-    SerializeJson, StackOffset,
+    RefType, SerializeJson, StackOffset,
 };
+use reflex_macros::PointerIter;
 use serde_json::Value as JsonValue;
 
 use crate::{
     allocator::Arena,
+    compiler::{
+        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
+        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings,
+    },
     hash::{TermHash, TermHasher, TermSize},
-    term_type::TypedTerm,
-    ArenaPointer, ArenaRef,
+    term_type::{ListTerm, TypedTerm, WasmExpression},
+    ArenaPointer, ArenaRef, Term,
 };
-use reflex_macros::PointerIter;
-
-use super::{ListTerm, WasmExpression};
 
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
@@ -32,7 +34,8 @@ impl TermSize for ConstructorTerm {
 }
 impl TermHash for ConstructorTerm {
     fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
-        hasher.hash(&self.keys, arena)
+        let keys_hash = arena.read_value::<Term, _>(self.keys, |term| term.id());
+        hasher.hash(&keys_hash, arena)
     }
 }
 
@@ -134,8 +137,34 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<ConstructorTerm, A> {
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<ConstructorTerm, A> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        self.capture_depth() == 0
+    fn should_intern(&self, eager: Eagerness) -> bool {
+        self.keys().as_inner().should_intern(eager)
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<ConstructorTerm, A> {
+    fn compile(
+        &self,
+        state: &mut CompilerState,
+        bindings: &CompilerVariableBindings,
+        options: &CompilerOptions,
+        stack: &CompilerStack,
+    ) -> CompilerResult<A> {
+        let keys = self.keys();
+        let mut instructions = CompiledBlock::default();
+        // Push the prototype key list onto the stack
+        // => [ListTerm]
+        instructions.append_block(
+            keys.as_deref()
+                .as_inner()
+                .compile(state, bindings, options, stack)?,
+        );
+        // Invoke the term constructor
+        // => [ConstructorTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+            RuntimeBuiltin::CreateConstructor,
+        ));
+        Ok(instructions)
     }
 }
 

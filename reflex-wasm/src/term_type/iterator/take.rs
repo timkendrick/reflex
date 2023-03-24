@@ -5,14 +5,18 @@
 use std::collections::HashSet;
 
 use reflex::core::{DependencyList, Eagerness, GraphNode, Internable, SerializeJson, StackOffset};
+use reflex_macros::PointerIter;
 use serde_json::Value as JsonValue;
 
 use crate::{
     allocator::Arena,
+    compiler::{
+        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
+        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings,
+    },
     hash::{TermHash, TermHasher, TermSize},
     ArenaPointer, ArenaRef, Term,
 };
-use reflex_macros::PointerIter;
 
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
@@ -27,7 +31,8 @@ impl TermSize for TakeIteratorTerm {
 }
 impl TermHash for TakeIteratorTerm {
     fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
-        hasher.hash(&self.source, arena).write_u32(self.count)
+        let source_hash = arena.read_value::<Term, _>(self.source, |term| term.id());
+        hasher.hash(&source_hash, arena).hash(&self.count, arena)
     }
 }
 
@@ -110,8 +115,34 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<TakeIteratorTerm, A> {
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<TakeIteratorTerm, A> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        self.capture_depth() == 0
+    fn should_intern(&self, eager: Eagerness) -> bool {
+        self.source().should_intern(eager)
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<TakeIteratorTerm, A> {
+    fn compile(
+        &self,
+        state: &mut CompilerState,
+        bindings: &CompilerVariableBindings,
+        options: &CompilerOptions,
+        stack: &CompilerStack,
+    ) -> CompilerResult<A> {
+        let source = self.source();
+        let count = self.count();
+        let mut instructions = CompiledBlock::default();
+        // Push the source argument onto the stack
+        // => [Term]
+        instructions.append_block(source.compile(state, bindings, options, stack)?);
+        // Push the count argument onto the stack
+        // => [Term, count]
+        instructions.push(CompiledInstruction::u32_const(count));
+        // Invoke the term constructor
+        // => [TakeIteratorTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+            RuntimeBuiltin::CreateTakeIterator,
+        ));
+        Ok(instructions)
     }
 }
 

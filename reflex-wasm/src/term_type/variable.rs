@@ -7,15 +7,19 @@ use std::{collections::HashSet, iter::once};
 use reflex::core::{
     DependencyList, Eagerness, GraphNode, Internable, SerializeJson, StackOffset, VariableTermType,
 };
+use reflex_macros::PointerIter;
 use serde_json::Value as JsonValue;
 
 use crate::{
     allocator::Arena,
+    compiler::{
+        CompileWasm, CompiledBlock, CompiledInstruction, CompilerError, CompilerOptions,
+        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings, ValueType,
+    },
     hash::{TermHash, TermHasher, TermSize},
     term_type::TypedTerm,
     ArenaRef,
 };
-use reflex_macros::PointerIter;
 
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
@@ -118,7 +122,30 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<VariableTerm, A> {
 
 impl<A: Arena + Clone> Internable for ArenaRef<VariableTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
-        self.capture_depth() == 0
+        false
+    }
+}
+impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<VariableTerm, A> {
+    fn compile(
+        &self,
+        _state: &mut CompilerState,
+        bindings: &CompilerVariableBindings,
+        _options: &CompilerOptions,
+        _stack: &CompilerStack,
+    ) -> CompilerResult<A> {
+        let stack_offset = self.stack_offset();
+        if let Some(scope_offset) = bindings.get(stack_offset) {
+            let mut instructions = CompiledBlock::default();
+            // Copy the lexically-scoped variable onto the stack
+            // => [Term]
+            instructions.push(CompiledInstruction::GetScopeValue {
+                value_type: ValueType::HeapPointer,
+                scope_offset,
+            });
+            Ok(instructions)
+        } else {
+            Err(CompilerError::UnboundVariable(stack_offset))
+        }
     }
 }
 

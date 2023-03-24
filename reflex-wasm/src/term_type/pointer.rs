@@ -5,14 +5,18 @@
 use std::collections::HashSet;
 
 use reflex::core::{DependencyList, Eagerness, GraphNode, Internable, SerializeJson, StackOffset};
+use reflex_macros::PointerIter;
 use serde_json::Value as JsonValue;
 
 use crate::{
     allocator::Arena,
+    compiler::{
+        CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions, CompilerResult,
+        CompilerStack, CompilerState, CompilerVariableBindings,
+    },
     hash::{TermHash, TermHasher, TermSize},
     ArenaPointer, ArenaRef, Term,
 };
-use reflex_macros::PointerIter;
 
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
@@ -26,7 +30,7 @@ impl TermSize for PointerTerm {
 }
 impl TermHash for PointerTerm {
     fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
-        hasher.hash(&self.target, arena)
+        arena.read_value::<Term, _>(self.target, |term| term.hash(hasher, arena))
     }
 }
 
@@ -107,6 +111,23 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<PointerTerm, A> {
 impl<A: Arena + Clone> Internable for ArenaRef<PointerTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
         false
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<PointerTerm, A> {
+    fn compile(
+        &self,
+        _state: &mut CompilerState,
+        _bindings: &CompilerVariableBindings,
+        _options: &CompilerOptions,
+        _stack: &CompilerStack,
+    ) -> CompilerResult<A> {
+        let target = self.target();
+        let mut instructions = CompiledBlock::default();
+        // Push the target pointer onto the stack
+        // => [target]
+        instructions.push(CompiledInstruction::heap_pointer(target));
+        Ok(instructions)
     }
 }
 

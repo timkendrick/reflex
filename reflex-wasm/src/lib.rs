@@ -4,11 +4,18 @@
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use std::{hash::Hash, marker::PhantomData};
 
-use allocator::{Arena, ArenaAllocator};
-use hash::{TermHash, TermHashState, TermHasher, TermSize};
+use reflex::{
+    core::{NodeId, RefType},
+    hash::HashId,
+};
+use reflex_macros::PointerIter;
 
-use reflex::{core::RefType, hash::HashId};
-use term_type::*;
+use crate::{
+    allocator::{Arena, ArenaAllocator},
+    hash::{TermHash, TermHashState, TermHasher, TermSize},
+    stdlib::Stdlib,
+    term_type::{TermType, TermTypeDiscriminants},
+};
 
 pub use anyhow;
 pub use wasi_common;
@@ -31,6 +38,57 @@ pub mod utils;
 
 // Memory is allocated in 64KiB pages according to WASM spec
 pub const WASM_PAGE_SIZE: usize = 64 * 1024;
+
+#[derive(PartialEq, Eq, Clone, Copy, Debug, PointerIter)]
+#[repr(C)]
+pub struct FunctionIndex(u32);
+impl FunctionIndex {
+    pub fn as_stdlib(&self) -> Option<Stdlib> {
+        let Self(target) = self;
+        Stdlib::try_from(*target).ok()
+    }
+}
+impl TermSize for FunctionIndex {
+    fn size_of(&self) -> usize {
+        std::mem::size_of::<Self>()
+    }
+}
+impl TermHash for FunctionIndex {
+    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
+        let Self(uid) = self;
+        hasher.hash(uid, arena)
+    }
+}
+impl From<u32> for FunctionIndex {
+    fn from(value: u32) -> Self {
+        Self(value)
+    }
+}
+impl From<FunctionIndex> for u32 {
+    fn from(value: FunctionIndex) -> Self {
+        let FunctionIndex(value) = value;
+        value
+    }
+}
+impl From<Stdlib> for FunctionIndex {
+    fn from(value: Stdlib) -> Self {
+        Self(u32::from(value))
+    }
+}
+impl TryFrom<FunctionIndex> for Stdlib {
+    type Error = <Self as TryFrom<u32>>::Error;
+    fn try_from(value: FunctionIndex) -> Result<Self, Self::Error> {
+        Self::try_from(u32::from(value))
+    }
+}
+impl std::fmt::Display for FunctionIndex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match Stdlib::try_from(*self) {
+            Ok(stdlib) => write!(f, "<stdlib:{}>", stdlib),
+            Err(_) => write!(f, "<fn:{}>", self.0),
+        }
+    }
+}
 
 pub struct ArenaRef<T, A: Arena> {
     arena: A,
@@ -120,6 +178,19 @@ impl<'a, T: 'a, A: Arena, TInner: Iterator<Item = ArenaPointer>>
         }
     }
 }
+impl<'a, T: 'a, A: Arena, TInner: Iterator<Item = ArenaPointer>> Clone
+    for IntoArenaRefIter<'a, T, A, TInner>
+where
+    TInner: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            arena: self.arena,
+            inner: self.inner.clone(),
+            _item: PhantomData,
+        }
+    }
+}
 
 pub trait IntoArenaRefIterator<'a, A: Arena>
 where
@@ -202,8 +273,6 @@ impl TermSize for Term {
 }
 impl TermHash for Term {
     fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
-        // TODO: Investigate shallow hashing for compound terms
-        // hasher.write_hash(self.header.hash)
         self.value.hash(hasher, arena)
     }
 }
@@ -214,9 +283,9 @@ impl<A: Arena> ArenaRef<Term, A> {
     }
 }
 
-impl<A: Arena> TermHash for ArenaRef<Term, A> {
-    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
-        self.read_value(move |value| TermHash::hash(value, hasher, arena))
+impl<A: Arena> NodeId for ArenaRef<Term, A> {
+    fn id(&self) -> HashId {
+        self.read_value(|term| term.id())
     }
 }
 
@@ -265,11 +334,6 @@ impl From<ArenaPointer> for u32 {
 impl From<u32> for ArenaPointer {
     fn from(value: u32) -> Self {
         Self(value)
-    }
-}
-impl TermHash for ArenaPointer {
-    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
-        arena.read_value::<Term, _>(*self, |term| term.hash(hasher, arena))
     }
 }
 impl std::fmt::Debug for ArenaPointer {
@@ -487,7 +551,7 @@ mod tests {
     use crate::{
         allocator::{Arena, ArenaAllocator, VecAllocator},
         hash::TermSize,
-        ArenaPointer, ArenaRef, PointerIter,
+        ArenaPointer, ArenaRef,
     };
 
     use super::*;

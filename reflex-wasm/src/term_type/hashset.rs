@@ -8,19 +8,22 @@ use reflex::core::{
     DependencyList, Eagerness, GraphNode, HashmapTermType, HashsetTermType, Internable,
     SerializeJson, StackOffset,
 };
+use reflex_macros::PointerIter;
 use reflex_utils::MapIntoIterator;
 use serde_json::Value as JsonValue;
 
 use crate::{
     allocator::Arena,
+    compiler::{
+        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
+        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings,
+    },
     hash::{TermHash, TermHasher, TermSize},
-    term_type::TypedTerm,
-    ArenaPointer, ArenaRef, Array, IntoArenaRefIter,
-};
-use reflex_macros::PointerIter;
-
-use super::{
-    HashmapBucket, HashmapBucketKeysIterator, HashmapBucketsIterator, HashmapTerm, WasmExpression,
+    term_type::{
+        hashmap::{HashmapBucket, HashmapBucketKeysIterator, HashmapBucketsIterator, HashmapTerm},
+        TypedTerm, WasmExpression,
+    },
+    ArenaPointer, ArenaRef, Array, IntoArenaRefIter, Term,
 };
 
 #[derive(Clone, Copy, Debug, PointerIter)]
@@ -35,7 +38,8 @@ impl TermSize for HashsetTerm {
 }
 impl TermHash for HashsetTerm {
     fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
-        hasher.hash(&self.entries, arena)
+        let entries_hash = arena.read_value::<Term, _>(self.entries, |term| term.id());
+        hasher.hash(&entries_hash, arena)
     }
 }
 
@@ -211,8 +215,34 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<HashsetTerm, A> {
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<HashsetTerm, A> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        self.capture_depth() == 0
+    fn should_intern(&self, eager: Eagerness) -> bool {
+        self.entries().as_inner().should_intern(eager)
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<HashsetTerm, A> {
+    fn compile(
+        &self,
+        state: &mut CompilerState,
+        bindings: &CompilerVariableBindings,
+        options: &CompilerOptions,
+        stack: &CompilerStack,
+    ) -> CompilerResult<A> {
+        let entries = self.entries();
+        let mut instructions = CompiledBlock::default();
+        // Allocate the entries argument onto the stack
+        // => [HashmapTerm]
+        instructions.append_block(
+            entries
+                .as_inner()
+                .compile(state, bindings, options, stack)?,
+        );
+        // Invoke the term constructor
+        // => [HashsetTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+            RuntimeBuiltin::CreateHashset,
+        ));
+        Ok(instructions)
     }
 }
 

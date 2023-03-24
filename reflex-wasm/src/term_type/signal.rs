@@ -8,16 +8,19 @@ use reflex::core::{
     DependencyList, Eagerness, Expression, GraphNode, Internable, SerializeJson, SignalTermType,
     StackOffset,
 };
+use reflex_macros::PointerIter;
 use serde_json::Value as JsonValue;
 
-use super::{TreeTerm, WasmExpression};
 use crate::{
     allocator::Arena,
+    compiler::{
+        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
+        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings,
+    },
     hash::{TermHash, TermHasher, TermSize},
-    term_type::TypedTerm,
-    ArenaPointer, ArenaRef,
+    term_type::{TreeTerm, TypedTerm, WasmExpression},
+    ArenaPointer, ArenaRef, Term,
 };
-use reflex_macros::PointerIter;
 
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
@@ -31,7 +34,8 @@ impl TermSize for SignalTerm {
 }
 impl TermHash for SignalTerm {
     fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
-        hasher.hash(&self.conditions, arena)
+        let conditions_hash = arena.read_value::<Term, _>(self.conditions, |term| term.id());
+        hasher.hash(&conditions_hash, arena)
     }
 }
 
@@ -135,8 +139,34 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<SignalTerm, A> {
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<SignalTerm, A> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        self.capture_depth() == 0
+    fn should_intern(&self, eager: Eagerness) -> bool {
+        self.conditions().as_inner().should_intern(eager)
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<SignalTerm, A> {
+    fn compile(
+        &self,
+        state: &mut CompilerState,
+        bindings: &CompilerVariableBindings,
+        options: &CompilerOptions,
+        stack: &CompilerStack,
+    ) -> CompilerResult<A> {
+        let conditions = self.conditions();
+        let mut instructions = CompiledBlock::default();
+        // Push the conditions argument onto the stack
+        // => [TreeTerm]
+        instructions.append_block(
+            conditions
+                .as_inner()
+                .compile(state, bindings, options, stack)?,
+        );
+        // Invoke the term constructor
+        // => [SignalTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+            RuntimeBuiltin::CreateSignal,
+        ));
+        Ok(instructions)
     }
 }
 

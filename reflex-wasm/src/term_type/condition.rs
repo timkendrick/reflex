@@ -11,14 +11,16 @@ use reflex::core::{
 use serde_json::Value as JsonValue;
 use strum_macros::EnumDiscriminants;
 
-use super::{ListTerm, WasmExpression};
 use crate::{
     allocator::Arena,
+    compiler::{
+        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
+        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings, ValueType,
+    },
     hash::{TermHash, TermHasher, TermSize},
-    term_type::{TermTypeDiscriminants, TypedTerm},
+    term_type::{ListTerm, TermTypeDiscriminants, TypedTerm, WasmExpression},
     ArenaPointer, ArenaRef, PointerIter, Term,
 };
-use reflex_macros::PointerIter;
 
 #[derive(Clone, Copy, Debug, EnumDiscriminants)]
 #[repr(C)]
@@ -32,7 +34,7 @@ pub enum ConditionTerm {
     InvalidPointer(InvalidPointerCondition),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub enum ConditionTermPointerIter {
     Custom(CustomConditionPointerIter),
     Pending(PendingConditionPointerIter),
@@ -144,6 +146,68 @@ impl<A: Arena + Clone> ArenaRef<ConditionTerm, A> {
             )
         }
     }
+    pub fn as_custom_condition(&self) -> Option<&ArenaRef<TypedCondition<CustomCondition>, A>> {
+        match self.read_value(|term| term.condition_type()) {
+            ConditionTermDiscriminants::Custom => {
+                Some(self.as_typed_condition::<CustomCondition>())
+            }
+            _ => None,
+        }
+    }
+    pub fn as_error_condition(&self) -> Option<&ArenaRef<TypedCondition<ErrorCondition>, A>> {
+        match self.read_value(|term| term.condition_type()) {
+            ConditionTermDiscriminants::Error => Some(self.as_typed_condition::<ErrorCondition>()),
+            _ => None,
+        }
+    }
+    pub fn as_pending_condition(&self) -> Option<&ArenaRef<TypedCondition<PendingCondition>, A>> {
+        match self.read_value(|term| term.condition_type()) {
+            ConditionTermDiscriminants::Pending => {
+                Some(self.as_typed_condition::<PendingCondition>())
+            }
+            _ => None,
+        }
+    }
+    pub fn as_type_error_condition(
+        &self,
+    ) -> Option<&ArenaRef<TypedCondition<TypeErrorCondition>, A>> {
+        match self.read_value(|term| term.condition_type()) {
+            ConditionTermDiscriminants::TypeError => {
+                Some(self.as_typed_condition::<TypeErrorCondition>())
+            }
+            _ => None,
+        }
+    }
+    pub fn as_invalid_function_target_condition(
+        &self,
+    ) -> Option<&ArenaRef<TypedCondition<InvalidFunctionTargetCondition>, A>> {
+        match self.read_value(|term| term.condition_type()) {
+            ConditionTermDiscriminants::InvalidFunctionTarget => {
+                Some(self.as_typed_condition::<InvalidFunctionTargetCondition>())
+            }
+            _ => None,
+        }
+    }
+    pub fn as_invalid_function_args_condition(
+        &self,
+    ) -> Option<&ArenaRef<TypedCondition<InvalidFunctionArgsCondition>, A>> {
+        match self.read_value(|term| term.condition_type()) {
+            ConditionTermDiscriminants::InvalidFunctionArgs => {
+                Some(self.as_typed_condition::<InvalidFunctionArgsCondition>())
+            }
+            _ => None,
+        }
+    }
+    pub fn as_invalid_pointer_condition(
+        &self,
+    ) -> Option<&ArenaRef<TypedCondition<InvalidPointerCondition>, A>> {
+        match self.read_value(|term| term.condition_type()) {
+            ConditionTermDiscriminants::InvalidPointer => {
+                Some(self.as_typed_condition::<InvalidPointerCondition>())
+            }
+            _ => None,
+        }
+    }
 }
 
 impl<A: Arena + Clone> PointerIter for ArenaRef<ConditionTerm, A> {
@@ -199,7 +263,7 @@ impl<A: Arena + Clone> PointerIter for ArenaRef<ConditionTerm, A> {
 }
 
 #[repr(transparent)]
-pub(crate) struct TypedCondition<V> {
+pub struct TypedCondition<V> {
     condition: ConditionTerm,
     _type: PhantomData<V>,
 }
@@ -547,6 +611,41 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<ConditionTerm, A> {
     }
 }
 
+impl<A: Arena + Clone> Internable for ArenaRef<ConditionTerm, A> {
+    fn should_intern(&self, eager: Eagerness) -> bool {
+        match self.condition_type() {
+            ConditionTermDiscriminants::Custom => self
+                .as_typed_condition::<CustomCondition>()
+                .as_inner()
+                .should_intern(eager),
+            ConditionTermDiscriminants::Pending => self
+                .as_typed_condition::<PendingCondition>()
+                .as_inner()
+                .should_intern(eager),
+            ConditionTermDiscriminants::Error => self
+                .as_typed_condition::<ErrorCondition>()
+                .as_inner()
+                .should_intern(eager),
+            ConditionTermDiscriminants::TypeError => self
+                .as_typed_condition::<TypeErrorCondition>()
+                .as_inner()
+                .should_intern(eager),
+            ConditionTermDiscriminants::InvalidFunctionTarget => self
+                .as_typed_condition::<InvalidFunctionTargetCondition>()
+                .as_inner()
+                .should_intern(eager),
+            ConditionTermDiscriminants::InvalidFunctionArgs => self
+                .as_typed_condition::<InvalidFunctionArgsCondition>()
+                .as_inner()
+                .should_intern(eager),
+            ConditionTermDiscriminants::InvalidPointer => self
+                .as_typed_condition::<InvalidPointerCondition>()
+                .as_inner()
+                .should_intern(eager),
+        }
+    }
+}
+
 impl<A: Arena + Clone> SerializeJson for ArenaRef<ConditionTerm, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
         Err(format!("Unable to serialize term: {}", self))
@@ -654,6 +753,7 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<ConditionTerm, A> {
         }
     }
 }
+
 impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<ConditionTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read_value(|term| std::fmt::Debug::fmt(term, f))
@@ -674,10 +774,13 @@ impl TermSize for CustomCondition {
 }
 impl TermHash for CustomCondition {
     fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
+        let effect_type_hash = arena.read_value::<Term, _>(self.effect_type, |term| term.id());
+        let payload_hash = arena.read_value::<Term, _>(self.payload, |term| term.id());
+        let token_hash = arena.read_value::<Term, _>(self.token, |term| term.id());
         hasher
-            .hash(&self.effect_type, arena)
-            .hash(&self.payload, arena)
-            .hash(&self.token, arena)
+            .hash(&effect_type_hash, arena)
+            .hash(&payload_hash, arena)
+            .hash(&token_hash, arena)
     }
 }
 
@@ -744,6 +847,14 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<CustomCondition, A> {
     }
     fn is_complex(&self) -> bool {
         true
+    }
+}
+
+impl<A: Arena + Clone> Internable for ArenaRef<CustomCondition, A> {
+    fn should_intern(&self, eager: Eagerness) -> bool {
+        self.effect_type().should_intern(eager)
+            && self.payload().should_intern(eager)
+            && self.token().should_intern(eager)
     }
 }
 
@@ -818,6 +929,12 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<PendingCondition, A> {
     }
 }
 
+impl<A: Arena + Clone> Internable for ArenaRef<PendingCondition, A> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        true
+    }
+}
+
 impl<A: Arena + Clone> PartialEq for ArenaRef<PendingCondition, A> {
     fn eq(&self, _other: &Self) -> bool {
         true
@@ -849,7 +966,8 @@ impl TermSize for ErrorCondition {
 }
 impl TermHash for ErrorCondition {
     fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
-        hasher.hash(&self.payload, arena)
+        let payload_hash = arena.read_value::<Term, _>(self.payload, |term| term.id());
+        hasher.hash(&payload_hash, arena)
     }
 }
 
@@ -897,6 +1015,12 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<ErrorCondition, A> {
     }
 }
 
+impl<A: Arena + Clone> Internable for ArenaRef<ErrorCondition, A> {
+    fn should_intern(&self, eager: Eagerness) -> bool {
+        self.payload().should_intern(eager)
+    }
+}
+
 impl<A: Arena + Clone> PartialEq for ArenaRef<ErrorCondition, A> {
     fn eq(&self, other: &Self) -> bool {
         self.payload() == other.payload()
@@ -929,9 +1053,10 @@ impl TermSize for TypeErrorCondition {
 }
 impl TermHash for TypeErrorCondition {
     fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
+        let payload_hash = arena.read_value::<Term, _>(self.payload, |term| term.id());
         hasher
             .hash(&self.expected, arena)
-            .hash(&self.payload, arena)
+            .hash(&payload_hash, arena)
     }
 }
 
@@ -985,6 +1110,12 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<TypeErrorCondition, A> {
     }
 }
 
+impl<A: Arena + Clone> Internable for ArenaRef<TypeErrorCondition, A> {
+    fn should_intern(&self, eager: Eagerness) -> bool {
+        self.payload().should_intern(eager)
+    }
+}
+
 impl<A: Arena + Clone> PartialEq for ArenaRef<TypeErrorCondition, A> {
     fn eq(&self, other: &Self) -> bool {
         self.read_value(|term| term.expected) == other.read_value(|term| term.expected)
@@ -1021,7 +1152,8 @@ impl TermSize for InvalidFunctionTargetCondition {
 }
 impl TermHash for InvalidFunctionTargetCondition {
     fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
-        hasher.hash(&self.target, arena)
+        let target_hash = arena.read_value::<Term, _>(self.target, |term| term.id());
+        hasher.hash(&target_hash, arena)
     }
 }
 
@@ -1069,6 +1201,12 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<InvalidFunctionTargetCondition, A>
     }
 }
 
+impl<A: Arena + Clone> Internable for ArenaRef<InvalidFunctionTargetCondition, A> {
+    fn should_intern(&self, eager: Eagerness) -> bool {
+        self.target().should_intern(eager)
+    }
+}
+
 impl<A: Arena + Clone> PartialEq for ArenaRef<InvalidFunctionTargetCondition, A> {
     fn eq(&self, other: &Self) -> bool {
         self.target() == other.target()
@@ -1101,7 +1239,9 @@ impl TermSize for InvalidFunctionArgsCondition {
 }
 impl TermHash for InvalidFunctionArgsCondition {
     fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
-        hasher.hash(&self.target, arena).hash(&self.args, arena)
+        let target_hash = arena.read_value::<Term, _>(self.target, |term| term.id());
+        let args_hash = arena.read_value::<Term, _>(self.args, |term| term.id());
+        hasher.hash(&target_hash, arena).hash(&args_hash, arena)
     }
 }
 
@@ -1171,6 +1311,15 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<InvalidFunctionArgsCondition, A> {
     }
     fn is_complex(&self) -> bool {
         true
+    }
+}
+
+impl<A: Arena + Clone> Internable for ArenaRef<InvalidFunctionArgsCondition, A> {
+    fn should_intern(&self, eager: Eagerness) -> bool {
+        self.target()
+            .map(|term| term.should_intern(eager))
+            .unwrap_or(true)
+            && self.args().as_inner().should_intern(eager)
     }
 }
 
@@ -1251,6 +1400,12 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<InvalidPointerCondition, A> {
     }
 }
 
+impl<A: Arena + Clone> Internable for ArenaRef<InvalidPointerCondition, A> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        true
+    }
+}
+
 impl<A: Arena + Clone> PartialEq for ArenaRef<InvalidPointerCondition, A> {
     fn eq(&self, _other: &Self) -> bool {
         true
@@ -1270,9 +1425,214 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<InvalidPointerCondition, A
     }
 }
 
-impl<A: Arena + Clone> Internable for ArenaRef<ConditionTerm, A> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        self.capture_depth() == 0
+impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<ConditionTerm, A> {
+    fn compile(
+        &self,
+        state: &mut CompilerState,
+        bindings: &CompilerVariableBindings,
+        options: &CompilerOptions,
+        stack: &CompilerStack,
+    ) -> CompilerResult<A> {
+        match self.condition_type() {
+            ConditionTermDiscriminants::Custom => self
+                .as_typed_condition::<CustomCondition>()
+                .as_inner()
+                .compile(state, bindings, options, stack),
+            ConditionTermDiscriminants::Pending => self
+                .as_typed_condition::<PendingCondition>()
+                .as_inner()
+                .compile(state, bindings, options, stack),
+            ConditionTermDiscriminants::Error => self
+                .as_typed_condition::<ErrorCondition>()
+                .as_inner()
+                .compile(state, bindings, options, stack),
+            ConditionTermDiscriminants::TypeError => self
+                .as_typed_condition::<TypeErrorCondition>()
+                .as_inner()
+                .compile(state, bindings, options, stack),
+            ConditionTermDiscriminants::InvalidFunctionTarget => self
+                .as_typed_condition::<InvalidFunctionTargetCondition>()
+                .as_inner()
+                .compile(state, bindings, options, stack),
+            ConditionTermDiscriminants::InvalidFunctionArgs => self
+                .as_typed_condition::<InvalidFunctionArgsCondition>()
+                .as_inner()
+                .compile(state, bindings, options, stack),
+            ConditionTermDiscriminants::InvalidPointer => self
+                .as_typed_condition::<InvalidPointerCondition>()
+                .as_inner()
+                .compile(state, bindings, options, stack),
+        }
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<CustomCondition, A> {
+    fn compile(
+        &self,
+        state: &mut CompilerState,
+        bindings: &CompilerVariableBindings,
+        options: &CompilerOptions,
+        stack: &CompilerStack,
+    ) -> CompilerResult<A> {
+        let effect_type = self.effect_type();
+        let payload = self.payload();
+        let token = self.token();
+        let mut instructions = CompiledBlock::default();
+        // Yield the effect type onto the stack
+        // => [Term]
+        instructions.append_block(effect_type.compile(state, bindings, options, stack)?);
+        let stack = stack.push_lazy(ValueType::HeapPointer);
+        // Yield the payload onto the stack
+        // => [Term, Term]
+        instructions.append_block(payload.compile(state, bindings, options, &stack)?);
+        let stack = stack.push_lazy(ValueType::HeapPointer);
+        // Yield the token onto the stack
+        // => [Term, Term, Token]
+        instructions.append_block(token.compile(state, bindings, options, &stack)?);
+        // Invoke the term constructor
+        // => [ConditionTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+            RuntimeBuiltin::CreateCustomCondition,
+        ));
+        Ok(instructions)
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<PendingCondition, A> {
+    fn compile(
+        &self,
+        _state: &mut CompilerState,
+        _bindings: &CompilerVariableBindings,
+        _options: &CompilerOptions,
+        _stack: &CompilerStack,
+    ) -> CompilerResult<A> {
+        let mut instructions = CompiledBlock::default();
+        // Invoke the term constructor
+        // => [ConditionTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+            RuntimeBuiltin::CreatePendingCondition,
+        ));
+        Ok(instructions)
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<ErrorCondition, A> {
+    fn compile(
+        &self,
+        state: &mut CompilerState,
+        bindings: &CompilerVariableBindings,
+        options: &CompilerOptions,
+        stack: &CompilerStack,
+    ) -> CompilerResult<A> {
+        let payload = self.payload();
+        let mut instructions = CompiledBlock::default();
+        // Yield the payload onto the stack
+        // => [Term]
+        instructions.append_block(payload.compile(state, bindings, options, stack)?);
+        // Invoke the term constructor
+        // => [ConditionTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+            RuntimeBuiltin::CreateErrorCondition,
+        ));
+        Ok(instructions)
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<TypeErrorCondition, A> {
+    fn compile(
+        &self,
+        state: &mut CompilerState,
+        bindings: &CompilerVariableBindings,
+        options: &CompilerOptions,
+        stack: &CompilerStack,
+    ) -> CompilerResult<A> {
+        let expected = self.expected();
+        let payload = self.payload();
+        let mut instructions = CompiledBlock::default();
+        // Push the expected type identifier onto the stack
+        // => [type_id]
+        instructions.push(CompiledInstruction::u32_const(expected));
+        // Yield the received payload onto the stack
+        // => [type_id, Term]
+        instructions.append_block(payload.compile(state, bindings, options, stack)?);
+        // Invoke the term constructor
+        // => [ConditionTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+            RuntimeBuiltin::CreateTypeErrorCondition,
+        ));
+        Ok(instructions)
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<InvalidFunctionTargetCondition, A> {
+    fn compile(
+        &self,
+        state: &mut CompilerState,
+        bindings: &CompilerVariableBindings,
+        options: &CompilerOptions,
+        stack: &CompilerStack,
+    ) -> CompilerResult<A> {
+        let target = self.target();
+        let mut instructions = CompiledBlock::default();
+        // Yield the target onto the stack
+        // => [Term]
+        instructions.append_block(target.compile(state, bindings, options, stack)?);
+        // Invoke the term constructor
+        // => [ConditionTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+            RuntimeBuiltin::CreateInvalidFunctionTargetCondition,
+        ));
+        Ok(instructions)
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<InvalidFunctionArgsCondition, A> {
+    fn compile(
+        &self,
+        state: &mut CompilerState,
+        bindings: &CompilerVariableBindings,
+        options: &CompilerOptions,
+        stack: &CompilerStack,
+    ) -> CompilerResult<A> {
+        let target = self.target();
+        let args = self.args();
+        let mut instructions = CompiledBlock::default();
+        // Yield the target onto the stack
+        // => [Option<Term>]
+        match target {
+            Some(target) => {
+                instructions.append_block(target.compile(state, bindings, options, stack)?);
+            }
+            None => instructions.push(CompiledInstruction::NullPointer),
+        }
+        let stack = stack.push_lazy(ValueType::HeapPointer);
+        // Yield the argument list onto the stack
+        // => [Option<Term>, ListTerm]
+        instructions.append_block(args.as_inner().compile(state, bindings, options, &stack)?);
+        // Invoke the term constructor
+        // => [ConditionTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+            RuntimeBuiltin::CreateInvalidFunctionArgsCondition,
+        ));
+        Ok(instructions)
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<InvalidPointerCondition, A> {
+    fn compile(
+        &self,
+        _state: &mut CompilerState,
+        _bindings: &CompilerVariableBindings,
+        _options: &CompilerOptions,
+        _stack: &CompilerStack,
+    ) -> CompilerResult<A> {
+        let mut instructions = CompiledBlock::default();
+        // Invoke the term constructor
+        // => [ConditionTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+            RuntimeBuiltin::CreateInvalidPointerCondition,
+        ));
+        Ok(instructions)
     }
 }
 

@@ -631,6 +631,26 @@ pub enum ArgType {
     /** Pass argument directly into function body without evaluating */
     Lazy,
 }
+impl ArgType {
+    pub fn is_strict(&self) -> bool {
+        match self {
+            Self::Strict => true,
+            _ => false,
+        }
+    }
+    pub fn is_eager(&self) -> bool {
+        match self {
+            Self::Eager => true,
+            _ => false,
+        }
+    }
+    pub fn is_lazy(&self) -> bool {
+        match self {
+            Self::Lazy => true,
+            _ => false,
+        }
+    }
+}
 
 #[derive(Hash, Eq, PartialEq, Clone, Copy, Debug)]
 pub struct FunctionArity<const REQUIRED: usize, const OPTIONAL: usize> {
@@ -1192,6 +1212,20 @@ pub trait HeapAllocator<T: Expression> {
 pub enum Eagerness {
     Eager,
     Lazy,
+}
+impl Eagerness {
+    pub fn is_eager(&self) -> bool {
+        match self {
+            Eagerness::Eager => true,
+            _ => false,
+        }
+    }
+    pub fn is_lazy(&self) -> bool {
+        match self {
+            Eagerness::Lazy => true,
+            _ => false,
+        }
+    }
 }
 
 pub type SignalId = HashId;

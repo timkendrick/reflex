@@ -6,15 +6,19 @@ use std::collections::HashSet;
 
 use chrono::{DateTime, NaiveDateTime, SecondsFormat, Utc};
 use reflex::core::{DependencyList, Eagerness, GraphNode, Internable, SerializeJson, StackOffset};
+use reflex_macros::PointerIter;
 use serde_json::Value as JsonValue;
 
 use crate::{
     allocator::Arena,
+    compiler::{
+        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
+        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings,
+    },
     hash::{TermHash, TermHasher, TermSize},
     utils::{chunks_to_i64, i64_to_chunks},
     ArenaRef,
 };
-use reflex_macros::PointerIter;
 
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
@@ -137,6 +141,28 @@ impl std::fmt::Display for DateTimestamp {
             )
             .to_rfc3339_opts(SecondsFormat::AutoSi, true)
         )
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<DateTerm, A> {
+    fn compile(
+        &self,
+        _state: &mut CompilerState,
+        _bindings: &CompilerVariableBindings,
+        _options: &CompilerOptions,
+        _stack: &CompilerStack,
+    ) -> CompilerResult<A> {
+        let timestamp = self.timestamp();
+        let mut instructions = CompiledBlock::default();
+        // Push the value argument onto the stack
+        // => [value]
+        instructions.push(CompiledInstruction::i64_const(timestamp));
+        // Invoke the term constructor
+        // => [DateTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+            RuntimeBuiltin::CreateDate,
+        ));
+        Ok(instructions)
     }
 }
 

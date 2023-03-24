@@ -8,17 +8,21 @@ use reflex::core::{
     ArgType, Arity, DependencyList, Eagerness, Expression, GraphNode, Internable,
     PartialApplicationTermType, SerializeJson, StackOffset,
 };
+use reflex_macros::PointerIter;
+use reflex_utils::WithExactSizeIterator;
 use serde_json::Value as JsonValue;
 
 use crate::{
     allocator::Arena,
+    compiler::{
+        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
+        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings, LazyExpression,
+        MaybeLazyExpression,
+    },
     hash::{TermHash, TermHasher, TermSize},
-    term_type::TypedTerm,
+    term_type::{list::compile_list, ListTerm, TypedTerm, WasmExpression},
     ArenaPointer, ArenaRef, Term,
 };
-use reflex_macros::PointerIter;
-
-use super::{ListTerm, WasmExpression};
 
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
@@ -33,7 +37,9 @@ impl TermSize for PartialTerm {
 }
 impl TermHash for PartialTerm {
     fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
-        hasher.hash(&self.target, arena).hash(&self.args, arena)
+        let target_hash = arena.read_value::<Term, _>(self.target, |term| term.id());
+        let args_hash = arena.read_value::<Term, _>(self.args, |term| term.id());
+        hasher.hash(&target_hash, arena).hash(&args_hash, arena)
     }
 }
 
@@ -146,7 +152,7 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<PartialTerm, A> {
             })
     }
     fn is_static(&self) -> bool {
-        false
+        true
     }
     fn is_atomic(&self) -> bool {
         self.target().is_atomic() && self.args().is_atomic()
@@ -203,8 +209,69 @@ fn get_eager_args<T>(args: impl IntoIterator<Item = T>, arity: &Arity) -> impl I
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<PartialTerm, A> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        self.capture_depth() == 0
+    fn should_intern(&self, eager: Eagerness) -> bool {
+        self.target().should_intern(eager) && self.args().as_inner().should_intern(eager)
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<PartialTerm, A> {
+    fn compile(
+        &self,
+        state: &mut CompilerState,
+        bindings: &CompilerVariableBindings,
+        options: &CompilerOptions,
+        stack: &CompilerStack,
+    ) -> CompilerResult<A> {
+        let target = self.target();
+        let args = self.args();
+        let num_partial_args = args.as_inner().len();
+        let arity = target
+            .arity()
+            .unwrap_or(Arity::lazy(num_partial_args, 0, false));
+        let num_partial_args =
+            num_partial_args.min((0..num_partial_args).zip(arity.iter()).count());
+        let args_list = args.as_inner();
+        let args_with_eagerness = WithExactSizeIterator::new(
+            num_partial_args,
+            args_list
+                .iter()
+                .zip(arity.iter())
+                .map(|(arg, arg_type)| match arg_type {
+                    ArgType::Strict => {
+                        let eagerness = if arg.is_static() && arg.as_signal_term().is_none() {
+                            Eagerness::Lazy
+                        } else {
+                            Eagerness::Eager
+                        };
+                        (MaybeLazyExpression::Eager(arg), eagerness)
+                    }
+                    ArgType::Eager => (MaybeLazyExpression::Eager(arg), Eagerness::Lazy),
+                    ArgType::Lazy => (
+                        MaybeLazyExpression::Lazy(LazyExpression::new(arg)),
+                        Eagerness::Lazy,
+                    ),
+                }),
+        );
+        let mut instructions = CompiledBlock::default();
+        // Push the partial application target onto the stack
+        // => [Term]
+        instructions.append_block(target.compile(state, bindings, options, stack)?);
+        let stack = stack.push_strict();
+        // Push the partial application arguments onto the stack
+        // => [Term, ListTerm]
+        instructions.append_block(compile_list(
+            args_with_eagerness,
+            state,
+            bindings,
+            options,
+            &stack,
+        )?);
+        // Invoke the term constructor
+        // => [PartialTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+            RuntimeBuiltin::CreatePartial,
+        ));
+        Ok(instructions)
     }
 }
 

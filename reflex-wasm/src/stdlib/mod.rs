@@ -169,8 +169,6 @@ pub use unzip::*;
 pub use values::*;
 pub use zip::*;
 
-use crate::term_type::FunctionIndex;
-
 #[derive(Matcher, PartialEq, Eq, Clone, Copy, Debug, EnumDiscriminants)]
 pub enum Stdlib {
     Abs(Abs),
@@ -276,12 +274,6 @@ pub enum Stdlib {
 impl std::hash::Hash for Stdlib {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         core::mem::discriminant(self).hash(state);
-    }
-}
-
-impl From<FunctionIndex> for Stdlib {
-    fn from(value: FunctionIndex) -> Self {
-        Self::try_from(u32::from(value)).expect("Invalid function index")
     }
 }
 
@@ -569,7 +561,110 @@ impl TryFrom<u32> for Stdlib {
         }
     }
 }
+
 impl Stdlib {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Abs(_) => "Stdlib_Abs",
+            Self::Accessor(_) => "Stdlib_Accessor",
+            Self::Add(_) => "Stdlib_Add",
+            Self::And(_) => "Stdlib_And",
+            Self::Apply(_) => "Stdlib_Apply",
+            Self::Car(_) => "Stdlib_Car",
+            Self::Cdr(_) => "Stdlib_Cdr",
+            Self::Ceil(_) => "Stdlib_Ceil",
+            Self::Chain(_) => "Stdlib_Chain",
+            Self::CollectHashmap(_) => "Stdlib_CollectHashmap",
+            Self::CollectHashset(_) => "Stdlib_CollectHashset",
+            Self::CollectList(_) => "Stdlib_CollectList",
+            Self::CollectSignal(_) => "Stdlib_CollectSignal",
+            Self::CollectString(_) => "Stdlib_CollectString",
+            Self::CollectTree(_) => "Stdlib_CollectTree",
+            Self::ConstructHashmap(_) => "Stdlib_ConstructHashmap",
+            Self::ConstructHashset(_) => "Stdlib_ConstructHashset",
+            Self::ConstructList(_) => "Stdlib_ConstructList",
+            Self::ConstructRecord(_) => "Stdlib_ConstructRecord",
+            Self::Cons(_) => "Stdlib_Cons",
+            Self::Construct(_) => "Stdlib_Construct",
+            Self::Debug(_) => "Stdlib_Debug",
+            Self::DecrementVariable(_) => "Stdlib_DecrementVariable",
+            Self::Divide(_) => "Stdlib_Divide",
+            Self::Effect(_) => "Stdlib_Effect",
+            Self::EndsWith(_) => "Stdlib_EndsWith",
+            Self::Eq(_) => "Stdlib_Eq",
+            Self::Equal(_) => "Stdlib_Equal",
+            Self::Filter(_) => "Stdlib_Filter",
+            Self::Flatten(_) => "Stdlib_Flatten",
+            Self::Floor(_) => "Stdlib_Floor",
+            Self::Fold(_) => "Stdlib_Fold",
+            Self::FormatErrorMessage(_) => "Stdlib_FormatErrorMessage",
+            Self::Get(_) => "Stdlib_Get",
+            Self::GetVariable(_) => "Stdlib_GetVariable",
+            Self::GraphQlResolver(_) => "Stdlib_GraphQlResolver",
+            Self::Gt(_) => "Stdlib_Gt",
+            Self::Gte(_) => "Stdlib_Gte",
+            Self::Has(_) => "Stdlib_Has",
+            Self::Hash(_) => "Stdlib_Hash",
+            Self::Identity(_) => "Stdlib_Identity",
+            Self::If(_) => "Stdlib_If",
+            Self::IfError(_) => "Stdlib_IfError",
+            Self::IfPending(_) => "Stdlib_IfPending",
+            Self::IncrementVariable(_) => "Stdlib_IncrementVariable",
+            Self::IsFinite(_) => "Stdlib_IsFinite",
+            Self::Iterate(_) => "Stdlib_Iterate",
+            Self::Keys(_) => "Stdlib_Keys",
+            Self::Length(_) => "Stdlib_Length",
+            Self::Log(_) => "Stdlib_Log",
+            Self::Lt(_) => "Stdlib_Lt",
+            Self::Lte(_) => "Stdlib_Lte",
+            Self::Map(_) => "Stdlib_Map",
+            Self::Max(_) => "Stdlib_Max",
+            Self::Merge(_) => "Stdlib_Merge",
+            Self::Min(_) => "Stdlib_Min",
+            Self::Multiply(_) => "Stdlib_Multiply",
+            Self::Not(_) => "Stdlib_Not",
+            Self::Or(_) => "Stdlib_Or",
+            Self::ParseDate(_) => "Stdlib_ParseDate",
+            Self::ParseFloat(_) => "Stdlib_ParseFloat",
+            Self::ParseInt(_) => "Stdlib_ParseInt",
+            Self::ParseJson(_) => "Stdlib_ParseJson",
+            Self::Pow(_) => "Stdlib_Pow",
+            Self::Push(_) => "Stdlib_Push",
+            Self::PushFront(_) => "Stdlib_PushFront",
+            Self::Raise(_) => "Stdlib_Raise",
+            Self::Remainder(_) => "Stdlib_Remainder",
+            Self::Replace(_) => "Stdlib_Replace",
+            Self::ResolveArgs(_) => "Stdlib_ResolveArgs",
+            Self::ResolveDeep(_) => "Stdlib_ResolveDeep",
+            Self::ResolveHashmap(_) => "Stdlib_ResolveHashmap",
+            Self::ResolveHashset(_) => "Stdlib_ResolveHashset",
+            Self::ResolveList(_) => "Stdlib_ResolveList",
+            Self::ResolveQueryBranch(_) => "Stdlib_ResolveQueryBranch",
+            Self::ResolveQueryLeaf(_) => "Stdlib_ResolveQueryLeaf",
+            Self::ResolveRecord(_) => "Stdlib_ResolveRecord",
+            Self::ResolveShallow(_) => "Stdlib_ResolveShallow",
+            Self::ResolveTree(_) => "Stdlib_ResolveTree",
+            Self::Round(_) => "Stdlib_Round",
+            Self::Scan(_) => "Stdlib_Scan",
+            Self::Sequence(_) => "Stdlib_Sequence",
+            Self::Set(_) => "Stdlib_Set",
+            Self::SetVariable(_) => "Stdlib_SetVariable",
+            Self::Skip(_) => "Stdlib_Skip",
+            Self::Slice(_) => "Stdlib_Slice",
+            Self::Split(_) => "Stdlib_Split",
+            Self::StartsWith(_) => "Stdlib_StartsWith",
+            Self::StringifyJson(_) => "Stdlib_StringifyJson",
+            Self::Subtract(_) => "Stdlib_Subtract",
+            Self::Take(_) => "Stdlib_Take",
+            Self::Throw(_) => "Stdlib_Throw",
+            Self::ToRequest(_) => "Stdlib_ToRequest",
+            Self::ToString(_) => "Stdlib_ToString",
+            Self::Urlencode(_) => "Stdlib_Urlencode",
+            Self::Unzip(_) => "Stdlib_Unzip",
+            Self::Values(_) => "Stdlib_Values",
+            Self::Zip(_) => "Stdlib_Zip",
+        }
+    }
     pub fn arity(&self) -> Arity {
         match self {
             Self::Abs(inner) => inner.arity(),

@@ -5,14 +5,18 @@
 use std::collections::HashSet;
 
 use reflex::core::{DependencyList, Eagerness, GraphNode, Internable, SerializeJson, StackOffset};
+use reflex_macros::PointerIter;
 use serde_json::Value as JsonValue;
 
 use crate::{
     allocator::Arena,
+    compiler::{
+        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
+        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings, ValueType,
+    },
     hash::{TermHash, TermHasher, TermSize},
     ArenaPointer, ArenaRef, Term,
 };
-use reflex_macros::PointerIter;
 
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
@@ -27,7 +31,9 @@ impl TermSize for ZipIteratorTerm {
 }
 impl TermHash for ZipIteratorTerm {
     fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
-        hasher.hash(&self.left, arena).hash(&self.right, arena)
+        let left_hash = arena.read_value::<Term, _>(self.left, |term| term.id());
+        let right_hash = arena.read_value::<Term, _>(self.right, |term| term.id());
+        hasher.hash(&left_hash, arena).hash(&right_hash, arena)
     }
 }
 
@@ -117,11 +123,37 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<ZipIteratorTerm, A> {
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<ZipIteratorTerm, A> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        self.capture_depth() == 0
+    fn should_intern(&self, eager: Eagerness) -> bool {
+        self.left().should_intern(eager) && self.right().should_intern(eager)
     }
 }
 
+impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<ZipIteratorTerm, A> {
+    fn compile(
+        &self,
+        state: &mut CompilerState,
+        bindings: &CompilerVariableBindings,
+        options: &CompilerOptions,
+        stack: &CompilerStack,
+    ) -> CompilerResult<A> {
+        let left = self.left();
+        let right = self.right();
+        let mut instructions = CompiledBlock::default();
+        // Push the left argument onto the stack
+        // => [Term]
+        instructions.append_block(left.compile(state, bindings, options, stack)?);
+        let stack = stack.push_lazy(ValueType::HeapPointer);
+        // Push the right argument onto the stack
+        // => [Term, Term]
+        instructions.append_block(right.compile(state, bindings, options, &stack)?);
+        // Invoke the term constructor
+        // => [ZipIteratorTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+            RuntimeBuiltin::CreateZipIterator,
+        ));
+        Ok(instructions)
+    }
+}
 #[cfg(test)]
 mod tests {
     use crate::term_type::{TermType, TermTypeDiscriminants};

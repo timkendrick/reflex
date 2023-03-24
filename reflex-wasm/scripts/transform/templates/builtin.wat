@@ -89,7 +89,7 @@
   (call (@concat "$" (@get $builtin_name) "::dispatch") (@map $arg_name (@chain (@get $arg_names) (@get $vararg_names)) (local.get (@get $arg_name))) (local.get $state))
   (call $Dependencies::traits::union (local.get $dependencies)))
 
-(func (@concat "$" (@get $builtin_name) "::dispatch") (@map $arg_name (@chain (@get $arg_names) (@get $vararg_names)) (param (@get $arg_name) i32)) (param $state i32) (result i32 i32)
+(func (@concat "$" (@get $builtin_name) "::dispatch") (export (@concat "\"" (@get $builtin_name) "\"")) (@map $arg_name (@chain (@get $arg_names) (@get $vararg_names)) (param (@get $arg_name) i32)) (param $state i32) (result i32 i32)
   ;; Invoke the correct method implementation depending on the argument types
   (@map $arg_name
     (@chain (@get $arg_names) (@get $vararg_names))

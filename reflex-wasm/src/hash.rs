@@ -146,7 +146,7 @@ impl TermHasher {
         let Self { state } = self;
         let TermHashState(state) = state;
         Self {
-            state: TermHashState((state ^ value as u64).wrapping_mul(0x100000001b3)),
+            state: TermHashState((state ^ (value as u64)).wrapping_mul(0x100000001b3)),
         }
     }
     pub fn write_u32(self, value: u32) -> Self {

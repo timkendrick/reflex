@@ -278,8 +278,26 @@ dispatcher!({
 #[derive(Debug)]
 pub enum WasmWorkerError<T: Expression> {
     Unititialized,
+    InvalidGraphDefinition,
     InterpreterError(InterpreterError),
     SerializationError(T),
+}
+
+impl<T: Expression + std::fmt::Display> std::fmt::Display for WasmWorkerError<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Unititialized => write!(f, "WebAssembly module not initialized"),
+            Self::InvalidGraphDefinition => write!(f, "Invalid graph definition"),
+            Self::InterpreterError(err) => {
+                write!(f, "WebAssembly interpreter error: {}", err)
+            }
+            Self::SerializationError(term) => write!(
+                f,
+                "WebAssembly serialization error: unable to serialize term: {}",
+                term
+            ),
+        }
+    }
 }
 
 enum MaybeOwned<'a, T> {
@@ -324,14 +342,24 @@ where
                     WasmInterpreter::instantiate(&self.wasm_module, "memory")
                         .map_err(WasmWorkerError::InterpreterError)
                         .and_then(|mut instance| {
-                            let graph_root_factory = instance
-                                .call::<(), u32>(&self.graph_root_factory_export_name, ())
-                                .map_err(WasmWorkerError::InterpreterError)?;
+                            let graph_root = instance
+                                .call::<u32, (u32, u32)>(
+                                    &self.graph_root_factory_export_name,
+                                    u32::from(ArenaPointer::null()),
+                                )
+                                .map_err(WasmWorkerError::InterpreterError)
+                                .and_then(|(graph_root, dependencies)| {
+                                    if ArenaPointer::from(dependencies).is_null() {
+                                        Ok(ArenaPointer::from(graph_root))
+                                    } else {
+                                        Err(WasmWorkerError::InvalidGraphDefinition)
+                                    }
+                                })?;
                             let mut wasm_factory =
                                 WasmTermFactory::from(Rc::new(RefCell::new(&mut instance)));
                             let query = match self.evaluation_mode {
                                 QueryEvaluationMode::Query => compile_graphql_query(
-                                    ArenaPointer::from(graph_root_factory),
+                                    graph_root,
                                     &self.query,
                                     &self.factory,
                                     &mut wasm_factory,
@@ -405,10 +433,10 @@ where
                         .iter()
                         .fold(Ok(()), |result, (state_token, value)| {
                             let _ = result?;
-                            let mut wasm_factory =
+                            let wasm_factory =
                                 WasmTermFactory::from(Rc::new(RefCell::new(&mut state.instance)));
                             let value_pointer =
-                                import_wasm_expression(value, &self.factory, &mut wasm_factory)
+                                import_wasm_expression(value, &self.factory, &wasm_factory)
                                     .map_err(WasmWorkerError::SerializationError)?;
                             match state.state_values.entry(*state_token) {
                                 Entry::Occupied(mut entry) => {
@@ -511,18 +539,7 @@ where
                 ))))
             }
             Err(err) => {
-                let message = match err.deref() {
-                    WasmWorkerError::Unititialized => {
-                        String::from("WebAssembly module not initialized")
-                    }
-                    WasmWorkerError::InterpreterError(err) => {
-                        format!("WebAssembly interpreter error: {}", err)
-                    }
-                    WasmWorkerError::SerializationError(term) => format!(
-                        "WebAssembly serialization error: unable to serialize term: {}",
-                        term
-                    ),
-                };
+                let message = format!("{}", err.deref());
                 let result = EvaluationResult::new(
                     create_error_expression(message, &self.factory, &self.allocator),
                     Default::default(),
@@ -605,7 +622,11 @@ fn parse_wasm_interpreter_result<'heap, T: Expression>(
     EvaluationResult::new(
         export_wasm_expression(result, factory, allocator, arena).unwrap_or_else(|term| {
             create_error_expression(
-                format!("Unable to serialize term: {}", term),
+                if let Some(condition) = term.as_condition_term() {
+                    format!("{}", condition)
+                } else {
+                    format!("Unable to translate evaluation result: {}", term)
+                },
                 factory,
                 allocator,
             )
@@ -687,7 +708,7 @@ where
 fn compile_wasm_expression<'heap, T: Expression>(
     expression: &T,
     factory: &impl ExpressionFactory<T>,
-    wasm_factory: &mut WasmTermFactory<&'heap mut WasmInterpreter>,
+    wasm_factory: &WasmTermFactory<&'heap mut WasmInterpreter>,
 ) -> Result<ArenaPointer, T>
 where
     T::Builtin: Into<crate::stdlib::Stdlib>,
@@ -698,7 +719,7 @@ where
 fn import_wasm_expression<'heap, T: Expression>(
     expression: &T,
     factory: &impl ExpressionFactory<T>,
-    wasm_factory: &mut WasmTermFactory<&'heap mut WasmInterpreter>,
+    wasm_factory: &WasmTermFactory<&'heap mut WasmInterpreter>,
 ) -> Result<ArenaPointer, T>
 where
     T::Builtin: Into<crate::stdlib::Stdlib>,

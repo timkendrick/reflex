@@ -7,15 +7,19 @@ use std::collections::HashSet;
 use reflex::core::{
     BooleanTermType, DependencyList, Eagerness, GraphNode, Internable, SerializeJson, StackOffset,
 };
+use reflex_macros::PointerIter;
 use serde_json::Value as JsonValue;
 
 use crate::{
     allocator::Arena,
+    compiler::{
+        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
+        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings,
+    },
     hash::{TermHash, TermHasher, TermSize},
     term_type::TypedTerm,
     ArenaRef,
 };
-use reflex_macros::PointerIter;
 
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
@@ -128,7 +132,29 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<BooleanTerm, A> {
 
 impl<A: Arena + Clone> Internable for ArenaRef<BooleanTerm, A> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
-        self.capture_depth() == 0
+        true
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<BooleanTerm, A> {
+    fn compile(
+        &self,
+        _state: &mut CompilerState,
+        _bindings: &CompilerVariableBindings,
+        _options: &CompilerOptions,
+        _stack: &CompilerStack,
+    ) -> CompilerResult<A> {
+        let value = self.value();
+        let mut instructions = CompiledBlock::default();
+        // Push the value argument onto the stack
+        // => [value]
+        instructions.push(CompiledInstruction::u32_const(value as u32));
+        // Invoke the term constructor
+        // => [BooleanTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+            RuntimeBuiltin::CreateBoolean,
+        ));
+        Ok(instructions)
     }
 }
 

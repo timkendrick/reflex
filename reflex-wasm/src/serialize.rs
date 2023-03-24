@@ -13,8 +13,8 @@ use crate::{
 };
 
 pub struct SerializerState {
-    allocated_terms: IntMap<HashId, ArenaPointer>,
-    next_offset: ArenaPointer,
+    pub(crate) allocated_terms: IntMap<HashId, ArenaPointer>,
+    pub(crate) next_offset: ArenaPointer,
 }
 impl SerializerState {
     pub(crate) fn new(
@@ -75,7 +75,7 @@ where
         // Allocate space for the term in the target arena
         let allocator_offset = state.next_offset;
         let term_pointer = allocator_offset;
-        let term_size = self.read_value(|t| t.size_of());
+        let term_size = self.read_value(|term| term.size_of());
         destination.extend(allocator_offset, term_size);
 
         // Copy the term contents from the source arena to the target arena

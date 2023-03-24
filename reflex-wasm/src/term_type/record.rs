@@ -8,18 +8,21 @@ use reflex::core::{
     DependencyList, Eagerness, Expression, GraphNode, Internable, NodeId, RecordTermType,
     SerializeJson, StackOffset,
 };
+use reflex_macros::PointerIter;
 use reflex_utils::json::is_empty_json_object;
 use serde_json::{Map as JsonMap, Value as JsonValue};
 
 use crate::{
     allocator::Arena,
+    compiler::{
+        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
+        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings, LazyExpression,
+        ValueType,
+    },
     hash::{TermHash, TermHasher, TermSize},
-    term_type::TypedTerm,
+    term_type::{list::compile_list, ListTerm, TypedTerm, WasmExpression},
     ArenaPointer, ArenaRef, Term,
 };
-use reflex_macros::PointerIter;
-
-use super::{ListTerm, WasmExpression};
 
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
@@ -35,7 +38,9 @@ impl TermSize for RecordTerm {
 }
 impl TermHash for RecordTerm {
     fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
-        hasher.hash(&self.keys, arena).hash(&self.values, arena)
+        let keys_hash = arena.read_value::<Term, _>(self.keys, |term| term.id());
+        let values_hash = arena.read_value::<Term, _>(self.values, |term| term.id());
+        hasher.hash(&keys_hash, arena).hash(&values_hash, arena)
     }
 }
 
@@ -253,8 +258,60 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<RecordTerm, A> {
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<RecordTerm, A> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        self.capture_depth() == 0
+    fn should_intern(&self, eager: Eagerness) -> bool {
+        self.keys().as_inner().should_intern(eager) && self.values().as_inner().should_intern(eager)
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<RecordTerm, A> {
+    fn compile(
+        &self,
+        state: &mut CompilerState,
+        bindings: &CompilerVariableBindings,
+        options: &CompilerOptions,
+        stack: &CompilerStack,
+    ) -> CompilerResult<A> {
+        let keys = self.keys();
+        let values = self.values();
+        let values_list = values.as_inner();
+        let values = values_list.iter();
+        let mut instructions = CompiledBlock::default();
+        // Push the keys argument onto the stack
+        // => [ListTerm]
+        instructions.append_block(keys.as_inner().compile(state, bindings, options, stack)?);
+        let stack = stack.push_lazy(ValueType::HeapPointer);
+        // Push the values argument onto the stack
+        // => [ListTerm]
+        instructions.append_block(if options.lazy_record_values {
+            compile_list(
+                values.map(|item| (LazyExpression::new(item), Eagerness::Lazy)),
+                state,
+                bindings,
+                options,
+                &stack,
+            )
+        } else {
+            compile_list(
+                values.map(|item| {
+                    let eagerness = if item.is_static() && item.as_signal_term().is_none() {
+                        Eagerness::Lazy
+                    } else {
+                        Eagerness::Eager
+                    };
+                    (item, eagerness)
+                }),
+                state,
+                bindings,
+                options,
+                &stack,
+            )
+        }?);
+        // Invoke the term constructor
+        // => [RecordTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+            RuntimeBuiltin::CreateRecord,
+        ));
+        Ok(instructions)
     }
 }
 

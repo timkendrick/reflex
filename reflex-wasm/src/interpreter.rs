@@ -18,7 +18,7 @@ use wasmtime_wasi::{sync::WasiCtxBuilder, WasiCtx};
 use crate::{
     allocator::{Arena, ArenaAllocator, ArenaIterator},
     cli::compile::{WasmCompilerMode, WasmProgram},
-    compiler::RuntimeBuiltin,
+    compiler::builtin::RuntimeBuiltin,
     exports::add_wasm_runtime_imports,
     hash::TermSize,
     pad_to_4_byte_offset,

@@ -57,14 +57,11 @@
             (then)
             (else
               ;; Otherwise hash the key and value
-              (local.get $key)
-              (local.get $state)
-              (call $Term::traits::hash)
-              (local.set $state)
+              (call $Hash::write_i64 (local.get $state) (call $Term::get_hash (local.get $key)))
               (call $HashmapBucket::get::value
                 (call $Hashmap::get::buckets::pointer (local.get $self) (local.get $index)))
-              (local.get $state)
-              (call $Term::traits::hash)
+              (call $Term::get_hash)
+              (call $Hash::write_i64)
               (local.set $state)))
           ;; If this was the final bucket return the hash, otherwise continue with the next bucket
           (if (result i64)
@@ -112,7 +109,8 @@
               (i32.mul (call $HashmapBucket::sizeof) (local.get $capacity)))))
         ;; Then manually write the hashmap struct contents into the term wrapper
         (call $TermType::Hashmap::construct (call $Term::pointer::value (local.get $self)) (i32.const 0))
-        (call $Term::Hashmap::set::buckets::capacity (local.get $self) (local.get $capacity)))))
+        (call $Term::Hashmap::set::buckets::capacity (local.get $self) (local.get $capacity))
+        (call $Term::Hashmap::set::buckets::length (local.get $self) (local.get $capacity)))))
 
   (func $Term::Hashmap::drop (param $self i32)
     ;; Avoid dropping the global empty hashmap instance
