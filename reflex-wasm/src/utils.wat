@@ -110,7 +110,7 @@
     (i32.and (i32.const 0xFF) (i32.shr_u (local.get $self) (i32.mul (local.get $index) (i32.const 8)))))
 
   (func $Utils::i64::get_byte (param $self i64) (param $index i32) (result i32)
-    (i32.and (i32.const 0xFF) (i32.wrap_i64 (i64.shr_u (local.get $self) (i64.extend_i32_u (i32.mul (local.get $index) (i32.const 8)))))))
+    (i32.wrap_i64 (i64.and (i64.const 0xFF) (i64.shr_u (local.get $self) (i64.extend_i32_u (i32.mul (local.get $index) (i32.const 8)))))))
 
   (func $Utils::i32::round_to_next (param $self i32) (param $step i32) (result i32)
     ;; (step * ((self + (step - 1)) / step))
