@@ -17,7 +17,7 @@ export default (describe) => {
     }) => {
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(createTakeIterator(createRepeatIterator(createInt(3)), 0)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
@@ -26,7 +26,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(createTakeIterator(createRepeatIterator(createInt(3)), 5)),
         );
         const [result, dependencies] = evaluate(expression, NULL);

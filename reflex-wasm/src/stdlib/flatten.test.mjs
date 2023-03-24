@@ -17,12 +17,9 @@ export default (describe) => {
     }) => {
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
-            createApplication(
-              createBuiltin(Stdlib.Flatten),
-              createUnitList(createEmptyIterator()),
-            ),
+            createApplication(createBuiltin(Stdlib.Flatten), createUnitList(createEmptyIterator())),
           ),
         );
         const [result, dependencies] = evaluate(expression, NULL);
@@ -31,7 +28,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Flatten),
@@ -45,11 +42,13 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Flatten),
-              createUnitList(createTriple(createEmptyIterator(), createEmptyIterator(), createEmptyIterator())),
+              createUnitList(
+                createTriple(createEmptyIterator(), createEmptyIterator(), createEmptyIterator()),
+              ),
             ),
           ),
         );
@@ -59,11 +58,17 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Flatten),
-              createUnitList(createTriple(createRangeIterator(3, 3), createRangeIterator(6, 2), createRangeIterator(8, 1))),
+              createUnitList(
+                createTriple(
+                  createRangeIterator(3, 3),
+                  createRangeIterator(6, 2),
+                  createRangeIterator(8, 1),
+                ),
+              ),
             ),
           ),
         );

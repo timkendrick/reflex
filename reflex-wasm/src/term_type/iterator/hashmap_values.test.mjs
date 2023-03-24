@@ -20,7 +20,7 @@ export default (describe) => {
     }) => {
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(createHashmapValuesIterator(createHashmap([]))),
         );
         const [result, dependencies] = evaluate(expression, NULL);
@@ -29,7 +29,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createHashmapValuesIterator(
               createHashmap([

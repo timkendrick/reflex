@@ -28,6 +28,10 @@ const TEMPLATE_EQUALS_FIELD_PRIMITIVE = path.join(
   __dirname,
   '../templates/derive/equals_field_primitive.wat',
 );
+const TEMPLATE_EQUALS_FIELD_INLINE = path.join(
+  __dirname,
+  '../templates/derive/equals_field_inline.wat',
+);
 const TEMPLATE_EQUALS_FIELD_REFERENCE = path.join(
   __dirname,
   '../templates/derive/equals_field_reference.wat',
@@ -480,7 +484,7 @@ function createDeriveStructFieldEqualsMethodNodes(
     case 'struct':
     case 'union':
       return getTemplateElements(
-        context.import(TEMPLATE_EQUALS_FIELD_REFERENCE, {
+        context.import(TEMPLATE_EQUALS_FIELD_INLINE, {
           $type_name: identifier,
           $field_name: fieldIdentifier,
           $target_type: fieldType.identifier,

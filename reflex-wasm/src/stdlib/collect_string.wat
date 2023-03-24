@@ -3,7 +3,7 @@
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 (module
   (@builtin $Stdlib_CollectString "CollectString"
-    (@args (@strict $self))
+    (@args (@variadic (@strict $arg_list)))
 
     (@impl
       (call $TermType::implements::iterate)

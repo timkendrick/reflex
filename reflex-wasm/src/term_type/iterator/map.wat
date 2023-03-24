@@ -86,9 +86,13 @@
         (global.get $NULL)
         (local.get $dependencies))
       (else
-        ;; Otherwise emit the transformed value and the source iterator state
-        (call $Term::Application::new
+        ;; Otherwise apply the iteratee function to the source iterator item
+        (call $Term::traits::apply
           (call $Term::MapIterator::get::iteratee (local.get $self))
-          (call $Term::List::of (local.get $value)))
+          (call $Term::List::of (local.get $value))
+          (local.get $state))
+        ;; Combine the function application dependencies with the iteration dependencies
+        (local.set $dependencies (call $Dependencies::traits::union (local.get $dependencies)))
+        ;; Emit the transformed value and the source iterator state
         (local.get $iterator_state)
         (local.get $dependencies)))))

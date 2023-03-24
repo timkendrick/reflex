@@ -1,6 +1,17 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
+use crate::{
+    allocator::{Arena, ArenaAllocator},
+    factory::WasmTermFactory,
+    interpreter::{InterpreterError, UnboundEvaluationResult, WasmInterpreter},
+    term_type::{
+        ApplicationTerm, HashmapTerm, IntTerm, ListTerm, TermType, TreeTerm, TypedTerm,
+        WasmExpression,
+    },
+    utils::{from_twos_complement_i64, into_twos_complement_i64},
+    ArenaPointer, ArenaRef, Term,
+};
 use metrics::histogram;
 use reflex::{
     core::{
@@ -14,16 +25,13 @@ use reflex_dispatcher::{
     ProcessId, SchedulerCommand, SchedulerMode, SchedulerTransition, TaskFactory, TaskInbox,
 };
 use reflex_macros::{dispatcher, Named};
-use reflex_wasm::{
-    allocator::{Arena, ArenaAllocator},
-    factory::WasmTermFactory,
-    interpreter::{InterpreterError, UnboundEvaluationResult, WasmInterpreter},
-    term_type::{
-        ApplicationTerm, HashmapTerm, IntTerm, ListTerm, TermType, TreeTerm, TypedTerm,
-        WasmExpression,
+use reflex_runtime::{
+    action::bytecode_interpreter::{
+        BytecodeInterpreterEvaluateAction, BytecodeInterpreterGcAction,
+        BytecodeInterpreterInitAction, BytecodeInterpreterResultAction,
     },
-    utils::{from_twos_complement_i64, into_twos_complement_i64},
-    ArenaPointer, ArenaRef, Term,
+    action::bytecode_interpreter::{BytecodeInterpreterGcCompleteAction, BytecodeWorkerStatistics},
+    AsyncExpression, AsyncExpressionFactory, AsyncHeapAllocator, QueryEvaluationMode,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -31,18 +39,7 @@ use std::{
     ops::Deref, rc::Rc, sync::Arc, time::Instant,
 };
 
-use crate::{
-    action::bytecode_interpreter::{
-        BytecodeInterpreterEvaluateAction, BytecodeInterpreterGcAction,
-        BytecodeInterpreterInitAction, BytecodeInterpreterResultAction,
-    },
-    actor::wasm_interpreter::WasmProgram,
-    AsyncExpression, AsyncExpressionFactory, AsyncHeapAllocator,
-};
-use crate::{
-    action::bytecode_interpreter::{BytecodeInterpreterGcCompleteAction, BytecodeWorkerStatistics},
-    QueryEvaluationMode,
-};
+use crate::actor::wasm_interpreter::WasmProgram;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct WasmWorkerMetricNames {

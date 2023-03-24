@@ -3,19 +3,30 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 export default (describe) => {
   describe('Stdlib_CollectHashmap', (test) => {
-    test('(Iterator)', (assert, {
+    test('()', (assert, {
       createApplication,
-      createEmptyIterator,
+      createEmptyList,
       createBuiltin,
-      createFlattenIterator,
+      evaluate,
+      format,
+      NULL,
+      Stdlib,
+    }) => {
+      const expression = createApplication(createBuiltin(Stdlib.CollectHashmap), createEmptyList());
+      const [result, dependencies] = evaluate(expression, NULL);
+      assert.strictEqual(format(result), 'Map(0)');
+      assert.strictEqual(format(dependencies), 'NULL');
+    });
+
+    test('((String, Int), (String, Int), (String, Int))', (assert, {
+      createApplication,
+      createBuiltin,
+      createEmptyList,
       createInt,
-      createOnceIterator,
+      createLambda,
       createPair,
       createString,
-      createRangeIterator,
       createTriple,
-      createUnitList,
-      createZipIterator,
       evaluate,
       format,
       getHashmapValue,
@@ -25,20 +36,10 @@ export default (describe) => {
       (() => {
         const expression = createApplication(
           createBuiltin(Stdlib.CollectHashmap),
-          createUnitList(createEmptyIterator()),
-        );
-        const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), 'Map(0)');
-        assert.strictEqual(format(dependencies), 'NULL');
-      })();
-      (() => {
-        const expression = createApplication(
-          createBuiltin(Stdlib.CollectHashmap),
-          createUnitList(
-            createZipIterator(
-              createTriple(createString('foo'), createString('bar'), createString('baz')),
-              createRangeIterator(3, 3),
-            ),
+          createTriple(
+            createPair(createString('foo'), createInt(3)),
+            createPair(createString('bar'), createInt(4)),
+            createPair(createString('baz'), createInt(5)),
           ),
         );
         const [result, dependencies] = evaluate(expression, NULL);
@@ -51,12 +52,49 @@ export default (describe) => {
       (() => {
         const expression = createApplication(
           createBuiltin(Stdlib.CollectHashmap),
-          createUnitList(
-            createTriple(
-              createString('foo'),
-              createPair(createString('bar'), createInt(4)),
-              createString('baz'),
+          createTriple(
+            createPair(
+              createApplication(createLambda(0, createString('foo')), createEmptyList()),
+              createApplication(createLambda(0, createInt(3)), createEmptyList()),
             ),
+            createPair(
+              createApplication(createLambda(0, createString('bar')), createEmptyList()),
+              createApplication(createLambda(0, createInt(4)), createEmptyList()),
+            ),
+            createPair(
+              createApplication(createLambda(0, createString('baz')), createEmptyList()),
+              createApplication(createLambda(0, createInt(5)), createEmptyList()),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), 'Map(3)');
+        assert.strictEqual(format(getHashmapValue(result, createString('foo'))), '3');
+        assert.strictEqual(format(getHashmapValue(result, createString('bar'))), '4');
+        assert.strictEqual(format(getHashmapValue(result, createString('baz'))), '5');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+    });
+
+    test('Invalid entries', (assert, {
+      createApplication,
+      createBuiltin,
+      createInt,
+      createPair,
+      createString,
+      createTriple,
+      evaluate,
+      format,
+      NULL,
+      Stdlib,
+    }) => {
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.CollectHashmap),
+          createTriple(
+            createString('foo'),
+            createPair(createString('bar'), createInt(4)),
+            createString('baz'),
           ),
         );
         const [result, dependencies] = evaluate(expression, NULL);
@@ -64,27 +102,6 @@ export default (describe) => {
           format(result),
           '{<TypeErrorCondition:List:"foo">,<TypeErrorCondition:List:"baz">}',
         );
-        assert.strictEqual(format(dependencies), 'NULL');
-      })();
-      (() => {
-        const expression = createApplication(
-          createBuiltin(Stdlib.CollectHashmap),
-          createUnitList(
-            createFlattenIterator(
-              createOnceIterator(
-                createZipIterator(
-                  createTriple(createString('foo'), createString('bar'), createString('baz')),
-                  createRangeIterator(3, 3),
-                ),
-              ),
-            ),
-          ),
-        );
-        const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), 'Map(3)');
-        assert.strictEqual(format(getHashmapValue(result, createString('foo'))), '3');
-        assert.strictEqual(format(getHashmapValue(result, createString('bar'))), '4');
-        assert.strictEqual(format(getHashmapValue(result, createString('baz'))), '5');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });

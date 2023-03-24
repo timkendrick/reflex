@@ -23,6 +23,7 @@ reflex-runtime = { path = "../reflex-runtime" }
 reflex-scheduler = { path = "../reflex-scheduler" }
 reflex-stdlib = { path = "../reflex-stdlib" }
 reflex-utils = { path = "../reflex-utils" }
+reflex-wasm = { path = "../reflex-wasm" }
 anyhow = "1.0"
 clap = { version = "3.0", features = ["derive"] }
 futures = "*"

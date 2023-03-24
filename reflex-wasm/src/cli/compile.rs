@@ -124,6 +124,7 @@ struct RuntimeBuiltinMappings {
     create_flatten_iterator: FunctionId,
     create_hashmap_keys_iterator: FunctionId,
     create_hashmap_values_iterator: FunctionId,
+    create_indexed_accessor_iterator: FunctionId,
     create_integers_iterator: FunctionId,
     create_intersperse_iterator: FunctionId,
     create_map_iterator: FunctionId,
@@ -186,6 +187,7 @@ impl RuntimeBuiltinMappings {
             RuntimeBuiltin::CreateFlattenIterator => self.create_flatten_iterator,
             RuntimeBuiltin::CreateHashmapKeysIterator => self.create_hashmap_keys_iterator,
             RuntimeBuiltin::CreateHashmapValuesIterator => self.create_hashmap_values_iterator,
+            RuntimeBuiltin::CreateIndexedAccessorIterator => self.create_indexed_accessor_iterator,
             RuntimeBuiltin::CreateIntegersIterator => self.create_integers_iterator,
             RuntimeBuiltin::CreateIntersperseIterator => self.create_intersperse_iterator,
             RuntimeBuiltin::CreateMapIterator => self.create_map_iterator,
@@ -293,6 +295,10 @@ fn parse_runtime_builtins(
         create_hashmap_values_iterator: get_builtin_function(
             &builtins,
             RuntimeBuiltin::CreateHashmapValuesIterator,
+        )?,
+        create_indexed_accessor_iterator: get_builtin_function(
+            &builtins,
+            RuntimeBuiltin::CreateIndexedAccessorIterator,
         )?,
         create_integers_iterator: get_builtin_function(
             &builtins,

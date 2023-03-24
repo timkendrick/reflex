@@ -19,7 +19,7 @@ export default (describe) => {
     }) => {
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(createFlattenIterator(createEmptyIterator())),
         );
         const [result, dependencies] = evaluate(expression, NULL);
@@ -28,7 +28,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createFlattenIterator(
               createTriple(createEmptyIterator(), createEmptyIterator(), createEmptyIterator()),
@@ -41,7 +41,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createFlattenIterator(
               createTriple(
@@ -58,7 +58,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createFlattenIterator(
               createTriple(
@@ -75,7 +75,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createFlattenIterator(
               createTriple(
@@ -92,7 +92,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createFlattenIterator(
               createTriple(

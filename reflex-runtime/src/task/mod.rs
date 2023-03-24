@@ -15,27 +15,23 @@ use crate::{
         evaluate_handler::{
             EffectThrottleTaskFactory, EvaluateHandlerTask, EvaluateHandlerTaskAction,
         },
-        wasm_worker::{WasmWorkerAction, WasmWorkerTask, WasmWorkerTaskFactory},
     },
     AsyncExpression, AsyncExpressionFactory, AsyncHeapAllocator,
 };
 
 pub mod bytecode_worker;
 pub mod evaluate_handler;
-pub mod wasm_worker;
 
 blanket_trait!(
     pub trait RuntimeTaskAction<T: Expression>:
-        BytecodeWorkerAction<T> + WasmWorkerAction<T> + EvaluateHandlerTaskAction
+        BytecodeWorkerAction<T> + EvaluateHandlerTaskAction
     {
     }
 );
 
 blanket_trait!(
     pub trait RuntimeTask<T, TFactory, TAllocator>:
-        EvaluateHandlerTask
-        + BytecodeWorkerTask<T, TFactory, TAllocator>
-        + WasmWorkerTask<T, TFactory, TAllocator>
+        EvaluateHandlerTask + BytecodeWorkerTask<T, TFactory, TAllocator>
     where
         T: Expression,
         TFactory: ExpressionFactory<T>,
@@ -54,7 +50,6 @@ task_factory_enum!({
         TAllocator: HeapAllocator<T>,
     {
         BytecodeWorker(BytecodeWorkerTaskFactory<T, TFactory, TAllocator>),
-        WasmWorker(WasmWorkerTaskFactory<T, TFactory, TAllocator>),
         EvaluateHandler(EffectThrottleTaskFactory),
     }
     impl<T, TFactory, TAllocator, TAction, TTask> TaskFactory<TAction, TTask>

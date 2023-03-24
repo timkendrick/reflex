@@ -20,7 +20,7 @@ export default (describe) => {
     }) => {
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(createFilterIterator(createEmptyIterator(), createBuiltin(Stdlib.Not))),
         );
         const [result, dependencies] = evaluate(expression, NULL);
@@ -29,7 +29,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createFilterIterator(createRangeIterator(3, 3), createBuiltin(Stdlib.Not)),
           ),
@@ -40,7 +40,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createFilterIterator(
               createList([createNil(), createBoolean(false), createBoolean(true), createNil()]),

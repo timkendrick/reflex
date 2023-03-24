@@ -14,7 +14,6 @@ pub mod bytecode_interpreter;
 pub mod evaluate_handler;
 pub mod query_inspector;
 pub mod query_manager;
-pub mod wasm_interpreter;
 
 use crate::task::evaluate_handler::EvaluateHandlerTask;
 

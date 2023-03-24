@@ -127,19 +127,28 @@ export default (describe) => {
     }) => {
       const list = createTriple(createInt(3), createInt(4), createInt(5));
       (function () {
-        const expression = createApplication(createBuiltin(Stdlib.Get), createPair(list, createInt(0)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Get),
+          createPair(list, createInt(0)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '3');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (function () {
-        const expression = createApplication(createBuiltin(Stdlib.Get), createPair(list, createInt(1)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Get),
+          createPair(list, createInt(1)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '4');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (function () {
-        const expression = createApplication(createBuiltin(Stdlib.Get), createPair(list, createInt(2)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Get),
+          createPair(list, createInt(2)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '5');
         assert.strictEqual(format(dependencies), 'NULL');
@@ -160,7 +169,7 @@ export default (describe) => {
     }) => {
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(createBuiltin(Stdlib.Iterate), createUnitList(createEmptyList())),
           ),
@@ -171,7 +180,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Iterate),

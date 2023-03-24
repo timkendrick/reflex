@@ -17,7 +17,7 @@ export default (describe) => {
     }) => {
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(createBuiltin(Stdlib.Values), createUnitList(createEmptyList())),
           ),
@@ -28,7 +28,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Values),
@@ -57,7 +57,7 @@ export default (describe) => {
     }) => {
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Values),
@@ -71,7 +71,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Values),
@@ -105,7 +105,7 @@ export default (describe) => {
     }) => {
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(createBuiltin(Stdlib.Values), createUnitList(createHashmap([]))),
           ),
@@ -116,7 +116,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Values),
@@ -152,7 +152,7 @@ export default (describe) => {
     }) => {
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(createBuiltin(Stdlib.Values), createUnitList(createHashset([]))),
           ),
@@ -163,7 +163,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Values),
@@ -191,7 +191,7 @@ export default (describe) => {
     }) => {
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(createBuiltin(Stdlib.Values), createUnitList(createEmptyIterator())),
           ),
@@ -202,7 +202,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Values),

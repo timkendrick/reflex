@@ -85,13 +85,15 @@
         (global.get $NULL)
         (local.get $dependencies))
       (else
-        ;; Otherwise apply the predicate function to the given value and evaluate the result
-        (call $Term::traits::evaluate
-          ;; TODO: Avoid unnecessary heap allocations for intermediate values
-          (call $Term::Application::new
-            (call $Term::FilterIterator::get::predicate (local.get $self))
-            (call $Term::List::of (local.get $value)))
-            (local.get $state))
+        ;; Otherwise apply the predicate function to the source iterator item
+        (call $Term::traits::apply
+          (call $Term::FilterIterator::get::predicate (local.get $self))
+          (call $Term::List::of (local.get $value))
+          (local.get $state))
+        ;; Combine the function application dependencies with the iteration dependencies
+        (local.set $dependencies (call $Dependencies::traits::union (local.get $dependencies)))
+        ;; Evaluate the result and combine the accumulated dependencies
+        (call $Term::traits::evaluate (local.get $state))
         (local.set $dependencies (call $Dependencies::traits::union (local.get $dependencies)))
         ;; If the predicate returned a truthy result, emit the iterator value
         (if (result i32 i32 i32)

@@ -88,7 +88,7 @@ use reflex_runtime::{
     runtime_actors,
     task::{
         bytecode_worker::BytecodeWorkerTaskFactory, evaluate_handler::EffectThrottleTaskFactory,
-        wasm_worker::WasmWorkerTaskFactory, RuntimeTask, RuntimeTaskAction, RuntimeTaskFactory,
+        RuntimeTask, RuntimeTaskAction, RuntimeTaskFactory,
     },
     AsyncExpression, AsyncExpressionFactory, AsyncHeapAllocator, QueryEvaluationMode,
     QueryInvalidationStrategy,
@@ -99,6 +99,7 @@ use reflex_scheduler::tokio::{
     TokioSchedulerLogger,
 };
 use reflex_utils::reconnect::{NoopReconnectTimeout, ReconnectTimeout};
+use reflex_wasm::task::wasm_worker::WasmWorkerTaskFactory;
 
 /// Reflex runtime evaluator
 #[derive(Parser)]
@@ -1319,6 +1320,7 @@ task_factory_enum!({
         TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     {
         Runtime(RuntimeTaskFactory<T, TFactory, TAllocator>),
+        WasmWorker(WasmWorkerTaskFactory<T, TFactory, TAllocator>),
         DefaultHandlers(DefaultHandlersTaskFactory<TConnect>),
         GrpcHandler(GrpcHandlerConnectionTaskFactory),
     }
@@ -1486,7 +1488,7 @@ where
     TMetricLabels: BytecodeInterpreterMetricLabels + Send + 'static,
 {
     fn from(value: WasmWorkerTaskFactory<T, TFactory, TAllocator>) -> Self {
-        Self::from(CliTaskFactory::Runtime(RuntimeTaskFactory::from(value)))
+        Self::from(CliTaskFactory::WasmWorker(value))
     }
 }
 

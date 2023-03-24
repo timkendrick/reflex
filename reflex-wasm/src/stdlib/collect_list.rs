@@ -6,11 +6,11 @@ use reflex::core::{uuid, ArgType, Arity, FunctionArity, Uid, Uuid};
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub struct CollectList;
 impl CollectList {
-    pub const UUID: Uuid = uuid!("d7ffb58b-9c7e-49d3-b36c-a92de31ccdc6");
-    const ARITY: FunctionArity<1, 0> = FunctionArity {
-        required: [ArgType::Strict],
+    pub const UUID: Uuid = uuid!("c99b0901-f996-4887-9403-c2f123b779b0");
+    const ARITY: FunctionArity<0, 0> = FunctionArity {
+        required: [],
         optional: [],
-        variadic: None,
+        variadic: Some(ArgType::Strict),
     };
     pub fn arity(&self) -> Arity {
         Arity::from(&Self::ARITY)

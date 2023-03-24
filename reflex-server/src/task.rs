@@ -18,11 +18,11 @@ use reflex_handlers::task::{
 use reflex_interpreter::compiler::Compile;
 use reflex_macros::{blanket_trait, task_factory_enum, Matcher};
 use reflex_runtime::task::bytecode_worker::BytecodeWorkerTaskFactory;
-use reflex_runtime::task::wasm_worker::WasmWorkerTaskFactory;
 use reflex_runtime::{
     task::{RuntimeTask, RuntimeTaskAction, RuntimeTaskFactory},
     AsyncExpression, AsyncExpressionFactory, AsyncHeapAllocator,
 };
+use reflex_wasm::task::wasm_worker::WasmWorkerTaskFactory;
 
 use crate::server::task::websocket_graphql_server::{
     WebSocketGraphQlServerTask, WebSocketGraphQlServerTaskAction,
@@ -65,6 +65,7 @@ task_factory_enum!({
         Runtime(RuntimeTaskFactory<T, TFactory, TAllocator>),
         DefaultHandlers(DefaultHandlersTaskFactory<TConnect>),
         GrpcHandler(GrpcHandlerConnectionTaskFactory),
+        WasmWorker(WasmWorkerTaskFactory<T, TFactory, TAllocator>),
         WebSocketGraphQlServer(WebSocketGraphQlServerTaskFactory),
     }
 
@@ -90,19 +91,6 @@ where
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
 {
     fn from(value: BytecodeWorkerTaskFactory<T, TFactory, TAllocator>) -> Self {
-        RuntimeTaskFactory::from(value).into()
-    }
-}
-
-impl<T, TFactory, TAllocator, TConnect> From<WasmWorkerTaskFactory<T, TFactory, TAllocator>>
-    for ServerTaskFactory<T, TFactory, TAllocator, TConnect>
-where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
-    TFactory: AsyncExpressionFactory<T> + Default,
-    TAllocator: AsyncHeapAllocator<T> + Default,
-    TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
-{
-    fn from(value: WasmWorkerTaskFactory<T, TFactory, TAllocator>) -> Self {
         RuntimeTaskFactory::from(value).into()
     }
 }

@@ -661,5 +661,85 @@ export default (describe) => {
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });
+
+    test('(Iterator)', (assert, {
+      createApplication,
+      createEmptyIterator,
+      createRangeIterator,
+      createBuiltin,
+      createLambda,
+      createMapIterator,
+      createPair,
+      createUnitList,
+      createVariable,
+      evaluate,
+      format,
+      NULL,
+      Stdlib,
+    }) => {
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.ResolveDeep),
+          createUnitList(createEmptyIterator()),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '[]');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.ResolveDeep),
+          createUnitList(createRangeIterator(3, 3)),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '[3, 4, 5]');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.ResolveDeep),
+          createUnitList(createMapIterator(createRangeIterator(-3, 3), createBuiltin(Stdlib.Abs))),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '[3, 2, 1]');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.ResolveDeep),
+          createUnitList(
+            createApplication(
+              createBuiltin(Stdlib.Identity),
+              createUnitList(
+                createMapIterator(
+                  createRangeIterator(3, 3),
+                  createLambda(
+                    1,
+                    createApplication(
+                      createBuiltin(Stdlib.Identity),
+                      createUnitList(
+                        createMapIterator(
+                          createRangeIterator(0, 3),
+                          createLambda(
+                            1,
+                            createApplication(
+                              createBuiltin(Stdlib.Add),
+                              createPair(createVariable(1), createVariable(0)),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '[[3, 4, 5], [4, 5, 6], [5, 6, 7]]');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+    });
   });
 };

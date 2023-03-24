@@ -19,7 +19,7 @@ export default (describe) => {
     }) => {
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createEvaluateIterator(
               createMapIterator(createEmptyIterator(), createBuiltin(Stdlib.Abs)),
@@ -32,7 +32,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createEvaluateIterator(
               createMapIterator(

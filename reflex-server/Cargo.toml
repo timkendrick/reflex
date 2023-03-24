@@ -26,6 +26,7 @@ reflex-runtime = { path = "../reflex-runtime" }
 reflex-scheduler = { path = "../reflex-scheduler" }
 reflex-stdlib = { path = "../reflex-stdlib" }
 reflex-utils = { path = "../reflex-utils" }
+reflex-wasm = { path = "../reflex-wasm" }
 anyhow = "1.0"
 bytes = "1.1.0"
 chrono = "0.4"

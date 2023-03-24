@@ -21,7 +21,7 @@ export default (describe) => {
     }) => {
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createEvaluateIterator(
               createIntersperseIterator(createEmptyIterator(), createString('foo')),
@@ -34,7 +34,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createEvaluateIterator(
               createIntersperseIterator(createUnitList(createInt(3)), createString('foo')),
@@ -48,7 +48,7 @@ export default (describe) => {
       (() => {
         debugger;
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createEvaluateIterator(
               createIntersperseIterator(
@@ -65,7 +65,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createEvaluateIterator(
               createIntersperseIterator(

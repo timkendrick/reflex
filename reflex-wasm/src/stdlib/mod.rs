@@ -23,11 +23,16 @@ pub mod collect_signal;
 pub mod collect_string;
 pub mod collect_tree;
 pub mod cons;
+pub mod construct_hashmap;
+pub mod construct_hashset;
+pub mod construct_list;
+pub mod construct_record;
 pub mod divide;
 pub mod effect;
 pub mod ends_with;
 pub mod eq;
 pub mod equal;
+pub mod filter;
 pub mod flatten;
 pub mod floor;
 pub mod fold;
@@ -49,6 +54,7 @@ pub mod keys;
 pub mod length;
 pub mod lt;
 pub mod lte;
+pub mod map;
 pub mod max;
 pub mod merge;
 pub mod min;
@@ -63,10 +69,14 @@ pub mod remainder;
 pub mod replace;
 pub mod resolve_args;
 pub mod resolve_deep;
+pub mod resolve_hashmap;
+pub mod resolve_hashset;
+pub mod resolve_list;
+pub mod resolve_record;
 pub mod resolve_shallow;
+pub mod resolve_tree;
 pub mod round;
 pub mod sequence;
-pub mod server;
 pub mod set;
 pub mod skip;
 pub mod slice;
@@ -74,6 +84,7 @@ pub mod split;
 pub mod starts_with;
 pub mod subtract;
 pub mod take;
+pub mod unzip;
 pub mod values;
 pub mod zip;
 
@@ -92,11 +103,16 @@ pub use collect_signal::*;
 pub use collect_string::*;
 pub use collect_tree::*;
 pub use cons::*;
+pub use construct_hashmap::*;
+pub use construct_hashset::*;
+pub use construct_list::*;
+pub use construct_record::*;
 pub use divide::*;
 pub use effect::*;
 pub use ends_with::*;
 pub use eq::*;
 pub use equal::*;
+pub use filter::*;
 pub use flatten::*;
 pub use floor::*;
 pub use fold::*;
@@ -118,6 +134,7 @@ pub use keys::*;
 pub use length::*;
 pub use lt::*;
 pub use lte::*;
+pub use map::*;
 pub use max::*;
 pub use merge::*;
 pub use min::*;
@@ -133,10 +150,14 @@ pub use remainder::*;
 pub use replace::*;
 pub use resolve_args::*;
 pub use resolve_deep::*;
+pub use resolve_hashmap::*;
+pub use resolve_hashset::*;
+pub use resolve_list::*;
+pub use resolve_record::*;
 pub use resolve_shallow::*;
+pub use resolve_tree::*;
 pub use round::*;
 pub use sequence::*;
-pub use server::*;
 pub use set::*;
 pub use skip::*;
 pub use slice::*;
@@ -144,6 +165,7 @@ pub use split::*;
 pub use starts_with::*;
 pub use subtract::*;
 pub use take::*;
+pub use unzip::*;
 pub use values::*;
 pub use zip::*;
 
@@ -168,6 +190,10 @@ pub enum Stdlib {
     CollectTree(CollectTree),
     Cons(Cons),
     Construct(Construct),
+    ConstructHashmap(ConstructHashmap),
+    ConstructHashset(ConstructHashset),
+    ConstructList(ConstructList),
+    ConstructRecord(ConstructRecord),
     Debug(Debug),
     DecrementVariable(DecrementVariable),
     Divide(Divide),
@@ -175,6 +201,7 @@ pub enum Stdlib {
     EndsWith(EndsWith),
     Eq(Eq),
     Equal(Equal),
+    Filter(Filter),
     Flatten(Flatten),
     Floor(Floor),
     Fold(Fold),
@@ -198,6 +225,7 @@ pub enum Stdlib {
     Log(Log),
     Lt(Lt),
     Lte(Lte),
+    Map(Map),
     Max(Max),
     Merge(Merge),
     Min(Min),
@@ -216,9 +244,14 @@ pub enum Stdlib {
     Replace(Replace),
     ResolveArgs(ResolveArgs),
     ResolveDeep(ResolveDeep),
+    ResolveHashmap(ResolveHashmap),
+    ResolveHashset(ResolveHashset),
+    ResolveList(ResolveList),
     ResolveQueryBranch(ResolveQueryBranch),
     ResolveQueryLeaf(ResolveQueryLeaf),
+    ResolveRecord(ResolveRecord),
     ResolveShallow(ResolveShallow),
+    ResolveTree(ResolveTree),
     Round(Round),
     Scan(Scan),
     Sequence(Sequence),
@@ -235,6 +268,7 @@ pub enum Stdlib {
     ToRequest(ToRequest),
     ToString(ToString),
     Urlencode(Urlencode),
+    Unzip(Unzip),
     Values(Values),
     Zip(Zip),
 }
@@ -271,6 +305,10 @@ impl From<Stdlib> for u32 {
             Stdlib::CollectTree(_) => StdlibDiscriminants::CollectTree as u32,
             Stdlib::Cons(_) => StdlibDiscriminants::Cons as u32,
             Stdlib::Construct(_) => StdlibDiscriminants::Construct as u32,
+            Stdlib::ConstructHashmap(_) => StdlibDiscriminants::ConstructHashmap as u32,
+            Stdlib::ConstructHashset(_) => StdlibDiscriminants::ConstructHashset as u32,
+            Stdlib::ConstructList(_) => StdlibDiscriminants::ConstructList as u32,
+            Stdlib::ConstructRecord(_) => StdlibDiscriminants::ConstructRecord as u32,
             Stdlib::Debug(_) => StdlibDiscriminants::Debug as u32,
             Stdlib::DecrementVariable(_) => StdlibDiscriminants::DecrementVariable as u32,
             Stdlib::Divide(_) => StdlibDiscriminants::Divide as u32,
@@ -278,6 +316,7 @@ impl From<Stdlib> for u32 {
             Stdlib::EndsWith(_) => StdlibDiscriminants::EndsWith as u32,
             Stdlib::Eq(_) => StdlibDiscriminants::Eq as u32,
             Stdlib::Equal(_) => StdlibDiscriminants::Equal as u32,
+            Stdlib::Filter(_) => StdlibDiscriminants::Filter as u32,
             Stdlib::Flatten(_) => StdlibDiscriminants::Flatten as u32,
             Stdlib::Floor(_) => StdlibDiscriminants::Floor as u32,
             Stdlib::Fold(_) => StdlibDiscriminants::Fold as u32,
@@ -301,6 +340,7 @@ impl From<Stdlib> for u32 {
             Stdlib::Log(_) => StdlibDiscriminants::Log as u32,
             Stdlib::Lt(_) => StdlibDiscriminants::Lt as u32,
             Stdlib::Lte(_) => StdlibDiscriminants::Lte as u32,
+            Stdlib::Map(_) => StdlibDiscriminants::Map as u32,
             Stdlib::Max(_) => StdlibDiscriminants::Max as u32,
             Stdlib::Merge(_) => StdlibDiscriminants::Merge as u32,
             Stdlib::Min(_) => StdlibDiscriminants::Min as u32,
@@ -319,9 +359,14 @@ impl From<Stdlib> for u32 {
             Stdlib::Replace(_) => StdlibDiscriminants::Replace as u32,
             Stdlib::ResolveArgs(_) => StdlibDiscriminants::ResolveArgs as u32,
             Stdlib::ResolveDeep(_) => StdlibDiscriminants::ResolveDeep as u32,
+            Stdlib::ResolveHashmap(_) => StdlibDiscriminants::ResolveHashmap as u32,
+            Stdlib::ResolveHashset(_) => StdlibDiscriminants::ResolveHashset as u32,
+            Stdlib::ResolveList(_) => StdlibDiscriminants::ResolveList as u32,
             Stdlib::ResolveQueryBranch(_) => StdlibDiscriminants::ResolveQueryBranch as u32,
             Stdlib::ResolveQueryLeaf(_) => StdlibDiscriminants::ResolveQueryLeaf as u32,
+            Stdlib::ResolveRecord(_) => StdlibDiscriminants::ResolveRecord as u32,
             Stdlib::ResolveShallow(_) => StdlibDiscriminants::ResolveShallow as u32,
+            Stdlib::ResolveTree(_) => StdlibDiscriminants::ResolveTree as u32,
             Stdlib::Round(_) => StdlibDiscriminants::Round as u32,
             Stdlib::Scan(_) => StdlibDiscriminants::Scan as u32,
             Stdlib::Sequence(_) => StdlibDiscriminants::Sequence as u32,
@@ -338,6 +383,7 @@ impl From<Stdlib> for u32 {
             Stdlib::ToRequest(_) => StdlibDiscriminants::ToRequest as u32,
             Stdlib::ToString(_) => StdlibDiscriminants::ToString as u32,
             Stdlib::Urlencode(_) => StdlibDiscriminants::Urlencode as u32,
+            Stdlib::Unzip(_) => StdlibDiscriminants::Unzip as u32,
             Stdlib::Values(_) => StdlibDiscriminants::Values as u32,
             Stdlib::Zip(_) => StdlibDiscriminants::Zip as u32,
         }
@@ -378,6 +424,18 @@ impl TryFrom<u32> for Stdlib {
             value if value == StdlibDiscriminants::Construct as u32 => {
                 Ok(Self::Construct(Construct))
             }
+            value if value == StdlibDiscriminants::ConstructHashmap as u32 => {
+                Ok(Self::ConstructHashmap(ConstructHashmap))
+            }
+            value if value == StdlibDiscriminants::ConstructHashset as u32 => {
+                Ok(Self::ConstructHashset(ConstructHashset))
+            }
+            value if value == StdlibDiscriminants::ConstructList as u32 => {
+                Ok(Self::ConstructList(ConstructList))
+            }
+            value if value == StdlibDiscriminants::ConstructRecord as u32 => {
+                Ok(Self::ConstructRecord(ConstructRecord))
+            }
             value if value == StdlibDiscriminants::Debug as u32 => Ok(Self::Debug(Debug)),
             value if value == StdlibDiscriminants::DecrementVariable as u32 => {
                 Ok(Self::DecrementVariable(DecrementVariable))
@@ -387,6 +445,7 @@ impl TryFrom<u32> for Stdlib {
             value if value == StdlibDiscriminants::EndsWith as u32 => Ok(Self::EndsWith(EndsWith)),
             value if value == StdlibDiscriminants::Eq as u32 => Ok(Self::Eq(Eq)),
             value if value == StdlibDiscriminants::Equal as u32 => Ok(Self::Equal(Equal)),
+            value if value == StdlibDiscriminants::Filter as u32 => Ok(Self::Filter(Filter)),
             value if value == StdlibDiscriminants::Flatten as u32 => Ok(Self::Flatten(Flatten)),
             value if value == StdlibDiscriminants::Floor as u32 => Ok(Self::Floor(Floor)),
             value if value == StdlibDiscriminants::Fold as u32 => Ok(Self::Fold(Fold)),
@@ -420,6 +479,7 @@ impl TryFrom<u32> for Stdlib {
             value if value == StdlibDiscriminants::Log as u32 => Ok(Self::Log(Log)),
             value if value == StdlibDiscriminants::Lt as u32 => Ok(Self::Lt(Lt)),
             value if value == StdlibDiscriminants::Lte as u32 => Ok(Self::Lte(Lte)),
+            value if value == StdlibDiscriminants::Map as u32 => Ok(Self::Map(Map)),
             value if value == StdlibDiscriminants::Max as u32 => Ok(Self::Max(Max)),
             value if value == StdlibDiscriminants::Merge as u32 => Ok(Self::Merge(Merge)),
             value if value == StdlibDiscriminants::Min as u32 => Ok(Self::Min(Min)),
@@ -452,14 +512,29 @@ impl TryFrom<u32> for Stdlib {
             value if value == StdlibDiscriminants::ResolveDeep as u32 => {
                 Ok(Self::ResolveDeep(ResolveDeep))
             }
+            value if value == StdlibDiscriminants::ResolveHashmap as u32 => {
+                Ok(Self::ResolveHashmap(ResolveHashmap))
+            }
+            value if value == StdlibDiscriminants::ResolveHashset as u32 => {
+                Ok(Self::ResolveHashset(ResolveHashset))
+            }
+            value if value == StdlibDiscriminants::ResolveList as u32 => {
+                Ok(Self::ResolveList(ResolveList))
+            }
             value if value == StdlibDiscriminants::ResolveQueryBranch as u32 => {
                 Ok(Self::ResolveQueryBranch(ResolveQueryBranch))
             }
             value if value == StdlibDiscriminants::ResolveQueryLeaf as u32 => {
                 Ok(Self::ResolveQueryLeaf(ResolveQueryLeaf))
             }
+            value if value == StdlibDiscriminants::ResolveRecord as u32 => {
+                Ok(Self::ResolveRecord(ResolveRecord))
+            }
             value if value == StdlibDiscriminants::ResolveShallow as u32 => {
                 Ok(Self::ResolveShallow(ResolveShallow))
+            }
+            value if value == StdlibDiscriminants::ResolveTree as u32 => {
+                Ok(Self::ResolveTree(ResolveTree))
             }
             value if value == StdlibDiscriminants::Round as u32 => Ok(Self::Round(Round)),
             value if value == StdlibDiscriminants::Scan as u32 => Ok(Self::Scan(Scan)),
@@ -487,6 +562,7 @@ impl TryFrom<u32> for Stdlib {
             value if value == StdlibDiscriminants::Urlencode as u32 => {
                 Ok(Self::Urlencode(Urlencode))
             }
+            value if value == StdlibDiscriminants::Unzip as u32 => Ok(Self::Unzip(Unzip)),
             value if value == StdlibDiscriminants::Values as u32 => Ok(Self::Values(Values)),
             value if value == StdlibDiscriminants::Zip as u32 => Ok(Self::Zip(Zip)),
             _ => Err(()),
@@ -513,6 +589,10 @@ impl Stdlib {
             Self::CollectTree(inner) => inner.arity(),
             Self::Cons(inner) => inner.arity(),
             Self::Construct(inner) => inner.arity(),
+            Self::ConstructHashmap(inner) => inner.arity(),
+            Self::ConstructHashset(inner) => inner.arity(),
+            Self::ConstructList(inner) => inner.arity(),
+            Self::ConstructRecord(inner) => inner.arity(),
             Self::Debug(inner) => inner.arity(),
             Self::DecrementVariable(inner) => inner.arity(),
             Self::Divide(inner) => inner.arity(),
@@ -520,6 +600,7 @@ impl Stdlib {
             Self::EndsWith(inner) => inner.arity(),
             Self::Eq(inner) => inner.arity(),
             Self::Equal(inner) => inner.arity(),
+            Self::Filter(inner) => inner.arity(),
             Self::Flatten(inner) => inner.arity(),
             Self::Floor(inner) => inner.arity(),
             Self::Fold(inner) => inner.arity(),
@@ -543,6 +624,7 @@ impl Stdlib {
             Self::Log(inner) => inner.arity(),
             Self::Lt(inner) => inner.arity(),
             Self::Lte(inner) => inner.arity(),
+            Self::Map(inner) => inner.arity(),
             Self::Max(inner) => inner.arity(),
             Self::Merge(inner) => inner.arity(),
             Self::Min(inner) => inner.arity(),
@@ -561,9 +643,14 @@ impl Stdlib {
             Self::Replace(inner) => inner.arity(),
             Self::ResolveArgs(inner) => inner.arity(),
             Self::ResolveDeep(inner) => inner.arity(),
+            Self::ResolveHashmap(inner) => inner.arity(),
+            Self::ResolveHashset(inner) => inner.arity(),
+            Self::ResolveList(inner) => inner.arity(),
             Self::ResolveQueryBranch(inner) => inner.arity(),
             Self::ResolveQueryLeaf(inner) => inner.arity(),
+            Self::ResolveRecord(inner) => inner.arity(),
             Self::ResolveShallow(inner) => inner.arity(),
+            Self::ResolveTree(inner) => inner.arity(),
             Self::Round(inner) => inner.arity(),
             Self::Scan(inner) => inner.arity(),
             Self::Sequence(inner) => inner.arity(),
@@ -580,6 +667,7 @@ impl Stdlib {
             Self::ToRequest(inner) => inner.arity(),
             Self::ToString(inner) => inner.arity(),
             Self::Urlencode(inner) => inner.arity(),
+            Self::Unzip(inner) => inner.arity(),
             Self::Values(inner) => inner.arity(),
             Self::Zip(inner) => inner.arity(),
         }
@@ -603,6 +691,10 @@ impl Stdlib {
             Self::CollectTree(inner) => inner.uid(),
             Self::Cons(inner) => inner.uid(),
             Self::Construct(inner) => inner.uid(),
+            Self::ConstructHashmap(inner) => inner.uid(),
+            Self::ConstructHashset(inner) => inner.uid(),
+            Self::ConstructList(inner) => inner.uid(),
+            Self::ConstructRecord(inner) => inner.uid(),
             Self::Debug(inner) => inner.uid(),
             Self::DecrementVariable(inner) => inner.uid(),
             Self::Divide(inner) => inner.uid(),
@@ -610,6 +702,7 @@ impl Stdlib {
             Self::EndsWith(inner) => inner.uid(),
             Self::Eq(inner) => inner.uid(),
             Self::Equal(inner) => inner.uid(),
+            Self::Filter(inner) => inner.uid(),
             Self::Flatten(inner) => inner.uid(),
             Self::Floor(inner) => inner.uid(),
             Self::Fold(inner) => inner.uid(),
@@ -633,6 +726,7 @@ impl Stdlib {
             Self::Log(inner) => inner.uid(),
             Self::Lt(inner) => inner.uid(),
             Self::Lte(inner) => inner.uid(),
+            Self::Map(inner) => inner.uid(),
             Self::Max(inner) => inner.uid(),
             Self::Merge(inner) => inner.uid(),
             Self::Min(inner) => inner.uid(),
@@ -651,9 +745,14 @@ impl Stdlib {
             Self::Replace(inner) => inner.uid(),
             Self::ResolveArgs(inner) => inner.uid(),
             Self::ResolveDeep(inner) => inner.uid(),
+            Self::ResolveHashmap(inner) => inner.uid(),
+            Self::ResolveHashset(inner) => inner.uid(),
+            Self::ResolveList(inner) => inner.uid(),
             Self::ResolveQueryBranch(inner) => inner.uid(),
             Self::ResolveQueryLeaf(inner) => inner.uid(),
+            Self::ResolveRecord(inner) => inner.uid(),
             Self::ResolveShallow(inner) => inner.uid(),
+            Self::ResolveTree(inner) => inner.uid(),
             Self::Round(inner) => inner.uid(),
             Self::Scan(inner) => inner.uid(),
             Self::Sequence(inner) => inner.uid(),
@@ -670,6 +769,7 @@ impl Stdlib {
             Self::ToRequest(inner) => inner.uid(),
             Self::ToString(inner) => inner.uid(),
             Self::Urlencode(inner) => inner.uid(),
+            Self::Unzip(inner) => inner.uid(),
             Self::Values(inner) => inner.uid(),
             Self::Zip(inner) => inner.uid(),
         }
@@ -726,6 +826,10 @@ impl TryFrom<Uuid> for Stdlib {
             CollectTree::UUID => Ok(Self::CollectTree(CollectTree)),
             Cons::UUID => Ok(Self::Cons(Cons)),
             Construct::UUID => Ok(Self::Construct(Construct)),
+            ConstructHashmap::UUID => Ok(Self::ConstructHashmap(ConstructHashmap)),
+            ConstructHashset::UUID => Ok(Self::ConstructHashset(ConstructHashset)),
+            ConstructList::UUID => Ok(Self::ConstructList(ConstructList)),
+            ConstructRecord::UUID => Ok(Self::ConstructRecord(ConstructRecord)),
             Debug::UUID => Ok(Self::Debug(Debug)),
             DecrementVariable::UUID => Ok(Self::DecrementVariable(DecrementVariable)),
             Divide::UUID => Ok(Self::Divide(Divide)),
@@ -733,6 +837,7 @@ impl TryFrom<Uuid> for Stdlib {
             EndsWith::UUID => Ok(Self::EndsWith(EndsWith)),
             Eq::UUID => Ok(Self::Eq(Eq)),
             Equal::UUID => Ok(Self::Equal(Equal)),
+            Filter::UUID => Ok(Self::Filter(Filter)),
             Flatten::UUID => Ok(Self::Flatten(Flatten)),
             Floor::UUID => Ok(Self::Floor(Floor)),
             Fold::UUID => Ok(Self::Fold(Fold)),
@@ -756,6 +861,7 @@ impl TryFrom<Uuid> for Stdlib {
             Log::UUID => Ok(Self::Log(Log)),
             Lt::UUID => Ok(Self::Lt(Lt)),
             Lte::UUID => Ok(Self::Lte(Lte)),
+            Map::UUID => Ok(Self::Map(Map)),
             Max::UUID => Ok(Self::Max(Max)),
             Merge::UUID => Ok(Self::Merge(Merge)),
             Min::UUID => Ok(Self::Min(Min)),
@@ -774,9 +880,14 @@ impl TryFrom<Uuid> for Stdlib {
             Replace::UUID => Ok(Self::Replace(Replace)),
             ResolveArgs::UUID => Ok(Self::ResolveArgs(ResolveArgs)),
             ResolveDeep::UUID => Ok(Self::ResolveDeep(ResolveDeep)),
+            ResolveHashmap::UUID => Ok(Self::ResolveHashmap(ResolveHashmap)),
+            ResolveHashset::UUID => Ok(Self::ResolveHashset(ResolveHashset)),
+            ResolveList::UUID => Ok(Self::ResolveList(ResolveList)),
             ResolveQueryBranch::UUID => Ok(Self::ResolveQueryBranch(ResolveQueryBranch)),
             ResolveQueryLeaf::UUID => Ok(Self::ResolveQueryLeaf(ResolveQueryLeaf)),
+            ResolveRecord::UUID => Ok(Self::ResolveRecord(ResolveRecord)),
             ResolveShallow::UUID => Ok(Self::ResolveShallow(ResolveShallow)),
+            ResolveTree::UUID => Ok(Self::ResolveTree(ResolveTree)),
             Round::UUID => Ok(Self::Round(Round)),
             Scan::UUID => Ok(Self::Scan(Scan)),
             Sequence::UUID => Ok(Self::Sequence(Sequence)),
@@ -793,6 +904,7 @@ impl TryFrom<Uuid> for Stdlib {
             ToRequest::UUID => Ok(Self::ToRequest(ToRequest)),
             ToString::UUID => Ok(Self::ToString(ToString)),
             Urlencode::UUID => Ok(Self::Urlencode(Urlencode)),
+            Unzip::UUID => Ok(Self::Unzip(Unzip)),
             Values::UUID => Ok(Self::Values(Values)),
             Zip::UUID => Ok(Self::Zip(Zip)),
             _ => Err(()),
@@ -803,5 +915,110 @@ impl TryFrom<Uuid> for Stdlib {
 impl std::fmt::Display for Stdlib {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "wasm::{:?}", StdlibDiscriminants::from(self))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stdlib_function_indices() {
+        assert_eq!(StdlibDiscriminants::Abs as u32, 0);
+        assert_eq!(StdlibDiscriminants::Accessor as u32, 1);
+        assert_eq!(StdlibDiscriminants::Add as u32, 2);
+        assert_eq!(StdlibDiscriminants::And as u32, 3);
+        assert_eq!(StdlibDiscriminants::Apply as u32, 4);
+        assert_eq!(StdlibDiscriminants::Car as u32, 5);
+        assert_eq!(StdlibDiscriminants::Cdr as u32, 6);
+        assert_eq!(StdlibDiscriminants::Ceil as u32, 7);
+        assert_eq!(StdlibDiscriminants::Chain as u32, 8);
+        assert_eq!(StdlibDiscriminants::CollectHashmap as u32, 9);
+        assert_eq!(StdlibDiscriminants::CollectHashset as u32, 10);
+        assert_eq!(StdlibDiscriminants::CollectList as u32, 11);
+        assert_eq!(StdlibDiscriminants::CollectString as u32, 12);
+        assert_eq!(StdlibDiscriminants::CollectTree as u32, 13);
+        assert_eq!(StdlibDiscriminants::Cons as u32, 14);
+        assert_eq!(StdlibDiscriminants::Construct as u32, 15);
+        assert_eq!(StdlibDiscriminants::ConstructHashmap as u32, 16);
+        assert_eq!(StdlibDiscriminants::ConstructHashset as u32, 17);
+        assert_eq!(StdlibDiscriminants::ConstructList as u32, 18);
+        assert_eq!(StdlibDiscriminants::ConstructRecord as u32, 19);
+        assert_eq!(StdlibDiscriminants::Debug as u32, 20);
+        assert_eq!(StdlibDiscriminants::DecrementVariable as u32, 21);
+        assert_eq!(StdlibDiscriminants::Divide as u32, 22);
+        assert_eq!(StdlibDiscriminants::Effect as u32, 23);
+        assert_eq!(StdlibDiscriminants::EndsWith as u32, 24);
+        assert_eq!(StdlibDiscriminants::Eq as u32, 25);
+        assert_eq!(StdlibDiscriminants::Equal as u32, 26);
+        assert_eq!(StdlibDiscriminants::Filter as u32, 27);
+        assert_eq!(StdlibDiscriminants::Flatten as u32, 28);
+        assert_eq!(StdlibDiscriminants::Floor as u32, 29);
+        assert_eq!(StdlibDiscriminants::Fold as u32, 30);
+        assert_eq!(StdlibDiscriminants::FormatErrorMessage as u32, 31);
+        assert_eq!(StdlibDiscriminants::Get as u32, 32);
+        assert_eq!(StdlibDiscriminants::GetVariable as u32, 33);
+        assert_eq!(StdlibDiscriminants::GraphQlResolver as u32, 34);
+        assert_eq!(StdlibDiscriminants::Gt as u32, 35);
+        assert_eq!(StdlibDiscriminants::Gte as u32, 36);
+        assert_eq!(StdlibDiscriminants::Has as u32, 37);
+        assert_eq!(StdlibDiscriminants::Hash as u32, 38);
+        assert_eq!(StdlibDiscriminants::Identity as u32, 39);
+        assert_eq!(StdlibDiscriminants::If as u32, 40);
+        assert_eq!(StdlibDiscriminants::IfError as u32, 41);
+        assert_eq!(StdlibDiscriminants::IfPending as u32, 42);
+        assert_eq!(StdlibDiscriminants::IncrementVariable as u32, 43);
+        assert_eq!(StdlibDiscriminants::IsFinite as u32, 44);
+        assert_eq!(StdlibDiscriminants::Iterate as u32, 45);
+        assert_eq!(StdlibDiscriminants::Keys as u32, 46);
+        assert_eq!(StdlibDiscriminants::Length as u32, 47);
+        assert_eq!(StdlibDiscriminants::Log as u32, 48);
+        assert_eq!(StdlibDiscriminants::Lt as u32, 49);
+        assert_eq!(StdlibDiscriminants::Lte as u32, 50);
+        assert_eq!(StdlibDiscriminants::Map as u32, 51);
+        assert_eq!(StdlibDiscriminants::Max as u32, 52);
+        assert_eq!(StdlibDiscriminants::Merge as u32, 53);
+        assert_eq!(StdlibDiscriminants::Min as u32, 54);
+        assert_eq!(StdlibDiscriminants::Multiply as u32, 55);
+        assert_eq!(StdlibDiscriminants::Not as u32, 56);
+        assert_eq!(StdlibDiscriminants::Or as u32, 57);
+        assert_eq!(StdlibDiscriminants::ParseDate as u32, 58);
+        assert_eq!(StdlibDiscriminants::ParseFloat as u32, 59);
+        assert_eq!(StdlibDiscriminants::ParseInt as u32, 60);
+        assert_eq!(StdlibDiscriminants::ParseJson as u32, 61);
+        assert_eq!(StdlibDiscriminants::Pow as u32, 62);
+        assert_eq!(StdlibDiscriminants::Push as u32, 63);
+        assert_eq!(StdlibDiscriminants::PushFront as u32, 64);
+        assert_eq!(StdlibDiscriminants::Remainder as u32, 65);
+        assert_eq!(StdlibDiscriminants::Replace as u32, 66);
+        assert_eq!(StdlibDiscriminants::ResolveArgs as u32, 67);
+        assert_eq!(StdlibDiscriminants::ResolveDeep as u32, 68);
+        assert_eq!(StdlibDiscriminants::ResolveHashmap as u32, 69);
+        assert_eq!(StdlibDiscriminants::ResolveHashset as u32, 70);
+        assert_eq!(StdlibDiscriminants::ResolveList as u32, 71);
+        assert_eq!(StdlibDiscriminants::ResolveQueryBranch as u32, 72);
+        assert_eq!(StdlibDiscriminants::ResolveQueryLeaf as u32, 73);
+        assert_eq!(StdlibDiscriminants::ResolveRecord as u32, 74);
+        assert_eq!(StdlibDiscriminants::ResolveShallow as u32, 75);
+        assert_eq!(StdlibDiscriminants::ResolveTree as u32, 76);
+        assert_eq!(StdlibDiscriminants::Round as u32, 77);
+        assert_eq!(StdlibDiscriminants::Scan as u32, 78);
+        assert_eq!(StdlibDiscriminants::Sequence as u32, 79);
+        assert_eq!(StdlibDiscriminants::Set as u32, 80);
+        assert_eq!(StdlibDiscriminants::SetVariable as u32, 81);
+        assert_eq!(StdlibDiscriminants::Skip as u32, 82);
+        assert_eq!(StdlibDiscriminants::Slice as u32, 83);
+        assert_eq!(StdlibDiscriminants::Split as u32, 84);
+        assert_eq!(StdlibDiscriminants::StartsWith as u32, 85);
+        assert_eq!(StdlibDiscriminants::StringifyJson as u32, 86);
+        assert_eq!(StdlibDiscriminants::Subtract as u32, 87);
+        assert_eq!(StdlibDiscriminants::Take as u32, 88);
+        assert_eq!(StdlibDiscriminants::Throw as u32, 89);
+        assert_eq!(StdlibDiscriminants::ToRequest as u32, 90);
+        assert_eq!(StdlibDiscriminants::ToString as u32, 91);
+        assert_eq!(StdlibDiscriminants::Urlencode as u32, 92);
+        assert_eq!(StdlibDiscriminants::Unzip as u32, 93);
+        assert_eq!(StdlibDiscriminants::Values as u32, 94);
+        assert_eq!(StdlibDiscriminants::Zip as u32, 95);
     }
 }

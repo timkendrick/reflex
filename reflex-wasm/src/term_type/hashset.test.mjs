@@ -105,7 +105,7 @@ export default (describe) => {
     }) => {
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(createHashset([])),
         );
         const [result, dependencies] = evaluate(expression, NULL);
@@ -114,7 +114,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createHashset([createString('foo'), createString('bar'), createString('baz')]),
           ),

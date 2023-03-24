@@ -72,7 +72,7 @@
                 ;; TODO: Convert argument lists to iterators for more efficient dynamic application
                 (call $Term::Application::new
                   (call $Term::Builtin::new (global.get $Stdlib_CollectList))
-                  (call $Term::List::of (local.get $arg_list))))))
+                  (local.get $arg_list)))))
           (global.get $NULL))))
 
     (@default

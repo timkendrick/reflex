@@ -1088,6 +1088,32 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<HashmapValuesIteratorTerm, A>
     }
 }
 
+impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<IndexedAccessorIteratorTerm, A> {
+    fn compile(
+        &self,
+        eager: Eagerness,
+        scope: &CompilerScope,
+        state: &mut CompilerState,
+        options: &CompilerOptions,
+    ) -> CompilerResult<A> {
+        let source = self.source();
+        let index = self.index();
+        let mut instructions = CompiledExpression::default();
+        // Push the source argument onto the stack
+        // => [Term]
+        instructions.extend(source.compile(eager, scope, state, options)?);
+        // Push the index argument onto the stack
+        // => [Term, index]
+        instructions.push(CompiledInstruction::u32_const(index as u32));
+        // Invoke the term constructor
+        // => [IndexedAccessorIteratorTerm]
+        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
+            RuntimeBuiltin::CreateIndexedAccessorIterator,
+        ));
+        Ok(instructions)
+    }
+}
+
 impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<IntegersIteratorTerm, A> {
     fn compile(
         &self,

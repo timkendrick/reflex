@@ -27,19 +27,19 @@ use reflex_interpreter::compiler::Compile;
 use reflex_macros::{blanket_trait, task_factory_enum, Matcher};
 use reflex_protobuf::types::WellKnownTypesTranscoder;
 use reflex_runtime::{
-    actor::{
-        bytecode_interpreter::{
-            BytecodeInterpreter, BytecodeInterpreterAction, BytecodeInterpreterMetricLabels,
-        },
-        wasm_interpreter::WasmInterpreter,
+    actor::bytecode_interpreter::{
+        BytecodeInterpreter, BytecodeInterpreterAction, BytecodeInterpreterMetricLabels,
     },
     task::{
         bytecode_worker::BytecodeWorkerTaskFactory, evaluate_handler::EffectThrottleTaskFactory,
-        wasm_worker::WasmWorkerTaskFactory, RuntimeTask, RuntimeTaskFactory,
+        RuntimeTask, RuntimeTaskFactory,
     },
     AsyncExpression, AsyncExpressionFactory, AsyncHeapAllocator,
 };
 use reflex_utils::reconnect::ReconnectTimeout;
+use reflex_wasm::{
+    actor::wasm_interpreter::WasmInterpreter, task::wasm_worker::WasmWorkerTaskFactory,
+};
 
 use crate::{
     actor::{ServerAction, ServerActor},

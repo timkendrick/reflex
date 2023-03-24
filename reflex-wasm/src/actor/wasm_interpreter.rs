@@ -21,13 +21,7 @@ use reflex_dispatcher::{
     ProcessId, SchedulerCommand, SchedulerMode, SchedulerTransition, TaskFactory, TaskInbox,
 };
 use reflex_macros::{dispatcher, Named};
-use reflex_wasm::{
-    exports::add_wasm_runtime_imports,
-    interpreter::{InterpreterError, WasmContextBuilder},
-};
-use serde::{Deserialize, Serialize};
-
-use crate::{
+use reflex_runtime::{
     action::{
         bytecode_interpreter::{
             BytecodeInterpreterEvaluateAction, BytecodeInterpreterGcAction,
@@ -38,14 +32,19 @@ use crate::{
             EvaluateResultAction, EvaluateStartAction, EvaluateStopAction, EvaluateUpdateAction,
         },
     },
-    task::wasm_worker::{WasmWorkerMetricNames, WasmWorkerTask, WasmWorkerTaskFactory},
+    actor::bytecode_interpreter::BytecodeInterpreterMetricLabels,
     utils::quantiles::{
         generate_quantile_metric_labels, publish_quantile_bucketed_metric, QuantileBucket,
     },
     QueryInvalidationStrategy,
 };
+use serde::{Deserialize, Serialize};
 
-use super::bytecode_interpreter::BytecodeInterpreterMetricLabels;
+use crate::{
+    exports::add_wasm_runtime_imports,
+    interpreter::{InterpreterError, WasmContextBuilder},
+    task::wasm_worker::{WasmWorkerMetricNames, WasmWorkerTask, WasmWorkerTaskFactory},
+};
 
 // TODO: Allow tweaking bytecode interpreter GC trigger
 const MAX_UPDATES_WITHOUT_GC: usize = 3;
@@ -120,7 +119,7 @@ impl WasmProgram {
     pub(crate) fn instantiate(
         &self,
         memory_name: &'static str,
-    ) -> Result<reflex_wasm::interpreter::WasmInterpreter, InterpreterError> {
+    ) -> Result<crate::interpreter::WasmInterpreter, InterpreterError> {
         WasmContextBuilder::from_cwasm(self.as_bytes(), memory_name)
             .and_then(|builder| add_wasm_runtime_imports(builder, memory_name))
             .and_then(|builder| builder.build())

@@ -20,7 +20,7 @@ export default (describe) => {
     }) => {
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(createHashmapKeysIterator(createHashmap([]))),
         );
         const [result, dependencies] = evaluate(expression, NULL);
@@ -29,7 +29,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createHashmapKeysIterator(
               createHashmap([
@@ -42,7 +42,10 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.ok(isList(result));
-        assert.strictEqual(`[${getListItems(result).map(format).sort().join(', ')}]`, '["bar", "baz", "foo"]');
+        assert.strictEqual(
+          `[${getListItems(result).map(format).sort().join(', ')}]`,
+          '["bar", "baz", "foo"]',
+        );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });

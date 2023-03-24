@@ -128,7 +128,7 @@ export default (describe) => {
     }) => {
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Iterate),
@@ -142,7 +142,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Iterate),
@@ -156,7 +156,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Iterate),
@@ -170,7 +170,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Iterate),
@@ -186,7 +186,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Iterate),
@@ -200,7 +200,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Iterate),
@@ -214,7 +214,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Iterate),
@@ -230,7 +230,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Iterate),
@@ -244,7 +244,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Iterate),
@@ -263,7 +263,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Iterate),
@@ -279,7 +279,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Iterate),
@@ -294,37 +294,6 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '[3, 4, 5]');
-        assert.strictEqual(format(dependencies), 'NULL');
-      })();
-    });
-
-    test('iterator collection', (assert, {
-      createApplication,
-      createBuiltin,
-      createEmptyIterator,
-      createRangeIterator,
-      createUnitList,
-      evaluate,
-      format,
-      NULL,
-      Stdlib,
-    }) => {
-      (() => {
-        const expression = createApplication(
-          createBuiltin(Stdlib.CollectTree),
-          createUnitList(createEmptyIterator()),
-        );
-        const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '(NULL . NULL)');
-        assert.strictEqual(format(dependencies), 'NULL');
-      })();
-      (() => {
-        const expression = createApplication(
-          createBuiltin(Stdlib.CollectTree),
-          createUnitList(createRangeIterator(3, 3)),
-        );
-        const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '(5 . (4 . (3 . NULL)))');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });

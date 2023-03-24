@@ -88,6 +88,10 @@ function createStdlib(runtime) {
     CollectSignal: runtime.Stdlib_CollectSignal.value,
     CollectString: runtime.Stdlib_CollectString.value,
     CollectTree: runtime.Stdlib_CollectTree.value,
+    ConstructHashmap: runtime.Stdlib_ConstructHashmap.value,
+    ConstructHashset: runtime.Stdlib_ConstructHashset.value,
+    ConstructList: runtime.Stdlib_ConstructList.value,
+    ConstructRecord: runtime.Stdlib_ConstructRecord.value,
     Cons: runtime.Stdlib_Cons.value,
     Construct: runtime.Stdlib_Construct.value,
     Debug: runtime.Stdlib_Debug.value,
@@ -97,6 +101,7 @@ function createStdlib(runtime) {
     EndsWith: runtime.Stdlib_EndsWith.value,
     Eq: runtime.Stdlib_Eq.value,
     Equal: runtime.Stdlib_Equal.value,
+    Filter: runtime.Stdlib_Filter.value,
     Flatten: runtime.Stdlib_Flatten.value,
     Floor: runtime.Stdlib_Floor.value,
     Fold: runtime.Stdlib_Fold.value,
@@ -120,6 +125,7 @@ function createStdlib(runtime) {
     Log: runtime.Stdlib_Log.value,
     Lt: runtime.Stdlib_Lt.value,
     Lte: runtime.Stdlib_Lte.value,
+    Map: runtime.Stdlib_Map.value,
     Max: runtime.Stdlib_Max.value,
     Merge: runtime.Stdlib_Merge.value,
     Min: runtime.Stdlib_Min.value,
@@ -138,8 +144,13 @@ function createStdlib(runtime) {
     Replace: runtime.Stdlib_Replace.value,
     ResolveArgs: runtime.Stdlib_ResolveArgs.value,
     ResolveDeep: runtime.Stdlib_ResolveDeep.value,
+    ResolveHashmap: runtime.Stdlib_ResolveHashmap.value,
+    ResolveHashset: runtime.Stdlib_ResolveHashset.value,
+    ResolveList: runtime.Stdlib_ResolveList.value,
     ResolveQueryBranch: runtime.Stdlib_ResolveQueryBranch.value,
     ResolveQueryLeaf: runtime.Stdlib_ResolveQueryLeaf.value,
+    ResolveRecord: runtime.Stdlib_ResolveRecord.value,
+    ResolveTree: runtime.Stdlib_ResolveTree.value,
     ResolveShallow: runtime.Stdlib_ResolveShallow.value,
     Round: runtime.Stdlib_Round.value,
     Scan: runtime.Stdlib_Scan.value,
@@ -156,6 +167,7 @@ function createStdlib(runtime) {
     Throw: runtime.Stdlib_Throw.value,
     ToRequest: runtime.Stdlib_ToRequest.value,
     ToString: runtime.Stdlib_ToString.value,
+    Unzip: runtime.Stdlib_Unzip.value,
     Urlencode: runtime.Stdlib_Urlencode.value,
     Values: runtime.Stdlib_Values.value,
     Zip: runtime.Stdlib_Zip.value,
@@ -501,6 +513,9 @@ export function createRuntime(runtime) {
     getHashmapValue(value, key) {
       return runtime.getHashmapValue(value, key);
     },
+    hasHashmapKey(value, key) {
+      return Boolean(runtime.hasHashmapKey(value, key));
+    },
     createHashset(values) {
       const entries = runtime.allocateHashmap(runtime.defaultHashmapCapacity(values.length));
       const nil = runtime.createNil();
@@ -577,6 +592,9 @@ export function createRuntime(runtime) {
     },
     createHashmapValuesIterator(source) {
       return runtime.createHashmapValuesIterator(source);
+    },
+    createIndexedAccessorIterator(source, index) {
+      return runtime.createIndexedAccessorIterator(source, index);
     },
     hash(value) {
       return u64(runtime.getTermHash(value));

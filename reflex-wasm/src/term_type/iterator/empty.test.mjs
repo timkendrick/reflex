@@ -15,7 +15,7 @@ export default (describe) => {
     }) => {
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(createEmptyIterator()),
         );
         const [result, dependencies] = evaluate(expression, NULL);

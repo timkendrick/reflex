@@ -96,6 +96,7 @@ export default (describe) => {
       createEmptyList,
       createBuiltin,
       createInt,
+      createLambda,
       createTriple,
       createUnitList,
       evaluate,
@@ -142,34 +143,37 @@ export default (describe) => {
           createUnitList(
             createTriple(
               createApplication(
-                createBuiltin(Stdlib.Identity),
-                createUnitList(
+                createLambda(
+                  0,
                   createTriple(
                     createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-1))),
                     createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-2))),
                     createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-3))),
                   ),
                 ),
+                createEmptyList(),
               ),
               createApplication(
-                createBuiltin(Stdlib.Identity),
-                createUnitList(
+                createLambda(
+                  0,
                   createTriple(
                     createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-4))),
                     createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-5))),
                     createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-6))),
                   ),
                 ),
+                createEmptyList(),
               ),
               createApplication(
-                createBuiltin(Stdlib.Identity),
-                createUnitList(
+                createLambda(
+                  0,
                   createTriple(
                     createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-7))),
                     createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-8))),
                     createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-9))),
                   ),
                 ),
+                createEmptyList(),
               ),
             ),
           ),
@@ -188,6 +192,7 @@ export default (describe) => {
       createEmptyList,
       createBuiltin,
       createInt,
+      createLambda,
       createRecord,
       createString,
       createTriple,
@@ -226,18 +231,9 @@ export default (describe) => {
           createUnitList(
             createRecord(
               createTriple(
-                createApplication(
-                  createBuiltin(Stdlib.Identity),
-                  createUnitList(createString('foo')),
-                ),
-                createApplication(
-                  createBuiltin(Stdlib.Identity),
-                  createUnitList(createString('bar')),
-                ),
-                createApplication(
-                  createBuiltin(Stdlib.Identity),
-                  createUnitList(createString('baz')),
-                ),
+                createApplication(createLambda(0, createString('foo')), createEmptyList()),
+                createApplication(createLambda(0, createString('bar')), createEmptyList()),
+                createApplication(createLambda(0, createString('baz')), createEmptyList()),
               ),
               createTriple(
                 createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-3))),
@@ -257,49 +253,43 @@ export default (describe) => {
           createUnitList(
             createRecord(
               createTriple(
-                createApplication(
-                  createBuiltin(Stdlib.Identity),
-                  createUnitList(createString('foo')),
-                ),
-                createApplication(
-                  createBuiltin(Stdlib.Identity),
-                  createUnitList(createString('bar')),
-                ),
-                createApplication(
-                  createBuiltin(Stdlib.Identity),
-                  createUnitList(createString('baz')),
-                ),
+                createApplication(createLambda(0, createString('foo')), createEmptyList()),
+                createApplication(createLambda(0, createString('bar')), createEmptyList()),
+                createApplication(createLambda(0, createString('baz')), createEmptyList()),
               ),
               createTriple(
                 createApplication(
-                  createBuiltin(Stdlib.Identity),
-                  createUnitList(
+                  createLambda(
+                    0,
                     createTriple(
                       createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-1))),
                       createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-2))),
                       createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-3))),
                     ),
                   ),
+                  createEmptyList(),
                 ),
                 createApplication(
-                  createBuiltin(Stdlib.Identity),
-                  createUnitList(
+                  createLambda(
+                    0,
                     createTriple(
                       createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-4))),
                       createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-5))),
                       createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-6))),
                     ),
                   ),
+                  createEmptyList(),
                 ),
                 createApplication(
-                  createBuiltin(Stdlib.Identity),
-                  createUnitList(
+                  createLambda(
+                    0,
                     createTriple(
                       createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-7))),
                       createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-8))),
                       createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-9))),
                     ),
                   ),
+                  createEmptyList(),
                 ),
               ),
             ),
@@ -317,8 +307,10 @@ export default (describe) => {
     test('(Hashmap)', (assert, {
       createApplication,
       createBuiltin,
+      createEmptyList,
       createInt,
       createHashmap,
+      createLambda,
       createString,
       createTriple,
       createUnitList,
@@ -366,24 +358,15 @@ export default (describe) => {
           createUnitList(
             createHashmap([
               [
-                createApplication(
-                  createBuiltin(Stdlib.Identity),
-                  createUnitList(createString('foo')),
-                ),
+                createApplication(createLambda(0, createString('foo')), createEmptyList()),
                 createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-3))),
               ],
               [
-                createApplication(
-                  createBuiltin(Stdlib.Identity),
-                  createUnitList(createString('bar')),
-                ),
+                createApplication(createLambda(0, createString('bar')), createEmptyList()),
                 createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-4))),
               ],
               [
-                createApplication(
-                  createBuiltin(Stdlib.Identity),
-                  createUnitList(createString('baz')),
-                ),
+                createApplication(createLambda(0, createString('baz')), createEmptyList()),
                 createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-5))),
               ],
             ]),
@@ -404,51 +387,45 @@ export default (describe) => {
           createUnitList(
             createHashmap([
               [
+                createApplication(createLambda(0, createString('foo')), createEmptyList()),
                 createApplication(
-                  createBuiltin(Stdlib.Identity),
-                  createUnitList(createString('foo')),
-                ),
-                createApplication(
-                  createBuiltin(Stdlib.Identity),
-                  createUnitList(
+                  createLambda(
+                    0,
                     createTriple(
                       createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-1))),
                       createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-2))),
                       createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-3))),
                     ),
                   ),
+                  createEmptyList(),
                 ),
               ],
               [
+                createApplication(createLambda(0, createString('bar')), createEmptyList()),
                 createApplication(
-                  createBuiltin(Stdlib.Identity),
-                  createUnitList(createString('bar')),
-                ),
-                createApplication(
-                  createBuiltin(Stdlib.Identity),
-                  createUnitList(
+                  createLambda(
+                    0,
                     createTriple(
                       createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-4))),
                       createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-5))),
                       createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-6))),
                     ),
                   ),
+                  createEmptyList(),
                 ),
               ],
               [
+                createApplication(createLambda(0, createString('baz')), createEmptyList()),
                 createApplication(
-                  createBuiltin(Stdlib.Identity),
-                  createUnitList(createString('baz')),
-                ),
-                createApplication(
-                  createBuiltin(Stdlib.Identity),
-                  createUnitList(
+                  createLambda(
+                    0,
                     createTriple(
                       createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-7))),
                       createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-8))),
                       createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-9))),
                     ),
                   ),
+                  createEmptyList(),
                 ),
               ],
             ]),
@@ -476,8 +453,10 @@ export default (describe) => {
     test('(Hashset)', (assert, {
       createApplication,
       createBuiltin,
+      createEmptyList,
       createInt,
       createHashset,
+      createLambda,
       createString,
       createTriple,
       createUnitList,
@@ -520,18 +499,9 @@ export default (describe) => {
           createBuiltin(Stdlib.ResolveShallow),
           createUnitList(
             createHashset([
-              createApplication(
-                createBuiltin(Stdlib.Identity),
-                createUnitList(createString('foo')),
-              ),
-              createApplication(
-                createBuiltin(Stdlib.Identity),
-                createUnitList(createString('bar')),
-              ),
-              createApplication(
-                createBuiltin(Stdlib.Identity),
-                createUnitList(createString('baz')),
-              ),
+              createApplication(createLambda(0, createString('foo')), createEmptyList()),
+              createApplication(createLambda(0, createString('bar')), createEmptyList()),
+              createApplication(createLambda(0, createString('baz')), createEmptyList()),
             ]),
           ),
         );
@@ -549,34 +519,37 @@ export default (describe) => {
           createUnitList(
             createHashset([
               createApplication(
-                createBuiltin(Stdlib.Identity),
-                createUnitList(
+                createLambda(
+                  0,
                   createTriple(
                     createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-1))),
                     createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-2))),
                     createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-3))),
                   ),
                 ),
+                createEmptyList(),
               ),
               createApplication(
-                createBuiltin(Stdlib.Identity),
-                createUnitList(
+                createLambda(
+                  0,
                   createTriple(
                     createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-4))),
                     createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-5))),
                     createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-6))),
                   ),
                 ),
+                createEmptyList(),
               ),
               createApplication(
-                createBuiltin(Stdlib.Identity),
-                createUnitList(
+                createLambda(
+                  0,
                   createTriple(
                     createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-7))),
                     createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-8))),
                     createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-9))),
                   ),
                 ),
+                createEmptyList(),
               ),
             ]),
           ),

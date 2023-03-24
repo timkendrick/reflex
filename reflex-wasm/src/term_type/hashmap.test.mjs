@@ -124,7 +124,7 @@ export default (describe) => {
     }) => {
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(createHashmap([])),
         );
         const [result, dependencies] = evaluate(expression, NULL);
@@ -133,7 +133,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createHashmap([
               [createString('foo'), createInt(3)],

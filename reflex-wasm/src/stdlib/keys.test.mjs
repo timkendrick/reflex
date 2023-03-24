@@ -17,7 +17,7 @@ export default (describe) => {
     }) => {
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(createBuiltin(Stdlib.Keys), createUnitList(createEmptyList())),
           ),
@@ -28,7 +28,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Keys),
@@ -57,7 +57,7 @@ export default (describe) => {
     }) => {
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Keys),
@@ -71,7 +71,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Keys),
@@ -99,14 +99,13 @@ export default (describe) => {
       evaluate,
       format,
       getListItems,
-      getListLength,
       isList,
       NULL,
       Stdlib,
     }) => {
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(createBuiltin(Stdlib.Keys), createUnitList(createHashmap([]))),
           ),
@@ -117,7 +116,7 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.CollectList),
+          createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(
               createBuiltin(Stdlib.Keys),
@@ -128,6 +127,47 @@ export default (describe) => {
                   [createInt(5), createInt(8)],
                 ]),
               ),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.ok(isList(result));
+        assert.strictEqual(`[${getListItems(result).map(format).sort().join(', ')}]`, '[3, 4, 5]');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+    });
+
+    test('(Hashset)', (assert, {
+      createApplication,
+      createBuiltin,
+      createInt,
+      createHashset,
+      createUnitList,
+      evaluate,
+      format,
+      getListItems,
+      isList,
+      NULL,
+      Stdlib,
+    }) => {
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.ResolveList),
+          createUnitList(
+            createApplication(createBuiltin(Stdlib.Keys), createUnitList(createHashset([]))),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '[]');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.ResolveList),
+          createUnitList(
+            createApplication(
+              createBuiltin(Stdlib.Keys),
+              createUnitList(createHashset([createInt(3), createInt(4), createInt(5)])),
             ),
           ),
         );

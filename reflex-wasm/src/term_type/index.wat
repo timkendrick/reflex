@@ -20,6 +20,7 @@
   (@include "./iterator/flatten.wat")
   (@include "./iterator/hashmap_keys.wat")
   (@include "./iterator/hashmap_values.wat")
+  (@include "./iterator/indexed_accessor.wat")
   (@include "./iterator/integers.wat")
   (@include "./iterator/intersperse.wat")
   (@include "./iterator/map.wat")
@@ -74,6 +75,7 @@
       (@import $FlattenIterator "./iterator/flatten.wat")
       (@import $HashmapKeysIterator "./iterator/hashmap_keys.wat")
       (@import $HashmapValuesIterator "./iterator/hashmap_values.wat")
+      (@import $IndexedAccessorIterator "./iterator/indexed_accessor.wat")
       (@import $IntegersIterator "./iterator/integers.wat")
       (@import $IntersperseIterator "./iterator/intersperse.wat")
       (@import $MapIterator "./iterator/map.wat")
@@ -253,20 +255,21 @@
         $Hashset
         $Tree
         $EmptyIterator
+        $EvaluateIterator
+        $FilterIterator
+        $FlattenIterator
+        $HashmapKeysIterator
+        $HashmapValuesIterator
+        $IndexedAccessorIterator
+        $IntegersIterator
+        $IntersperseIterator
+        $MapIterator
         $OnceIterator
+        $RangeIterator
         $RepeatIterator
         $SkipIterator
         $TakeIterator
-        $ZipIterator
-        $MapIterator
-        $FilterIterator
-        $FlattenIterator
-        $EvaluateIterator
-        $IntegersIterator
-        $IntersperseIterator
-        $RangeIterator
-        $HashmapKeysIterator
-        $HashmapValuesIterator)
+        $ZipIterator)
 
       (func $TermType::implements::iterate (param $type i32) (result i32)
         (@fold $result $typename

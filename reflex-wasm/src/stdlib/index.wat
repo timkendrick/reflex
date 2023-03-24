@@ -16,16 +16,22 @@
   (@include "./collect_signal.wat")
   (@include "./collect_string.wat")
   (@include "./collect_tree.wat")
+  (@include "./construct_hashmap.wat")
+  (@include "./construct_hashset.wat")
+  (@include "./construct_list.wat")
+  (@include "./construct_record.wat")
   (@include "./cons.wat")
   (@include "./divide.wat")
   (@include "./effect.wat")
   (@include "./ends_with.wat")
   (@include "./eq.wat")
   (@include "./equal.wat")
+  (@include "./filter.wat")
   (@include "./flatten.wat")
   (@include "./floor.wat")
   (@include "./fold.wat")
   (@include "./get.wat")
+  (@include "./graphql/graphql_resolver.wat")
   (@include "./graphql/resolve_query_branch.wat")
   (@include "./graphql/resolve_query_leaf.wat")
   (@include "./gt.wat")
@@ -58,6 +64,7 @@
   (@include "./length.wat")
   (@include "./lt.wat")
   (@include "./lte.wat")
+  (@include "./map.wat")
   (@include "./max.wat")
   (@include "./merge.wat")
   (@include "./min.wat")
@@ -72,10 +79,14 @@
   (@include "./replace.wat")
   (@include "./resolve_args.wat")
   (@include "./resolve_deep.wat")
+  (@include "./resolve_hashmap.wat")
+  (@include "./resolve_hashset.wat")
+  (@include "./resolve_list.wat")
+  (@include "./resolve_record.wat")
   (@include "./resolve_shallow.wat")
+  (@include "./resolve_tree.wat")
   (@include "./round.wat")
   (@include "./sequence.wat")
-  (@include "./server/graphql_resolver.wat")
   (@include "./set.wat")
   (@include "./skip.wat")
   (@include "./slice.wat")
@@ -83,6 +94,7 @@
   (@include "./starts_with.wat")
   (@include "./subtract.wat")
   (@include "./take.wat")
+  (@include "./unzip.wat")
   (@include "./values.wat")
   (@include "./zip.wat")
 
@@ -105,6 +117,10 @@
       $Stdlib_CollectTree
       $Stdlib_Cons
       $Stdlib_Construct
+      $Stdlib_ConstructHashmap
+      $Stdlib_ConstructHashset
+      $Stdlib_ConstructList
+      $Stdlib_ConstructRecord
       $Stdlib_Debug
       $Stdlib_DecrementVariable
       $Stdlib_Divide
@@ -112,6 +128,7 @@
       $Stdlib_EndsWith
       $Stdlib_Eq
       $Stdlib_Equal
+      $Stdlib_Filter
       $Stdlib_Flatten
       $Stdlib_Floor
       $Stdlib_Fold
@@ -135,6 +152,7 @@
       $Stdlib_Log
       $Stdlib_Lt
       $Stdlib_Lte
+      $Stdlib_Map
       $Stdlib_Max
       $Stdlib_Merge
       $Stdlib_Min
@@ -153,9 +171,14 @@
       $Stdlib_Replace
       $Stdlib_ResolveArgs
       $Stdlib_ResolveDeep
+      $Stdlib_ResolveHashmap
+      $Stdlib_ResolveHashset
+      $Stdlib_ResolveList
       $Stdlib_ResolveQueryBranch
       $Stdlib_ResolveQueryLeaf
+      $Stdlib_ResolveRecord
       $Stdlib_ResolveShallow
+      $Stdlib_ResolveTree
       $Stdlib_Round
       $Stdlib_Scan
       $Stdlib_Sequence
@@ -172,6 +195,7 @@
       $Stdlib_ToRequest
       $Stdlib_ToString
       $Stdlib_Urlencode
+      $Stdlib_Unzip
       $Stdlib_Values
       $Stdlib_Zip)
 

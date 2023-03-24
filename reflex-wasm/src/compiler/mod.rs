@@ -105,6 +105,7 @@ pub enum RuntimeBuiltin {
     CreateFlattenIterator,
     CreateHashmapKeysIterator,
     CreateHashmapValuesIterator,
+    CreateIndexedAccessorIterator,
     CreateIntegersIterator,
     CreateIntersperseIterator,
     CreateMapIterator,
@@ -168,6 +169,7 @@ impl RuntimeBuiltin {
             RuntimeBuiltin::CreateFlattenIterator => "createFlattenIterator",
             RuntimeBuiltin::CreateHashmapKeysIterator => "createHashmapKeysIterator",
             RuntimeBuiltin::CreateHashmapValuesIterator => "createHashmapValuesIterator",
+            RuntimeBuiltin::CreateIndexedAccessorIterator => "createIndexedAccessorIterator",
             RuntimeBuiltin::CreateIntegersIterator => "createIntegersIterator",
             RuntimeBuiltin::CreateIntersperseIterator => "createIntersperseIterator",
             RuntimeBuiltin::CreateMapIterator => "createMapIterator",
@@ -501,6 +503,10 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<Term, A> {
                 .compile(eager, scope, state, options),
             TermTypeDiscriminants::HashmapValuesIterator => self
                 .as_typed_term::<HashmapValuesIteratorTerm>()
+                .as_inner()
+                .compile(eager, scope, state, options),
+            TermTypeDiscriminants::IndexedAccessorIterator => self
+                .as_typed_term::<IndexedAccessorIteratorTerm>()
                 .as_inner()
                 .compile(eager, scope, state, options),
             TermTypeDiscriminants::IntegersIterator => self

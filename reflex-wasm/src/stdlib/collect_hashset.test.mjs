@@ -3,17 +3,28 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 export default (describe) => {
   describe('Stdlib_CollectHashset', (test) => {
-    test('(Iterator)', (assert, {
+    test('()', (assert, {
       createApplication,
-      createEmptyIterator,
-      createFlattenIterator,
+      createEmptyList,
       createBuiltin,
-      createInt,
-      createOnceIterator,
-      createRangeIterator,
+      evaluate,
+      format,
+      NULL,
+      Stdlib,
+    }) => {
+      const expression = createApplication(createBuiltin(Stdlib.CollectHashset), createEmptyList());
+      const [result, dependencies] = evaluate(expression, NULL);
+      assert.strictEqual(format(result), 'Set(0)');
+      assert.strictEqual(format(dependencies), 'NULL');
+    });
+
+    test('(String, String, String)', (assert, {
+      createApplication,
+      createBuiltin,
+      createEmptyList,
+      createLambda,
       createString,
       createTriple,
-      createUnitList,
       evaluate,
       format,
       hasHashsetValue,
@@ -23,18 +34,7 @@ export default (describe) => {
       (() => {
         const expression = createApplication(
           createBuiltin(Stdlib.CollectHashset),
-          createUnitList(createEmptyIterator()),
-        );
-        const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), 'Set(0)');
-        assert.strictEqual(format(dependencies), 'NULL');
-      })();
-      (() => {
-        const expression = createApplication(
-          createBuiltin(Stdlib.CollectHashset),
-          createUnitList(
-            createTriple(createString('foo'), createString('bar'), createString('baz')),
-          ),
+          createTriple(createString('foo'), createString('bar'), createString('baz')),
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), 'Set(3)');
@@ -47,27 +47,18 @@ export default (describe) => {
       (() => {
         const expression = createApplication(
           createBuiltin(Stdlib.CollectHashset),
-          createUnitList(createRangeIterator(3, 3)),
+          createTriple(
+            createApplication(createLambda(0, createString('foo')), createEmptyList()),
+            createApplication(createLambda(0, createString('bar')), createEmptyList()),
+            createApplication(createLambda(0, createString('baz')), createEmptyList()),
+          ),
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), 'Set(3)');
-        assert.strictEqual(hasHashsetValue(result, createInt(3)), true);
-        assert.strictEqual(hasHashsetValue(result, createInt(4)), true);
-        assert.strictEqual(hasHashsetValue(result, createInt(5)), true);
-        assert.strictEqual(hasHashsetValue(result, createInt(6)), false);
-        assert.strictEqual(format(dependencies), 'NULL');
-      })();
-      (() => {
-        const expression = createApplication(
-          createBuiltin(Stdlib.CollectHashset),
-          createUnitList(createFlattenIterator(createOnceIterator(createRangeIterator(3, 3)))),
-        );
-        const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), 'Set(3)');
-        assert.strictEqual(hasHashsetValue(result, createInt(3)), true);
-        assert.strictEqual(hasHashsetValue(result, createInt(4)), true);
-        assert.strictEqual(hasHashsetValue(result, createInt(5)), true);
-        assert.strictEqual(hasHashsetValue(result, createInt(6)), false);
+        assert.strictEqual(hasHashsetValue(result, createString('foo')), true);
+        assert.strictEqual(hasHashsetValue(result, createString('bar')), true);
+        assert.strictEqual(hasHashsetValue(result, createString('baz')), true);
+        assert.strictEqual(hasHashsetValue(result, createString('qux')), false);
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });

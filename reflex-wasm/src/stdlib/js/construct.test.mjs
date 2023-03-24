@@ -111,11 +111,11 @@ export default (describe) => {
       })();
     });
 
-    test('(Builtin, List)', (assert, {
+    test('(Builtin, Int, Int)', (assert, {
       createApplication,
       createBuiltin,
       createInt,
-      createPair,
+      createTriple,
       evaluate,
       format,
       NULL,
@@ -124,28 +124,7 @@ export default (describe) => {
       (() => {
         const expression = createApplication(
           createBuiltin(Stdlib.Construct),
-          createPair(createBuiltin(Stdlib.Subtract), createPair(createInt(3), createInt(4))),
-        );
-        const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), `${3 - 4}`);
-        assert.strictEqual(format(dependencies), 'NULL');
-      })();
-    });
-
-    test('(Builtin, Iterator)', (assert, {
-      createApplication,
-      createBuiltin,
-      createPair,
-      createRangeIterator,
-      evaluate,
-      format,
-      NULL,
-      Stdlib,
-    }) => {
-      (() => {
-        const expression = createApplication(
-          createBuiltin(Stdlib.Construct),
-          createPair(createBuiltin(Stdlib.Subtract), createRangeIterator(3, 2)),
+          createTriple(createBuiltin(Stdlib.Subtract), createInt(3), createInt(4)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), `${3 - 4}`);

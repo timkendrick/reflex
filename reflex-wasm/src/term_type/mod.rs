@@ -109,6 +109,7 @@ pub enum TermType {
     FlattenIterator(FlattenIteratorTerm),
     HashmapKeysIterator(HashmapKeysIteratorTerm),
     HashmapValuesIterator(HashmapValuesIteratorTerm),
+    IndexedAccessorIterator(IndexedAccessorIteratorTerm),
     IntegersIterator(IntegersIteratorTerm),
     IntersperseIterator(IntersperseIteratorTerm),
     MapIterator(MapIteratorTerm),
@@ -154,6 +155,9 @@ impl TryFrom<u32> for TermTypeDiscriminants {
             value if value == Self::FlattenIterator as u32 => Ok(Self::FlattenIterator),
             value if value == Self::HashmapKeysIterator as u32 => Ok(Self::HashmapKeysIterator),
             value if value == Self::HashmapValuesIterator as u32 => Ok(Self::HashmapValuesIterator),
+            value if value == Self::IndexedAccessorIterator as u32 => {
+                Ok(Self::IndexedAccessorIterator)
+            }
             value if value == Self::IntegersIterator as u32 => Ok(Self::IntegersIterator),
             value if value == Self::IntersperseIterator as u32 => Ok(Self::IntersperseIterator),
             value if value == Self::MapIterator as u32 => Ok(Self::MapIterator),
@@ -202,6 +206,7 @@ impl TermSize for TermType {
             Self::FlattenIterator(term) => term.size_of(),
             Self::HashmapKeysIterator(term) => term.size_of(),
             Self::HashmapValuesIterator(term) => term.size_of(),
+            Self::IndexedAccessorIterator(term) => term.size_of(),
             Self::IntegersIterator(term) => term.size_of(),
             Self::IntersperseIterator(term) => term.size_of(),
             Self::MapIterator(term) => term.size_of(),
@@ -309,6 +314,9 @@ impl TermHash for TermType {
             Self::HashmapValuesIterator(term) => hasher
                 .write_u8(TermTypeDiscriminants::HashmapValuesIterator as u8)
                 .hash(term, arena),
+            Self::IndexedAccessorIterator(term) => hasher
+                .write_u8(TermTypeDiscriminants::IndexedAccessorIterator as u8)
+                .hash(term, arena),
             Self::IntegersIterator(term) => hasher
                 .write_u8(TermTypeDiscriminants::IntegersIterator as u8)
                 .hash(term, arena),
@@ -372,6 +380,7 @@ pub enum TermPointerIterator {
     FlattenIterator(FlattenIteratorTermPointerIter),
     HashmapKeysIterator(HashmapKeysIteratorTermPointerIter),
     HashmapValuesIterator(HashmapValuesIteratorTermPointerIter),
+    IndexedAccessorIterator(IndexedAccessorIteratorTermPointerIter),
     IntegersIterator(IntegersIteratorTermPointerIter),
     IntersperseIterator(IntersperseIteratorTermPointerIter),
     MapIterator(MapIteratorTermPointerIter),
@@ -417,6 +426,7 @@ impl Iterator for TermPointerIterator {
             TermPointerIterator::FlattenIterator(inner) => inner.next(),
             TermPointerIterator::HashmapKeysIterator(inner) => inner.next(),
             TermPointerIterator::HashmapValuesIterator(inner) => inner.next(),
+            TermPointerIterator::IndexedAccessorIterator(inner) => inner.next(),
             TermPointerIterator::IntegersIterator(inner) => inner.next(),
             TermPointerIterator::IntersperseIterator(inner) => inner.next(),
             TermPointerIterator::MapIterator(inner) => inner.next(),
@@ -536,6 +546,13 @@ impl<A: Arena + Clone> PointerIter for ArenaRef<Term, A> {
             TermTypeDiscriminants::HashmapValuesIterator => {
                 TermPointerIterator::HashmapValuesIterator(
                     self.as_typed_term::<HashmapValuesIteratorTerm>()
+                        .as_inner()
+                        .iter(),
+                )
+            }
+            TermTypeDiscriminants::IndexedAccessorIterator => {
+                TermPointerIterator::IndexedAccessorIterator(
+                    self.as_typed_term::<IndexedAccessorIteratorTerm>()
                         .as_inner()
                         .iter(),
                 )
@@ -698,6 +715,10 @@ impl<A: Arena + Clone> Internable for ArenaRef<Term, A> {
                 .as_typed_term::<HashmapValuesIteratorTerm>()
                 .as_inner()
                 .should_intern(eager),
+            TermTypeDiscriminants::IndexedAccessorIterator => self
+                .as_typed_term::<IndexedAccessorIteratorTerm>()
+                .as_inner()
+                .should_intern(eager),
             TermTypeDiscriminants::IntegersIterator => self
                 .as_typed_term::<IntegersIteratorTerm>()
                 .as_inner()
@@ -760,6 +781,7 @@ pub enum WasmIteratorTerm<A: Arena + Clone> {
     FlattenIterator(ArenaRef<FlattenIteratorTerm, A>),
     HashmapKeysIterator(ArenaRef<HashmapKeysIteratorTerm, A>),
     HashmapValuesIterator(ArenaRef<HashmapValuesIteratorTerm, A>),
+    IndexedAccessorIterator(ArenaRef<IndexedAccessorIteratorTerm, A>),
     IntegersIterator(ArenaRef<IntegersIteratorTerm, A>),
     IntersperseIterator(ArenaRef<IntersperseIteratorTerm, A>),
     MapIterator(ArenaRef<MapIteratorTerm, A>),
@@ -807,6 +829,10 @@ where
                 .as_hashmap_values_iterator_term()
                 .map(|term| term.as_inner())
                 .map(WasmIteratorTerm::HashmapValuesIterator),
+            TermTypeDiscriminants::IndexedAccessorIterator => expression
+                .as_indexed_accessor_iterator_term()
+                .map(|term| term.as_inner())
+                .map(WasmIteratorTerm::IndexedAccessorIterator),
             TermTypeDiscriminants::IntegersIterator => expression
                 .as_integers_iterator_term()
                 .map(|term| term.as_inner())
@@ -1088,6 +1114,14 @@ impl<'a> Into<Option<&'a HashmapValuesIteratorTerm>> for &'a TermType {
         }
     }
 }
+impl<'a> Into<Option<&'a IndexedAccessorIteratorTerm>> for &'a TermType {
+    fn into(self) -> Option<&'a IndexedAccessorIteratorTerm> {
+        match self {
+            TermType::IndexedAccessorIterator(term) => Some(term),
+            _ => None,
+        }
+    }
+}
 impl<'a> Into<Option<&'a IntegersIteratorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a IntegersIteratorTerm> {
         match self {
@@ -1318,6 +1352,16 @@ impl<A: Arena + Clone> PartialEq for ArenaRef<Term, A> {
                         .as_typed_term::<HashmapValuesIteratorTerm>()
                         .as_inner()
             }
+            (
+                TermTypeDiscriminants::IndexedAccessorIterator,
+                TermTypeDiscriminants::IndexedAccessorIterator,
+            ) => {
+                self.as_typed_term::<IndexedAccessorIteratorTerm>()
+                    .as_inner()
+                    == other
+                        .as_typed_term::<IndexedAccessorIteratorTerm>()
+                        .as_inner()
+            }
             (TermTypeDiscriminants::IntegersIterator, TermTypeDiscriminants::IntegersIterator) => {
                 self.as_typed_term::<IntegersIteratorTerm>().as_inner()
                     == other.as_typed_term::<IntegersIteratorTerm>().as_inner()
@@ -1504,6 +1548,11 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             TermTypeDiscriminants::HashmapValuesIterator => {
                 GraphNode::size(&self.as_typed_term::<HashmapValuesIteratorTerm>().as_inner())
             }
+            TermTypeDiscriminants::IndexedAccessorIterator => GraphNode::size(
+                &self
+                    .as_typed_term::<IndexedAccessorIteratorTerm>()
+                    .as_inner(),
+            ),
             TermTypeDiscriminants::IntegersIterator => {
                 GraphNode::size(&self.as_typed_term::<IntegersIteratorTerm>().as_inner())
             }
@@ -1625,6 +1674,11 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             TermTypeDiscriminants::HashmapValuesIterator => GraphNode::capture_depth(
                 &self.as_typed_term::<HashmapValuesIteratorTerm>().as_inner(),
             ),
+            TermTypeDiscriminants::IndexedAccessorIterator => GraphNode::capture_depth(
+                &self
+                    .as_typed_term::<IndexedAccessorIteratorTerm>()
+                    .as_inner(),
+            ),
             TermTypeDiscriminants::IntegersIterator => {
                 GraphNode::capture_depth(&self.as_typed_term::<IntegersIteratorTerm>().as_inner())
             }
@@ -1745,6 +1799,11 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             ),
             TermTypeDiscriminants::HashmapValuesIterator => GraphNode::free_variables(
                 &self.as_typed_term::<HashmapValuesIteratorTerm>().as_inner(),
+            ),
+            TermTypeDiscriminants::IndexedAccessorIterator => GraphNode::free_variables(
+                &self
+                    .as_typed_term::<IndexedAccessorIteratorTerm>()
+                    .as_inner(),
             ),
             TermTypeDiscriminants::IntegersIterator => {
                 GraphNode::free_variables(&self.as_typed_term::<IntegersIteratorTerm>().as_inner())
@@ -1897,6 +1956,12 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
                 &self.as_typed_term::<HashmapValuesIteratorTerm>().as_inner(),
                 offset,
             ),
+            TermTypeDiscriminants::IndexedAccessorIterator => GraphNode::count_variable_usages(
+                &self
+                    .as_typed_term::<IndexedAccessorIteratorTerm>()
+                    .as_inner(),
+                offset,
+            ),
             TermTypeDiscriminants::IntegersIterator => GraphNode::count_variable_usages(
                 &self.as_typed_term::<IntegersIteratorTerm>().as_inner(),
                 offset,
@@ -2047,6 +2112,12 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             ),
             TermTypeDiscriminants::HashmapValuesIterator => GraphNode::dynamic_dependencies(
                 &self.as_typed_term::<HashmapValuesIteratorTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::IndexedAccessorIterator => GraphNode::dynamic_dependencies(
+                &self
+                    .as_typed_term::<IndexedAccessorIteratorTerm>()
+                    .as_inner(),
                 deep,
             ),
             TermTypeDiscriminants::IntegersIterator => GraphNode::dynamic_dependencies(
@@ -2209,6 +2280,12 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
                 &self.as_typed_term::<HashmapValuesIteratorTerm>().as_inner(),
                 deep,
             ),
+            TermTypeDiscriminants::IndexedAccessorIterator => GraphNode::has_dynamic_dependencies(
+                &self
+                    .as_typed_term::<IndexedAccessorIteratorTerm>()
+                    .as_inner(),
+                deep,
+            ),
             TermTypeDiscriminants::IntegersIterator => GraphNode::has_dynamic_dependencies(
                 &self.as_typed_term::<IntegersIteratorTerm>().as_inner(),
                 deep,
@@ -2339,6 +2416,11 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             TermTypeDiscriminants::HashmapValuesIterator => {
                 GraphNode::is_static(&self.as_typed_term::<HashmapValuesIteratorTerm>().as_inner())
             }
+            TermTypeDiscriminants::IndexedAccessorIterator => GraphNode::is_static(
+                &self
+                    .as_typed_term::<IndexedAccessorIteratorTerm>()
+                    .as_inner(),
+            ),
             TermTypeDiscriminants::IntegersIterator => {
                 GraphNode::is_static(&self.as_typed_term::<IntegersIteratorTerm>().as_inner())
             }
@@ -2460,6 +2542,11 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             TermTypeDiscriminants::HashmapValuesIterator => {
                 GraphNode::is_atomic(&self.as_typed_term::<HashmapValuesIteratorTerm>().as_inner())
             }
+            TermTypeDiscriminants::IndexedAccessorIterator => GraphNode::is_atomic(
+                &self
+                    .as_typed_term::<IndexedAccessorIteratorTerm>()
+                    .as_inner(),
+            ),
             TermTypeDiscriminants::IntegersIterator => {
                 GraphNode::is_atomic(&self.as_typed_term::<IntegersIteratorTerm>().as_inner())
             }
@@ -2581,6 +2668,11 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             TermTypeDiscriminants::HashmapValuesIterator => {
                 GraphNode::is_complex(&self.as_typed_term::<HashmapValuesIteratorTerm>().as_inner())
             }
+            TermTypeDiscriminants::IndexedAccessorIterator => GraphNode::is_complex(
+                &self
+                    .as_typed_term::<IndexedAccessorIteratorTerm>()
+                    .as_inner(),
+            ),
             TermTypeDiscriminants::IntegersIterator => {
                 GraphNode::is_complex(&self.as_typed_term::<IntegersIteratorTerm>().as_inner())
             }
@@ -2704,6 +2796,11 @@ impl<A: Arena + Clone> SerializeJson for ArenaRef<Term, A> {
             }
             TermTypeDiscriminants::HashmapValuesIterator => SerializeJson::to_json(
                 &self.as_typed_term::<HashmapValuesIteratorTerm>().as_inner(),
+            ),
+            TermTypeDiscriminants::IndexedAccessorIterator => SerializeJson::to_json(
+                &self
+                    .as_typed_term::<IndexedAccessorIteratorTerm>()
+                    .as_inner(),
             ),
             TermTypeDiscriminants::IntegersIterator => {
                 SerializeJson::to_json(&self.as_typed_term::<IntegersIteratorTerm>().as_inner())
@@ -2896,6 +2993,17 @@ impl<A: Arena + Clone> SerializeJson for ArenaRef<Term, A> {
                     .as_typed_term::<HashmapValuesIteratorTerm>()
                     .as_inner(),
             ),
+            (
+                TermTypeDiscriminants::IndexedAccessorIterator,
+                TermTypeDiscriminants::IndexedAccessorIterator,
+            ) => SerializeJson::patch(
+                &self
+                    .as_typed_term::<IndexedAccessorIteratorTerm>()
+                    .as_inner(),
+                &target
+                    .as_typed_term::<IndexedAccessorIteratorTerm>()
+                    .as_inner(),
+            ),
             (TermTypeDiscriminants::IntegersIterator, TermTypeDiscriminants::IntegersIterator) => {
                 self.as_typed_term::<IntegersIteratorTerm>()
                     .as_inner()
@@ -3050,6 +3158,12 @@ impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<Term, A> {
                 &self.as_typed_term::<HashmapValuesIteratorTerm>().as_inner(),
                 f,
             ),
+            TermTypeDiscriminants::IndexedAccessorIterator => std::fmt::Debug::fmt(
+                &self
+                    .as_typed_term::<IndexedAccessorIteratorTerm>()
+                    .as_inner(),
+                f,
+            ),
             TermTypeDiscriminants::IntegersIterator => {
                 std::fmt::Debug::fmt(&self.as_typed_term::<IntegersIteratorTerm>().as_inner(), f)
             }
@@ -3177,6 +3291,12 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<Term, A> {
                 &self.as_typed_term::<HashmapValuesIteratorTerm>().as_inner(),
                 f,
             ),
+            TermTypeDiscriminants::IndexedAccessorIterator => std::fmt::Display::fmt(
+                &self
+                    .as_typed_term::<IndexedAccessorIteratorTerm>()
+                    .as_inner(),
+                f,
+            ),
             TermTypeDiscriminants::IntegersIterator => {
                 std::fmt::Display::fmt(&self.as_typed_term::<IntegersIteratorTerm>().as_inner(), f)
             }
@@ -3295,6 +3415,9 @@ impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<TermType, A> {
             TermTypeDiscriminants::HashmapValuesIterator => {
                 std::fmt::Debug::fmt(&self.read_value(|value| *value), f)
             }
+            TermTypeDiscriminants::IndexedAccessorIterator => {
+                std::fmt::Debug::fmt(&self.read_value(|value| *value), f)
+            }
             TermTypeDiscriminants::IntegersIterator => {
                 std::fmt::Debug::fmt(&self.read_value(|value| *value), f)
             }
@@ -3387,6 +3510,9 @@ impl<V> TypedTerm<V> {
                 }
                 TermType::HashmapValuesIterator(inner) => {
                     std::mem::transmute::<&HashmapValuesIteratorTerm, &V>(inner)
+                }
+                TermType::IndexedAccessorIterator(inner) => {
+                    std::mem::transmute::<&IndexedAccessorIteratorTerm, &V>(inner)
                 }
                 TermType::IntegersIterator(inner) => {
                     std::mem::transmute::<&IntegersIteratorTerm, &V>(inner)
@@ -3843,6 +3969,26 @@ impl<A: Arena + Clone> ArenaRef<Term, A> {
             _ => None,
         }
     }
+    pub fn as_indexed_accessor_iterator_term(
+        &self,
+    ) -> Option<&ArenaRef<TypedTerm<IndexedAccessorIteratorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::IndexedAccessorIterator => {
+                Some(self.as_typed_term::<IndexedAccessorIteratorTerm>())
+            }
+            _ => None,
+        }
+    }
+    pub fn into_indexed_accessor_iterator_term(
+        self,
+    ) -> Option<ArenaRef<TypedTerm<IndexedAccessorIteratorTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::IndexedAccessorIterator => {
+                Some(self.into_typed_term::<IndexedAccessorIteratorTerm>())
+            }
+            _ => None,
+        }
+    }
     pub fn as_integers_iterator_term(
         &self,
     ) -> Option<&ArenaRef<TypedTerm<IntegersIteratorTerm>, A>> {
@@ -4076,14 +4222,15 @@ mod tests {
         assert_eq!(TermTypeDiscriminants::FlattenIterator as u32, 27);
         assert_eq!(TermTypeDiscriminants::HashmapKeysIterator as u32, 28);
         assert_eq!(TermTypeDiscriminants::HashmapValuesIterator as u32, 29);
-        assert_eq!(TermTypeDiscriminants::IntegersIterator as u32, 30);
-        assert_eq!(TermTypeDiscriminants::IntersperseIterator as u32, 31);
-        assert_eq!(TermTypeDiscriminants::MapIterator as u32, 32);
-        assert_eq!(TermTypeDiscriminants::OnceIterator as u32, 33);
-        assert_eq!(TermTypeDiscriminants::RangeIterator as u32, 34);
-        assert_eq!(TermTypeDiscriminants::RepeatIterator as u32, 35);
-        assert_eq!(TermTypeDiscriminants::SkipIterator as u32, 36);
-        assert_eq!(TermTypeDiscriminants::TakeIterator as u32, 37);
-        assert_eq!(TermTypeDiscriminants::ZipIterator as u32, 38);
+        assert_eq!(TermTypeDiscriminants::IndexedAccessorIterator as u32, 30);
+        assert_eq!(TermTypeDiscriminants::IntegersIterator as u32, 31);
+        assert_eq!(TermTypeDiscriminants::IntersperseIterator as u32, 32);
+        assert_eq!(TermTypeDiscriminants::MapIterator as u32, 33);
+        assert_eq!(TermTypeDiscriminants::OnceIterator as u32, 34);
+        assert_eq!(TermTypeDiscriminants::RangeIterator as u32, 35);
+        assert_eq!(TermTypeDiscriminants::RepeatIterator as u32, 36);
+        assert_eq!(TermTypeDiscriminants::SkipIterator as u32, 37);
+        assert_eq!(TermTypeDiscriminants::TakeIterator as u32, 38);
+        assert_eq!(TermTypeDiscriminants::ZipIterator as u32, 39);
     }
 }

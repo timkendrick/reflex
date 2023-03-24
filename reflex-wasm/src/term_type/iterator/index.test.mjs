@@ -8,6 +8,7 @@ import flatten from './flatten.test.mjs';
 import hashmapKeys from './hashmap_keys.test.mjs';
 import hashmapValues from './hashmap_values.test.mjs';
 import integers from './integers.test.mjs';
+import indexedAccessor from './indexed_accessor.test.mjs';
 import intersperse from './intersperse.test.mjs';
 import map from './map.test.mjs';
 import once from './once.test.mjs';
@@ -24,6 +25,7 @@ export default (describe) => {
   flatten(describe);
   hashmapKeys(describe);
   hashmapValues(describe);
+  indexedAccessor(describe);
   integers(describe);
   intersperse(describe);
   map(describe);

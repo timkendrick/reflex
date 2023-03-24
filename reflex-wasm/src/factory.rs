@@ -23,6 +23,7 @@ use reflex::{
 use reflex_utils::WithExactSizeIterator;
 
 use crate::{
+    self as reflex_wasm,
     allocator::{Arena, ArenaAllocator},
     hash::TermSize,
     term_type::{
@@ -1206,6 +1207,328 @@ where
         match expression.read_value(|term| term.type_id()) {
             TermTypeDiscriminants::Signal => Some(expression.as_typed_term::<SignalTerm>()),
             _ => None,
+        }
+    }
+}
+
+impl From<reflex_stdlib::stdlib::Stdlib> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Stdlib) -> Self {
+        match value {
+            reflex_stdlib::stdlib::Stdlib::Abs => {
+                reflex_wasm::stdlib::Stdlib::Abs(reflex_wasm::stdlib::Abs)
+            }
+            reflex_stdlib::stdlib::Stdlib::Add => {
+                reflex_wasm::stdlib::Stdlib::Add(reflex_wasm::stdlib::Add)
+            }
+            reflex_stdlib::stdlib::Stdlib::And => {
+                reflex_wasm::stdlib::Stdlib::And(reflex_wasm::stdlib::And)
+            }
+            reflex_stdlib::stdlib::Stdlib::Apply => {
+                reflex_wasm::stdlib::Stdlib::Apply(reflex_wasm::stdlib::Apply)
+            }
+            reflex_stdlib::stdlib::Stdlib::Car => {
+                reflex_wasm::stdlib::Stdlib::Car(reflex_wasm::stdlib::Car)
+            }
+            reflex_stdlib::stdlib::Stdlib::Cdr => {
+                reflex_wasm::stdlib::Stdlib::Cdr(reflex_wasm::stdlib::Cdr)
+            }
+            reflex_stdlib::stdlib::Stdlib::Ceil => {
+                reflex_wasm::stdlib::Stdlib::Ceil(reflex_wasm::stdlib::Ceil)
+            }
+            reflex_stdlib::stdlib::Stdlib::Chain => {
+                reflex_wasm::stdlib::Stdlib::Chain(reflex_wasm::stdlib::Chain)
+            }
+            reflex_stdlib::stdlib::Stdlib::CollectHashMap => {
+                reflex_wasm::stdlib::Stdlib::CollectHashmap(reflex_wasm::stdlib::CollectHashmap)
+            }
+            reflex_stdlib::stdlib::Stdlib::CollectHashSet => {
+                reflex_wasm::stdlib::Stdlib::CollectHashset(reflex_wasm::stdlib::CollectHashset)
+            }
+            reflex_stdlib::stdlib::Stdlib::CollectList => {
+                reflex_wasm::stdlib::Stdlib::CollectList(reflex_wasm::stdlib::CollectList)
+            }
+            reflex_stdlib::stdlib::Stdlib::CollectSignal => {
+                reflex_wasm::stdlib::Stdlib::CollectSignal(reflex_wasm::stdlib::CollectSignal)
+            }
+            reflex_stdlib::stdlib::Stdlib::Concat => {
+                reflex_wasm::stdlib::Stdlib::CollectString(reflex_wasm::stdlib::CollectString)
+            }
+            reflex_stdlib::stdlib::Stdlib::Cons => {
+                reflex_wasm::stdlib::Stdlib::Cons(reflex_wasm::stdlib::Cons)
+            }
+            reflex_stdlib::stdlib::Stdlib::ConstructHashMap => {
+                reflex_wasm::stdlib::Stdlib::ConstructHashmap(reflex_wasm::stdlib::ConstructHashmap)
+            }
+            reflex_stdlib::stdlib::Stdlib::ConstructHashSet => {
+                reflex_wasm::stdlib::Stdlib::ConstructHashset(reflex_wasm::stdlib::ConstructHashset)
+            }
+            reflex_stdlib::stdlib::Stdlib::ConstructRecord => {
+                reflex_wasm::stdlib::Stdlib::ConstructRecord(reflex_wasm::stdlib::ConstructRecord)
+            }
+            reflex_stdlib::stdlib::Stdlib::ConstructList => {
+                reflex_wasm::stdlib::Stdlib::ConstructList(reflex_wasm::stdlib::ConstructList)
+            }
+            reflex_stdlib::stdlib::Stdlib::Contains => {
+                reflex_wasm::stdlib::Stdlib::Has(reflex_wasm::stdlib::Has)
+            }
+            reflex_stdlib::stdlib::Stdlib::Divide => {
+                reflex_wasm::stdlib::Stdlib::Divide(reflex_wasm::stdlib::Divide)
+            }
+            reflex_stdlib::stdlib::Stdlib::Effect => {
+                reflex_wasm::stdlib::Stdlib::Effect(reflex_wasm::stdlib::Effect)
+            }
+            reflex_stdlib::stdlib::Stdlib::EndsWith => {
+                reflex_wasm::stdlib::Stdlib::EndsWith(reflex_wasm::stdlib::EndsWith)
+            }
+            reflex_stdlib::stdlib::Stdlib::Eq => {
+                reflex_wasm::stdlib::Stdlib::Eq(reflex_wasm::stdlib::Eq)
+            }
+            reflex_stdlib::stdlib::Stdlib::Equal => {
+                reflex_wasm::stdlib::Stdlib::Equal(reflex_wasm::stdlib::Equal)
+            }
+            reflex_stdlib::stdlib::Stdlib::Filter => {
+                reflex_wasm::stdlib::Stdlib::Filter(reflex_wasm::stdlib::Filter)
+            }
+            reflex_stdlib::stdlib::Stdlib::Flatten => {
+                reflex_wasm::stdlib::Stdlib::Flatten(reflex_wasm::stdlib::Flatten)
+            }
+            reflex_stdlib::stdlib::Stdlib::Floor => {
+                reflex_wasm::stdlib::Stdlib::Floor(reflex_wasm::stdlib::Floor)
+            }
+            reflex_stdlib::stdlib::Stdlib::Get => {
+                reflex_wasm::stdlib::Stdlib::Get(reflex_wasm::stdlib::Get)
+            }
+            reflex_stdlib::stdlib::Stdlib::Gt => {
+                reflex_wasm::stdlib::Stdlib::Gt(reflex_wasm::stdlib::Gt)
+            }
+            reflex_stdlib::stdlib::Stdlib::Gte => {
+                reflex_wasm::stdlib::Stdlib::Gte(reflex_wasm::stdlib::Gte)
+            }
+            reflex_stdlib::stdlib::Stdlib::Hash => {
+                reflex_wasm::stdlib::Stdlib::Hash(reflex_wasm::stdlib::Hash)
+            }
+            reflex_stdlib::stdlib::Stdlib::If => {
+                reflex_wasm::stdlib::Stdlib::If(reflex_wasm::stdlib::If)
+            }
+            reflex_stdlib::stdlib::Stdlib::IfError => {
+                reflex_wasm::stdlib::Stdlib::IfError(reflex_wasm::stdlib::IfError)
+            }
+            reflex_stdlib::stdlib::Stdlib::IfPending => {
+                reflex_wasm::stdlib::Stdlib::IfPending(reflex_wasm::stdlib::IfPending)
+            }
+            reflex_stdlib::stdlib::Stdlib::Insert => {
+                reflex_wasm::stdlib::Stdlib::Set(reflex_wasm::stdlib::Set)
+            }
+            reflex_stdlib::stdlib::Stdlib::Keys => {
+                reflex_wasm::stdlib::Stdlib::Keys(reflex_wasm::stdlib::Keys)
+            }
+            reflex_stdlib::stdlib::Stdlib::Length => {
+                reflex_wasm::stdlib::Stdlib::Length(reflex_wasm::stdlib::Length)
+            }
+            reflex_stdlib::stdlib::Stdlib::Lt => {
+                reflex_wasm::stdlib::Stdlib::Lt(reflex_wasm::stdlib::Lt)
+            }
+            reflex_stdlib::stdlib::Stdlib::Lte => {
+                reflex_wasm::stdlib::Stdlib::Lte(reflex_wasm::stdlib::Lte)
+            }
+            reflex_stdlib::stdlib::Stdlib::Map => {
+                reflex_wasm::stdlib::Stdlib::Map(reflex_wasm::stdlib::Map)
+            }
+            reflex_stdlib::stdlib::Stdlib::Max => {
+                reflex_wasm::stdlib::Stdlib::Max(reflex_wasm::stdlib::Max)
+            }
+            reflex_stdlib::stdlib::Stdlib::Merge => {
+                reflex_wasm::stdlib::Stdlib::Merge(reflex_wasm::stdlib::Merge)
+            }
+            reflex_stdlib::stdlib::Stdlib::Min => {
+                reflex_wasm::stdlib::Stdlib::Min(reflex_wasm::stdlib::Min)
+            }
+            reflex_stdlib::stdlib::Stdlib::Multiply => {
+                reflex_wasm::stdlib::Stdlib::Multiply(reflex_wasm::stdlib::Multiply)
+            }
+            reflex_stdlib::stdlib::Stdlib::Not => {
+                reflex_wasm::stdlib::Stdlib::Not(reflex_wasm::stdlib::Not)
+            }
+            reflex_stdlib::stdlib::Stdlib::Or => {
+                reflex_wasm::stdlib::Stdlib::Or(reflex_wasm::stdlib::Or)
+            }
+            reflex_stdlib::stdlib::Stdlib::Pow => {
+                reflex_wasm::stdlib::Stdlib::Pow(reflex_wasm::stdlib::Pow)
+            }
+            reflex_stdlib::stdlib::Stdlib::Push => {
+                reflex_wasm::stdlib::Stdlib::Push(reflex_wasm::stdlib::Push)
+            }
+            reflex_stdlib::stdlib::Stdlib::PushFront => {
+                reflex_wasm::stdlib::Stdlib::PushFront(reflex_wasm::stdlib::PushFront)
+            }
+            reflex_stdlib::stdlib::Stdlib::Raise => {
+                reflex_wasm::stdlib::Stdlib::Raise(reflex_wasm::stdlib::Raise)
+            }
+            reflex_stdlib::stdlib::Stdlib::Reduce => {
+                reflex_wasm::stdlib::Stdlib::Fold(reflex_wasm::stdlib::Fold)
+            }
+            reflex_stdlib::stdlib::Stdlib::Remainder => {
+                reflex_wasm::stdlib::Stdlib::Remainder(reflex_wasm::stdlib::Remainder)
+            }
+            reflex_stdlib::stdlib::Stdlib::Replace => {
+                reflex_wasm::stdlib::Stdlib::Replace(reflex_wasm::stdlib::Replace)
+            }
+            reflex_stdlib::stdlib::Stdlib::ResolveArgs => {
+                reflex_wasm::stdlib::Stdlib::ResolveArgs(reflex_wasm::stdlib::ResolveArgs)
+            }
+            reflex_stdlib::stdlib::Stdlib::ResolveDeep => {
+                reflex_wasm::stdlib::Stdlib::ResolveDeep(reflex_wasm::stdlib::ResolveDeep)
+            }
+            reflex_stdlib::stdlib::Stdlib::ResolveHashMap => {
+                reflex_wasm::stdlib::Stdlib::ResolveHashmap(reflex_wasm::stdlib::ResolveHashmap)
+            }
+            reflex_stdlib::stdlib::Stdlib::ResolveHashSet => {
+                reflex_wasm::stdlib::Stdlib::ResolveHashset(reflex_wasm::stdlib::ResolveHashset)
+            }
+            reflex_stdlib::stdlib::Stdlib::ResolveShallow => {
+                reflex_wasm::stdlib::Stdlib::ResolveShallow(reflex_wasm::stdlib::ResolveShallow)
+            }
+            reflex_stdlib::stdlib::Stdlib::ResolveRecord => {
+                reflex_wasm::stdlib::Stdlib::ResolveRecord(reflex_wasm::stdlib::ResolveRecord)
+            }
+            reflex_stdlib::stdlib::Stdlib::ResolveList => {
+                reflex_wasm::stdlib::Stdlib::ResolveList(reflex_wasm::stdlib::ResolveList)
+            }
+            reflex_stdlib::stdlib::Stdlib::Round => {
+                reflex_wasm::stdlib::Stdlib::Round(reflex_wasm::stdlib::Round)
+            }
+            reflex_stdlib::stdlib::Stdlib::Sequence => {
+                reflex_wasm::stdlib::Stdlib::Sequence(reflex_wasm::stdlib::Sequence)
+            }
+            reflex_stdlib::stdlib::Stdlib::Slice => {
+                reflex_wasm::stdlib::Stdlib::Slice(reflex_wasm::stdlib::Slice)
+            }
+            reflex_stdlib::stdlib::Stdlib::Split => {
+                reflex_wasm::stdlib::Stdlib::Split(reflex_wasm::stdlib::Split)
+            }
+            reflex_stdlib::stdlib::Stdlib::StartsWith => {
+                reflex_wasm::stdlib::Stdlib::StartsWith(reflex_wasm::stdlib::StartsWith)
+            }
+            reflex_stdlib::stdlib::Stdlib::Subtract => {
+                reflex_wasm::stdlib::Stdlib::Subtract(reflex_wasm::stdlib::Subtract)
+            }
+            reflex_stdlib::stdlib::Stdlib::Unzip => {
+                reflex_wasm::stdlib::Stdlib::Unzip(reflex_wasm::stdlib::Unzip)
+            }
+            reflex_stdlib::stdlib::Stdlib::Values => {
+                reflex_wasm::stdlib::Stdlib::Values(reflex_wasm::stdlib::Values)
+            }
+            reflex_stdlib::stdlib::Stdlib::Zip => {
+                reflex_wasm::stdlib::Stdlib::Zip(reflex_wasm::stdlib::Zip)
+            }
+        }
+    }
+}
+
+impl From<reflex_json::stdlib::Stdlib> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_json::stdlib::Stdlib) -> Self {
+        match value {
+            reflex_json::stdlib::Stdlib::JsonDeserialize => {
+                reflex_wasm::stdlib::Stdlib::ParseJson(reflex_wasm::stdlib::ParseJson)
+            }
+            reflex_json::stdlib::Stdlib::JsonSerialize => {
+                reflex_wasm::stdlib::Stdlib::StringifyJson(reflex_wasm::stdlib::StringifyJson)
+            }
+        }
+    }
+}
+
+impl From<reflex_js::stdlib::Stdlib> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_js::stdlib::Stdlib) -> Self {
+        match value {
+            reflex_js::stdlib::Stdlib::Accessor => {
+                reflex_wasm::stdlib::Stdlib::Accessor(reflex_wasm::stdlib::Accessor)
+            }
+            reflex_js::stdlib::Stdlib::Construct => {
+                reflex_wasm::stdlib::Stdlib::Construct(reflex_wasm::stdlib::Construct)
+            }
+            reflex_js::stdlib::Stdlib::DateConstructor => {
+                reflex_wasm::stdlib::Stdlib::ParseDate(reflex_wasm::stdlib::ParseDate)
+            }
+            reflex_js::stdlib::Stdlib::EncodeUriComponent => {
+                reflex_wasm::stdlib::Stdlib::Urlencode(reflex_wasm::stdlib::Urlencode)
+            }
+            reflex_js::stdlib::Stdlib::FormatErrorMessage => {
+                reflex_wasm::stdlib::Stdlib::FormatErrorMessage(
+                    reflex_wasm::stdlib::FormatErrorMessage,
+                )
+            }
+            reflex_js::stdlib::Stdlib::IsFinite => {
+                reflex_wasm::stdlib::Stdlib::IsFinite(reflex_wasm::stdlib::IsFinite)
+            }
+            reflex_js::stdlib::Stdlib::Log => {
+                reflex_wasm::stdlib::Stdlib::Log(reflex_wasm::stdlib::Log)
+            }
+            reflex_js::stdlib::Stdlib::LogArgs => {
+                reflex_wasm::stdlib::Stdlib::Log(reflex_wasm::stdlib::Log)
+            }
+            reflex_js::stdlib::Stdlib::ParseFloat => {
+                reflex_wasm::stdlib::Stdlib::ParseFloat(reflex_wasm::stdlib::ParseFloat)
+            }
+            reflex_js::stdlib::Stdlib::ParseInt => {
+                reflex_wasm::stdlib::Stdlib::ParseInt(reflex_wasm::stdlib::ParseInt)
+            }
+            reflex_js::stdlib::Stdlib::Throw => {
+                reflex_wasm::stdlib::Stdlib::Throw(reflex_wasm::stdlib::Throw)
+            }
+            reflex_js::stdlib::Stdlib::ToString => {
+                reflex_wasm::stdlib::Stdlib::ToString(reflex_wasm::stdlib::ToString)
+            }
+        }
+    }
+}
+
+impl From<reflex_graphql::stdlib::Stdlib> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_graphql::stdlib::Stdlib) -> Self {
+        match value {
+            reflex_graphql::stdlib::Stdlib::CollectQueryListItems => {
+                reflex_wasm::stdlib::Stdlib::CollectList(reflex_wasm::stdlib::CollectList)
+            }
+            reflex_graphql::stdlib::Stdlib::DynamicQueryBranch => {
+                reflex_wasm::stdlib::Stdlib::ResolveQueryBranch(
+                    reflex_wasm::stdlib::ResolveQueryBranch,
+                )
+            }
+            reflex_graphql::stdlib::Stdlib::FlattenDeep => {
+                reflex_wasm::stdlib::Stdlib::ResolveQueryLeaf(reflex_wasm::stdlib::ResolveQueryLeaf)
+            }
+            reflex_graphql::stdlib::Stdlib::GraphQlResolver => {
+                reflex_wasm::stdlib::Stdlib::GraphQlResolver(reflex_wasm::stdlib::GraphQlResolver)
+            }
+        }
+    }
+}
+
+impl From<reflex_handlers::stdlib::Stdlib> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_handlers::stdlib::Stdlib) -> Self {
+        match value {
+            reflex_handlers::stdlib::Stdlib::Scan => {
+                reflex_wasm::stdlib::Stdlib::Scan(reflex_wasm::stdlib::Scan)
+            }
+            reflex_handlers::stdlib::Stdlib::ToRequest => {
+                reflex_wasm::stdlib::Stdlib::ToRequest(reflex_wasm::stdlib::ToRequest)
+            }
+            reflex_handlers::stdlib::Stdlib::GetVariable => {
+                reflex_wasm::stdlib::Stdlib::GetVariable(reflex_wasm::stdlib::GetVariable)
+            }
+            reflex_handlers::stdlib::Stdlib::SetVariable => {
+                reflex_wasm::stdlib::Stdlib::SetVariable(reflex_wasm::stdlib::SetVariable)
+            }
+            reflex_handlers::stdlib::Stdlib::IncrementVariable => {
+                reflex_wasm::stdlib::Stdlib::IncrementVariable(
+                    reflex_wasm::stdlib::IncrementVariable,
+                )
+            }
+            reflex_handlers::stdlib::Stdlib::DecrementVariable => {
+                reflex_wasm::stdlib::Stdlib::DecrementVariable(
+                    reflex_wasm::stdlib::DecrementVariable,
+                )
+            }
         }
     }
 }
