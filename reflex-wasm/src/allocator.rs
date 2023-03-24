@@ -52,7 +52,12 @@ impl VecAllocator {
         Self(data)
     }
     pub(crate) fn get_ref<T>(&self, offset: ArenaPointer) -> &T {
-        if (u32::from(offset) % 4 != 0) || offset >= self.end_offset() {
+        let is_zero_sized_value = std::mem::size_of::<T>() == 0;
+        let is_invalid_offset = match is_zero_sized_value {
+            true => offset > self.end_offset(),
+            false => offset >= self.end_offset(),
+        };
+        if (u32::from(offset) % 4 != 0) || is_invalid_offset {
             panic!(
                 "Invalid allocator offset: {} (length: {})",
                 u32::from(offset),
@@ -60,12 +65,17 @@ impl VecAllocator {
             );
         }
         let Self(data) = self;
-        let offset = (u32::from(offset) / 4) as usize;
-        let item = &data[offset];
-        unsafe { std::mem::transmute::<&u32, &T>(item) }
+        let words = data.as_slice();
+        let index = (u32::from(offset) / 4) as usize;
+        unsafe { std::mem::transmute::<&u32, &T>(words.get_unchecked(index)) }
     }
     pub(crate) fn get_mut<T>(&mut self, offset: ArenaPointer) -> &mut T {
-        if (u32::from(offset) % 4 != 0) || (offset >= self.end_offset()) {
+        let is_zero_sized_value = std::mem::size_of::<T>() == 0;
+        let is_invalid_offset = match is_zero_sized_value {
+            true => offset > self.end_offset(),
+            false => offset >= self.end_offset(),
+        };
+        if (u32::from(offset) % 4 != 0) || is_invalid_offset {
             panic!(
                 "Invalid allocator offset: {} (length: {})",
                 u32::from(offset),
@@ -73,9 +83,9 @@ impl VecAllocator {
             );
         }
         let Self(data) = self;
+        let words = data.as_mut_slice();
         let index = (u32::from(offset) / 4) as usize;
-        let item = &mut data[index];
-        unsafe { std::mem::transmute::<&mut u32, &mut T>(item) }
+        unsafe { std::mem::transmute::<&mut u32, &mut T>(words.get_unchecked_mut(index)) }
     }
     pub fn into_inner(self) -> Vec<u32> {
         let Self(data) = self;
