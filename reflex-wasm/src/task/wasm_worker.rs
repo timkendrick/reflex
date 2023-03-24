@@ -3,11 +3,12 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 use crate::{
     allocator::{Arena, ArenaAllocator},
+    cli::compile::WasmProgram,
     factory::WasmTermFactory,
     interpreter::{InterpreterError, UnboundEvaluationResult, WasmInterpreter},
     term_type::{
-        ApplicationTerm, HashmapTerm, IntTerm, ListTerm, TermType, TreeTerm, TypedTerm,
-        WasmExpression,
+        symbol::SymbolTerm, ApplicationTerm, HashmapTerm, IntTerm, ListTerm, TermType, TreeTerm,
+        TypedTerm, WasmExpression,
     },
     utils::{from_twos_complement_i64, into_twos_complement_i64},
     ArenaPointer, ArenaRef, Term,
@@ -24,13 +25,14 @@ use reflex_dispatcher::{
     Action, ActorEvents, HandlerContext, MessageData, MessageOffset, NoopDisposeCallback,
     ProcessId, SchedulerCommand, SchedulerMode, SchedulerTransition, TaskFactory, TaskInbox,
 };
-use reflex_macros::{dispatcher, Named};
+use reflex_macros::{blanket_trait, dispatcher, Named};
 use reflex_runtime::{
     action::bytecode_interpreter::{
         BytecodeInterpreterEvaluateAction, BytecodeInterpreterGcAction,
         BytecodeInterpreterInitAction, BytecodeInterpreterResultAction,
     },
     action::bytecode_interpreter::{BytecodeInterpreterGcCompleteAction, BytecodeWorkerStatistics},
+    task::bytecode_worker::BytecodeWorkerAction,
     AsyncExpression, AsyncExpressionFactory, AsyncHeapAllocator, QueryEvaluationMode,
 };
 use serde::{Deserialize, Serialize};
@@ -39,14 +41,16 @@ use std::{
     ops::Deref, rc::Rc, sync::Arc, time::Instant,
 };
 
-use crate::actor::wasm_interpreter::WasmProgram;
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct WasmWorkerMetricNames {
     pub query_worker_compile_duration: Cow<'static, str>,
     pub query_worker_evaluate_duration: Cow<'static, str>,
     pub query_worker_gc_duration: Cow<'static, str>,
 }
+
+blanket_trait!(
+    pub trait WasmWorkerTaskAction<T: Expression>: BytecodeWorkerAction<T> {}
+);
 
 pub trait WasmWorkerTask<T, TFactory, TAllocator>:
     From<WasmWorkerTaskFactory<T, TFactory, TAllocator>>
@@ -75,7 +79,7 @@ pub struct WasmWorkerTaskFactory<
     pub query: T,
     pub graph_root_factory_export_name: String,
     pub evaluation_mode: QueryEvaluationMode,
-    pub graph_root: Arc<WasmProgram>,
+    pub wasm_module: Arc<WasmProgram>,
     pub metric_names: WasmWorkerMetricNames,
     pub caller_pid: ProcessId,
     pub _expression: PhantomData<T>,
@@ -89,6 +93,7 @@ where
     T: AsyncExpression,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
+    T::Builtin: Into<crate::stdlib::Stdlib>,
     TAction: Action + WasmWorkerAction<T> + Send + 'static,
     TTask: TaskFactory<TAction, TTask>,
 {
@@ -99,7 +104,7 @@ where
             query,
             graph_root_factory_export_name,
             evaluation_mode,
-            graph_root,
+            wasm_module,
             metric_names,
             caller_pid,
             _expression,
@@ -113,7 +118,7 @@ where
             query,
             graph_root_factory_export_name,
             evaluation_mode,
-            program: graph_root,
+            wasm_module,
             factory,
             allocator,
             metric_names,
@@ -133,7 +138,7 @@ where
     query: T,
     graph_root_factory_export_name: String,
     evaluation_mode: QueryEvaluationMode,
-    program: Arc<WasmProgram>,
+    wasm_module: Arc<WasmProgram>,
     factory: TFactory,
     allocator: TAllocator,
     metric_names: WasmWorkerMetricNames,
@@ -190,6 +195,7 @@ dispatcher!({
         T: Expression,
         TFactory: ExpressionFactory<T>,
         TAllocator: HeapAllocator<T>,
+        T::Builtin: Into<crate::stdlib::Stdlib>,
         TAction: Action,
         TTask: TaskFactory<TAction, TTask>,
     {
@@ -295,6 +301,7 @@ where
     T: Expression,
     TFactory: ExpressionFactory<T>,
     TAllocator: HeapAllocator<T>,
+    T::Builtin: Into<crate::stdlib::Stdlib>,
 {
     fn handle_bytecode_interpreter_init<TAction, TTask>(
         &self,
@@ -314,18 +321,17 @@ where
             WasmWorkerState::Uninitialized => {
                 *state = match {
                     let compiler_start_time = Instant::now();
-                    self.program
-                        .instantiate("memory")
+                    WasmInterpreter::instantiate(&self.wasm_module, "memory")
                         .map_err(WasmWorkerError::InterpreterError)
                         .and_then(|mut instance| {
-                            let graph_root = instance
+                            let graph_root_factory = instance
                                 .call::<(), u32>(&self.graph_root_factory_export_name, ())
                                 .map_err(WasmWorkerError::InterpreterError)?;
                             let mut wasm_factory =
                                 WasmTermFactory::from(Rc::new(RefCell::new(&mut instance)));
                             let query = match self.evaluation_mode {
                                 QueryEvaluationMode::Query => compile_graphql_query(
-                                    ArenaPointer::from(graph_root),
+                                    ArenaPointer::from(graph_root_factory),
                                     &self.query,
                                     &self.factory,
                                     &mut wasm_factory,
@@ -423,13 +429,17 @@ where
                 match state_update_status {
                     Err(err) => Err(MaybeOwned::Owned(err)),
                     Ok(_) => {
-                        let runtime_state = HashmapTerm::allocate(
-                            state
-                                .state_values
-                                .values()
-                                .map(|(key, value)| (*key, *value)),
-                            &mut state.instance,
-                        );
+                        let runtime_state = if state.state_values.is_empty() {
+                            ArenaPointer::null()
+                        } else {
+                            HashmapTerm::allocate(
+                                state
+                                    .state_values
+                                    .values()
+                                    .map(|(key, value)| (*key, *value)),
+                                &mut state.instance,
+                            )
+                        };
                         let start_time = Instant::now();
                         let result = state.instance.interpret(state.entry_point, runtime_state);
                         let elapsed_time = start_time.elapsed();
@@ -627,28 +637,57 @@ fn create_error_expression<T: Expression>(
 }
 
 fn compile_graphql_query<'heap, T: Expression>(
-    graph_root: ArenaPointer,
+    graph_root_factory: ArenaPointer,
     query: &T,
     factory: &impl ExpressionFactory<T>,
     arena: &mut WasmTermFactory<&'heap mut WasmInterpreter>,
-) -> Result<ArenaPointer, T> {
-    let compiled_query_pointer = compile_wasm_expression(query, factory, arena)?;
-    let term = Term::new(
-        TermType::Application(ApplicationTerm {
-            target: compiled_query_pointer,
-            args: ListTerm::allocate([graph_root], arena),
-            cache: Default::default(),
-        }),
-        &*arena,
-    );
-    Ok(arena.allocate(term))
+) -> Result<ArenaPointer, T>
+where
+    T::Builtin: Into<crate::stdlib::Stdlib>,
+{
+    let compiled_query_function = compile_wasm_expression(query, factory, arena)?;
+    let graph_root = {
+        // Graph root factory evaluates to a 1-argument function that takes the query token as an argument
+        let query_token = arena.allocate(Term::new(
+            TermType::Symbol(SymbolTerm {
+                id: (query.id() & 0x00000000FFFFFFFF) as u32,
+            }),
+            arena,
+        ));
+        let factory_args = ListTerm::allocate([query_token], arena);
+        let factory_call = arena.allocate(Term::new(
+            TermType::Application(ApplicationTerm {
+                target: graph_root_factory,
+                args: factory_args,
+                cache: Default::default(),
+            }),
+            arena,
+        ));
+        factory_call
+    };
+    let query = {
+        // Create an expression that applies the query function to the graph root
+        let query_term = Term::new(
+            TermType::Application(ApplicationTerm {
+                target: compiled_query_function,
+                args: ListTerm::allocate([graph_root], arena),
+                cache: Default::default(),
+            }),
+            &*arena,
+        );
+        arena.allocate(query_term)
+    };
+    Ok(query)
 }
 
 fn compile_wasm_expression<'heap, T: Expression>(
     expression: &T,
     factory: &impl ExpressionFactory<T>,
     wasm_factory: &mut WasmTermFactory<&'heap mut WasmInterpreter>,
-) -> Result<ArenaPointer, T> {
+) -> Result<ArenaPointer, T>
+where
+    T::Builtin: Into<crate::stdlib::Stdlib>,
+{
     import_wasm_expression(expression, factory, wasm_factory)
 }
 
@@ -656,7 +695,10 @@ fn import_wasm_expression<'heap, T: Expression>(
     expression: &T,
     factory: &impl ExpressionFactory<T>,
     wasm_factory: &mut WasmTermFactory<&'heap mut WasmInterpreter>,
-) -> Result<ArenaPointer, T> {
+) -> Result<ArenaPointer, T>
+where
+    T::Builtin: Into<crate::stdlib::Stdlib>,
+{
     let term = wasm_factory.import(expression, factory)?;
     Ok(term.as_pointer())
 }

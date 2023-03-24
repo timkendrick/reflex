@@ -21,6 +21,19 @@ pub enum ServerBuiltins {
     GraphQl(reflex_graphql::stdlib::Stdlib),
     Handlers(reflex_handlers::stdlib::Stdlib),
 }
+
+impl From<ServerBuiltins> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: ServerBuiltins) -> Self {
+        match value {
+            ServerBuiltins::Stdlib(inner) => inner.into(),
+            ServerBuiltins::Json(inner) => inner.into(),
+            ServerBuiltins::Js(inner) => inner.into(),
+            ServerBuiltins::GraphQl(inner) => inner.into(),
+            ServerBuiltins::Handlers(inner) => inner.into(),
+        }
+    }
+}
+
 impl From<reflex_stdlib::stdlib::Stdlib> for ServerBuiltins {
     fn from(target: reflex_stdlib::stdlib::Stdlib) -> Self {
         Self::Stdlib(target)

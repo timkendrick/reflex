@@ -1,19 +1,45 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-// SPDX-FileContributor: Chris Campbell <c.campbell@mwam.com> https://github.com/c-campbell-mwam
-use std::{convert::Infallible, future, iter::empty, net::SocketAddr, path::PathBuf, sync::Arc};
+use std::{
+    cell::RefCell,
+    convert::Infallible,
+    future,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    path::PathBuf,
+    rc::Rc,
+    str::FromStr,
+    sync::Arc,
+};
 
 use hyper::{server::conn::AddrStream, service::make_service_fn, Server};
-use reflex::core::{
-    Applicable, Expression, ExpressionFactory, HeapAllocator, InstructionPointer, Reducible,
-    Rewritable,
+use reflex::{
+    cache::SubstitutionCache,
+    core::{Expression, ExpressionFactory, HeapAllocator, Rewritable},
 };
 use reflex_dispatcher::HandlerContext;
+use reflex_graphql::{
+    imports::{graphql_imports, GraphQlImportsBuiltin},
+    NoopGraphQlQueryTransform,
+};
 use reflex_grpc::DefaultGrpcConfig;
-use reflex_handlers::{actor::HandlerActor, utils::tls::create_https_client};
-use reflex_parser::{create_parser, DefaultModuleLoader, ParserBuiltin, Syntax, SyntaxParser};
+use reflex_handlers::actor::graphql::{GraphQlHandler, GraphQlHandlerMetricNames};
+use reflex_handlers::{
+    actor::HandlerActor,
+    imports::HandlerImportsBuiltin,
+    utils::tls::{create_https_client, hyper_rustls},
+};
+use reflex_js::{
+    create_js_env, create_module_loader, globals::JsGlobalsBuiltin, imports::JsImportsBuiltin,
+    parse_module, JsParserBuiltin,
+};
+use reflex_lang::{allocator::DefaultAllocator, CachedSharedTerm, SharedTermFactory};
+use reflex_parser::syntax::js::default_js_loaders;
 use reflex_scheduler::threadpool::TokioRuntimeThreadPoolFactory;
+use reflex_server::{
+    action::ServerCliAction, builtins::ServerBuiltins, graphql_service, logger::NoopLogger,
+    GraphQlWebServer, GraphQlWebServerMetricNames,
+};
 use reflex_server::{
     cli::{
         execute_query::GraphQlWebServerMetricLabels,
@@ -25,33 +51,53 @@ use reflex_server::{
     },
     GraphQlWebServerActorFactory,
 };
+use reflex_utils::reconnect::NoopReconnectTimeout;
+use reflex_wasm::cli::compile::WasmProgram;
+use reflex_wasm::{
+    allocator::VecAllocator,
+    cli::compile::{compile_module, EntryPointType, WasmCompilerMode},
+    factory::WasmTermFactory,
+};
 use tokio::sync::oneshot;
 
-use reflex_graphql::NoopGraphQlQueryTransform;
-use reflex_handlers::{
-    actor::graphql::{GraphQlHandler, GraphQlHandlerMetricNames},
-    utils::tls::hyper_rustls,
-};
-use reflex_interpreter::{
-    compiler::{compile_graph_root, Compile, CompiledProgram, CompilerMode, CompilerOptions},
-    InterpreterOptions,
-};
-use reflex_lang::{allocator::DefaultAllocator, CachedSharedTerm, SharedTermFactory};
-use reflex_server::{
-    action::ServerCliAction, builtins::ServerBuiltins, graphql_service, logger::NoopLogger,
-    GraphQlWebServer, GraphQlWebServerMetricNames,
-};
-use reflex_utils::reconnect::NoopReconnectTimeout;
+const RUNTIME_BYTES: &[u8] = include_bytes!("../../reflex-wasm/build/runtime.wasm");
 
-pub fn serve_graphql(input: &str) -> (SocketAddr, oneshot::Sender<()>) {
+#[derive(Debug)]
+pub enum WasmTestError<T: Expression> {
+    Parser(reflex_js::parser::ParserError),
+    TranspileError(T),
+    Compiler(reflex_wasm::cli::compile::WasmCompilerError),
+    Server(String),
+}
+
+impl<T: Expression> std::error::Error for WasmTestError<T> {}
+
+impl<T: Expression> std::fmt::Display for WasmTestError<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Parser(err) => write!(f, "Failed to parse graph definition: {err}"),
+            Self::TranspileError(value) => write!(f, "Failed to translate graph node: {value}"),
+            Self::Compiler(err) => write!(f, "Failed to compile graph definition: {err}"),
+            Self::Server(err) => write!(f, "Failed to launch GraphQL server: {err}"),
+        }
+    }
+}
+
+pub fn serve_graphql(
+    graph_definition: &str,
+) -> Result<(SocketAddr, oneshot::Sender<()>), WasmTestError<CachedSharedTerm<ServerBuiltins>>> {
     let factory = SharedTermFactory::<ServerBuiltins>::default();
     let allocator = DefaultAllocator::default();
     let https_client = create_https_client(None).unwrap();
-    let compiler_options = CompilerOptions::default();
-    let interpreter_options = InterpreterOptions::default();
-    let graph_root = {
-        compile_graphql_module(input, empty(), &factory, &allocator, &compiler_options).unwrap()
-    };
+    let entry_point_export_name = "__graphql_root__";
+    let wasm_module = compile_graphql_module(
+        entry_point_export_name,
+        EntryPointType::Factory,
+        graph_definition,
+        &factory,
+        &allocator,
+        WasmCompilerMode::Wasm,
+    )?;
 
     type TBuiltin = ServerBuiltins;
     type T = CachedSharedTerm<TBuiltin>;
@@ -87,7 +133,8 @@ pub fn serve_graphql(input: &str) -> (SocketAddr, oneshot::Sender<()>) {
     let async_tasks = TokioRuntimeThreadPoolFactory::new(tokio::runtime::Handle::current());
     let blocking_tasks = TokioRuntimeThreadPoolFactory::new(tokio::runtime::Handle::current());
     let app = GraphQlWebServer::<TAction, TTask>::new(
-        graph_root,
+        wasm_module,
+        entry_point_export_name,
         None,
         {
             let factory = factory.clone();
@@ -106,8 +153,6 @@ pub fn serve_graphql(input: &str) -> (SocketAddr, oneshot::Sender<()>) {
                 )]
             })
         },
-        compiler_options,
-        interpreter_options,
         factory,
         allocator,
         NoopGraphQlQueryTransform,
@@ -125,8 +170,7 @@ pub fn serve_graphql(input: &str) -> (SocketAddr, oneshot::Sender<()>) {
         blocking_tasks,
         None,
     )
-    .unwrap();
-    let socket_addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+    .map_err(WasmTestError::Server)?;
     let service = make_service_fn({
         let main_pid = app.main_pid();
         let app = Arc::new(app);
@@ -137,6 +181,7 @@ pub fn serve_graphql(input: &str) -> (SocketAddr, oneshot::Sender<()>) {
             future::ready(Ok::<_, Infallible>(service))
         }
     });
+    let socket_addr = SocketAddr::new(IpAddr::from(Ipv4Addr::LOCALHOST), 0);
     let server = Server::bind(&socket_addr).serve(service);
     let (tx, rx) = oneshot::channel();
     let addr = server.local_addr().clone();
@@ -145,35 +190,64 @@ pub fn serve_graphql(input: &str) -> (SocketAddr, oneshot::Sender<()>) {
             .with_graceful_shutdown(async { rx.await.ok().unwrap() })
             .await
     });
-    (addr, tx)
+    Ok((addr, tx))
 }
 
 fn compile_graphql_module<T: Expression + 'static>(
+    export_name: &str,
+    export_type: EntryPointType,
     graph_definition: &str,
-    env_vars: impl IntoIterator<Item = (String, String)>,
     factory: &(impl ExpressionFactory<T> + Clone + 'static),
     allocator: &(impl HeapAllocator<T> + Clone + 'static),
-    compiler_options: &CompilerOptions,
-) -> Result<(CompiledProgram, InstructionPointer), String>
+    compiler_mode: WasmCompilerMode,
+) -> Result<WasmProgram, WasmTestError<T>>
 where
-    // TODO: Remove unnecessary trait bounds
-    T: Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
-    T::Builtin: ParserBuiltin,
+    T: Rewritable<T>,
+    T::Builtin: JsParserBuiltin
+        + JsGlobalsBuiltin
+        + JsImportsBuiltin
+        + HandlerImportsBuiltin
+        + GraphQlImportsBuiltin
+        + Into<reflex_wasm::stdlib::Stdlib>,
 {
-    let parser = create_parser(
-        Syntax::JavaScript,
-        Some(PathBuf::from("./index.js").as_path()),
-        Option::<DefaultModuleLoader<T>>::None,
-        env_vars,
+    let module_loader = Some(default_js_loaders(
+        graphql_imports(factory, allocator),
         factory,
         allocator,
-    );
-    let expression = parser.parse(graph_definition)?;
-    compile_graph_root(
-        &expression,
+    ));
+    let js_env = create_js_env(factory, allocator);
+    let module_loader = create_module_loader(js_env.clone(), module_loader, factory, allocator);
+    let graph_root = parse_module(
+        graph_definition,
+        &js_env,
+        &PathBuf::from_str("<script>").unwrap(),
+        &module_loader,
         factory,
         allocator,
-        compiler_options,
-        CompilerMode::Function,
     )
+    .map_err(WasmTestError::Parser)?;
+
+    // Abstract any free variables from any internal lambda functions within the expression
+    let graph_root = graph_root
+        .hoist_free_variables(factory, allocator)
+        .unwrap_or(graph_root);
+
+    // Partially-evaluate any pure expressions within the expression
+    let graph_root = graph_root
+        .normalize(factory, allocator, &mut SubstitutionCache::new())
+        .unwrap_or(graph_root);
+
+    let mut arena = VecAllocator::default();
+    let arena = Rc::new(RefCell::new(&mut arena));
+    let entry_point = WasmTermFactory::from(Rc::clone(&arena))
+        .import(&graph_root, factory)
+        .map_err(WasmTestError::TranspileError)?;
+    let wasm_module = compile_module(
+        [(String::from(export_name), export_type, entry_point)],
+        RUNTIME_BYTES,
+        compiler_mode,
+        true,
+    )
+    .map_err(WasmTestError::Compiler)?;
+    Ok(wasm_module)
 }

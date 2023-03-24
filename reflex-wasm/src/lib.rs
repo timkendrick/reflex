@@ -29,6 +29,9 @@ pub mod task;
 pub mod term_type;
 pub mod utils;
 
+// Memory is allocated in 64KiB pages according to WASM spec
+pub const WASM_PAGE_SIZE: usize = 64 * 1024;
+
 pub struct ArenaRef<T, A: Arena> {
     arena: A,
     pointer: ArenaPointer,

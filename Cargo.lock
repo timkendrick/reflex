@@ -2396,7 +2396,6 @@ dependencies = [
  "criterion",
  "reflex",
  "reflex-interpreter",
- "reflex-js",
  "reflex-lang",
  "reflex-lisp",
  "reflex-stdlib",
@@ -2454,8 +2453,8 @@ dependencies = [
  "reflex-stdlib",
  "reflex-utils",
  "serde",
- "strum",
- "strum_macros",
+ "strum 0.22.0",
+ "strum_macros 0.22.0",
 ]
 
 [[package]]
@@ -2506,8 +2505,8 @@ dependencies = [
  "rustls 0.21.2",
  "rustls-pemfile",
  "serde",
- "strum",
- "strum_macros",
+ "strum 0.22.0",
+ "strum_macros 0.22.0",
  "tokio",
  "tokio-tungstenite",
  "uuid",
@@ -2538,8 +2537,8 @@ dependencies = [
  "reflex-stdlib",
  "serde",
  "serde_json",
- "strum",
- "strum_macros",
+ "strum 0.22.0",
+ "strum_macros 0.22.0",
  "swc_common",
  "swc_ecma_ast",
  "swc_ecma_parser",
@@ -2555,8 +2554,8 @@ dependencies = [
  "reflex-stdlib",
  "serde",
  "serde_json",
- "strum",
- "strum_macros",
+ "strum 0.22.0",
+ "strum_macros 0.22.0",
 ]
 
 [[package]]
@@ -2720,8 +2719,8 @@ version = "0.1.0"
 dependencies = [
  "reflex",
  "serde",
- "strum",
- "strum_macros",
+ "strum 0.22.0",
+ "strum_macros 0.22.0",
 ]
 
 [[package]]
@@ -2743,13 +2742,13 @@ dependencies = [
  "reflex-graphql",
  "reflex-grpc",
  "reflex-handlers",
- "reflex-interpreter",
  "reflex-js",
  "reflex-lang",
  "reflex-parser",
  "reflex-scheduler",
  "reflex-server",
  "reflex-utils",
+ "reflex-wasm",
  "serde_json",
  "tokio",
  "tokio-tungstenite",
@@ -2778,22 +2777,23 @@ dependencies = [
  "reflex",
  "reflex-dispatcher",
  "reflex-graphql",
+ "reflex-grpc",
  "reflex-handlers",
  "reflex-js",
  "reflex-json",
+ "reflex-lang",
  "reflex-macros",
+ "reflex-parser",
  "reflex-runtime",
  "reflex-stdlib",
  "reflex-utils",
  "serde",
  "serde_json",
- "strum",
- "strum_macros",
- "swc_common",
- "swc_ecma_ast",
- "swc_ecma_parser",
+ "strum 0.22.0",
+ "strum_macros 0.22.0",
  "walrus",
  "wasi-common",
+ "wasm-opt",
  "wasmtime",
  "wasmtime-wasi",
 ]
@@ -2991,6 +2991,12 @@ dependencies = [
  "ring",
  "untrusted",
 ]
+
+[[package]]
+name = "rustversion"
+version = "1.0.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc31bd9b61a32c31f9650d18add92aa83a49ba979c143eefd27fe7177b05bd5f"
 
 [[package]]
 name = "ryu"
@@ -3272,6 +3278,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f7ac893c7d471c8a21f31cfe213ec4f6d9afeed25537c772e08ef3f005f8729e"
 
 [[package]]
+name = "strum"
+version = "0.24.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "063e6045c0e62079840579a7e47a355ae92f60eb74daaf156fb1e84ba164e63f"
+
+[[package]]
 name = "strum_macros"
 version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3280,6 +3292,19 @@ dependencies = [
  "heck 0.3.3",
  "proc-macro2",
  "quote",
+ "syn",
+]
+
+[[package]]
+name = "strum_macros"
+version = "0.24.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e385be0d24f186b4ce2f9982191e7101bb737312ad61c1f2f984f34bcf85d59"
+dependencies = [
+ "heck 0.4.0",
+ "proc-macro2",
+ "quote",
+ "rustversion",
  "syn",
 ]
 
@@ -4199,6 +4224,47 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05632e0a66a6ed8cca593c24223aabd6262f256c3693ad9822c315285f010614"
 dependencies = [
  "leb128",
+]
+
+[[package]]
+name = "wasm-opt"
+version = "0.111.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "84a303793cbc01fb96551badfc7367db6007396bba6bac97936b3c8b6f7fdb41"
+dependencies = [
+ "anyhow",
+ "libc",
+ "strum 0.24.1",
+ "strum_macros 0.24.3",
+ "tempfile",
+ "thiserror",
+ "wasm-opt-cxx-sys",
+ "wasm-opt-sys",
+]
+
+[[package]]
+name = "wasm-opt-cxx-sys"
+version = "0.111.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d9c9deb56f8a9f2ec177b3bd642a8205621835944ed5da55f2388ef216aca5a4"
+dependencies = [
+ "anyhow",
+ "cxx",
+ "cxx-build",
+ "wasm-opt-sys",
+]
+
+[[package]]
+name = "wasm-opt-sys"
+version = "0.111.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4432e28b542738a9776cedf92e8a99d8991c7b4667ee2c7ccddfb479dd2856a7"
+dependencies = [
+ "anyhow",
+ "cc",
+ "cxx",
+ "cxx-build",
+ "regex",
 ]
 
 [[package]]

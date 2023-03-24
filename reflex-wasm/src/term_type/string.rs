@@ -111,7 +111,7 @@ impl<A: Arena + Clone> ArenaRef<StringTerm, A> {
         self.read_value(|term| HashId::from(term.hash(TermHasher::default(), &self.arena).finish()))
     }
     fn offset(&self) -> ArenaPointer {
-        self.inner_pointer(|term| &term.data.items[0])
+        self.inner_pointer(|term| &term.data.items)
     }
     fn as_utf8<'a>(&'a self) -> Utf8Bytes<A::Slice<'a>> {
         Utf8Bytes(self.arena.as_slice(self.offset(), self.len()))

@@ -18,8 +18,7 @@ use hyper_tungstenite::{
 };
 use opentelemetry::trace::{Span, Tracer};
 use reflex::core::{
-    Applicable, Expression, ExpressionFactory, HeapAllocator, InstructionPointer, Reducible,
-    Rewritable,
+    Applicable, Expression, ExpressionFactory, HeapAllocator, Reducible, Rewritable,
 };
 use reflex_dispatcher::{
     utils::take_until_final_item::TakeUntilFinalItem, Action, Actor, AsyncScheduler, Handler,
@@ -34,23 +33,21 @@ use reflex_graphql::{
     validate::parse_graphql_schema_types,
     GraphQlParserBuiltin, GraphQlSchema,
 };
-use reflex_interpreter::{
-    compiler::{Compile, CompiledProgram, CompilerOptions},
-    InterpreterOptions,
-};
 use reflex_json::JsonValue;
 use reflex_macros::blanket_trait;
 use reflex_runtime::{
-    actor::bytecode_interpreter::{
-        BytecodeInterpreter, BytecodeInterpreterAction, BytecodeInterpreterMetricLabels,
-        BytecodeInterpreterMetricNames,
-    },
+    actor::bytecode_interpreter::{BytecodeInterpreterAction, BytecodeInterpreterMetricLabels},
     task::RuntimeTask,
     AsyncExpression, AsyncExpressionFactory, AsyncHeapAllocator,
 };
 use reflex_scheduler::tokio::{
     TokioInbox, TokioScheduler, TokioSchedulerBuilder, TokioSchedulerInstrumentation,
     TokioSchedulerLogger, TokioThreadPoolFactory,
+};
+use reflex_wasm::{
+    actor::wasm_interpreter::{WasmInterpreter, WasmInterpreterMetricNames},
+    cli::compile::WasmProgram,
+    task::wasm_worker::WasmWorkerTask,
 };
 use uuid::Uuid;
 
@@ -111,12 +108,12 @@ blanket_trait!(
 #[derive(Default, Clone, Copy, Debug)]
 pub struct GraphQlWebServerMetricNames {
     pub server: ServerMetricNames,
-    pub interpreter: BytecodeInterpreterMetricNames,
+    pub interpreter: WasmInterpreterMetricNames,
 }
 
 blanket_trait!(
     pub trait GraphQlWebServerTask<T, TFactory, TAllocator>:
-        RuntimeTask + WebSocketGraphQlServerTask
+        RuntimeTask + WasmWorkerTask<T, TFactory, TAllocator> + WebSocketGraphQlServerTask
     where
         T: Expression,
         TFactory: ExpressionFactory<T>,
@@ -151,9 +148,9 @@ pub trait GraphQlWebServerActor<
             TOperationMetricLabels,
             TTracer,
         >,
-    > + From<BytecodeInterpreter<T, TFactory, TAllocator, TWorkerMetricLabels>>
+    > + From<WasmInterpreter<T, TFactory, TAllocator, TWorkerMetricLabels>>
     + From<Redispatcher> where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
+    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T>,
     T::String: Send,
     T::Builtin: Send,
     T::Signal: Send,
@@ -202,7 +199,7 @@ impl<
         TTracer,
     > for _Self
 where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
+    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T>,
     T::String: Send,
     T::Builtin: Send,
     T::Signal: Send,
@@ -234,7 +231,7 @@ where
                 TOperationMetricLabels,
                 TTracer,
             >,
-        > + From<BytecodeInterpreter<T, TFactory, TAllocator, TWorkerMetricLabels>>
+        > + From<WasmInterpreter<T, TFactory, TAllocator, TWorkerMetricLabels>>
         + From<Redispatcher>,
 {
 }
@@ -461,7 +458,8 @@ where
         TAsyncTasks,
         TBlockingTasks,
     >(
-        graph_root: (CompiledProgram, InstructionPointer),
+        wasm_module: WasmProgram,
+        graph_root_factory_export_name: impl Into<String>,
         schema: Option<GraphQlSchema>,
         custom_actors: GraphQlWebServerActorFactory<
             TAction,
@@ -473,8 +471,6 @@ where
             TActorFactory,
             TActors,
         >,
-        compiler_options: CompilerOptions,
-        interpreter_options: InterpreterOptions,
         factory: TFactory,
         allocator: TAllocator,
         transform_http: TTransformHttp,
@@ -493,7 +489,7 @@ where
         effect_throttle: Option<Duration>,
     ) -> Result<Self, String>
     where
-        T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
+        T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T>,
         T::String: Send,
         T::Builtin: Send,
         T::Signal: Send,
@@ -535,7 +531,11 @@ where
         TAsyncTasks: TokioThreadPoolFactory<TAction, TTask> + 'static,
         TBlockingTasks: TokioThreadPoolFactory<TAction, TTask> + 'static,
         TAction: Action + GraphQlWebServerAction<T> + Send + Sync + 'static,
-        TTask: RuntimeTask + WebSocketGraphQlServerTask + Send + 'static,
+        TTask: RuntimeTask
+            + WasmWorkerTask<T, TFactory, TAllocator>
+            + WebSocketGraphQlServerTask
+            + Send
+            + 'static,
         TTask::Actor: From<
                 ServerActor<
                     T,
@@ -549,7 +549,7 @@ where
                     TOperationMetricLabels,
                     TTracer,
                 >,
-            > + From<BytecodeInterpreter<T, TFactory, TAllocator, TWorkerMetricLabels>>
+            > + From<WasmInterpreter<T, TFactory, TAllocator, TWorkerMetricLabels>>
             + From<Redispatcher>,
         TTask::Actor: Send + Sync + 'static,
         <TTask::Actor as Actor<TAction, TTask>>::Events<TokioInbox<TAction>>: Send + 'static,
@@ -584,10 +584,9 @@ where
                 .map(TTask::Actor::from)
             }
             .chain(
-                once(BytecodeInterpreter::new(
-                    graph_root,
-                    compiler_options,
-                    interpreter_options,
+                once(WasmInterpreter::new(
+                    wasm_module,
+                    graph_root_factory_export_name,
                     factory,
                     allocator,
                     metric_names.interpreter,

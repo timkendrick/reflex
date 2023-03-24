@@ -17,15 +17,14 @@ use wasmtime_wasi::{sync::WasiCtxBuilder, WasiCtx};
 
 use crate::{
     allocator::{Arena, ArenaAllocator, ArenaIterator},
+    cli::compile::{WasmCompilerMode, WasmProgram},
     compiler::RuntimeBuiltin,
+    exports::add_wasm_runtime_imports,
     hash::TermSize,
     pad_to_4_byte_offset,
     term_type::{TreeTerm, TypedTerm},
-    ArenaPointer, ArenaRef, PointerIter, Term,
+    ArenaPointer, ArenaRef, PointerIter, Term, WASM_PAGE_SIZE,
 };
-
-// Memory is allocated in 64KiB pages according to WASM spec
-const WASM_PAGE_SIZE: usize = 64 * 1024;
 
 pub struct UnboundEvaluationResult {
     pub result_pointer: ArenaPointer,
@@ -371,11 +370,35 @@ impl WasmInterpreter {
 pub struct WasmInterpreter(WasmContext);
 
 impl WasmInterpreter {
+    pub fn instantiate(
+        module: &WasmProgram,
+        memory_name: &'static str,
+    ) -> Result<crate::interpreter::WasmInterpreter, InterpreterError> {
+        match module.compiler_mode {
+            WasmCompilerMode::Wasm => WasmContextBuilder::from_wasm(module.as_bytes(), memory_name),
+            WasmCompilerMode::Cranelift => {
+                WasmContextBuilder::from_cwasm(module.as_bytes(), memory_name)
+            }
+        }
+        .and_then(|builder| add_wasm_runtime_imports(builder, memory_name))
+        .and_then(|builder| builder.build())
+        .map(Into::into)
+    }
+
     pub fn get_global(&mut self, export_name: &str) -> Option<Val> {
         self.0.get_global(export_name)
     }
     pub fn get_globals(&mut self) -> impl Iterator<Item = (&str, Val)> {
         self.0.get_globals()
+    }
+    pub fn dump_heap(&self) -> Vec<u8> {
+        let Self(context) = self;
+        context
+            .as_slice(
+                ArenaPointer::from(0),
+                u32::from(context.end_offset()) as usize,
+            )
+            .into()
     }
 }
 

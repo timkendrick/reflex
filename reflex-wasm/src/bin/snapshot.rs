@@ -1,11 +1,11 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use std::io::Write;
+use std::{io::Write, path::PathBuf};
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use reflex_wasm::cli::snapshot::inline_heap_snapshot;
+use reflex_wasm::cli::snapshot::{capture_heap_snapshot, inline_heap_snapshot, MemorySnapshot};
 
 // Reflex WebAssembly memory snapshot tool
 #[derive(Parser, Debug)]
@@ -19,6 +19,10 @@ struct Args {
     #[arg(short, long)]
     memory_name: String,
 
+    /// Heap snapshot to inline into the WASM module (defaults to initial VM memory snapshot)
+    #[arg(short, long)]
+    snapshot: Option<PathBuf>,
+
     /// Path to output file (defaults to stdout)
     #[arg(short, long)]
     output: Option<String>,
@@ -31,13 +35,23 @@ fn main() -> Result<()> {
         input: input_path,
         memory_name,
         output: output_path,
+        snapshot,
     } = args;
 
     // Load the WASM module
     let wasm_bytes = std::fs::read(&input_path).with_context(|| "Failed to load input module")?;
 
-    // Inline the initial interpreter heap snapshot into the WASM module source
-    let output_bytes = inline_heap_snapshot(&wasm_bytes, &memory_name)?;
+    // Capture the heap snapshot if one was not provided
+    let snapshot = match snapshot {
+        Some(snapshot_path) => std::fs::read(&snapshot_path)
+            .map(MemorySnapshot::from_bytes)
+            .with_context(|| "Failed to load heap snapshot"),
+        None => capture_heap_snapshot(&wasm_bytes, &memory_name)
+            .with_context(|| "Failed to capture initial heap snapshot"),
+    }?;
+
+    // Inline the heap snapshot into the WASM module source
+    let output_bytes = inline_heap_snapshot(&wasm_bytes, &memory_name, snapshot)?;
 
     // Output .wasm file contents
     match output_path {

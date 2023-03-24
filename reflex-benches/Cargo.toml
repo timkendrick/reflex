@@ -18,7 +18,6 @@ harness = false
 [dependencies]
 reflex = { path = "../reflex"}
 reflex-interpreter = { path = "../reflex-interpreter"}
-reflex-js = { path = "../reflex-js"}
 reflex-lang = { path = "../reflex-lang"}
 reflex-lisp = { path = "../reflex-lisp"}
 reflex-stdlib = { path = "../reflex-stdlib"}

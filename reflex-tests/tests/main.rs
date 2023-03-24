@@ -21,7 +21,7 @@ async fn duplicate_subscriptions() {
         });
     "#;
 
-    let (server_addr, server_killswitch) = serve_graphql(graph_definition);
+    let (server_addr, server_killswitch) = serve_graphql(graph_definition).unwrap();
 
     let mut client1 = GraphQlConnection::new(&server_addr).await;
     let client1value1 = client1
@@ -71,7 +71,7 @@ async fn modified_subscriptions() {
         });
     "#;
 
-    let (server_addr, server_killswitch) = serve_graphql(graph_definition);
+    let (server_addr, server_killswitch) = serve_graphql(graph_definition).unwrap();
 
     let mut client1 = GraphQlConnection::new(&server_addr).await;
     let client1value1 = client1

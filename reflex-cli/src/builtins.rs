@@ -119,6 +119,18 @@ impl std::fmt::Display for CliBuiltins {
     }
 }
 
+impl From<CliBuiltins> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: CliBuiltins) -> Self {
+        match value {
+            CliBuiltins::Stdlib(inner) => inner.into(),
+            CliBuiltins::Json(inner) => inner.into(),
+            CliBuiltins::Js(inner) => inner.into(),
+            CliBuiltins::Handlers(inner) => inner.into(),
+            CliBuiltins::GraphQl(inner) => inner.into(),
+        }
+    }
+}
+
 impl From<stdlib::Abs> for CliBuiltins {
     fn from(value: stdlib::Abs) -> Self {
         Self::from(stdlib::Stdlib::from(value))

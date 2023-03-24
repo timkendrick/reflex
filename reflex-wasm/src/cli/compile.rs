@@ -1,24 +1,38 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use std::collections::HashMap;
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    env::temp_dir,
+    path::{Path, PathBuf},
+    rc::Rc,
+};
 
-use reflex::core::Eagerness;
+use reflex::{
+    cache::SubstitutionCache,
+    core::{Eagerness, Expression, ExpressionFactory, HeapAllocator, Reducible, Rewritable, Uuid},
+};
+use reflex_parser::{create_parser, ParserBuiltin, Syntax, SyntaxParser};
+use serde::{Deserialize, Serialize};
 use walrus::{
     self,
     ir::{Call, GlobalGet, Instr, LocalGet, LocalTee},
-    ActiveData, ActiveDataLocation, DataId, DataKind, ExportItem, FunctionId, GlobalId,
+    ActiveData, ActiveDataLocation, DataId, DataKind, ExportItem, FunctionId, GlobalId, MemoryId,
 };
 
 use crate::{
-    allocator::Arena,
+    allocator::{Arena, VecAllocator},
     compiler::{
         CompileWasm, CompiledExpression, CompiledInstruction, CompilerOptions, CompilerScope,
         CompilerState, RuntimeBuiltin, RuntimeGlobal,
     },
+    factory::WasmTermFactory,
     term_type::WasmExpression,
-    ArenaRef, Term,
+    ArenaRef, Term, WASM_PAGE_SIZE,
 };
+
+pub mod loader;
 
 #[derive(Debug)]
 pub enum WasmCompilerError {
@@ -26,7 +40,12 @@ pub enum WasmCompilerError {
     DataSectionNotFound,
     MultipleDataSections,
     InvalidDataSection,
+    MemoryNotFound,
+    MultipleMemories,
+    ParseError(PathBuf, String),
     CompilerError(anyhow::Error),
+    OptimizationError(wasm_opt::OptimizationError),
+    OptimizationFileSystemError(std::io::Error),
     RuntimeGlobalNotFound(RuntimeGlobal),
     RuntimeBuiltinNotFound(RuntimeBuiltin),
 }
@@ -39,8 +58,19 @@ impl std::fmt::Display for WasmCompilerError {
             Self::ModuleLoadError(err) => write!(f, "Failed to load WASM module: {err}"),
             Self::DataSectionNotFound => write!(f, "Data section definition not found"),
             Self::MultipleDataSections => write!(f, "Multiple data section definitions"),
+            Self::MemoryNotFound => write!(f, "Memory definition not found"),
+            Self::MultipleMemories => write!(f, "Multiple memory definitions"),
             Self::InvalidDataSection => write!(f, "Invalid data section definition"),
+            Self::ParseError(input_path, err) => write!(
+                f,
+                "Failed to parse input file {}: {err}",
+                input_path.display()
+            ),
             Self::CompilerError(err) => write!(f, "Failed to compile WASM output: {err}"),
+            Self::OptimizationError(err) => write!(f, "Failed to optimize WASM output: {err}"),
+            Self::OptimizationFileSystemError(err) => {
+                write!(f, "Failed to generate optimized WASM output: {err}")
+            }
             Self::RuntimeGlobalNotFound(target) => {
                 write!(f, "Runtime global not found: {}", target.name())
             }
@@ -51,10 +81,120 @@ impl std::fmt::Display for WasmCompilerError {
     }
 }
 
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
+pub enum WasmCompilerMode {
+    /// Standard WASM module
+    Wasm,
+    /// Cranelift-precompiled module
+    Cranelift,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WasmProgram {
+    pub(crate) compiler_mode: WasmCompilerMode,
+    bytes: Vec<u8>,
+}
+
+impl WasmProgram {
+    pub fn from_wasm(bytes: Vec<u8>) -> Self {
+        Self {
+            compiler_mode: WasmCompilerMode::Wasm,
+            bytes,
+        }
+    }
+    pub fn from_cwasm(bytes: Vec<u8>) -> Self {
+        Self {
+            compiler_mode: WasmCompilerMode::Cranelift,
+            bytes,
+        }
+    }
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.bytes
+    }
+}
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
+pub enum EntryPointType {
+    /// Creates an entry-point function that evaluates the given expression with the provided state argument
+    Expression,
+    /// Creates a factory function that returns an instance of the given expression
+    Factory,
+}
+
+pub fn parse_and_compile_module<T: Expression + 'static>(
+    source: &str,
+    syntax: Syntax,
+    input_path: &Path,
+    export_name: &str,
+    export_type: EntryPointType,
+    runtime: &[u8],
+    module_loader: impl Fn(&str, &Path) -> Option<Result<T, String>> + 'static,
+    env_vars: impl IntoIterator<Item = (String, String)>,
+    factory: &(impl ExpressionFactory<T> + Clone + 'static),
+    allocator: &(impl HeapAllocator<T> + Clone + 'static),
+    compiler_mode: WasmCompilerMode,
+    unoptimized: bool,
+) -> Result<WasmProgram, WasmCompilerError>
+where
+    T::Builtin: ParserBuiltin + Into<crate::stdlib::Stdlib>,
+    // TODO: Remove unnecessary trait bounds
+    T: Rewritable<T> + Reducible<T>,
+{
+    // Parse the input file into an expression
+    let parser = create_parser(
+        syntax,
+        Some(input_path),
+        Some(module_loader),
+        env_vars,
+        factory,
+        allocator,
+    );
+
+    let expression = parser
+        .parse(source)
+        .map_err(|err| WasmCompilerError::ParseError(input_path.into(), err))?;
+
+    // Abstract any free variables from any internal lambda functions within the expression
+    let expression = expression
+        .hoist_free_variables(factory, allocator)
+        .unwrap_or(expression);
+
+    // Partially-evaluate any pure expressions within the expression
+    let expression = if unoptimized {
+        expression
+    } else {
+        expression
+            .normalize(factory, allocator, &mut SubstitutionCache::new())
+            .unwrap_or(expression)
+    };
+
+    // Convert the expression into the WASM term representation
+    let mut arena = VecAllocator::default();
+    let allocator = &mut arena;
+    let shared_arena = Rc::new(RefCell::new(allocator));
+    let wasm_term = WasmTermFactory::from(shared_arena)
+        .import(&expression, factory)
+        .map_err(|term| anyhow::anyhow!("Failed to compile term: {}", term))
+        .map_err(WasmCompilerError::CompilerError)?;
+
+    // Compile the expression into a WASM module
+    compile_module(
+        [(String::from(export_name), export_type, wasm_term)],
+        runtime,
+        compiler_mode,
+        unoptimized,
+    )
+}
+
 pub fn compile_module(
-    entry_points: impl IntoIterator<Item = (String, WasmExpression<impl Arena + Clone>)>,
+    entry_points: impl IntoIterator<Item = (String, EntryPointType, WasmExpression<impl Arena + Clone>)>,
     runtime_wasm: &[u8],
-) -> Result<Vec<u8>, WasmCompilerError> {
+    compiler_mode: WasmCompilerMode,
+    unoptimized: bool,
+) -> Result<WasmProgram, WasmCompilerError> {
     // Create a new Wasm module based on the runtime bytes
     let mut ast = parse_wasm_ast(runtime_wasm)?;
     let builtin_mappings = parse_runtime_builtins(&ast)?;
@@ -62,26 +202,64 @@ pub fn compile_module(
     // Locate the data section
     let heap_snapshot_id = get_data_section_instruction_id(&ast)?;
     let initial_heap_snapshot = &ast.data.get(heap_snapshot_id).value;
+    let memory_id = get_memory_instruction_id(&ast)?;
 
     // Compile the entry points, allocating any static expressions into the compiler state linear memory
     let (entry_points, updated_heap_snapshot) =
         compile_entry_points(entry_points, initial_heap_snapshot)?;
 
     // Write the entry point functions into the module
-    for (export_name, function_body) in entry_points.into_iter() {
+    for (export_name, export_type, function_body) in entry_points.into_iter() {
         let compiled_function_body =
             link_compiled_chunk(function_body, &mut ast, &builtin_mappings);
-        let term_factory = create_term_factory_function(&mut ast, compiled_function_body);
-        let function_id =
-            create_entry_point_function(&mut ast, term_factory, builtin_mappings.evaluate);
+        let term_factory_id = create_term_factory_function(&mut ast, compiled_function_body);
+        let function_id = match export_type {
+            EntryPointType::Expression => {
+                create_entry_point_function(&mut ast, term_factory_id, builtin_mappings.evaluate)
+            }
+            EntryPointType::Factory => term_factory_id,
+        };
         ast.exports.add(&export_name, function_id);
     }
 
     // Update the module's linear memory initialization instruction with the allocated contents
+    let num_heap_pages = 1 + (updated_heap_snapshot.len().saturating_sub(1) / WASM_PAGE_SIZE);
     ast.data.get_mut(heap_snapshot_id).value = updated_heap_snapshot;
+    ast.memories.get_mut(memory_id).initial = num_heap_pages as u32;
 
     // Emit the resulting WASM as bytes
-    Ok(ast.emit_wasm())
+    let wasm_bytes = ast.emit_wasm();
+
+    let wasm_bytes = if unoptimized {
+        Ok(wasm_bytes)
+    } else {
+        let unoptimized_filename = temp_dir().join(format!("{}.wasm", Uuid::new_v4()));
+        let optimized_filename = temp_dir().join(format!("{}.wasm", Uuid::new_v4()));
+        std::fs::write(&unoptimized_filename, wasm_bytes)
+            .map_err(WasmCompilerError::OptimizationFileSystemError)
+            .and_then(|_| {
+                wasm_opt::OptimizationOptions::new_opt_level_4()
+                    .debug_info(true)
+                    .all_features()
+                    .run(&unoptimized_filename, &optimized_filename)
+                    .map_err(WasmCompilerError::OptimizationError)
+                    .and_then(|_| {
+                        std::fs::read(&optimized_filename)
+                            .map_err(WasmCompilerError::OptimizationFileSystemError)
+                    })
+            })
+    }?;
+
+    match compiler_mode {
+        WasmCompilerMode::Wasm => Ok(WasmProgram::from_wasm(wasm_bytes)),
+        WasmCompilerMode::Cranelift => {
+            let engine = wasmtime::Engine::default();
+            engine
+                .precompile_module(&wasm_bytes)
+                .map_err(WasmCompilerError::CompilerError)
+                .map(WasmProgram::from_cwasm)
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -380,15 +558,24 @@ fn get_data_section_instruction_id(module: &walrus::Module) -> Result<DataId, Wa
     }
 }
 
+fn get_memory_instruction_id(module: &walrus::Module) -> Result<MemoryId, WasmCompilerError> {
+    let mut memory_instructions = module.memories.iter();
+    match (memory_instructions.next(), memory_instructions.next()) {
+        (Some(memory), None) => Ok(memory.id()),
+        (Some(_), Some(_)) => Err(WasmCompilerError::MultipleMemories),
+        (None, _) => Err(WasmCompilerError::MemoryNotFound),
+    }
+}
+
 fn compile_entry_points<A: Arena + Clone>(
-    entry_points: impl IntoIterator<Item = (String, ArenaRef<Term, A>)>,
+    entry_points: impl IntoIterator<Item = (String, EntryPointType, ArenaRef<Term, A>)>,
     heap_snapshot: &[u8],
-) -> Result<(Vec<(String, CompiledExpression)>, Vec<u8>), WasmCompilerError> {
+) -> Result<(Vec<(String, EntryPointType, CompiledExpression)>, Vec<u8>), WasmCompilerError> {
     // Initialize the compiler state with the contents of the initialized linear memory
     let mut compiler_state = CompilerState::from_heap_snapshot::<Term>(heap_snapshot);
     let compiled_entry_points = entry_points
         .into_iter()
-        .map(|(export_name, expression)| {
+        .map(|(export_name, export_type, expression)| {
             let function_body = expression
                 .compile(
                     Eagerness::Eager,
@@ -397,7 +584,7 @@ fn compile_entry_points<A: Arena + Clone>(
                     &CompilerOptions::default(),
                 )
                 .map_err(|err| WasmCompilerError::CompilerError(anyhow::anyhow!("{}", err)))?;
-            Ok((export_name, function_body))
+            Ok((export_name, export_type, function_body))
         })
         .collect::<Result<Vec<_>, _>>()?;
     let updated_heap_snapshot = compiler_state.into_linear_memory();
@@ -508,12 +695,18 @@ mod tests {
     use super::*;
 
     fn create_mock_wasm_interpreter(
-        wasm_bytes: &[u8],
+        wasm_module: &WasmProgram,
     ) -> Result<WasmInterpreter, InterpreterError> {
-        let mut interpreter: WasmInterpreter =
-            add_import_stubs(WasmContextBuilder::from_wasm(wasm_bytes, "memory")?)?
-                .build()?
-                .into();
+        let memory_name = "memory";
+        let context = match wasm_module.compiler_mode {
+            WasmCompilerMode::Wasm => {
+                WasmContextBuilder::from_wasm(wasm_module.as_bytes(), memory_name)
+            }
+            WasmCompilerMode::Cranelift => {
+                WasmContextBuilder::from_cwasm(wasm_module.as_bytes(), memory_name)
+            }
+        }?;
+        let mut interpreter: WasmInterpreter = add_import_stubs(context)?.build()?.into();
         interpreter.initialize()?;
         Ok(interpreter)
     }
@@ -526,7 +719,13 @@ mod tests {
         let arena = Rc::new(RefCell::new(&mut arena));
         let expression = WasmExpression::new(arena.clone(), term_pointer);
 
-        let wasm_bytes = compile_module([("foo".into(), expression)], RUNTIME_BYTES).unwrap();
+        let wasm_bytes = compile_module(
+            [("foo".into(), EntryPointType::Expression, expression)],
+            RUNTIME_BYTES,
+            WasmCompilerMode::Wasm,
+            true,
+        )
+        .unwrap();
 
         let mut interpreter = create_mock_wasm_interpreter(&wasm_bytes).unwrap();
 
@@ -583,7 +782,13 @@ mod tests {
         let arena = Rc::new(RefCell::new(&mut arena));
         let expression = WasmExpression::new(arena.clone(), current);
 
-        let wasm_bytes = compile_module([("foo".into(), expression)], RUNTIME_BYTES).unwrap();
+        let wasm_bytes = compile_module(
+            [("foo".into(), EntryPointType::Expression, expression)],
+            RUNTIME_BYTES,
+            WasmCompilerMode::Wasm,
+            true,
+        )
+        .unwrap();
 
         let mut interpreter = create_mock_wasm_interpreter(&wasm_bytes).unwrap();
 

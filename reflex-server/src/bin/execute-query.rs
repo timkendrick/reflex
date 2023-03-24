@@ -24,9 +24,8 @@ use reflex_handlers::{
     utils::tls::{create_https_client, hyper_rustls},
     DefaultHandlerMetricNames,
 };
-use reflex_interpreter::compiler::{compile_graph_root, CompilerMode, CompilerOptions};
 use reflex_lang::{allocator::DefaultAllocator, CachedSharedTerm, SharedTermFactory};
-use reflex_parser::{create_parser, DefaultModuleLoader, Syntax, SyntaxParser};
+use reflex_parser::DefaultModuleLoader;
 use reflex_protobuf::types::WellKnownTypesTranscoder;
 use reflex_scheduler::threadpool::TokioRuntimeThreadPoolFactory;
 use reflex_server::{
@@ -53,16 +52,20 @@ use reflex_server::{
     tokio_runtime_metrics_export::TokioRuntimeMonitorMetricNames,
 };
 use reflex_utils::reconnect::NoopReconnectTimeout;
+use reflex_wasm::cli::compile::WasmProgram;
 
 /// Execute a GraphQL query against the provided graph root
 #[derive(Parser)]
 pub struct Args {
-    /// Path to graph definition entry point
+    /// Path to runtime WebAssembly module
     #[clap(long)]
-    graph_root: PathBuf,
-    /// Graph definition syntax
-    #[clap(long, default_value = "javascript")]
-    syntax: Syntax,
+    module: PathBuf,
+    /// Whether the provided WebAssembly module has been precompiled via Cranelift
+    #[clap(long)]
+    precompiled: bool,
+    /// Name of graph root entry point function within runtime WebAssembly module
+    #[clap(long)]
+    entry_point: String,
     /// Path to GraphQL schema SDL
     #[clap(long)]
     schema: Option<PathBuf>,
@@ -81,15 +84,6 @@ pub struct Args {
     /// Log runtime actions
     #[clap(long)]
     log: Option<Option<LogFormat>>,
-    /// Log compiler output
-    #[clap(long)]
-    debug_compiler: bool,
-    /// Log interpreter instructions
-    #[clap(long)]
-    debug_interpreter: bool,
-    /// Log interpreter stack
-    #[clap(long)]
-    debug_stack: bool,
 }
 impl Into<ExecuteQueryCliOptions> for Args {
     fn into(self) -> ExecuteQueryCliOptions {
@@ -98,9 +92,6 @@ impl Into<ExecuteQueryCliOptions> for Args {
             variables: self.variables,
             headers: None,
             effect_throttle: self.effect_throttle_ms.map(Duration::from_millis),
-            debug_compiler: self.debug_compiler,
-            debug_interpreter: self.debug_interpreter,
-            debug_stack: self.debug_stack,
         }
     }
 }
@@ -152,6 +143,18 @@ async fn main() -> Result<()> {
     >;
 
     let args = Args::parse();
+    let wasm_module = fs::read(&args.module).with_context(|| {
+        format!(
+            "Failed to load WebAssemby module: {}",
+            args.module.to_string_lossy()
+        )
+    })?;
+    let wasm_module = if args.precompiled {
+        WasmProgram::from_cwasm(wasm_module)
+    } else {
+        WasmProgram::from_wasm(wasm_module)
+    };
+    let graph_root_factory_export_name = args.entry_point.clone();
     let schema = if let Some(schema_path) = &args.schema {
         Some(load_graphql_schema(schema_path.as_path())?)
     } else {
@@ -174,10 +177,6 @@ async fn main() -> Result<()> {
         None => None,
         Some(config) => Some(config.into_tracer()?),
     };
-    let compiler_options = CompilerOptions {
-        debug: args.debug_compiler,
-        ..Default::default()
-    };
     let logger = args.log.map(|format| match format {
         Some(LogFormat::Json) => {
             EitherLogger::Left(JsonActionLogger::<_, TAction, TTask>::stderr())
@@ -186,34 +185,10 @@ async fn main() -> Result<()> {
             PrefixedLogFormatter::new("server", DefaultActionFormatter::new(factory.clone())),
         )),
     });
-    let input_path = args.graph_root.as_path();
-    let source = read_file(input_path)?;
-    let parser = create_parser(
-        args.syntax,
-        Some(input_path),
-        Option::<TLoader>::None,
-        std::env::vars(),
-        &factory,
-        &allocator,
-    );
-    let expression = parser.parse(&source).map_err(|err| {
-        anyhow!(
-            "Failed to parse source at {}: {}",
-            input_path.display(),
-            err
-        )
-    })?;
-    let graph_root = compile_graph_root(
-        &expression,
-        &factory,
-        &allocator,
-        &compiler_options,
-        CompilerMode::Function,
-    )
-    .map_err(|err| anyhow!("Failed to compile entry point module: {}", err))?;
     cli::<TAction, TTask, T, TFactory, TAllocator, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _>(
         args.into(),
-        graph_root,
+        wasm_module,
+        graph_root_factory_export_name,
         schema,
         GraphQlWebServerActorFactory::new(|context| {
             let reconnect_timeout = NoopReconnectTimeout;
@@ -275,10 +250,6 @@ async fn main() -> Result<()> {
     )
     .await
     .map(|response| println!("{}", response))
-}
-
-fn read_file(path: &Path) -> Result<String> {
-    fs::read_to_string(path).with_context(|| format!("Failed to read path {}", path.display()))
 }
 
 fn load_graphql_schema(path: &Path) -> Result<GraphQlSchema> {

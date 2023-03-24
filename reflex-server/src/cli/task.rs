@@ -27,20 +27,14 @@ use reflex_interpreter::compiler::Compile;
 use reflex_macros::{blanket_trait, task_factory_enum, Matcher};
 use reflex_protobuf::types::WellKnownTypesTranscoder;
 use reflex_runtime::{
-    actor::bytecode_interpreter::{
-        BytecodeInterpreter, BytecodeInterpreterAction, BytecodeInterpreterMetricLabels,
-    },
-    task::{
-        bytecode_worker::{BytecodeWorkerAction, BytecodeWorkerTask, BytecodeWorkerTaskFactory},
-        evaluate_handler::EffectThrottleTaskFactory,
-        RuntimeTask, RuntimeTaskFactory,
-    },
+    actor::bytecode_interpreter::{BytecodeInterpreterAction, BytecodeInterpreterMetricLabels},
+    task::{evaluate_handler::EffectThrottleTaskFactory, RuntimeTask, RuntimeTaskFactory},
     AsyncExpression, AsyncExpressionFactory, AsyncHeapAllocator,
 };
 use reflex_utils::reconnect::ReconnectTimeout;
 use reflex_wasm::{
     actor::wasm_interpreter::WasmInterpreter,
-    task::wasm_worker::{WasmWorkerTask, WasmWorkerTaskFactory},
+    task::wasm_worker::{WasmWorkerTask, WasmWorkerTaskAction, WasmWorkerTaskFactory},
 };
 
 use crate::{
@@ -61,7 +55,7 @@ blanket_trait!(
     pub trait ServerCliTaskAction<T: Expression>:
         ServerAction<T>
         + BytecodeInterpreterAction<T>
-        + BytecodeWorkerAction<T>
+        + WasmWorkerTaskAction<T>
         + ServerTaskAction
         + HandlerAction<T>
         + GrpcHandlerAction<T>
@@ -72,7 +66,6 @@ blanket_trait!(
 blanket_trait!(
     pub trait ServerCliTask<T, TFactory, TAllocator, TConnect>:
         RuntimeTask
-        + BytecodeWorkerTask<T, TFactory, TAllocator>
         + WasmWorkerTask<T, TFactory, TAllocator>
         + ServerTask<TConnect>
         + GraphQlWebServerTask<T, TFactory, TAllocator>
@@ -84,7 +77,7 @@ blanket_trait!(
         T::SignalList: Send,
         T::StructPrototype: Send,
         T::ExpressionList: Send,
-        T::Builtin: GraphQlParserBuiltin,
+        T::Builtin: GraphQlParserBuiltin + Into<reflex_wasm::stdlib::Stdlib>,
         TFactory: AsyncExpressionFactory<T> + Default,
         TAllocator: AsyncHeapAllocator<T> + Default,
         TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
@@ -118,7 +111,7 @@ task_factory_enum!({
         T::SignalList: Send,
         T::StructPrototype: Send,
         T::ExpressionList: Send,
-        T::Builtin: GraphQlParserBuiltin,
+        T::Builtin: GraphQlParserBuiltin + Into<reflex_wasm::stdlib::Stdlib>,
         TFactory: AsyncExpressionFactory<T> + Default,
         TAllocator: AsyncHeapAllocator<T> + Default,
         TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
@@ -150,8 +143,6 @@ task_factory_enum!({
                 TTracer,
             >,
         ),
-        BytecodeInterpreter(BytecodeInterpreter<T, TFactory, TAllocator, TWorkerMetricLabels>),
-        BytecodeWorkerTask(BytecodeWorkerTaskFactory<T, TFactory, TAllocator>),
         WasmInterpreter(WasmInterpreter<T, TFactory, TAllocator, TWorkerMetricLabels>),
         WasmWorkerTask(WasmWorkerTaskFactory<T, TFactory, TAllocator>),
         Handler(HandlerActor<T, TFactory, TAllocator, TConnect, TReconnect>),
@@ -221,7 +212,7 @@ task_factory_enum!({
         T::SignalList: Send,
         T::StructPrototype: Send,
         T::ExpressionList: Send,
-        T::Builtin: GraphQlParserBuiltin,
+        T::Builtin: GraphQlParserBuiltin + Into<reflex_wasm::stdlib::Stdlib>,
         TFactory: AsyncExpressionFactory<T> + Default,
         TAllocator: AsyncHeapAllocator<T> + Default,
         TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
@@ -297,7 +288,7 @@ where
     T::SignalList: Send,
     T::StructPrototype: Send,
     T::ExpressionList: Send,
-    T::Builtin: GraphQlParserBuiltin,
+    T::Builtin: GraphQlParserBuiltin + Into<reflex_wasm::stdlib::Stdlib>,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
@@ -348,70 +339,6 @@ impl<
         TOperationMetricLabels,
         TTracer,
         TAction,
-    > From<BytecodeInterpreter<T, TFactory, TAllocator, TWorkerMetricLabels>>
-    for ServerCliTaskActor<
-        T,
-        TFactory,
-        TAllocator,
-        TConnect,
-        TReconnect,
-        TGrpcConfig,
-        TTransformHttp,
-        TTransformWs,
-        TGraphQlQueryLabel,
-        THttpMetricLabels,
-        TConnectionMetricLabels,
-        TWorkerMetricLabels,
-        TOperationMetricLabels,
-        TTracer,
-        TAction,
-    >
-where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
-    T::String: Send,
-    T::Builtin: Send,
-    T::Signal: Send,
-    T::SignalList: Send,
-    T::StructPrototype: Send,
-    T::ExpressionList: Send,
-    T::Builtin: GraphQlParserBuiltin,
-    TFactory: AsyncExpressionFactory<T> + Default,
-    TAllocator: AsyncHeapAllocator<T> + Default,
-    TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
-    TReconnect: ReconnectTimeout + Send + Clone + 'static,
-    TGrpcConfig: GrpcConfig + Send + 'static,
-    TTransformHttp: HttpGraphQlServerQueryTransform,
-    TTransformWs: WebSocketGraphQlServerQueryTransform,
-    TGraphQlQueryLabel: GraphQlServerQueryLabel,
-    THttpMetricLabels: HttpGraphQlServerQueryMetricLabels,
-    TConnectionMetricLabels: WebSocketGraphQlServerConnectionMetricLabels,
-    TOperationMetricLabels: GraphQlServerOperationMetricLabels,
-    TWorkerMetricLabels: BytecodeInterpreterMetricLabels,
-    TTracer: Tracer,
-    TTracer::Span: Send + Sync + 'static,
-    TAction: Action + ServerCliTaskAction<T> + Send + 'static,
-{
-    fn from(value: BytecodeInterpreter<T, TFactory, TAllocator, TWorkerMetricLabels>) -> Self {
-        Self::BytecodeInterpreter(value)
-    }
-}
-
-impl<
-        T,
-        TFactory,
-        TAllocator,
-        TConnect,
-        TReconnect,
-        TGrpcConfig,
-        TTransformHttp,
-        TTransformWs,
-        TGraphQlQueryLabel,
-        THttpMetricLabels,
-        TConnectionMetricLabels,
-        TWorkerMetricLabels,
-        TOperationMetricLabels,
-        TTracer,
-        TAction,
     > From<WasmInterpreter<T, TFactory, TAllocator, TWorkerMetricLabels>>
     for ServerCliTaskActor<
         T,
@@ -438,7 +365,7 @@ where
     T::SignalList: Send,
     T::StructPrototype: Send,
     T::ExpressionList: Send,
-    T::Builtin: GraphQlParserBuiltin,
+    T::Builtin: GraphQlParserBuiltin + Into<reflex_wasm::stdlib::Stdlib>,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
@@ -502,7 +429,7 @@ where
     T::SignalList: Send,
     T::StructPrototype: Send,
     T::ExpressionList: Send,
-    T::Builtin: GraphQlParserBuiltin,
+    T::Builtin: GraphQlParserBuiltin + Into<reflex_wasm::stdlib::Stdlib>,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
@@ -566,7 +493,7 @@ where
     T::SignalList: Send,
     T::StructPrototype: Send,
     T::ExpressionList: Send,
-    T::Builtin: GraphQlParserBuiltin,
+    T::Builtin: GraphQlParserBuiltin + Into<reflex_wasm::stdlib::Stdlib>,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
@@ -639,7 +566,7 @@ where
     T::SignalList: Send,
     T::StructPrototype: Send,
     T::ExpressionList: Send,
-    T::Builtin: GraphQlParserBuiltin,
+    T::Builtin: GraphQlParserBuiltin + Into<reflex_wasm::stdlib::Stdlib>,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
@@ -701,7 +628,7 @@ where
     T::SignalList: Send,
     T::StructPrototype: Send,
     T::ExpressionList: Send,
-    T::Builtin: GraphQlParserBuiltin,
+    T::Builtin: GraphQlParserBuiltin + Into<reflex_wasm::stdlib::Stdlib>,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
@@ -762,7 +689,7 @@ where
     T::SignalList: Send,
     T::StructPrototype: Send,
     T::ExpressionList: Send,
-    T::Builtin: GraphQlParserBuiltin,
+    T::Builtin: GraphQlParserBuiltin + Into<reflex_wasm::stdlib::Stdlib>,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
@@ -823,7 +750,7 @@ where
     T::SignalList: Send,
     T::StructPrototype: Send,
     T::ExpressionList: Send,
-    T::Builtin: GraphQlParserBuiltin,
+    T::Builtin: GraphQlParserBuiltin + Into<reflex_wasm::stdlib::Stdlib>,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
@@ -884,7 +811,7 @@ where
     T::SignalList: Send,
     T::StructPrototype: Send,
     T::ExpressionList: Send,
-    T::Builtin: GraphQlParserBuiltin,
+    T::Builtin: GraphQlParserBuiltin + Into<reflex_wasm::stdlib::Stdlib>,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
@@ -945,7 +872,7 @@ where
     T::SignalList: Send,
     T::StructPrototype: Send,
     T::ExpressionList: Send,
-    T::Builtin: GraphQlParserBuiltin,
+    T::Builtin: GraphQlParserBuiltin + Into<reflex_wasm::stdlib::Stdlib>,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
@@ -1006,7 +933,7 @@ where
     T::SignalList: Send,
     T::StructPrototype: Send,
     T::ExpressionList: Send,
-    T::Builtin: GraphQlParserBuiltin,
+    T::Builtin: GraphQlParserBuiltin + Into<reflex_wasm::stdlib::Stdlib>,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
@@ -1067,7 +994,7 @@ where
     T::SignalList: Send,
     T::StructPrototype: Send,
     T::ExpressionList: Send,
-    T::Builtin: GraphQlParserBuiltin,
+    T::Builtin: GraphQlParserBuiltin + Into<reflex_wasm::stdlib::Stdlib>,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
@@ -1128,7 +1055,7 @@ where
     T::SignalList: Send,
     T::StructPrototype: Send,
     T::ExpressionList: Send,
-    T::Builtin: GraphQlParserBuiltin,
+    T::Builtin: GraphQlParserBuiltin + Into<reflex_wasm::stdlib::Stdlib>,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
@@ -1189,7 +1116,7 @@ where
     T::SignalList: Send,
     T::StructPrototype: Send,
     T::ExpressionList: Send,
-    T::Builtin: GraphQlParserBuiltin,
+    T::Builtin: GraphQlParserBuiltin + Into<reflex_wasm::stdlib::Stdlib>,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
@@ -1250,7 +1177,7 @@ where
     T::SignalList: Send,
     T::StructPrototype: Send,
     T::ExpressionList: Send,
-    T::Builtin: GraphQlParserBuiltin,
+    T::Builtin: GraphQlParserBuiltin + Into<reflex_wasm::stdlib::Stdlib>,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,

@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 // SPDX-FileContributor: Chris Campbell <c.campbell@mwam.com> https://github.com/c-campbell-mwam
+// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use std::{
     collections::{HashMap, VecDeque},
     convert::Infallible,
@@ -36,13 +36,9 @@ use nom::{
     sequence::tuple,
     IResult,
 };
-use reflex::core::{Applicable, Expression, InstructionPointer, Reducible, Rewritable};
+use reflex::core::{Applicable, Expression, Reducible, Rewritable};
 use reflex_graphql::{GraphQlOperation, GraphQlParserBuiltin, GraphQlSchema};
 use reflex_handlers::utils::tls::{parse_ca_certs, rustls};
-use reflex_interpreter::{
-    compiler::{Compile, CompiledProgram, CompilerOptions},
-    InterpreterOptions,
-};
 use reflex_json::JsonValue;
 use reflex_runtime::{
     actor::bytecode_interpreter::BytecodeInterpreterMetricLabels, task::RuntimeTask,
@@ -51,6 +47,7 @@ use reflex_runtime::{
 use reflex_scheduler::tokio::{
     TokioInbox, TokioSchedulerInstrumentation, TokioSchedulerLogger, TokioThreadPoolFactory,
 };
+use reflex_wasm::{cli::compile::WasmProgram, task::wasm_worker::WasmWorkerTask};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -409,7 +406,8 @@ pub fn cli<
     TBlockingTasks,
 >(
     args: ReflexServerCliOptions,
-    graph_root: (CompiledProgram, InstructionPointer),
+    wasm_module: WasmProgram,
+    graph_root_factory_export_name: impl Into<String>,
     schema: Option<GraphQlSchema>,
     custom_actors: GraphQlWebServerActorFactory<
         TAction,
@@ -423,8 +421,6 @@ pub fn cli<
     >,
     factory: &TFactory,
     allocator: &TAllocator,
-    compiler_options: CompilerOptions,
-    interpreter_options: InterpreterOptions,
     transform_http: TTransformHttp,
     transform_ws: TTransformWs,
     metric_names: GraphQlWebServerMetricNames,
@@ -442,12 +438,7 @@ pub fn cli<
     effect_throttle: Option<Duration>,
 ) -> Result<impl Future<Output = Result<(), hyper::Error>>>
 where
-    T: AsyncExpression
-        + Expression<String = String>
-        + Rewritable<T>
-        + Reducible<T>
-        + Applicable<T>
-        + Compile<T>,
+    T: AsyncExpression + Expression<String = String> + Rewritable<T> + Reducible<T> + Applicable<T>,
     T::String: Send,
     T::Builtin: Send,
     T::Signal: Send,
@@ -490,6 +481,7 @@ where
     TAction: Action + GraphQlWebServerAction<T> + Clone + Send + Sync + 'static,
     TTask: TaskFactory<TAction, TTask>
         + RuntimeTask
+        + WasmWorkerTask<T, TFactory, TAllocator>
         + GraphQlWebServerTask<T, TFactory, TAllocator>
         + WebSocketGraphQlServerTask
         + Send
@@ -520,11 +512,10 @@ where
         "main",
     );
     let app = GraphQlWebServer::new(
-        graph_root,
+        wasm_module,
+        graph_root_factory_export_name,
         schema,
         custom_actors,
-        compiler_options,
-        interpreter_options,
         factory.clone(),
         allocator.clone(),
         transform_http,

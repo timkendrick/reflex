@@ -1,57 +1,116 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
-// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use std::{cell::RefCell, io::Write, rc::Rc};
+// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
+use std::{io::Write, iter::empty, path::PathBuf, str::FromStr};
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use reflex_wasm::{
-    allocator::{ArenaAllocator, VecAllocator},
-    cli::compile::compile_module,
-    term_type::{IntTerm, TermType},
-    ArenaRef, Term,
+use reflex_lang::{allocator::DefaultAllocator, SharedTermFactory};
+use reflex_parser::Syntax;
+use reflex_wasm::cli::compile::{
+    loader::create_loader, parse_and_compile_module, EntryPointType, WasmCompilerMode,
 };
 
 // Reflex WebAssembly compiler
 #[derive(Parser, Debug)]
 #[command(about)]
 struct Args {
-    /// Path to runtime library module
-    #[arg(short, long)]
-    runtime: String,
-
+    /// Path to program entry point
+    entry_point: PathBuf,
+    /// Input file syntax
+    #[clap(long, default_value = "javascript")]
+    syntax: Syntax,
     /// Name of the exported WASM function
     #[arg(short, long)]
     export_name: String,
-
+    /// Whether to precompile the resulting module as a graphql entry point
+    #[arg(long)]
+    export_type: WasmCompilerExportType,
+    /// Path to runtime library module
+    #[arg(short, long)]
+    runtime: PathBuf,
     /// Path to output file (defaults to stdout)
     #[arg(short, long)]
     output: Option<String>,
+    /// Whether to precompile the resulting module with the Cranelift compiler
+    #[arg(long)]
+    precompile: bool,
+    /// Whether to skip compile-time evaluation where applicable
+    #[arg(long)]
+    unoptimized: bool,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+enum WasmCompilerExportType {
+    Expression,
+    Factory,
+}
+
+impl From<WasmCompilerExportType> for EntryPointType {
+    fn from(value: WasmCompilerExportType) -> Self {
+        match value {
+            WasmCompilerExportType::Expression => Self::Expression,
+            WasmCompilerExportType::Factory => Self::Factory,
+        }
+    }
+}
+
+impl FromStr for WasmCompilerExportType {
+    type Err = anyhow::Error;
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        match input.to_lowercase().as_str() {
+            "expression" => Ok(Self::Expression),
+            "factory" => Ok(Self::Factory),
+            _ => Err(anyhow::anyhow!("Unknown export type: {}", input)),
+        }
+    }
 }
 
 fn main() -> Result<()> {
     // Parse CLI args
     let args = Args::parse();
     let runtime_path = &args.runtime;
-    let entry_point_name = args.export_name;
+    let input_path = args.entry_point;
+    let syntax = args.syntax;
+    let export_name = args.export_name;
+    let export_type = EntryPointType::from(args.export_type);
+    let compiler_mode = if args.precompile {
+        WasmCompilerMode::Cranelift
+    } else {
+        WasmCompilerMode::Wasm
+    };
+    let unoptimized = args.unoptimized;
+    let factory = SharedTermFactory::<reflex_wasm::stdlib::Stdlib>::default();
+    let allocator = DefaultAllocator::default();
 
     // Load the runtime library module
     let runtime_bytes =
         std::fs::read(&runtime_path).with_context(|| "Failed to load runtime library")?;
 
-    // Create a dummy expression
-    // TODO: allow compiling user-provided expressions
-    let mut arena = VecAllocator::default();
-    let term_pointer = arena.allocate(Term::new(TermType::Int(IntTerm::from(5)), &arena));
-    let arena = Rc::new(RefCell::new(&mut arena));
-    let expression: ArenaRef<Term, _> = ArenaRef::new(arena.clone(), term_pointer);
+    // Read the input file
+    let source =
+        std::fs::read_to_string(&input_path).with_context(|| "Failed to read input file")?;
 
-    // Compile the expression into a WASM module
-    let output_bytes = compile_module([(entry_point_name, expression)], &runtime_bytes)
-        .with_context(|| "Failed to compile WASM module")?;
+    // Parse the input file and compile to WASM
+    let wasm_module = parse_and_compile_module(
+        &source,
+        syntax,
+        &input_path,
+        &export_name,
+        export_type,
+        &runtime_bytes,
+        create_loader(empty(), &factory, &allocator),
+        std::env::vars(),
+        &factory,
+        &allocator,
+        compiler_mode,
+        unoptimized,
+    )
+    .with_context(|| "Failed to compile WebAssembly module")?;
 
-    // Output .wasm file contents
+    // Output compiled WASM module bytes
+    let output_bytes = wasm_module.as_bytes();
     match args.output {
         Some(name) => std::fs::write(&name, output_bytes),
         None => std::io::stdout().write(&output_bytes).map(|_| ()),

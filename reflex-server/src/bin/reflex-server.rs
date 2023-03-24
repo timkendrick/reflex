@@ -1,15 +1,15 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 // SPDX-FileContributor: Chris Campbell <c.campbell@mwam.com> https://github.com/c-campbell-mwam
+// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use std::{
     fs,
     iter::once,
     net::SocketAddr,
     path::{Path, PathBuf},
     str::FromStr,
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 use anyhow::{anyhow, Context, Result};
@@ -27,12 +27,8 @@ use reflex_handlers::{
     utils::tls::{create_https_client, hyper_rustls},
     DefaultHandlerMetricNames,
 };
-use reflex_interpreter::{
-    compiler::{compile_graph_root, CompilerMode, CompilerOptions},
-    InterpreterOptions,
-};
 use reflex_lang::{allocator::DefaultAllocator, CachedSharedTerm, SharedTermFactory};
-use reflex_parser::{create_parser, DefaultModuleLoader, Syntax, SyntaxParser};
+use reflex_parser::DefaultModuleLoader;
 use reflex_protobuf::types::WellKnownTypesTranscoder;
 use reflex_scheduler::threadpool::TokioRuntimeThreadPoolFactory;
 use reflex_server::{
@@ -54,8 +50,7 @@ use reflex_server::{
         ServerSchedulerMetricNames,
     },
     server::action::init::{
-        InitGraphRootAction, InitHttpServerAction, InitOpenTelemetryAction,
-        InitPrometheusMetricsAction,
+        InitHttpServerAction, InitOpenTelemetryAction, InitPrometheusMetricsAction,
     },
     GraphQlWebServerActorFactory, GraphQlWebServerMetricNames,
 };
@@ -63,15 +58,20 @@ use reflex_server::{
     server::utils::EitherTracer, tokio_runtime_metrics_export::TokioRuntimeMonitorMetricNames,
 };
 use reflex_utils::reconnect::FibonacciReconnectTimeout;
+use reflex_wasm::cli::compile::WasmProgram;
 
 /// Launch a GraphQL server for the provided graph root
 #[derive(Parser)]
 struct Args {
-    /// Path to graph definition entry point
-    entry_point: PathBuf,
-    /// Graph definition syntax
-    #[clap(long, default_value = "javascript")]
-    syntax: Syntax,
+    /// Path to runtime WebAssembly module
+    #[clap(long)]
+    module: PathBuf,
+    /// Whether the provided WebAssembly module has been precompiled via Cranelift
+    #[clap(long)]
+    precompiled: bool,
+    /// Name of graph root entry point function within runtime WebAssembly module
+    #[clap(long)]
+    entry_point: String,
     /// Path to GraphQL schema SDL
     #[clap(long)]
     schema: Option<PathBuf>,
@@ -90,18 +90,6 @@ struct Args {
     /// Log runtime actions
     #[clap(long)]
     log: Option<Option<LogFormat>>,
-    /// Prevent static compiler optimizations
-    #[clap(long)]
-    unoptimized: bool,
-    /// Log compiler output
-    #[clap(long)]
-    debug_compiler: bool,
-    /// Log interpreter instructions
-    #[clap(long)]
-    debug_interpreter: bool,
-    /// Log interpreter stack
-    #[clap(long)]
-    debug_stack: bool,
 }
 impl Into<ReflexServerCliOptions> for Args {
     fn into(self) -> ReflexServerCliOptions {
@@ -156,6 +144,18 @@ pub async fn main() -> Result<()> {
     let args = Args::parse();
     let factory: TFactory = SharedTermFactory::<TBuiltin>::default();
     let allocator: TAllocator = DefaultAllocator::default();
+    let wasm_module = fs::read(&args.module).with_context(|| {
+        format!(
+            "Failed to load WebAssemby module: {}",
+            args.module.to_string_lossy()
+        )
+    })?;
+    let wasm_module = if args.precompiled {
+        WasmProgram::from_cwasm(wasm_module)
+    } else {
+        WasmProgram::from_wasm(wasm_module)
+    };
+    let graph_root_factory_export_name = args.entry_point.clone();
     let mut logger = args.log.map(|format| match format {
         Some(LogFormat::Json) => {
             EitherLogger::Left(JsonActionLogger::<_, TAction, TTask>::stderr())
@@ -211,57 +211,6 @@ pub async fn main() -> Result<()> {
             Some(config.into_tracer()?)
         }
     };
-    let compiler_options = CompilerOptions {
-        debug: args.debug_compiler,
-        ..if args.unoptimized {
-            CompilerOptions::unoptimized()
-        } else {
-            CompilerOptions::default()
-        }
-    };
-    let interpreter_options = InterpreterOptions {
-        debug_instructions: args.debug_interpreter || args.debug_stack,
-        debug_stack: args.debug_stack,
-        ..InterpreterOptions::default()
-    };
-    let input_path = args.entry_point.as_path();
-    let source = read_file(input_path)?;
-    let parser = create_parser(
-        args.syntax,
-        Some(input_path),
-        Option::<TLoader>::None,
-        std::env::vars(),
-        &factory,
-        &allocator,
-    );
-    let expression = parser.parse(&source).map_err(|err| {
-        anyhow!(
-            "Failed to parse source at {}: {}",
-            input_path.display(),
-            err
-        )
-    })?;
-    let graph_root = {
-        let compiler_start_time = Instant::now();
-        let graph_root = compile_graph_root(
-            &expression,
-            &factory,
-            &allocator,
-            &compiler_options,
-            CompilerMode::Function,
-        )
-        .map_err(|err| anyhow!("Failed to compile entry point module: {}", err))?;
-        let compiler_elapsed_time = compiler_start_time.elapsed();
-        let (program, _entry_point) = &graph_root;
-        log_server_action(
-            &mut logger,
-            &TAction::from(InitGraphRootAction {
-                compiler_duration: compiler_elapsed_time,
-                instruction_count: program.instructions.len(),
-            }),
-        );
-        graph_root
-    };
     let metric_names = ServerSchedulerMetricNames::default();
     let config: ReflexServerCliOptions = args.into();
     log_server_action(
@@ -273,7 +222,8 @@ pub async fn main() -> Result<()> {
     let server =
         cli::<TAction, TTask, T, TFactory, TAllocator, _, _, _, _, _, _, _, _, _, _, _, _, _, _>(
             config,
-            graph_root,
+            wasm_module,
+            graph_root_factory_export_name,
             schema,
             GraphQlWebServerActorFactory::new(|context| {
                 let reconnect_timeout = FibonacciReconnectTimeout {
@@ -314,8 +264,6 @@ pub async fn main() -> Result<()> {
             }),
             &factory,
             &allocator,
-            compiler_options,
-            interpreter_options,
             NoopGraphQlQueryTransform,
             NoopGraphQlQueryTransform,
             GraphQlWebServerMetricNames::default(),
@@ -340,10 +288,6 @@ pub async fn main() -> Result<()> {
         )
         .with_context(|| anyhow!("Server startup failed"))?;
     server.await.with_context(|| anyhow!("Server error"))
-}
-
-fn read_file(path: &Path) -> Result<String> {
-    fs::read_to_string(path).with_context(|| format!("Failed to read path {}", path.display()))
 }
 
 fn log_server_action<TAction: Action>(

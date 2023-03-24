@@ -10,13 +10,13 @@ use std::{
 
 use reflex::{
     core::{
-        ApplicationTermType, BooleanTermType, CompiledFunctionTermType, ConditionListType,
-        ConditionType, ConstructorTermType, EffectTermType, Expression, ExpressionFactory,
-        ExpressionListType, FloatTermType, FloatValue, HashmapTermType, HashsetTermType,
-        HeapAllocator, InstructionPointer, IntTermType, IntValue, LambdaTermType, LetTermType,
-        ListTermType, PartialApplicationTermType, RecordTermType, RecursiveTermType, RefType,
-        SignalTermType, SignalType, StackOffset, StringTermType, StringValue, StructPrototypeType,
-        SymbolId, SymbolTermType, VariableTermType,
+        ApplicationTermType, BooleanTermType, BuiltinTermType, CompiledFunctionTermType,
+        ConditionListType, ConditionType, ConstructorTermType, EffectTermType, Expression,
+        ExpressionFactory, ExpressionListType, FloatTermType, FloatValue, HashmapTermType,
+        HashsetTermType, HeapAllocator, InstructionPointer, IntTermType, IntValue, LambdaTermType,
+        LetTermType, ListTermType, PartialApplicationTermType, RecordTermType, RecursiveTermType,
+        RefType, SignalTermType, SignalType, StackOffset, StringTermType, StringValue,
+        StructPrototypeType, SymbolId, SymbolTermType, VariableTermType,
     },
     hash::HashId,
 };
@@ -56,7 +56,10 @@ where
         &self,
         expression: &T,
         factory: &impl ExpressionFactory<T>,
-    ) -> Result<WasmExpression<Self>, T> {
+    ) -> Result<WasmExpression<Self>, T>
+    where
+        T::Builtin: Into<crate::stdlib::Stdlib>,
+    {
         if let Some(_) = factory.match_nil_term(expression) {
             Ok(self.create_nil_term())
         } else if let Some(term) = factory.match_boolean_term(expression) {
@@ -119,9 +122,8 @@ where
         } else if let Some(term) = factory.match_recursive_term(expression) {
             let body = self.import(term.factory().as_deref(), factory)?;
             Ok(self.create_recursive_term(body))
-        } else if let Some(_) = factory.match_builtin_term(expression) {
-            // TODO: Allow converting builtin terms across factories
-            Err(expression.clone())
+        } else if let Some(term) = factory.match_builtin_term(expression) {
+            Ok(self.create_builtin_term(term.target()))
         } else if let Some(term) = factory.match_compiled_function_term(expression) {
             let term = term.as_deref();
             let address = term.address();
@@ -454,13 +456,9 @@ where
         >,
     ) -> <ArenaRef<Term, Self> as Expression>::ExpressionList {
         let pointer = ListTerm::allocate(
-            expressions.into_iter().map(|term| {
-                debug_assert!(std::ptr::eq(
-                    term.arena.arena.deref().borrow().deref(),
-                    self.arena.deref().borrow().deref()
-                ));
-                term.pointer
-            }),
+            // TODO: Add debug assertions to check that WASM factory list items are from the correct arena
+            // (this may require collecting the list items first to prevent runtime borrow errors)
+            expressions.into_iter().map(|term| term.pointer),
             self.arena.deref().borrow_mut().deref_mut(),
         );
         ArenaRef::<TypedTerm<ListTerm>, Self>::new(self.clone(), pointer)
@@ -878,13 +876,13 @@ where
         _required_args: StackOffset,
         _optional_args: StackOffset,
     ) -> ArenaRef<Term, Self> {
-        self.create_signal_term(self.create_signal_list([self.create_signal(
-            SignalType::Error,
-            self.create_string_term(
-                self.create_static_string("Compiled functions not supported in WASM interpreter"),
-            ),
-            self.create_nil_term(),
-        )]))
+        let message =
+            self.create_static_string("Compiled functions not supported in WASM interpreter");
+        let payload = self.create_string_term(message);
+        let token = self.create_nil_term();
+        let signal = self.create_signal(SignalType::Error, payload, token);
+        let signal_list = self.create_signal_list([signal]);
+        self.create_signal_term(signal_list)
     }
 
     fn create_record_term(
@@ -899,7 +897,8 @@ where
         let keys = prototype.keys();
         let keys = keys.as_deref();
         let lookup_table = if keys.len() >= 16 {
-            Some(self.create_hashmap_term(keys.iter().zip(fields.iter())))
+            let entries = keys.iter().zip(fields.iter()).collect::<Vec<_>>();
+            Some(self.create_hashmap_term(entries))
         } else {
             None
         };
@@ -956,12 +955,11 @@ where
             IntoIter = impl ExactSizeIterator<Item = (ArenaRef<Term, Self>, ArenaRef<Term, Self>)>,
         >,
     ) -> ArenaRef<Term, Self> {
-        let pointer = HashmapTerm::allocate(
-            entries
-                .into_iter()
-                .map(|(key, value)| (key.as_pointer(), value.as_pointer())),
-            &mut *self.arena.borrow_mut(),
-        );
+        let entries = entries
+            .into_iter()
+            .map(|(key, value)| (key.as_pointer(), value.as_pointer()))
+            .collect::<Vec<_>>();
+        let pointer = HashmapTerm::allocate(entries, &mut *self.arena.borrow_mut());
         ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
@@ -973,9 +971,11 @@ where
         >,
     ) -> ArenaRef<Term, Self> {
         let nil = self.create_nil_term();
-        let entries = self
-            .create_hashmap_term(values.into_iter().map(|value| (value, nil.clone())))
-            .as_pointer();
+        let entries = values
+            .into_iter()
+            .map(|value| (value, nil.clone()))
+            .collect::<Vec<_>>();
+        let entries = self.create_hashmap_term(entries).as_pointer();
         let term = HashsetTerm { entries };
         let pointer = self.arena.borrow_mut().deref_mut().allocate(term);
         ArenaRef::<Term, Self>::new(self.clone(), pointer)
@@ -1530,5 +1530,475 @@ impl From<reflex_handlers::stdlib::Stdlib> for reflex_wasm::stdlib::Stdlib {
                 )
             }
         }
+    }
+}
+
+impl From<reflex_stdlib::stdlib::Abs> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Abs) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Add> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Add) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::And> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::And) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Apply> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Apply) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Car> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Car) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Cdr> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Cdr) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Ceil> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Ceil) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Chain> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Chain) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::CollectHashMap> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::CollectHashMap) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::CollectHashSet> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::CollectHashSet) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::CollectList> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::CollectList) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::CollectSignal> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::CollectSignal) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Concat> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Concat) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Cons> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Cons) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::ConstructHashMap> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::ConstructHashMap) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::ConstructHashSet> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::ConstructHashSet) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::ConstructRecord> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::ConstructRecord) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::ConstructList> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::ConstructList) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Contains> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Contains) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Divide> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Divide) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Effect> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Effect) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::EndsWith> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::EndsWith) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Eq> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Eq) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Equal> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Equal) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Filter> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Filter) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Flatten> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Flatten) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Floor> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Floor) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Get> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Get) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Gt> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Gt) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Gte> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Gte) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Hash> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Hash) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::If> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::If) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::IfError> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::IfError) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::IfPending> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::IfPending) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Insert> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Insert) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Keys> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Keys) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Length> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Length) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Lt> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Lt) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Lte> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Lte) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Map> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Map) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Max> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Max) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Merge> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Merge) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Min> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Min) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Multiply> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Multiply) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Not> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Not) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Or> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Or) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Pow> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Pow) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Push> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Push) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::PushFront> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::PushFront) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Raise> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Raise) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Reduce> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Reduce) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Remainder> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Remainder) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Replace> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Replace) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::ResolveArgs> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::ResolveArgs) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::ResolveDeep> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::ResolveDeep) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::ResolveHashMap> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::ResolveHashMap) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::ResolveHashSet> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::ResolveHashSet) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::ResolveShallow> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::ResolveShallow) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::ResolveRecord> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::ResolveRecord) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::ResolveList> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::ResolveList) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Round> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Round) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Sequence> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Sequence) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Slice> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Slice) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Split> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Split) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::StartsWith> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::StartsWith) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Subtract> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Subtract) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Unzip> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Unzip) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Values> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Values) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Zip> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Zip) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+
+impl From<reflex_json::stdlib::JsonDeserialize> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_json::stdlib::JsonDeserialize) -> Self {
+        Self::from(reflex_json::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_json::stdlib::JsonSerialize> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_json::stdlib::JsonSerialize) -> Self {
+        Self::from(reflex_json::stdlib::Stdlib::from(value))
+    }
+}
+
+impl From<reflex_js::stdlib::Accessor> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_js::stdlib::Accessor) -> Self {
+        Self::from(reflex_js::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_js::stdlib::Construct> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_js::stdlib::Construct) -> Self {
+        Self::from(reflex_js::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_js::stdlib::DateConstructor> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_js::stdlib::DateConstructor) -> Self {
+        Self::from(reflex_js::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_js::stdlib::EncodeUriComponent> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_js::stdlib::EncodeUriComponent) -> Self {
+        Self::from(reflex_js::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_js::stdlib::FormatErrorMessage> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_js::stdlib::FormatErrorMessage) -> Self {
+        Self::from(reflex_js::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_js::stdlib::IsFinite> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_js::stdlib::IsFinite) -> Self {
+        Self::from(reflex_js::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_js::stdlib::Log> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_js::stdlib::Log) -> Self {
+        Self::from(reflex_js::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_js::stdlib::LogArgs> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_js::stdlib::LogArgs) -> Self {
+        Self::from(reflex_js::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_js::stdlib::ParseFloat> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_js::stdlib::ParseFloat) -> Self {
+        Self::from(reflex_js::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_js::stdlib::ParseInt> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_js::stdlib::ParseInt) -> Self {
+        Self::from(reflex_js::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_js::stdlib::Throw> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_js::stdlib::Throw) -> Self {
+        Self::from(reflex_js::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_js::stdlib::ToString> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_js::stdlib::ToString) -> Self {
+        Self::from(reflex_js::stdlib::Stdlib::from(value))
+    }
+}
+
+impl From<reflex_graphql::stdlib::CollectQueryListItems> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_graphql::stdlib::CollectQueryListItems) -> Self {
+        Self::from(reflex_graphql::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_graphql::stdlib::DynamicQueryBranch> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_graphql::stdlib::DynamicQueryBranch) -> Self {
+        Self::from(reflex_graphql::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_graphql::stdlib::FlattenDeep> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_graphql::stdlib::FlattenDeep) -> Self {
+        Self::from(reflex_graphql::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_graphql::stdlib::GraphQlResolver> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_graphql::stdlib::GraphQlResolver) -> Self {
+        Self::from(reflex_graphql::stdlib::Stdlib::from(value))
+    }
+}
+
+impl From<reflex_handlers::stdlib::Scan> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_handlers::stdlib::Scan) -> Self {
+        Self::from(reflex_handlers::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_handlers::stdlib::ToRequest> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_handlers::stdlib::ToRequest) -> Self {
+        Self::from(reflex_handlers::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_handlers::stdlib::GetVariable> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_handlers::stdlib::GetVariable) -> Self {
+        Self::from(reflex_handlers::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_handlers::stdlib::SetVariable> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_handlers::stdlib::SetVariable) -> Self {
+        Self::from(reflex_handlers::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_handlers::stdlib::IncrementVariable> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_handlers::stdlib::IncrementVariable) -> Self {
+        Self::from(reflex_handlers::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_handlers::stdlib::DecrementVariable> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_handlers::stdlib::DecrementVariable) -> Self {
+        Self::from(reflex_handlers::stdlib::Stdlib::from(value))
     }
 }

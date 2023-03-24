@@ -10,15 +10,11 @@ use futures::{future, Future, FutureExt};
 use http::{header, HeaderMap, Request, Response};
 use metrics::SharedString;
 use opentelemetry::trace::{Span, Tracer};
-use reflex::core::{Applicable, InstructionPointer, Reducible, Rewritable};
+use reflex::core::{Applicable, Reducible, Rewritable};
 use reflex_dispatcher::{
     Action, Actor, Handler, ProcessId, SchedulerTransition, SerializableAction, TaskFactory,
 };
 use reflex_graphql::{GraphQlOperation, GraphQlParserBuiltin, GraphQlSchema};
-use reflex_interpreter::{
-    compiler::{Compile, CompiledProgram, CompilerOptions},
-    InterpreterOptions,
-};
 use reflex_json::{json, JsonValue};
 use reflex_runtime::{
     actor::bytecode_interpreter::BytecodeInterpreterMetricLabels, task::RuntimeTask,
@@ -27,6 +23,7 @@ use reflex_runtime::{
 use reflex_scheduler::tokio::{
     TokioInbox, TokioSchedulerInstrumentation, TokioSchedulerLogger, TokioThreadPoolFactory,
 };
+use reflex_wasm::cli::compile::WasmProgram;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -50,9 +47,6 @@ pub struct ExecuteQueryCliOptions {
     pub variables: Option<String>,
     pub headers: Option<HeaderMap>,
     pub effect_throttle: Option<Duration>,
-    pub debug_compiler: bool,
-    pub debug_interpreter: bool,
-    pub debug_stack: bool,
 }
 
 pub async fn cli<
@@ -80,7 +74,8 @@ pub async fn cli<
     TBlockingTasks,
 >(
     options: ExecuteQueryCliOptions,
-    graph_root: (CompiledProgram, InstructionPointer),
+    wasm_module: WasmProgram,
+    graph_root_factory_export_name: impl Into<String>,
     schema: Option<GraphQlSchema>,
     custom_actors: GraphQlWebServerActorFactory<
         TAction,
@@ -115,7 +110,6 @@ where
         + Rewritable<T>
         + Reducible<T>
         + Applicable<T>
-        + Compile<T>
         + Serialize
         + for<'de> Deserialize<'de>,
     T::String: Send,
@@ -191,16 +185,6 @@ where
         tokio_runtime_metric_names,
         "main",
     );
-    let compiler_options = if options.debug_compiler {
-        CompilerOptions::debug()
-    } else {
-        CompilerOptions::default()
-    };
-    let interpreter_options = InterpreterOptions {
-        debug_instructions: options.debug_interpreter,
-        debug_stack: options.debug_stack,
-        ..InterpreterOptions::default()
-    };
     let query = options.query;
     let variables = match options.variables {
         None => serde_json::Value::Object(serde_json::Map::new()),
@@ -230,11 +214,10 @@ where
             .with_context(|| anyhow!("Failed to create GraphQL request payload"))
     }?;
     let app = GraphQlWebServer::<TAction, TTask>::new(
-        graph_root,
+        wasm_module,
+        graph_root_factory_export_name,
         schema,
         custom_actors,
-        compiler_options,
-        interpreter_options,
         factory.clone(),
         allocator.clone(),
         transform_http,

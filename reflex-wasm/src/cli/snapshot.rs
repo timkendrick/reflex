@@ -4,8 +4,8 @@
 use std::collections::HashMap;
 
 use walrus::{
-    self, ActiveData, ActiveDataLocation, DataId, DataKind, ExportId, ExportItem, FunctionId,
-    GlobalId, GlobalKind, InitExpr, MemoryId,
+    self, ActiveData, ActiveDataLocation, DataKind, ExportId, ExportItem, FunctionId, GlobalId,
+    GlobalKind, InitExpr, MemoryId,
 };
 
 use crate::interpreter::{
@@ -21,9 +21,6 @@ pub enum WasmSnapshotError {
     InterpreterError(InterpreterError),
     MemoryNotFound(String),
     FunctionNotFound(String),
-    DataSectionNotFound,
-    MultipleDataSections,
-    InvalidDataSection,
     InvalidAstTransformation,
 }
 
@@ -36,9 +33,6 @@ impl std::fmt::Display for WasmSnapshotError {
             Self::InterpreterError(err) => write!(f, "Failed to initialize interpreter: {err}"),
             Self::MemoryNotFound(name) => write!(f, "Memory definition not found: {name}"),
             Self::FunctionNotFound(name) => write!(f, "Function definition not found: {name}"),
-            Self::DataSectionNotFound => write!(f, "Data section definition not found"),
-            Self::MultipleDataSections => write!(f, "Multiple data section definitions"),
-            Self::InvalidDataSection => write!(f, "Invalid data section definition"),
             Self::InvalidAstTransformation => write!(f, "Invalid AST transformation"),
         }
     }
@@ -49,19 +43,35 @@ pub struct MemorySnapshot {
     updated_globals: HashMap<String, wasmtime::Val>,
 }
 
-pub fn inline_heap_snapshot(
+impl MemorySnapshot {
+    pub fn from_bytes(bytes: impl Into<Vec<u8>>) -> Self {
+        Self {
+            linear_memory: bytes.into(),
+            updated_globals: Default::default(),
+        }
+    }
+}
+
+pub fn capture_heap_snapshot(
     wasm_bytes: &[u8],
     memory_name: &str,
-) -> Result<Vec<u8>, WasmSnapshotError> {
+) -> Result<MemorySnapshot, WasmSnapshotError> {
     // Instantiate the runtime WASM module in an interpreter
     let mut interpreter =
         load_wasm_module(wasm_bytes, memory_name).map_err(WasmSnapshotError::InterpreterError)?;
-
     // Capture a memory snapshot of the ininitalized WASM module
+    capture_initial_memory_snapshot(&mut interpreter)
+}
+
+pub fn inline_heap_snapshot(
+    wasm_bytes: &[u8],
+    memory_name: &str,
+    snapshot: MemorySnapshot,
+) -> Result<Vec<u8>, WasmSnapshotError> {
     let MemorySnapshot {
         linear_memory,
         updated_globals,
-    } = capture_initial_memory_snapshot(&mut interpreter)?;
+    } = snapshot;
 
     // Create a new WASM module based on the input bytes
     let mut ast = parse_wasm_ast(wasm_bytes)?;
@@ -95,9 +105,18 @@ pub fn inline_heap_snapshot(
         .ok_or_else(|| WasmSnapshotError::MemoryNotFound(String::from(memory_name)))?;
     update_initial_heap_size(&mut ast, memory_id, linear_memory_size);
 
-    // Update the module's linear memory initialization instruction with the allocated contents
-    let heap_snapshot_id = get_data_section_instruction_id(&ast)?;
-    update_data_segment(&mut ast, heap_snapshot_id, linear_memory);
+    // Replace the module's linear memory initialization instructions with the allocated contents
+    let existing_data_section_ids = ast.data.iter().map(|data| data.id()).collect::<Vec<_>>();
+    for data_id in existing_data_section_ids {
+        ast.data.delete(data_id)
+    }
+    ast.data.add(
+        DataKind::Active(ActiveData {
+            location: ActiveDataLocation::Absolute(0),
+            memory: memory_id,
+        }),
+        linear_memory,
+    );
 
     // Clear the _initialize method body
     let init_function_id = get_named_function_id(&ast, "_initialize")
@@ -124,14 +143,6 @@ fn update_initial_heap_size(
 
     // Otherwise increase the initial memory allocation to the next power of two
     memory.initial = required_pages.next_power_of_two();
-}
-
-fn update_data_segment(
-    ast: &mut walrus::Module,
-    data_segment_id: DataId,
-    linear_memory: impl Into<Vec<u8>>,
-) {
-    ast.data.get_mut(data_segment_id).value = linear_memory.into();
 }
 
 fn load_wasm_module(
@@ -226,27 +237,6 @@ fn clear_function_body(
     .ok_or_else(|| WasmSnapshotError::InvalidAstTransformation)?;
     init_function.builder_mut().func_body().instrs_mut().clear();
     Ok(())
-}
-
-fn get_data_section_instruction_id(module: &walrus::Module) -> Result<DataId, WasmSnapshotError> {
-    let mut data_instructions = module.data.iter();
-    match (data_instructions.next(), data_instructions.next()) {
-        (Some(data), None) => {
-            if matches!(
-                &data.kind,
-                DataKind::Active(ActiveData {
-                    location: ActiveDataLocation::Absolute(0),
-                    ..
-                })
-            ) {
-                Ok(data.id())
-            } else {
-                Err(WasmSnapshotError::InvalidDataSection)
-            }
-        }
-        (Some(_), Some(_)) => Err(WasmSnapshotError::MultipleDataSections),
-        (None, _) => Err(WasmSnapshotError::DataSectionNotFound),
-    }
 }
 
 fn parse_exported_memories(module: &walrus::Module) -> impl Iterator<Item = (&str, MemoryId)> + '_ {

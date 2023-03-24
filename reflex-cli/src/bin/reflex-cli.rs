@@ -578,6 +578,7 @@ enum CliActor<
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
+    T::Builtin: Into<reflex_wasm::stdlib::Stdlib>,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TGrpcConfig: GrpcConfig + Send + 'static,
@@ -615,6 +616,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
+    T::Builtin: Into<reflex_wasm::stdlib::Stdlib>,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TGrpcConfig: GrpcConfig + Send + 'static,
@@ -657,6 +659,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
+    T::Builtin: Into<reflex_wasm::stdlib::Stdlib>,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TGrpcConfig: GrpcConfig + Send + Clone + 'static,
@@ -817,6 +820,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
+    T::Builtin: Into<reflex_wasm::stdlib::Stdlib>,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TGrpcConfig: GrpcConfig + Send + Clone + 'static,
@@ -936,6 +940,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
+    T::Builtin: Into<reflex_wasm::stdlib::Stdlib>,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TGrpcConfig: GrpcConfig + Send + Clone + 'static,
@@ -1029,6 +1034,7 @@ enum CliActorState<
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
+    T::Builtin: Into<reflex_wasm::stdlib::Stdlib>,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TGrpcConfig: GrpcConfig + Send + Clone + 'static,
@@ -1092,6 +1098,7 @@ enum CliEvents<
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
+    T::Builtin: Into<reflex_wasm::stdlib::Stdlib>,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TGrpcConfig: GrpcConfig + Send + Clone + 'static,
@@ -1168,6 +1175,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
+    T::Builtin: Into<reflex_wasm::stdlib::Stdlib>,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TGrpcConfig: GrpcConfig + Send + Clone + 'static,
@@ -1224,6 +1232,7 @@ enum CliDispose<
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
+    T::Builtin: Into<reflex_wasm::stdlib::Stdlib>,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TGrpcConfig: GrpcConfig + Send + Clone + 'static,
@@ -1286,6 +1295,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
+    T::Builtin: Into<reflex_wasm::stdlib::Stdlib>,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TGrpcConfig: GrpcConfig + Send + Clone + 'static,
@@ -1328,6 +1338,7 @@ task_factory_enum!({
         T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
         TFactory: AsyncExpressionFactory<T> + Default,
         TAllocator: AsyncHeapAllocator<T> + Default,
+        T::Builtin: Into<reflex_wasm::stdlib::Stdlib>,
         TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     {
         Runtime(RuntimeTaskFactory),
@@ -1343,6 +1354,7 @@ task_factory_enum!({
         T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
         TFactory: AsyncExpressionFactory<T> + Default,
         TAllocator: AsyncHeapAllocator<T> + Default,
+        T::Builtin: Into<reflex_wasm::stdlib::Stdlib>,
         TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
         TAction: Action + CliTaskAction<T> + Send + 'static,
         TTask: TaskFactory<TAction, TTask>,
@@ -1362,6 +1374,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
+    T::Builtin: Into<reflex_wasm::stdlib::Stdlib>,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TGrpcConfig: GrpcConfig + Send + Clone + 'static,
@@ -1386,6 +1399,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
+    T::Builtin: Into<reflex_wasm::stdlib::Stdlib>,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TGrpcConfig: GrpcConfig + Send + Clone + 'static,
@@ -1414,6 +1428,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
+    T::Builtin: Into<reflex_wasm::stdlib::Stdlib>,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TGrpcConfig: GrpcConfig + Send + Clone + 'static,
@@ -1437,29 +1452,6 @@ where
 }
 
 impl<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels>
-    From<EffectThrottleTaskFactory>
-    for CliActorFactory<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels>
-where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
-    T::String: Send,
-    T::Builtin: Send,
-    T::Signal: Send,
-    T::SignalList: Send,
-    T::StructPrototype: Send,
-    T::ExpressionList: Send,
-    TFactory: AsyncExpressionFactory<T> + Default,
-    TAllocator: AsyncHeapAllocator<T> + Default,
-    TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
-    TReconnect: ReconnectTimeout + Send + Clone + 'static,
-    TGrpcConfig: GrpcConfig + Send + Clone + 'static,
-    TMetricLabels: BytecodeInterpreterMetricLabels + Send + 'static,
-{
-    fn from(value: EffectThrottleTaskFactory) -> Self {
-        Self::from(CliTaskFactory::Runtime(RuntimeTaskFactory::from(value)))
-    }
-}
-
-impl<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels>
     From<BytecodeWorkerTaskFactory<T, TFactory, TAllocator>>
     for CliActorFactory<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels>
 where
@@ -1472,6 +1464,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
+    T::Builtin: Into<reflex_wasm::stdlib::Stdlib>,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TGrpcConfig: GrpcConfig + Send + Clone + 'static,
@@ -1483,7 +1476,7 @@ where
 }
 
 impl<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels>
-    From<WasmWorkerTaskFactory<T, TFactory, TAllocator>>
+    From<EffectThrottleTaskFactory>
     for CliActorFactory<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels>
 where
     T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
@@ -1495,13 +1488,14 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
+    T::Builtin: Into<reflex_wasm::stdlib::Stdlib>,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TGrpcConfig: GrpcConfig + Send + Clone + 'static,
     TMetricLabels: BytecodeInterpreterMetricLabels + Send + 'static,
 {
-    fn from(value: WasmWorkerTaskFactory<T, TFactory, TAllocator>) -> Self {
-        Self::from(CliTaskFactory::WasmWorker(value))
+    fn from(value: EffectThrottleTaskFactory) -> Self {
+        Self::from(CliTaskFactory::Runtime(RuntimeTaskFactory::from(value)))
     }
 }
 
@@ -1518,6 +1512,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
+    T::Builtin: Into<reflex_wasm::stdlib::Stdlib>,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TGrpcConfig: GrpcConfig + Send + Clone + 'static,
@@ -1543,6 +1538,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
+    T::Builtin: Into<reflex_wasm::stdlib::Stdlib>,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TGrpcConfig: GrpcConfig + Send + Clone + 'static,
@@ -1568,6 +1564,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
+    T::Builtin: Into<reflex_wasm::stdlib::Stdlib>,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TGrpcConfig: GrpcConfig + Send + Clone + 'static,
@@ -1593,6 +1590,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
+    T::Builtin: Into<reflex_wasm::stdlib::Stdlib>,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TGrpcConfig: GrpcConfig + Send + Clone + 'static,
@@ -1618,6 +1616,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
+    T::Builtin: Into<reflex_wasm::stdlib::Stdlib>,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TGrpcConfig: GrpcConfig + Send + Clone + 'static,
@@ -1643,6 +1642,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
+    T::Builtin: Into<reflex_wasm::stdlib::Stdlib>,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TGrpcConfig: GrpcConfig + Send + Clone + 'static,

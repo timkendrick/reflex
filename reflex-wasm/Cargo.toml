@@ -11,28 +11,29 @@ path = "src/bin/compile.rs"
 
 
 [dependencies]
-anyhow = "1.0"
-chrono = "0.4"
-clap = { version = "4.0.32", features = ["derive"] }
 reflex = { path = "../reflex" }
 reflex-dispatcher = { path = "../reflex-dispatcher" }
 reflex-graphql = { path = "../reflex-graphql" }
+reflex-grpc = { path = "../reflex-grpc" }
 reflex-handlers = { path = "../reflex-handlers" }
 reflex-js = { path = "../reflex-js" }
 reflex-json = { path = "../reflex-json" }
+reflex-lang = { path = "../reflex-lang" }
 reflex-macros = { path = "../reflex-macros" }
+reflex-parser = { path = "../reflex-parser" }
 reflex-runtime = { path = "../reflex-runtime" }
 reflex-stdlib = { path = "../reflex-stdlib" }
 reflex-utils = { path = "../reflex-utils" }
+anyhow = "1.0"
+chrono = "0.4"
+clap = { version = "4.0", features = ["derive"] }
 metrics = "0.18"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 strum = "0.22"
 strum_macros = "0.22"
-swc_common = "0.29.16"
-swc_ecma_ast = "0.94.21"
-swc_ecma_parser = "0.122.31"
 walrus = "0.19.0"
 wasi-common = "4.0.0"
 wasmtime = "4.0.0"
 wasmtime-wasi = "4.0.0"
+wasm-opt = "0.111.0"

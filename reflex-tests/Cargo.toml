@@ -13,13 +13,13 @@ reflex-dispatcher = { path = "../reflex-dispatcher" }
 reflex-graphql = { path = "../reflex-graphql" }
 reflex-grpc = { path = "../reflex-grpc" }
 reflex-handlers = { path = "../reflex-handlers" }
-reflex-interpreter = { path = "../reflex-interpreter" }
 reflex-js = { path = "../reflex-js" }
 reflex-lang = { path = "../reflex-lang" }
 reflex-parser = { path = "../reflex-parser" }
 reflex-scheduler = { path = "../reflex-scheduler" }
 reflex-utils = { path = "../reflex-utils" }
 reflex-server = { path = "../reflex-server" }
+reflex-wasm = { path = "../reflex-wasm" }
 hyper = { version = "0.14", features = ["full"] }
 serde_json = "1"
 tokio = { version = "1", features = ["full", "tracing"] }

@@ -8,11 +8,8 @@ use wasmtime::{AsContext, AsContextMut, Caller, Extern, Memory, StoreContext};
 use crate::{
     interpreter::{InterpreterError, WasmContextBuilder},
     term_type::date::DateTimestamp,
-    ArenaPointer,
+    ArenaPointer, WASM_PAGE_SIZE,
 };
-
-// Memory is allocated in 64KiB pages according to WASM spec
-const WASM_PAGE_SIZE: usize = 64 * 1024;
 
 pub fn add_wasm_runtime_imports(
     builder: WasmContextBuilder,

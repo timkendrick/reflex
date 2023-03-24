@@ -38,11 +38,9 @@ use reflex_runtime::{
     },
     QueryInvalidationStrategy,
 };
-use serde::{Deserialize, Serialize};
 
 use crate::{
-    exports::add_wasm_runtime_imports,
-    interpreter::{InterpreterError, WasmContextBuilder},
+    cli::compile::WasmProgram,
     task::wasm_worker::{WasmWorkerMetricNames, WasmWorkerTask, WasmWorkerTaskFactory},
 };
 
@@ -103,33 +101,6 @@ impl Default for WasmInterpreterMetricNames {
             query_worker_evaluation_cache_deep_size: "query_worker_evaluation_cache_deep_size",
             query_worker_evaluation_cache_entry_count: "query_worker_evaluation_cache_entry_count",
         }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct WasmProgram(Vec<u8>);
-
-impl WasmProgram {
-    pub fn as_bytes(&self) -> &[u8] {
-        &self.0
-    }
-    pub fn into_bytes(self) -> Vec<u8> {
-        self.0
-    }
-    pub(crate) fn instantiate(
-        &self,
-        memory_name: &'static str,
-    ) -> Result<crate::interpreter::WasmInterpreter, InterpreterError> {
-        WasmContextBuilder::from_cwasm(self.as_bytes(), memory_name)
-            .and_then(|builder| add_wasm_runtime_imports(builder, memory_name))
-            .and_then(|builder| builder.build())
-            .map(Into::into)
-    }
-}
-
-impl From<Vec<u8>> for WasmProgram {
-    fn from(value: Vec<u8>) -> Self {
-        Self(value)
     }
 }
 
@@ -538,7 +509,7 @@ where
                                 .graph_root_factory_export_name
                                 .clone(),
                             evaluation_mode: *evaluation_mode,
-                            graph_root: self.program.clone(),
+                            wasm_module: self.program.clone(),
                             metric_names: WasmWorkerMetricNames {
                                 query_worker_compile_duration: self
                                     .metric_names
