@@ -17,8 +17,8 @@ use serde_json::Value as JsonValue;
 use crate::{
     allocator::{Arena, ArenaAllocator},
     compiler::{
-        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
-        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings, ValueType,
+        instruction, runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState, ConstValue, ValueType,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{TermType, TypedTerm, WasmExpression},
@@ -277,52 +277,67 @@ impl<A: Arena + Clone> Internable for ArenaRef<StringTerm, A> {
 impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<StringTerm, A> {
     fn compile(
         &self,
+        stack: CompilerStack,
         _state: &mut CompilerState,
-        _bindings: &CompilerVariableBindings,
         _options: &CompilerOptions,
-        _stack: &CompilerStack,
     ) -> CompilerResult<A> {
         let num_chars = self.len();
         let data = self.data();
-        let mut instructions = CompiledBlock::default();
+        let block = CompiledBlockBuilder::new(stack);
         // Push the string length onto the stack
         // => [length]
-        instructions.push(CompiledInstruction::u32_const(num_chars as u32));
+        let block = block.push(instruction::core::Const {
+            value: ConstValue::U32(num_chars as u32),
+        });
         // Allocate the string term
         // => [StringTerm]
-        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-            RuntimeBuiltin::AllocateString,
-        ));
+        let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+            target: RuntimeBuiltin::AllocateString,
+        });
         // Assign the string contents
-        for (chunk_index, chunk) in data.iter().enumerate() {
-            let char_index = chunk_index * std::mem::size_of::<u32>();
-            // Duplicate the string term pointer onto the stack
-            // => [StringTerm, StringTerm]
-            instructions.push(CompiledInstruction::Duplicate(ValueType::HeapPointer));
-            // Push the chunk index onto the stack
-            // => [StringTerm, StringTerm, index]
-            instructions.push(CompiledInstruction::u32_const(char_index as u32));
-            // Get the character offset for the chunk at the given index
-            // => [StringTerm, offset]
-            instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-                RuntimeBuiltin::GetStringCharOffset,
-            ));
-            // Push the chunk onto the stack
-            // => [StringTerm, offset, chunk]
-            instructions.push(CompiledInstruction::u32_const(chunk));
-            // Write the chunk value to the string contents
-            // => [StringTerm]
-            instructions.push(CompiledInstruction::WriteHeapValue(ValueType::U32));
-        }
+        let block = data
+            .iter()
+            .enumerate()
+            .fold(block, |block, (chunk_index, chunk)| {
+                let char_index = chunk_index * std::mem::size_of::<u32>();
+                // Duplicate the string term pointer onto the stack
+                // => [StringTerm, StringTerm]
+                let block = block.push(instruction::core::Duplicate {
+                    value_type: ValueType::HeapPointer,
+                });
+                // Push the chunk index onto the stack
+                // => [StringTerm, StringTerm, index]
+                let block = block.push(instruction::core::Const {
+                    value: ConstValue::U32(char_index as u32),
+                });
+                // Get the character offset for the chunk at the given index
+                // => [StringTerm, offset]
+                let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+                    target: RuntimeBuiltin::GetStringCharOffset,
+                });
+                // Push the chunk onto the stack
+                // => [StringTerm, offset, chunk]
+                let block = block.push(instruction::core::Const {
+                    value: ConstValue::U32(chunk),
+                });
+                // Write the chunk value to the string contents
+                // => [StringTerm]
+                let block = block.push(instruction::core::WriteHeapValue {
+                    value_type: ValueType::U32,
+                });
+                block
+            });
         // Now that the string contents has been added, push the string length onto the stack
         // => [StringTerm, length]
-        instructions.push(CompiledInstruction::u32_const(num_chars as u32));
+        let block = block.push(instruction::core::Const {
+            value: ConstValue::U32(num_chars as u32),
+        });
         // Initialize the string term with the length that is on the stack
         // => [StringTerm]
-        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-            RuntimeBuiltin::InitString,
-        ));
-        Ok(instructions)
+        let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+            target: RuntimeBuiltin::InitString,
+        });
+        block.finish()
     }
 }
 

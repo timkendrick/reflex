@@ -14,8 +14,8 @@ use serde_json::Value as JsonValue;
 use crate::{
     allocator::Arena,
     compiler::{
-        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
-        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings,
+        instruction, runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{ListTerm, TypedTerm, WasmExpression},
@@ -145,26 +145,22 @@ impl<A: Arena + Clone> Internable for ArenaRef<ConstructorTerm, A> {
 impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<ConstructorTerm, A> {
     fn compile(
         &self,
+        stack: CompilerStack,
         state: &mut CompilerState,
-        bindings: &CompilerVariableBindings,
         options: &CompilerOptions,
-        stack: &CompilerStack,
     ) -> CompilerResult<A> {
         let keys = self.keys();
-        let mut instructions = CompiledBlock::default();
+        let block = CompiledBlockBuilder::new(stack);
         // Push the prototype key list onto the stack
         // => [ListTerm]
-        instructions.append_block(
-            keys.as_deref()
-                .as_inner()
-                .compile(state, bindings, options, stack)?,
-        );
+        let block = block
+            .append_inner(|stack| keys.as_deref().as_inner().compile(stack, state, options))?;
         // Invoke the term constructor
         // => [ConstructorTerm]
-        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-            RuntimeBuiltin::CreateConstructor,
-        ));
-        Ok(instructions)
+        let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+            target: RuntimeBuiltin::CreateConstructor,
+        });
+        block.finish()
     }
 }
 

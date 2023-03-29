@@ -12,8 +12,8 @@ use serde_json::Value as JsonValue;
 use crate::{
     allocator::Arena,
     compiler::{
-        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
-        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings,
+        instruction, runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState, ConstValue,
     },
     hash::{TermHash, TermHasher, TermSize},
     utils::{chunks_to_i64, i64_to_chunks},
@@ -147,22 +147,23 @@ impl std::fmt::Display for DateTimestamp {
 impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<DateTerm, A> {
     fn compile(
         &self,
+        stack: CompilerStack,
         _state: &mut CompilerState,
-        _bindings: &CompilerVariableBindings,
         _options: &CompilerOptions,
-        _stack: &CompilerStack,
     ) -> CompilerResult<A> {
         let timestamp = self.timestamp();
-        let mut instructions = CompiledBlock::default();
+        let block = CompiledBlockBuilder::new(stack);
         // Push the value argument onto the stack
         // => [value]
-        instructions.push(CompiledInstruction::i64_const(timestamp));
+        let block = block.push(instruction::core::Const {
+            value: ConstValue::I64(timestamp),
+        });
         // Invoke the term constructor
         // => [DateTerm]
-        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-            RuntimeBuiltin::CreateDate,
-        ));
-        Ok(instructions)
+        let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+            target: RuntimeBuiltin::CreateDate,
+        });
+        block.finish()
     }
 }
 

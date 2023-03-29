@@ -13,8 +13,8 @@ use serde_json::Value as JsonValue;
 use crate::{
     allocator::Arena,
     compiler::{
-        CompileWasm, CompiledBlock, CompiledInstruction, CompilerError, CompilerOptions,
-        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings, ValueType,
+        error::CompilerError, instruction, CompileWasm, CompiledBlockBuilder, CompilerOptions,
+        CompilerResult, CompilerStack, CompilerState, ValueType,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::TypedTerm,
@@ -125,24 +125,32 @@ impl<A: Arena + Clone> Internable for ArenaRef<VariableTerm, A> {
         false
     }
 }
+
 impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<VariableTerm, A> {
     fn compile(
         &self,
+        stack: CompilerStack,
         _state: &mut CompilerState,
-        bindings: &CompilerVariableBindings,
-        _options: &CompilerOptions,
-        _stack: &CompilerStack,
+        options: &CompilerOptions,
     ) -> CompilerResult<A> {
         let stack_offset = self.stack_offset();
-        if let Some(scope_offset) = bindings.get(stack_offset) {
-            let mut instructions = CompiledBlock::default();
+        if let Some(scope_offset) = stack.lookup_variable(stack_offset) {
+            let block = CompiledBlockBuilder::new(stack);
             // Copy the lexically-scoped variable onto the stack
             // => [Term]
-            instructions.push(CompiledInstruction::GetScopeValue {
+            let block = block.push(instruction::core::GetScopeValue {
                 value_type: ValueType::HeapPointer,
                 scope_offset,
             });
-            Ok(instructions)
+            let block = if options.lazy_variable_initializers {
+                // If the variable was initialized lazily, evaluate the result now that we're using it
+                // => [Term]
+                block.push(instruction::runtime::Evaluate)
+            } else {
+                // Otherwise the variable will already have been evaluated at initialization time, so no need to evaluate again
+                block
+            };
+            block.finish()
         } else {
             Err(CompilerError::UnboundVariable(stack_offset))
         }

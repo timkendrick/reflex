@@ -14,9 +14,8 @@ use serde_json::Value as JsonValue;
 use crate::{
     allocator::Arena,
     compiler::{
-        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
-        CompilerResult, CompilerStack, CompilerStackValue, CompilerState, CompilerVariableBindings,
-        MaybeLazyExpression, ParamsSignature, TypeSignature, ValueType,
+        error::CompilerError, instruction, CompileWasm, CompiledBlockBuilder, CompilerOptions,
+        CompilerResult, CompilerStack, CompilerState, MaybeLazyExpression, Strictness, ValueType,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{TypedTerm, WasmExpression},
@@ -170,157 +169,97 @@ impl<A: Arena + Clone> Internable for ArenaRef<LetTerm, A> {
 impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<LetTerm, A> {
     fn compile(
         &self,
+        stack: CompilerStack,
         state: &mut CompilerState,
-        bindings: &CompilerVariableBindings,
         options: &CompilerOptions,
-        stack: &CompilerStack,
     ) -> CompilerResult<A> {
         let initializer = self.initializer();
         let body = self.body();
-        let mut instructions = CompiledBlock::default();
         // If the variable initializer is an alias to a variable declared in a parent scope, handle that as a special case
         if let Some(alias) = initializer.as_variable_term() {
             // Determine the scope offset of the aliased target variable
             let target_offset = alias.as_inner().stack_offset();
-            // Create a new compiler scope that includes the local variable
-            let inner_bindings = bindings.push_alias(target_offset);
+            // Determine the stack machine offset of the target variable
+            let target_scope_offset = stack
+                .lookup_variable(target_offset)
+                .ok_or_else(|| CompilerError::UnboundVariable(target_offset))?;
+            let block = CompiledBlockBuilder::new(stack);
+            // Load the aliased variable from the target scope
+            // => [Term]
+            let block = block.push(instruction::core::GetScopeValue {
+                value_type: ValueType::HeapPointer,
+                scope_offset: target_scope_offset,
+            });
+            // Create a new temporary lexical scope that includes the local variable
+            // => []
+            let block = block.push(instruction::core::ScopeStart {
+                value_type: ValueType::HeapPointer,
+            });
             // Yield the expression body onto the stack (this will be evaluated within the new scope)
             // => [Term]
-            instructions.append_block(body.compile(state, &inner_bindings, options, stack)?);
+            let block = block.append_inner(|stack| body.compile(stack, state, options))?;
+            // Drop the temporary lexical scope, leaving the result on the stack
+            // => [Term]
+            let block = block.push(instruction::core::ScopeEnd {
+                value_type: ValueType::HeapPointer,
+            });
+            block.finish()
         } else {
-            let eagerness = if options.lazy_variable_initializers
-                || (initializer.is_static() && initializer.as_signal_term().is_none())
-            {
-                Eagerness::Lazy
+            let (eagerness, strictness) = if options.lazy_variable_initializers {
+                (Eagerness::Lazy, Strictness::NonStrict)
             } else {
-                Eagerness::Eager
+                (
+                    Eagerness::Eager,
+                    // Skip signal-testing for variable initializers that are already fully evaluated to a non-signal value
+                    if initializer.is_static() && initializer.as_signal_term().is_none() {
+                        Strictness::NonStrict
+                    } else {
+                        Strictness::Strict
+                    },
+                )
             };
-            let is_strict = matches!(eagerness, Eagerness::Eager);
+            let block = CompiledBlockBuilder::new(stack);
             // Yield the initializer term onto the stack
             // => [Term]
-            instructions.append_block(
-                MaybeLazyExpression::new(initializer, eagerness)
-                    .compile(state, bindings, options, stack)?,
-            );
-            // Pop the initializer term and assign it to a temporary lexical scope
+            let block = block.append_inner(|stack| {
+                MaybeLazyExpression::new(initializer, eagerness).compile(stack, state, options)
+            })?;
+            // Pop the initializer term and assign it to a lexical scope
             // => []
-            instructions.push(CompiledInstruction::ScopeStart(ValueType::HeapPointer));
-            // Create a new compiler scope that includes the local variable
-            let inner_bindings = bindings.push_local();
-            // If the initializer is evaluated in strict mode, test for signals
-            if is_strict {
+            let block = block.push(instruction::runtime::DeclareVariable {
+                value_type: ValueType::HeapPointer,
+            });
+            // If the initializer is being evaluated in strict mode, test for signals
+            // => []
+            let block = if strictness.is_strict() {
                 // Push a copy of the initializer result onto the stack
                 // => [Term]
-                instructions.push(CompiledInstruction::GetScopeValue {
+                let block = block.push(instruction::core::GetScopeValue {
                     value_type: ValueType::HeapPointer,
                     scope_offset: 0,
                 });
-                // Invoke the builtin function to determine whether the value is a signal
-                // => [bool]
-                instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-                    RuntimeBuiltin::IsSignal,
-                ));
-                // Short circuit if a signal term was encountered
-                // TODO: Consolidate signal-testing code across multiple use cases
+                // If the initializer result is a signal, break out of the current block
+                // => [Term]
+                let block = block.push(instruction::runtime::BreakOnSignal { target_block: 0 });
+                // Otherwise drop the temporary signal-testing value from the operand stack
                 // => []
-                instructions.push(CompiledInstruction::ConditionalBreak {
-                    // Retain the evaluated condition term pointer on the stack, preceded by any existing captured stack values
-                    block_type: TypeSignature {
-                        params: ParamsSignature::from_iter(stack.value_types()),
-                        results: ParamsSignature::Single(ValueType::HeapPointer),
-                    },
-                    // Return the signal term
-                    handler: {
-                        let mut instructions = CompiledBlock::default();
-                        // If there were any captured values saved onto the operand stack we need to discard them
-                        if stack.depth() > 0 {
-                            // Discard any preceding stack arguments that had been captured for use in the continuation block closure
-                            let num_signal_scopes = stack.rev().fold(
-                                Ok(0usize),
-                                |num_signal_scopes, stack_value| {
-                                    let num_signal_scopes = num_signal_scopes?;
-                                    match stack_value {
-                                        CompilerStackValue::Lazy(value_type) => {
-                                            // If the captured stack value does not need to be checked for signals,
-                                            // pop it from the operand stack and move on
-                                            instructions
-                                                .push(CompiledInstruction::Drop(value_type));
-                                            Ok(num_signal_scopes)
-                                        }
-                                        CompilerStackValue::Strict => {
-                                            // Pop the captured value from the operand stack and store it in a temporary scope for signal-testing
-                                            instructions.push(CompiledInstruction::ScopeStart(
-                                                ValueType::HeapPointer,
-                                            ));
-                                            // Reinstate a copy of the captured value on the operand stack (true branch)
-                                            instructions.push(CompiledInstruction::GetScopeValue {
-                                                value_type: ValueType::HeapPointer,
-                                                scope_offset: 0,
-                                            });
-                                            // Push a null pointer onto the operand stack (false branch)
-                                            instructions.push(CompiledInstruction::NullPointer);
-                                            // Push another copy of the captured value onto the operand stack for signal comparison
-                                            instructions.push(CompiledInstruction::GetScopeValue {
-                                                value_type: ValueType::HeapPointer,
-                                                scope_offset: 0,
-                                            });
-                                            // Dispose the temporary signal-testing scope
-                                            instructions.push(CompiledInstruction::ScopeEnd(
-                                                ValueType::HeapPointer,
-                                            ));
-                                            // Determine whether the captured value is a signal (condition)
-                                            instructions.push(
-                                                CompiledInstruction::CallRuntimeBuiltin(
-                                                    RuntimeBuiltin::IsSignal,
-                                                ),
-                                            );
-                                            // Select either the captured value or the null pointer depending on whether the captured value is a signal
-                                            instructions.push(CompiledInstruction::Select(
-                                                ValueType::HeapPointer,
-                                            ));
-                                            // Push the existing accumulated signal onto the operand stack
-                                            instructions.push(CompiledInstruction::GetScopeValue {
-                                                value_type: ValueType::HeapPointer,
-                                                scope_offset: 0,
-                                            });
-                                            // Combine with the existing accumulated signal
-                                            instructions.push(
-                                                CompiledInstruction::CallRuntimeBuiltin(
-                                                    RuntimeBuiltin::CombineSignals,
-                                                ),
-                                            );
-                                            // Create a new lexical scope containing the accumulated signal result
-                                            instructions.push(CompiledInstruction::ScopeStart(
-                                                ValueType::HeapPointer,
-                                            ));
-                                            Ok(num_signal_scopes + 1)
-                                        }
-                                    }
-                                },
-                            )?;
-                            // Drop the temporary signal-testing scopes
-                            for _ in 0..num_signal_scopes {
-                                instructions
-                                    .push(CompiledInstruction::ScopeEnd(ValueType::HeapPointer));
-                            }
-                        }
-                        // Push the accumulated signal term pointer onto the top of the stack
-                        instructions.push(CompiledInstruction::GetScopeValue {
-                            value_type: ValueType::HeapPointer,
-                            scope_offset: 0,
-                        });
-                        instructions
-                    },
+                let block = block.push(instruction::core::Drop {
+                    value_type: ValueType::HeapPointer,
                 });
-            }
+                block
+            } else {
+                block
+            };
             // Yield the expression body onto the stack (this will be evaluated within the new scope)
             // => [Term]
-            instructions.append_block(body.compile(state, &inner_bindings, options, stack)?);
-            // Drop the temporary lexical scope, leaving the result on the stack
+            let block = block.append_inner(|stack| body.compile(stack, state, options))?;
+            // Drop the lexical scope, leaving the result on the stack
             // => [Term]
-            instructions.push(CompiledInstruction::ScopeEnd(ValueType::HeapPointer));
+            let block = block.push(instruction::core::ScopeEnd {
+                value_type: ValueType::HeapPointer,
+            });
+            block.finish()
         }
-        Ok(instructions)
     }
 }
 

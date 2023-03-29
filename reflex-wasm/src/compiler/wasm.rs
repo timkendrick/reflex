@@ -1,24 +1,22 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use std::{
-    collections::{HashMap, VecDeque},
-    iter::once,
-};
+use std::collections::HashMap;
 
 use crate::{
     compiler::{
-        builtin::RuntimeBuiltin, CompiledBlock, CompiledFunctionId, CompiledInstruction,
-        ConstValue, FunctionPointer, ParamsSignature, TypeSignature, ValueType,
+        instruction::core::Block, runtime::builtin::RuntimeBuiltin, CompiledBlock,
+        CompiledFunctionId, ParamsSignature, TypeSignature, ValueType,
     },
     stdlib::Stdlib,
-    utils::{from_twos_complement_i32, from_twos_complement_i64},
+    utils::from_twos_complement_i32,
     FunctionIndex,
 };
 
 use reflex::core::StackOffset;
+use reflex_utils::Stack;
 use walrus::{
-    ir::{self, BinaryOp, Instr, InstrSeqType, LoadKind, MemArg, StoreKind, Value},
+    ir::{self, BinaryOp, Instr, InstrSeqId, InstrSeqType},
     FunctionBuilder, FunctionId, GlobalId, InstrSeqBuilder, LocalId, MemoryId, Module, ModuleTypes,
     TableId, ValType,
 };
@@ -389,9 +387,8 @@ pub struct WasmGeneratorOptions {
 #[derive(Debug, Clone)]
 pub enum WasmGeneratorError {
     StackError,
-    InvalidBlockReturnType(TypeSignature),
     InvalidCompiledFunction(CompiledFunctionId),
-    InvalidContinuation,
+    InvalidBlockOffset(usize),
 }
 
 /// Create a function from the given pre-compiled function body instructions with the requisite parameters to transparently handle stateful reactivity
@@ -409,7 +406,7 @@ pub enum WasmGeneratorError {
 pub(crate) fn generate_stateful_function(
     module: &mut Module,
     arg_types: impl Iterator<Item = ValueType> + Clone,
-    body: &CompiledBlock,
+    body: CompiledBlock,
     export_mappings: &RuntimeExportMappings,
     memory_id: MemoryId,
     main_function_table_id: TableId,
@@ -461,27 +458,39 @@ pub(crate) fn generate_stateful_function(
         compiled_function_mappings,
         export_mappings,
     };
-
-    // Create the function signature
-    let mut builder = FunctionBuilder::new(&mut module.types, &params, &results);
-    // Create the function body
-    {
-        let mut function_body_builder = builder.func_body();
-        // Initialize the dependencies local to the null pointer
-        function_body_builder
+    let function_id = {
+        // Create the function signature
+        let mut builder = FunctionBuilder::new(&mut module.types, &params, &results);
+        // Create the function body
+        let mut function_body = builder.func_body();
+        // Embed the function pre-instructions
+        function_body
+            // Initialize the dependencies local to the null pointer
             .global_get(export_mappings.globals.null_pointer)
             .local_set(dependencies_id);
-        // Generate the WASM instructions for the rest of the function body
-        let mut instructions = body.emit_wasm(module, &mut bindings, options)?;
-        // Append the value of the dependencies local to the function body return value
-        instructions.push(ir::LocalGet {
-            local: dependencies_id,
-        });
-        // Append the generated instructions into the function body
-        compile_wasm(&mut function_body_builder, instructions)?;
-    }
-    // Add the function to the WASM module
-    let function_id = builder.finish(args, &mut module.funcs);
+        // Embed the compiled function body
+        {
+            // Create a control flow block to wrap the compiled function body
+            // (this allows any signals encountered within the function to short-circuit by breaking out of the block).
+            let block = Block {
+                block_type: TypeSignature {
+                    params: ParamsSignature::Void,
+                    results: ParamsSignature::Single(ValueType::HeapPointer),
+                },
+                body,
+            };
+            // Generate the WASM instructions for the block
+            let instructions = block.emit_wasm(module, &mut bindings, options)?;
+            // Inject the generated instructions into the function body
+            let _ = assemble_wasm(&mut function_body, Default::default(), instructions)?;
+        };
+        // Embed the function post-instructions
+        function_body
+            // Append the value of the dependencies local to the function body return value
+            .local_get(dependencies_id);
+        // Add the function to the WASM module
+        builder.finish(args, &mut module.funcs)
+    };
     Ok(function_id)
 }
 
@@ -574,9 +583,8 @@ impl std::fmt::Display for WasmGeneratorError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::StackError => write!(f, "Invalid stack access"),
-            Self::InvalidBlockReturnType(ty) => write!(f, "Invalid block return type: {ty:?}"),
             Self::InvalidCompiledFunction(id) => write!(f, "Invalid compiled function ID: {id}"),
-            Self::InvalidContinuation => write!(f, "Invalid continuation instruction"),
+            Self::InvalidBlockOffset(target) => write!(f, "Invalid parent block offset: {target}"),
         }
     }
 }
@@ -609,7 +617,7 @@ impl WasmCompiledFunctionMappings {
     }
 }
 
-struct WasmGeneratorBindings<'a> {
+pub struct WasmGeneratorBindings<'a> {
     /// Heap linear memory ID
     memory_id: MemoryId,
     /// Dynamic function lookup table
@@ -620,22 +628,62 @@ struct WasmGeneratorBindings<'a> {
     dependencies_id: LocalId,
     /// Temporary free-use register
     temp_id: LocalId,
-    /// Locals currrently accessible on the lexical scope stack (this list will grow and shrink as new lexical scopes are created and disposed)
-    stack: Vec<LocalId>,
     /// Lookup table mapping term hashes to compiled function ids
     compiled_function_mappings: &'a WasmCompiledFunctionMappings,
     /// Struct containing IDs of runtime builtin functions
     export_mappings: &'a RuntimeExportMappings,
+    /// Locals currrently accessible on the lexical scope stack (this list will grow and shrink as new lexical scopes are created and disposed)
+    stack: Vec<LocalId>,
 }
+
 impl<'a> WasmGeneratorBindings<'a> {
-    fn enter_scope(&mut self, local_id: LocalId) -> LocalId {
+    pub fn memory_id(&self) -> MemoryId {
+        self.memory_id
+    }
+    pub fn main_function_table_id(&self) -> TableId {
+        self.main_function_table_id
+    }
+    pub fn state_id(&self) -> LocalId {
+        self.state_id
+    }
+    pub fn dependencies_id(&self) -> LocalId {
+        self.dependencies_id
+    }
+    pub fn temp_id(&self) -> LocalId {
+        self.temp_id
+    }
+    pub fn null_pointer(&self) -> GlobalId {
+        self.export_mappings.globals.null_pointer
+    }
+    pub fn builtins(&self) -> &RuntimeBuiltinMappings {
+        &self.export_mappings.builtins
+    }
+    pub fn get_stdlib_function_id(&self, target: Stdlib) -> FunctionId {
+        self.export_mappings.stdlib.get_function_id(target)
+    }
+    pub fn get_stdlib_indirect_call_function_index(&self, target: Stdlib) -> FunctionIndex {
+        self.export_mappings
+            .stdlib
+            .get_indirect_call_function_index(target)
+    }
+    pub fn get_compiled_function_id(&self, target: CompiledFunctionId) -> Option<FunctionId> {
+        self.compiled_function_mappings.get_function_id(target)
+    }
+    pub fn get_compiled_function_indirect_call_function_index(
+        &self,
+        target: CompiledFunctionId,
+    ) -> Option<FunctionIndex> {
+        self.compiled_function_mappings
+            .get_indirect_call_function_index(target)
+    }
+    pub fn enter_scope(&mut self, local_id: LocalId) -> LocalId {
         self.stack.push(local_id);
         local_id
     }
-    fn leave_scope(&mut self) -> Option<LocalId> {
+    pub fn leave_scope(&mut self) -> Option<LocalId> {
         self.stack.pop()
     }
-    fn get_local(&self, offset: StackOffset) -> Result<LocalId, WasmGeneratorError> {
+    pub fn get_local(&self, offset: StackOffset) -> Result<LocalId, WasmGeneratorError> {
         if offset < self.stack.len() {
             Ok(self.stack[self.stack.len() - 1 - offset])
         } else {
@@ -644,7 +692,10 @@ impl<'a> WasmGeneratorBindings<'a> {
     }
 }
 
-fn parse_block_type_signature(signature: &TypeSignature, types: &mut ModuleTypes) -> InstrSeqType {
+pub fn parse_block_type_signature(
+    signature: &TypeSignature,
+    types: &mut ModuleTypes,
+) -> InstrSeqType {
     let TypeSignature { params, results } = signature;
     if let ParamsSignature::Void = params {
         match results {
@@ -683,14 +734,14 @@ fn parse_block_type_signature(signature: &TypeSignature, types: &mut ModuleTypes
     }
 }
 
-fn parse_function_type_signature(signature: &TypeSignature) -> (Vec<ValType>, Vec<ValType>) {
+pub fn parse_function_type_signature(signature: &TypeSignature) -> (Vec<ValType>, Vec<ValType>) {
     let TypeSignature { params, results } = signature;
     let params = params.iter().map(parse_value_type).collect::<Vec<_>>();
     let results = results.iter().map(parse_value_type).collect::<Vec<_>>();
     (params, results)
 }
 
-fn parse_value_type(ty: ValueType) -> ValType {
+pub fn parse_value_type(ty: ValueType) -> ValType {
     match ty {
         ValueType::I32 | ValueType::U32 | ValueType::HeapPointer | ValueType::FunctionPointer => {
             ValType::I32
@@ -702,15 +753,83 @@ fn parse_value_type(ty: ValueType) -> ValType {
 }
 
 #[derive(Default, Clone, Debug)]
-struct WasmGeneratorOutput {
-    instructions: Vec<WasmGeneratorDirective>,
+pub struct WasmGeneratorOutput {
+    instructions: Vec<WasmInstruction>,
 }
+
 impl WasmGeneratorOutput {
-    fn push(&mut self, instruction: impl Into<Instr>) {
+    pub fn push(&mut self, instruction: impl Into<Instr>) {
         self.instructions
-            .push(WasmGeneratorDirective::Instruction(instruction.into()));
+            .push(WasmInstruction::Instruction(instruction.into()));
     }
-    fn branch(
+    pub fn block(
+        &mut self,
+        block_type: &TypeSignature,
+        body: WasmGeneratorOutput,
+        module: &mut Module,
+        bindings: &WasmGeneratorBindings,
+        options: &WasmGeneratorOptions,
+    ) {
+        // If the compiler output format does not support block input params, emulate this feature by using locals to
+        // save the stack values before branching, then once within the child block we can load the stack values back
+        // out from the locals (these temporary locals are typically compiled away in a later optimization pass)
+        if options.disable_block_params && (block_type.params.len() > 0) {
+            // First create temporary locals to hold the stack values
+            let param_ids = block_type
+                .params
+                .iter()
+                .map(|param_type| module.locals.add(parse_value_type(param_type)))
+                .collect::<Vec<_>>();
+            // Temporarily pop the branch condition into the temporary local
+            self.push(ir::LocalSet {
+                local: bindings.temp_id,
+            });
+            // Pop all the captured operand stack values into their respective locals
+            for param_id in param_ids.iter().rev() {
+                self.push(ir::LocalSet { local: *param_id });
+            }
+            // Push the branch condition back onto the operand stack
+            self.push(ir::LocalGet {
+                local: bindings.temp_id,
+            });
+            // Prepare the child block header that pushes the captured values back onto the operand stack
+            let block_header =
+                WasmGeneratorOutput::from_iter(param_ids.into_iter().map(|param_id| {
+                    WasmInstruction::Instruction(ir::Instr::LocalGet(ir::LocalGet {
+                        local: param_id,
+                    }))
+                }));
+            let block_type = parse_block_type_signature(
+                &TypeSignature {
+                    params: ParamsSignature::Void,
+                    results: block_type.results.clone(),
+                },
+                &mut module.types,
+            );
+            let body = {
+                let mut instructions = block_header;
+                instructions.push_chunk(body);
+                instructions
+            };
+            // Emit the rewritten branch instruction
+            self.instructions
+                .push(WasmInstruction::Block { block_type, body });
+        } else {
+            // Otherwise if we are not manually capturing any stack values, emit the branch instruction as-is
+            let block_type = parse_block_type_signature(block_type, &mut module.types);
+            self.instructions
+                .push(WasmInstruction::Block { block_type, body });
+        };
+    }
+    pub fn br(&mut self, target_block: usize) {
+        self.instructions
+            .push(WasmInstruction::Break { target_block });
+    }
+    pub fn br_if(&mut self, target_block: usize) {
+        self.instructions
+            .push(WasmInstruction::ConditionalBreak { target_block });
+    }
+    pub fn if_else(
         &mut self,
         block_type: &TypeSignature,
         consequent: WasmGeneratorOutput,
@@ -744,217 +863,186 @@ impl WasmGeneratorOutput {
             // Prepare the child block header that pushes the captured values back onto the operand stack
             let block_header =
                 WasmGeneratorOutput::from_iter(param_ids.into_iter().map(|param_id| {
-                    WasmGeneratorDirective::Instruction(ir::Instr::LocalGet(ir::LocalGet {
+                    WasmInstruction::Instruction(ir::Instr::LocalGet(ir::LocalGet {
                         local: param_id,
                     }))
                 }));
+            let block_type = parse_block_type_signature(
+                &TypeSignature {
+                    params: ParamsSignature::Void,
+                    results: block_type.results.clone(),
+                },
+                &mut module.types,
+            );
             let (consequent_header, alternative_header) = (block_header.clone(), block_header);
+            let consequent = {
+                let mut instructions = consequent_header;
+                instructions.push_chunk(consequent);
+                instructions
+            };
+            let alternative = {
+                let mut instructions = alternative_header;
+                instructions.push_chunk(alternative);
+                instructions
+            };
             // Emit the rewritten branch instruction
-            self.instructions.push(WasmGeneratorDirective::Branch {
-                block_type: parse_block_type_signature(
-                    &TypeSignature {
-                        params: ParamsSignature::Void,
-                        results: block_type.results.clone(),
-                    },
-                    &mut module.types,
-                ),
-                consequent: {
-                    let mut instructions = consequent_header;
-                    instructions.append_block(consequent);
-                    instructions
-                },
-                alternative: {
-                    let mut instructions = alternative_header;
-                    instructions.append_block(alternative);
-                    instructions
-                },
-            })
-        } else {
-            // Otherwise if we are not manually capturing any stack values, emit the branch instruction as-is
-            self.instructions.push(WasmGeneratorDirective::Branch {
-                block_type: parse_block_type_signature(block_type, &mut module.types),
+            self.instructions.push(WasmInstruction::IfElse {
+                block_type,
                 consequent,
                 alternative,
             });
-        }
+        } else {
+            // Otherwise if we are not manually capturing any stack values, emit the branch instruction as-is
+            let block_type = parse_block_type_signature(block_type, &mut module.types);
+            self.instructions.push(WasmInstruction::IfElse {
+                block_type,
+                consequent,
+                alternative,
+            });
+        };
     }
-    fn continuation(&mut self) {
-        self.instructions.push(WasmGeneratorDirective::Continuation);
-    }
-    fn append_block(&mut self, block: WasmGeneratorOutput) {
-        self.instructions.extend(block);
-    }
-    fn iter(&self) -> std::slice::Iter<'_, WasmGeneratorDirective> {
+    pub fn iter(&self) -> std::slice::Iter<'_, WasmInstruction> {
         self.instructions.iter()
     }
+    fn push_chunk(&mut self, chunk: WasmGeneratorOutput) {
+        self.instructions.extend(chunk);
+    }
 }
-impl FromIterator<WasmGeneratorDirective> for WasmGeneratorOutput {
-    fn from_iter<T: IntoIterator<Item = WasmGeneratorDirective>>(iter: T) -> Self {
+
+impl FromIterator<WasmInstruction> for WasmGeneratorOutput {
+    fn from_iter<T: IntoIterator<Item = WasmInstruction>>(iter: T) -> Self {
         Self {
             instructions: iter.into_iter().collect(),
         }
     }
 }
+
 impl IntoIterator for WasmGeneratorOutput {
-    type Item = WasmGeneratorDirective;
+    type Item = WasmInstruction;
     type IntoIter = std::vec::IntoIter<Self::Item>;
     fn into_iter(self) -> Self::IntoIter {
         self.instructions.into_iter()
     }
 }
+
 impl<'a> IntoIterator for &'a WasmGeneratorOutput {
-    type Item = &'a WasmGeneratorDirective;
-    type IntoIter = std::slice::Iter<'a, WasmGeneratorDirective>;
+    type Item = &'a WasmInstruction;
+    type IntoIter = std::slice::Iter<'a, WasmInstruction>;
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
-impl Extend<WasmGeneratorDirective> for WasmGeneratorOutput {
-    fn extend<T: IntoIterator<Item = WasmGeneratorDirective>>(&mut self, iter: T) {
+
+impl Extend<WasmInstruction> for WasmGeneratorOutput {
+    fn extend<T: IntoIterator<Item = WasmInstruction>>(&mut self, iter: T) {
         self.instructions.extend(iter)
     }
 }
 
 #[derive(Debug, Clone)]
-enum WasmGeneratorDirective {
+pub enum WasmInstruction {
     /// Standard WASM instruction
     Instruction(Instr),
+    /// Control flow block
+    Block {
+        block_type: InstrSeqType,
+        body: WasmGeneratorOutput,
+    },
+    /// Unconditional break instruction
+    Break {
+        /// Index of the block to break out of (where `0` is the current block, `1` is the immediate parent of the current block, etc)
+        target_block: usize,
+    },
+    /// Conditional break instruction
+    ConditionalBreak {
+        /// Index of the block to break out of (where `0` is the current block, `1` is the immediate parent of the current block, etc)
+        target_block: usize,
+    },
     /// If-else conditional branch instruction
-    Branch {
+    IfElse {
         block_type: InstrSeqType,
         consequent: WasmGeneratorOutput,
         alternative: WasmGeneratorOutput,
     },
-    /// 'Hole' representing an injection point to insert any remaining instructions
-    ///
-    /// This is useful if e.g. you want to provide a branch instruction, where control flow continues in one of the two branches
-    Continuation,
-}
-type WasmGeneratorResult = Result<WasmGeneratorOutput, WasmGeneratorError>;
-
-fn compile_wasm(
-    builder: &mut InstrSeqBuilder,
-    instructions: impl IntoIterator<Item = WasmGeneratorDirective>,
-) -> Result<(), WasmGeneratorError> {
-    let (flattened_instructions, _) = flatten_continuations(instructions, Default::default())?;
-    assemble_wasm(builder, flattened_instructions);
-    Ok(())
 }
 
-#[derive(Debug, Clone)]
-enum WasmInstruction {
-    Instruction(Instr),
-    Branch {
-        block_type: InstrSeqType,
-        consequent: Vec<WasmInstruction>,
-        alternative: Vec<WasmInstruction>,
-    },
-}
-impl TryFrom<WasmGeneratorDirective> for WasmInstruction {
-    type Error = WasmGeneratorError;
-    fn try_from(value: WasmGeneratorDirective) -> Result<Self, Self::Error> {
-        match value {
-            WasmGeneratorDirective::Instruction(instruction) => Ok(Self::Instruction(instruction)),
-            WasmGeneratorDirective::Branch {
-                block_type,
-                consequent,
-                alternative,
-            } => Ok(Self::Branch {
-                block_type,
-                consequent: consequent
-                    .into_iter()
-                    .map(TryInto::try_into)
-                    .collect::<Result<Vec<_>, _>>()?,
-                alternative: alternative
-                    .into_iter()
-                    .map(TryInto::try_into)
-                    .collect::<Result<Vec<_>, _>>()?,
-            }),
-            WasmGeneratorDirective::Continuation => Err(WasmGeneratorError::InvalidContinuation),
-        }
-    }
-}
+pub type WasmGeneratorResult = Result<WasmGeneratorOutput, WasmGeneratorError>;
 
+#[must_use]
 fn assemble_wasm(
     builder: &mut InstrSeqBuilder,
+    enclosing_blocks: Stack<InstrSeqId>,
     instructions: impl IntoIterator<Item = WasmInstruction>,
-) {
-    for instruction in instructions {
-        match instruction {
-            WasmInstruction::Instruction(instruction) => {
-                builder.instr(instruction);
-            }
-            WasmInstruction::Branch {
-                block_type,
-                consequent,
-                alternative,
-            } => {
-                let consequent_block_id = {
-                    let mut block_builder = builder.dangling_instr_seq(block_type);
-                    assemble_wasm(&mut block_builder, consequent);
-                    block_builder.id()
-                };
-                let alternate_block_id = {
-                    let mut block_builder = builder.dangling_instr_seq(block_type);
-                    assemble_wasm(&mut block_builder, alternative);
-                    block_builder.id()
-                };
-                builder.instr(ir::IfElse {
-                    consequent: consequent_block_id,
-                    alternative: alternate_block_id,
-                });
-            }
-        }
-    }
-}
-
-fn flatten_continuations(
-    instructions: impl IntoIterator<Item = WasmGeneratorDirective>,
-    mut continuation: VecDeque<WasmGeneratorDirective>,
-) -> Result<(Vec<WasmInstruction>, VecDeque<WasmGeneratorDirective>), WasmGeneratorError> {
-    let mut results = Vec::new();
-    let mut remaining_instructions = instructions.into_iter().collect::<VecDeque<_>>();
-    while let Some(instruction) = remaining_instructions.pop_front() {
-        match instruction {
-            WasmGeneratorDirective::Instruction(instruction) => {
-                results.push(WasmInstruction::Instruction(instruction))
-            }
-            WasmGeneratorDirective::Branch {
-                block_type,
-                consequent,
-                alternative,
-            } => {
-                let consequent = {
-                    let continuation = std::mem::take(&mut remaining_instructions);
-                    let (block_instructions, continuation) =
-                        flatten_continuations(consequent, continuation)?;
-                    remaining_instructions = continuation;
-                    block_instructions
-                };
-                let alternative = {
-                    let continuation = std::mem::take(&mut remaining_instructions);
-                    let (block_instructions, continuation) =
-                        flatten_continuations(alternative, continuation)?;
-                    remaining_instructions = continuation;
-                    block_instructions
-                };
-                results.push(WasmInstruction::Branch {
+) -> Result<(), WasmGeneratorError> {
+    instructions
+        .into_iter()
+        .fold(Ok(()), |result, instruction| {
+            let _ = result?;
+            match instruction {
+                WasmInstruction::Instruction(instruction) => {
+                    builder.instr(instruction);
+                    Ok(())
+                }
+                WasmInstruction::Block { block_type, body } => {
+                    let block_id = {
+                        let mut block_builder = builder.dangling_instr_seq(block_type);
+                        let block_id = block_builder.id();
+                        assemble_wasm(&mut block_builder, enclosing_blocks.push(block_id), body)?;
+                        block_id
+                    };
+                    builder.instr(ir::Block { seq: block_id });
+                    Ok(())
+                }
+                WasmInstruction::Break { target_block } => {
+                    let block_id = enclosing_blocks
+                        .rev()
+                        .copied()
+                        .skip(target_block)
+                        .next()
+                        .ok_or_else(|| WasmGeneratorError::InvalidBlockOffset(target_block))?;
+                    builder.instr(ir::Br { block: block_id });
+                    Ok(())
+                }
+                WasmInstruction::ConditionalBreak { target_block } => {
+                    let block_id = enclosing_blocks
+                        .rev()
+                        .copied()
+                        .skip(target_block)
+                        .next()
+                        .ok_or_else(|| WasmGeneratorError::InvalidBlockOffset(target_block))?;
+                    builder.instr(ir::BrIf { block: block_id });
+                    Ok(())
+                }
+                WasmInstruction::IfElse {
                     block_type,
                     consequent,
                     alternative,
-                })
+                } => {
+                    let consequent_block_id = {
+                        let body = consequent;
+                        let mut block_builder = builder.dangling_instr_seq(block_type);
+                        let block_id = block_builder.id();
+                        assemble_wasm(&mut block_builder, enclosing_blocks.push(block_id), body)?;
+                        block_id
+                    };
+                    let alternative_block_id = {
+                        let body = alternative;
+                        let mut block_builder = builder.dangling_instr_seq(block_type);
+                        let block_id = block_builder.id();
+                        assemble_wasm(&mut block_builder, enclosing_blocks.push(block_id), body)?;
+                        block_id
+                    };
+                    builder.instr(ir::IfElse {
+                        consequent: consequent_block_id,
+                        alternative: alternative_block_id,
+                    });
+                    Ok(())
+                }
             }
-            WasmGeneratorDirective::Continuation => {
-                let continuation = std::mem::take(&mut continuation);
-                let (instructions, _) = flatten_continuations(continuation, Default::default())?;
-                results.extend(instructions);
-            }
-        }
-    }
-    Ok((results, continuation))
+        })
 }
 
-trait GenerateWasm {
+pub trait GenerateWasm {
     fn emit_wasm(
         &self,
         module: &mut Module,
@@ -972,356 +1060,8 @@ impl GenerateWasm for CompiledBlock {
     ) -> WasmGeneratorResult {
         let mut instructions = WasmGeneratorOutput::default();
         for instruction in self.instructions.iter() {
-            instructions.append_block(instruction.emit_wasm(module, bindings, options)?);
+            instructions.push_chunk(instruction.emit_wasm(module, bindings, options)?);
         }
         Ok(instructions)
-    }
-}
-
-impl GenerateWasm for CompiledInstruction {
-    fn emit_wasm(
-        &self,
-        module: &mut Module,
-        bindings: &mut WasmGeneratorBindings,
-        options: &WasmGeneratorOptions,
-    ) -> WasmGeneratorResult {
-        match self {
-            Self::Const(value) => {
-                let mut instructions = WasmGeneratorOutput::default();
-                instructions.push(ir::Const {
-                    value: match value {
-                        ConstValue::I32(value) => Value::I32(*value),
-                        ConstValue::U32(value) => Value::I32(from_twos_complement_i32(*value)),
-                        ConstValue::I64(value) => Value::I64(*value),
-                        ConstValue::U64(value) => Value::I64(from_twos_complement_i64(*value)),
-                        ConstValue::F32(value) => Value::F32(*value),
-                        ConstValue::F64(value) => Value::F64(*value),
-                        ConstValue::HeapPointer(value) => {
-                            Value::I32(from_twos_complement_i32(u32::from(*value)))
-                        }
-                        ConstValue::FunctionPointer(value) => {
-                            let function_index = match value {
-                                FunctionPointer::Stdlib(target) => Ok(bindings
-                                    .export_mappings
-                                    .stdlib
-                                    .get_indirect_call_function_index(*target)),
-                                FunctionPointer::Lambda(target_hash) => bindings
-                                    .compiled_function_mappings
-                                    .get_indirect_call_function_index(*target_hash)
-                                    .ok_or_else(|| {
-                                        WasmGeneratorError::InvalidCompiledFunction(*target_hash)
-                                    }),
-                            }?;
-                            Value::I32(from_twos_complement_i32(u32::from(function_index)))
-                        }
-                    },
-                });
-                Ok(instructions)
-            }
-            Self::ReadHeapValue(value_type) => {
-                let mut instructions = WasmGeneratorOutput::default();
-                instructions.push(ir::Load {
-                    memory: bindings.memory_id,
-                    kind: match value_type {
-                        ValueType::I32
-                        | ValueType::U32
-                        | ValueType::HeapPointer
-                        | ValueType::FunctionPointer => LoadKind::I32 {
-                            atomic: Default::default(),
-                        },
-                        ValueType::I64 | ValueType::U64 => LoadKind::I64 {
-                            atomic: Default::default(),
-                        },
-                        ValueType::F32 => LoadKind::F32,
-                        ValueType::F64 => LoadKind::F64,
-                    },
-                    arg: MemArg {
-                        align: Default::default(),
-                        offset: Default::default(),
-                    },
-                });
-                Ok(instructions)
-            }
-            Self::WriteHeapValue(value_type) => {
-                let mut instructions = WasmGeneratorOutput::default();
-                instructions.push(ir::Store {
-                    memory: bindings.memory_id,
-                    kind: match value_type {
-                        ValueType::I32
-                        | ValueType::U32
-                        | ValueType::HeapPointer
-                        | ValueType::FunctionPointer => StoreKind::I32 {
-                            atomic: Default::default(),
-                        },
-                        ValueType::I64 | ValueType::U64 => StoreKind::I64 {
-                            atomic: Default::default(),
-                        },
-                        ValueType::F32 => StoreKind::F32,
-                        ValueType::F64 => StoreKind::F64,
-                    },
-                    arg: MemArg {
-                        align: Default::default(),
-                        offset: Default::default(),
-                    },
-                });
-                Ok(instructions)
-            }
-            Self::Duplicate(_) => {
-                let mut instructions = WasmGeneratorOutput::default();
-                instructions.push(ir::LocalTee {
-                    local: bindings.temp_id,
-                });
-                instructions.push(ir::LocalGet {
-                    local: bindings.temp_id,
-                });
-                Ok(instructions)
-            }
-            Self::Drop(_) => {
-                let mut instructions = WasmGeneratorOutput::default();
-                instructions.push(ir::Drop {});
-                Ok(instructions)
-            }
-            Self::ScopeStart(value_type) => {
-                let scope_local_id = module.locals.add(parse_value_type(*value_type));
-                let mut instructions = WasmGeneratorOutput::default();
-                instructions.push(ir::LocalSet {
-                    local: scope_local_id,
-                });
-                bindings.enter_scope(scope_local_id);
-                Ok(instructions)
-            }
-            Self::ScopeEnd(_) => match bindings.leave_scope() {
-                Some(_) => Ok(Default::default()),
-                None => Err(WasmGeneratorError::StackError),
-            },
-            Self::GetScopeValue { scope_offset, .. } => {
-                let mut instructions = WasmGeneratorOutput::default();
-                instructions.push(ir::LocalGet {
-                    local: bindings.get_local(*scope_offset)?,
-                });
-                Ok(instructions)
-            }
-            Self::Select(value_type) => {
-                let mut instructions = WasmGeneratorOutput::default();
-                instructions.push(ir::Select {
-                    ty: Some(parse_value_type(*value_type)),
-                });
-                Ok(instructions)
-            }
-            Self::If {
-                block_type,
-                consequent,
-                alternative,
-            } => {
-                let mut instructions = WasmGeneratorOutput::default();
-                instructions.branch(
-                    block_type,
-                    consequent.emit_wasm(module, bindings, options)?,
-                    alternative.emit_wasm(module, bindings, options)?,
-                    module,
-                    bindings,
-                    options,
-                );
-                Ok(instructions)
-            }
-            Self::ConditionalBreak {
-                block_type,
-                handler,
-            } => {
-                // If a signal was encountered, we need to prevent further execution of the current block.
-                // This is achieved via an if-else block, whose consequent represents the short-circuit return, and
-                // whose alternative represents the continuation of the current block.
-                let mut instructions = WasmGeneratorOutput::default();
-                // Pop the boolean from the stack and continue with either the early-return block or the continuation
-                // branch as appropriate
-                instructions.branch(
-                    // Create a type signature for the if-else branches, where the params encode the number of preceding
-                    // items to capture from the operand stack, and whose results correspond to the result type of the
-                    // handler block (which must be the same as the result type of the enclosing block), with an
-                    // additional term pointer for the accumulated dependencies
-                    &{
-                        let TypeSignature { params, results } = block_type;
-                        let dependency_list_type = ValueType::HeapPointer;
-                        TypeSignature {
-                            params: params.clone(),
-                            results: ParamsSignature::from_iter(
-                                results.iter().chain(once(dependency_list_type)),
-                            ),
-                        }
-                    },
-                    // Construct the early-return block
-                    {
-                        let mut short_circuit_block = WasmGeneratorOutput::default();
-                        // Invoke the handler instructions
-                        short_circuit_block
-                            .append_block(handler.emit_wasm(module, bindings, options)?);
-                        // Push the accumulated dependencies onto the stack before terminating the block
-                        short_circuit_block.push(ir::LocalGet {
-                            local: bindings.dependencies_id,
-                        });
-                        short_circuit_block
-                    },
-                    // Construct the continuation branch
-                    {
-                        let mut continuation_block = WasmGeneratorOutput::default();
-                        // Insertion point for remaining instructions (the captured block input values remain on top of the stack)
-                        continuation_block.continuation();
-                        continuation_block
-                    },
-                    module,
-                    bindings,
-                    options,
-                );
-                Ok(instructions)
-            }
-            Self::Eq(value_type) => {
-                let mut instructions = WasmGeneratorOutput::default();
-                instructions.push(ir::Binop {
-                    op: match value_type {
-                        ValueType::I32
-                        | ValueType::U32
-                        | ValueType::HeapPointer
-                        | ValueType::FunctionPointer => BinaryOp::I32Eq,
-                        ValueType::I64 | ValueType::U64 => BinaryOp::I64Eq,
-                        ValueType::F32 => BinaryOp::F32Eq,
-                        ValueType::F64 => BinaryOp::F64Eq,
-                    },
-                });
-                Ok(instructions)
-            }
-            Self::NullPointer => {
-                let mut instructions = WasmGeneratorOutput::default();
-                instructions.push(ir::GlobalGet {
-                    global: bindings.export_mappings.globals.null_pointer,
-                });
-                Ok(instructions)
-            }
-            Self::LoadStateValue => {
-                let mut instructions = WasmGeneratorOutput::default();
-                instructions.push(ir::LocalGet {
-                    local: bindings.state_id,
-                });
-                instructions.push(ir::Call {
-                    func: bindings.export_mappings.builtins.get_state_value,
-                });
-                instructions.push(ir::LocalGet {
-                    local: bindings.dependencies_id,
-                });
-                instructions.push(ir::Call {
-                    func: bindings.export_mappings.builtins.combine_dependencies,
-                });
-                instructions.push(ir::LocalSet {
-                    local: bindings.dependencies_id,
-                });
-                Ok(instructions)
-            }
-            Self::CallRuntimeBuiltin(builtin) => {
-                let mut instructions = WasmGeneratorOutput::default();
-                instructions.push(ir::Call {
-                    func: bindings.export_mappings.builtins.get(*builtin),
-                });
-                Ok(instructions)
-            }
-            Self::CallStdlib(target) => {
-                let mut instructions = WasmGeneratorOutput::default();
-                instructions.push(ir::LocalGet {
-                    local: bindings.state_id,
-                });
-                instructions.push(ir::Call {
-                    func: bindings.export_mappings.stdlib.get_function_id(*target),
-                });
-                instructions.push(ir::LocalGet {
-                    local: bindings.dependencies_id,
-                });
-                instructions.push(ir::Call {
-                    func: bindings.export_mappings.builtins.combine_dependencies,
-                });
-                instructions.push(ir::LocalSet {
-                    local: bindings.dependencies_id,
-                });
-                Ok(instructions)
-            }
-            Self::CallCompiledFunction { target, .. } => {
-                match bindings.compiled_function_mappings.get_function_id(*target) {
-                    None => Err(WasmGeneratorError::InvalidCompiledFunction(*target)),
-                    Some(function_id) => {
-                        let mut instructions = WasmGeneratorOutput::default();
-                        instructions.push(ir::LocalGet {
-                            local: bindings.state_id,
-                        });
-                        instructions.push(ir::Call { func: function_id });
-                        instructions.push(ir::LocalGet {
-                            local: bindings.dependencies_id,
-                        });
-                        instructions.push(ir::Call {
-                            func: bindings.export_mappings.builtins.combine_dependencies,
-                        });
-                        instructions.push(ir::LocalSet {
-                            local: bindings.dependencies_id,
-                        });
-                        Ok(instructions)
-                    }
-                }
-            }
-            Self::CallDynamic(type_signature) => {
-                let (params, results) = parse_function_type_signature(type_signature);
-                let mut instructions = WasmGeneratorOutput::default();
-                instructions.push(ir::LocalGet {
-                    local: bindings.state_id,
-                });
-                instructions.push(ir::CallIndirect {
-                    ty: module.types.add(&params, &results),
-                    table: bindings.main_function_table_id,
-                });
-                instructions.push(ir::LocalGet {
-                    local: bindings.dependencies_id,
-                });
-                instructions.push(ir::Call {
-                    func: bindings.export_mappings.builtins.combine_dependencies,
-                });
-                instructions.push(ir::LocalSet {
-                    local: bindings.dependencies_id,
-                });
-                Ok(instructions)
-            }
-            Self::Evaluate => {
-                let mut instructions = WasmGeneratorOutput::default();
-                instructions.push(ir::LocalGet {
-                    local: bindings.state_id,
-                });
-                instructions.push(ir::Call {
-                    func: bindings.export_mappings.builtins.evaluate,
-                });
-                instructions.push(ir::LocalGet {
-                    local: bindings.dependencies_id,
-                });
-                instructions.push(ir::Call {
-                    func: bindings.export_mappings.builtins.combine_dependencies,
-                });
-                instructions.push(ir::LocalSet {
-                    local: bindings.dependencies_id,
-                });
-                Ok(instructions)
-            }
-            Self::Apply => {
-                let mut instructions = WasmGeneratorOutput::default();
-                instructions.push(ir::LocalGet {
-                    local: bindings.state_id,
-                });
-                instructions.push(ir::Call {
-                    func: bindings.export_mappings.builtins.apply,
-                });
-                instructions.push(ir::LocalGet {
-                    local: bindings.dependencies_id,
-                });
-                instructions.push(ir::Call {
-                    func: bindings.export_mappings.builtins.combine_dependencies,
-                });
-                instructions.push(ir::LocalSet {
-                    local: bindings.dependencies_id,
-                });
-                Ok(instructions)
-            }
-        }
     }
 }

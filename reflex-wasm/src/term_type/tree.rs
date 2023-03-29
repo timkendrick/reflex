@@ -18,8 +18,8 @@ use serde_json::Value as JsonValue;
 use crate::{
     allocator::Arena,
     compiler::{
-        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
-        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings, ValueType,
+        instruction, runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{ConditionTerm, TermTypeDiscriminants, TypedTerm, WasmExpression},
@@ -475,35 +475,33 @@ impl<A: Arena + Clone> Internable for ArenaRef<TreeTerm, A> {
 impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<TreeTerm, A> {
     fn compile(
         &self,
+        stack: CompilerStack,
         state: &mut CompilerState,
-        bindings: &CompilerVariableBindings,
         options: &CompilerOptions,
-        stack: &CompilerStack,
     ) -> CompilerResult<A> {
         let left = self.left();
         let right = self.right();
-        let mut instructions = CompiledBlock::default();
+        let block = CompiledBlockBuilder::new(stack);
         // Push the left argument onto the stack
         // => [Option<Term>]
-        if let Some(term) = left {
-            instructions.append_block(term.compile(state, bindings, options, stack)?);
+        let block = if let Some(term) = left {
+            block.append_inner(|stack| term.compile(stack, state, options))
         } else {
-            instructions.push(CompiledInstruction::NullPointer);
-        }
-        let stack = stack.push_lazy(ValueType::HeapPointer);
+            Ok(block.push(instruction::runtime::NullPointer))
+        }?;
         // Push the right argument onto the stack
         // => [Option<Term>, Option<Term>]
-        if let Some(term) = right {
-            instructions.append_block(term.compile(state, bindings, options, &stack)?);
+        let block = if let Some(term) = right {
+            block.append_inner(|stack| term.compile(stack, state, options))
         } else {
-            instructions.push(CompiledInstruction::NullPointer);
-        }
+            Ok(block.push(instruction::runtime::NullPointer))
+        }?;
         // Invoke the term constructor
         // => [TreeTerm]
-        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-            RuntimeBuiltin::CreateTree,
-        ));
-        Ok(instructions)
+        let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+            target: RuntimeBuiltin::CreateTree,
+        });
+        block.finish()
     }
 }
 

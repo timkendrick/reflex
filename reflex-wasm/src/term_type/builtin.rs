@@ -14,8 +14,9 @@ use serde_json::Value as JsonValue;
 use crate::{
     allocator::Arena,
     compiler::{
-        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerError,
-        CompilerOptions, CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings,
+        error::CompilerError, instruction, runtime::builtin::RuntimeBuiltin, CompileWasm,
+        CompiledBlockBuilder, CompilerOptions, CompilerResult, CompilerStack, CompilerState,
+        ConstValue, FunctionPointer,
     },
     hash::{TermHash, TermHasher, TermSize},
     stdlib::Stdlib,
@@ -156,25 +157,26 @@ impl<A: Arena + Clone> Internable for ArenaRef<BuiltinTerm, A> {
 impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<BuiltinTerm, A> {
     fn compile(
         &self,
+        stack: CompilerStack,
         _state: &mut CompilerState,
-        _bindings: &CompilerVariableBindings,
         _options: &CompilerOptions,
-        _stack: &CompilerStack,
     ) -> CompilerResult<A> {
         let target = self.target();
-        let stdlib = target
+        let stdlib_target = target
             .as_stdlib()
             .ok_or_else(|| CompilerError::InvalidFunctionTarget(target))?;
-        let mut instructions = CompiledBlock::default();
+        let block = CompiledBlockBuilder::new(stack);
         // Push the function index argument onto the stack
         // => [index]
-        instructions.push(CompiledInstruction::function_pointer(stdlib));
+        let block = block.push(instruction::core::Const {
+            value: ConstValue::FunctionPointer(FunctionPointer::Stdlib(stdlib_target)),
+        });
         // Invoke the term constructor
         // => [BuiltinTerm]
-        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-            RuntimeBuiltin::CreateBuiltin,
-        ));
-        Ok(instructions)
+        let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+            target: RuntimeBuiltin::CreateBuiltin,
+        });
+        block.finish()
     }
 }
 

@@ -14,8 +14,8 @@ use strum_macros::EnumDiscriminants;
 use crate::{
     allocator::Arena,
     compiler::{
-        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
-        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings, ValueType,
+        instruction, runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState, ConstValue,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{ListTerm, TermTypeDiscriminants, TypedTerm, WasmExpression},
@@ -1428,40 +1428,39 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<InvalidPointerCondition, A
 impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<ConditionTerm, A> {
     fn compile(
         &self,
+        stack: CompilerStack,
         state: &mut CompilerState,
-        bindings: &CompilerVariableBindings,
         options: &CompilerOptions,
-        stack: &CompilerStack,
     ) -> CompilerResult<A> {
         match self.condition_type() {
             ConditionTermDiscriminants::Custom => self
                 .as_typed_condition::<CustomCondition>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             ConditionTermDiscriminants::Pending => self
                 .as_typed_condition::<PendingCondition>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             ConditionTermDiscriminants::Error => self
                 .as_typed_condition::<ErrorCondition>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             ConditionTermDiscriminants::TypeError => self
                 .as_typed_condition::<TypeErrorCondition>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             ConditionTermDiscriminants::InvalidFunctionTarget => self
                 .as_typed_condition::<InvalidFunctionTargetCondition>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             ConditionTermDiscriminants::InvalidFunctionArgs => self
                 .as_typed_condition::<InvalidFunctionArgsCondition>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             ConditionTermDiscriminants::InvalidPointer => self
                 .as_typed_condition::<InvalidPointerCondition>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
         }
     }
 }
@@ -1469,170 +1468,160 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<ConditionTerm, A> {
 impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<CustomCondition, A> {
     fn compile(
         &self,
+        stack: CompilerStack,
         state: &mut CompilerState,
-        bindings: &CompilerVariableBindings,
         options: &CompilerOptions,
-        stack: &CompilerStack,
     ) -> CompilerResult<A> {
         let effect_type = self.effect_type();
         let payload = self.payload();
         let token = self.token();
-        let mut instructions = CompiledBlock::default();
+        let block = CompiledBlockBuilder::new(stack);
         // Yield the effect type onto the stack
         // => [Term]
-        instructions.append_block(effect_type.compile(state, bindings, options, stack)?);
-        let stack = stack.push_lazy(ValueType::HeapPointer);
+        let block = block.append_inner(|stack| effect_type.compile(stack, state, options))?;
         // Yield the payload onto the stack
         // => [Term, Term]
-        instructions.append_block(payload.compile(state, bindings, options, &stack)?);
-        let stack = stack.push_lazy(ValueType::HeapPointer);
+        let block = block.append_inner(|stack| payload.compile(stack, state, options))?;
         // Yield the token onto the stack
         // => [Term, Term, Token]
-        instructions.append_block(token.compile(state, bindings, options, &stack)?);
+        let block = block.append_inner(|stack| token.compile(stack, state, options))?;
         // Invoke the term constructor
         // => [ConditionTerm]
-        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-            RuntimeBuiltin::CreateCustomCondition,
-        ));
-        Ok(instructions)
+        let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+            target: RuntimeBuiltin::CreateCustomCondition,
+        });
+        block.finish()
     }
 }
 
 impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<PendingCondition, A> {
     fn compile(
         &self,
+        stack: CompilerStack,
         _state: &mut CompilerState,
-        _bindings: &CompilerVariableBindings,
         _options: &CompilerOptions,
-        _stack: &CompilerStack,
     ) -> CompilerResult<A> {
-        let mut instructions = CompiledBlock::default();
+        let block = CompiledBlockBuilder::new(stack);
         // Invoke the term constructor
         // => [ConditionTerm]
-        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-            RuntimeBuiltin::CreatePendingCondition,
-        ));
-        Ok(instructions)
+        let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+            target: RuntimeBuiltin::CreatePendingCondition,
+        });
+        block.finish()
     }
 }
 
 impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<ErrorCondition, A> {
     fn compile(
         &self,
+        stack: CompilerStack,
         state: &mut CompilerState,
-        bindings: &CompilerVariableBindings,
         options: &CompilerOptions,
-        stack: &CompilerStack,
     ) -> CompilerResult<A> {
         let payload = self.payload();
-        let mut instructions = CompiledBlock::default();
+        let block = CompiledBlockBuilder::new(stack);
         // Yield the payload onto the stack
         // => [Term]
-        instructions.append_block(payload.compile(state, bindings, options, stack)?);
+        let block = block.append_inner(|stack| payload.compile(stack, state, options))?;
         // Invoke the term constructor
         // => [ConditionTerm]
-        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-            RuntimeBuiltin::CreateErrorCondition,
-        ));
-        Ok(instructions)
+        let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+            target: RuntimeBuiltin::CreateErrorCondition,
+        });
+        block.finish()
     }
 }
 
 impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<TypeErrorCondition, A> {
     fn compile(
         &self,
+        stack: CompilerStack,
         state: &mut CompilerState,
-        bindings: &CompilerVariableBindings,
         options: &CompilerOptions,
-        stack: &CompilerStack,
     ) -> CompilerResult<A> {
         let expected = self.expected();
         let payload = self.payload();
-        let mut instructions = CompiledBlock::default();
+        let block = CompiledBlockBuilder::new(stack);
         // Push the expected type identifier onto the stack
         // => [type_id]
-        instructions.push(CompiledInstruction::u32_const(expected));
+        let block = block.push(instruction::core::Const {
+            value: ConstValue::U32(expected),
+        });
         // Yield the received payload onto the stack
         // => [type_id, Term]
-        instructions.append_block(payload.compile(state, bindings, options, stack)?);
+        let block = block.append_inner(|stack| payload.compile(stack, state, options))?;
         // Invoke the term constructor
         // => [ConditionTerm]
-        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-            RuntimeBuiltin::CreateTypeErrorCondition,
-        ));
-        Ok(instructions)
+        let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+            target: RuntimeBuiltin::CreateTypeErrorCondition,
+        });
+        block.finish()
     }
 }
 
 impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<InvalidFunctionTargetCondition, A> {
     fn compile(
         &self,
+        stack: CompilerStack,
         state: &mut CompilerState,
-        bindings: &CompilerVariableBindings,
         options: &CompilerOptions,
-        stack: &CompilerStack,
     ) -> CompilerResult<A> {
         let target = self.target();
-        let mut instructions = CompiledBlock::default();
+        let block = CompiledBlockBuilder::new(stack);
         // Yield the target onto the stack
         // => [Term]
-        instructions.append_block(target.compile(state, bindings, options, stack)?);
+        let block = block.append_inner(|stack| target.compile(stack, state, options))?;
         // Invoke the term constructor
         // => [ConditionTerm]
-        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-            RuntimeBuiltin::CreateInvalidFunctionTargetCondition,
-        ));
-        Ok(instructions)
+        let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+            target: RuntimeBuiltin::CreateInvalidFunctionTargetCondition,
+        });
+        block.finish()
     }
 }
 
 impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<InvalidFunctionArgsCondition, A> {
     fn compile(
         &self,
+        stack: CompilerStack,
         state: &mut CompilerState,
-        bindings: &CompilerVariableBindings,
         options: &CompilerOptions,
-        stack: &CompilerStack,
     ) -> CompilerResult<A> {
         let target = self.target();
         let args = self.args();
-        let mut instructions = CompiledBlock::default();
+        let block = CompiledBlockBuilder::new(stack);
         // Yield the target onto the stack
         // => [Option<Term>]
-        match target {
-            Some(target) => {
-                instructions.append_block(target.compile(state, bindings, options, stack)?);
-            }
-            None => instructions.push(CompiledInstruction::NullPointer),
-        }
-        let stack = stack.push_lazy(ValueType::HeapPointer);
+        let block = match target {
+            Some(target) => block.append_inner(|stack| target.compile(stack, state, options)),
+            None => Ok(block.push(instruction::runtime::NullPointer)),
+        }?;
         // Yield the argument list onto the stack
         // => [Option<Term>, ListTerm]
-        instructions.append_block(args.as_inner().compile(state, bindings, options, &stack)?);
+        let block = block.append_inner(|stack| args.as_inner().compile(stack, state, options))?;
         // Invoke the term constructor
         // => [ConditionTerm]
-        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-            RuntimeBuiltin::CreateInvalidFunctionArgsCondition,
-        ));
-        Ok(instructions)
+        let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+            target: RuntimeBuiltin::CreateInvalidFunctionArgsCondition,
+        });
+        block.finish()
     }
 }
 
 impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<InvalidPointerCondition, A> {
     fn compile(
         &self,
+        stack: CompilerStack,
         _state: &mut CompilerState,
-        _bindings: &CompilerVariableBindings,
         _options: &CompilerOptions,
-        _stack: &CompilerStack,
     ) -> CompilerResult<A> {
-        let mut instructions = CompiledBlock::default();
+        let block = CompiledBlockBuilder::new(stack);
         // Invoke the term constructor
         // => [ConditionTerm]
-        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-            RuntimeBuiltin::CreateInvalidPointerCondition,
-        ));
-        Ok(instructions)
+        let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+            target: RuntimeBuiltin::CreateInvalidPointerCondition,
+        });
+        block.finish()
     }
 }
 

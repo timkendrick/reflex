@@ -11,8 +11,8 @@ use serde_json::Value as JsonValue;
 use crate::{
     allocator::Arena,
     compiler::{
-        CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions, CompilerResult,
-        CompilerStack, CompilerState, CompilerVariableBindings,
+        instruction, CompileWasm, CompiledBlockBuilder, CompilerOptions, CompilerResult,
+        CompilerStack, CompilerState, ConstValue,
     },
     hash::{TermHash, TermHasher, TermSize},
     ArenaPointer, ArenaRef, Term,
@@ -117,17 +117,18 @@ impl<A: Arena + Clone> Internable for ArenaRef<PointerTerm, A> {
 impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<PointerTerm, A> {
     fn compile(
         &self,
+        stack: CompilerStack,
         _state: &mut CompilerState,
-        _bindings: &CompilerVariableBindings,
         _options: &CompilerOptions,
-        _stack: &CompilerStack,
     ) -> CompilerResult<A> {
         let target = self.target();
-        let mut instructions = CompiledBlock::default();
+        let block = CompiledBlockBuilder::new(stack);
         // Push the target pointer onto the stack
-        // => [target]
-        instructions.push(CompiledInstruction::heap_pointer(target));
-        Ok(instructions)
+        // => [Term]
+        let block = block.push(instruction::core::Const {
+            value: ConstValue::HeapPointer(target),
+        });
+        block.finish()
     }
 }
 

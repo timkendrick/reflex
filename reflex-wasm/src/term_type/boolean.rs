@@ -13,8 +13,8 @@ use serde_json::Value as JsonValue;
 use crate::{
     allocator::Arena,
     compiler::{
-        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
-        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings,
+        instruction, runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState, ConstValue,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::TypedTerm,
@@ -139,22 +139,23 @@ impl<A: Arena + Clone> Internable for ArenaRef<BooleanTerm, A> {
 impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<BooleanTerm, A> {
     fn compile(
         &self,
+        stack: CompilerStack,
         _state: &mut CompilerState,
-        _bindings: &CompilerVariableBindings,
         _options: &CompilerOptions,
-        _stack: &CompilerStack,
     ) -> CompilerResult<A> {
         let value = self.value();
-        let mut instructions = CompiledBlock::default();
+        let block = CompiledBlockBuilder::new(stack);
         // Push the value argument onto the stack
         // => [value]
-        instructions.push(CompiledInstruction::u32_const(value as u32));
+        let block = block.push(instruction::core::Const {
+            value: ConstValue::U32(value as u32),
+        });
         // Invoke the term constructor
         // => [BooleanTerm]
-        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-            RuntimeBuiltin::CreateBoolean,
-        ));
-        Ok(instructions)
+        let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+            target: RuntimeBuiltin::CreateBoolean,
+        });
+        block.finish()
     }
 }
 

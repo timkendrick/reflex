@@ -26,16 +26,17 @@ use walrus::{
 use crate::{
     allocator::{Arena, ArenaAllocator, VecAllocator},
     compiler::{
-        builtin::RuntimeBuiltin,
-        globals::RuntimeGlobal,
+        error::TypedStackError,
+        instruction::{self, CompiledInstruction},
+        runtime::{builtin::RuntimeBuiltin, globals::RuntimeGlobal},
         wasm::{
             generate_indirect_function_wrapper, generate_stateful_function, RuntimeBuiltinMappings,
             RuntimeExportMappings, RuntimeGlobalMappings, RuntimeStdlibMappings,
             WasmCompiledFunctionMappings, WasmGeneratorError, WasmGeneratorOptions,
         },
-        CompileWasm, CompiledBlock, CompiledFunctionId, CompiledInstruction, CompiledLambda,
+        CapturingThunk, CompileWasm, CompiledBlock, CompiledFunctionId, CompiledLambda,
         CompiledThunk, CompilerOptions, CompilerStack, CompilerState, ConstValue, FunctionPointer,
-        ParamsSignature, ValueType,
+        ParamsSignature, PureThunk, TypeSignature, ValueType,
     },
     factory::WasmTermFactory,
     stdlib::{self, Stdlib},
@@ -58,6 +59,7 @@ pub enum WasmCompilerError {
     ParseError(PathBuf, String),
     InvalidFunctionTable,
     InvalidFunctionId(CompiledFunctionId),
+    StackError(TypedStackError),
     CompilerError(anyhow::Error),
     OptimizationError(wasm_opt::OptimizationError),
     OptimizationFileSystemError(std::io::Error),
@@ -88,6 +90,7 @@ impl std::fmt::Display for WasmCompilerError {
                 "Failed to parse input file {}: {err}",
                 input_path.display()
             ),
+            Self::StackError(err) => write!(f, "Stack error: {err}"),
             Self::CompilerError(err) => write!(f, "Failed to compile WASM output: {err}"),
             Self::OptimizationError(err) => write!(f, "Failed to optimize WASM output: {err}"),
             Self::OptimizationFileSystemError(err) => {
@@ -276,15 +279,24 @@ pub fn compile_module(
                 let params = (0..lambda_term.num_args())
                     .map(|_| ValueType::HeapPointer)
                     .collect::<ParamsSignature>();
+                // Create a new compiler stack to be used within the function body,
+                // with all the lambda arguments declared as scoped variables
+                // and a block wrapper to catch short-circuiting signals
+                let inner_stack = params
+                    .iter()
+                    .fold(CompilerStack::default(), |stack, value_type| {
+                        stack.declare_variable(value_type)
+                    })
+                    .enter_block(&TypeSignature {
+                        params: ParamsSignature::Void,
+                        results: ParamsSignature::Single(ValueType::HeapPointer),
+                    })
+                    .map_err(WasmCompilerError::StackError)?;
+
                 // Generate preliminary bytecode for the function body
                 let body = lambda_term
                     .body()
-                    .compile(
-                        &mut compiler_state,
-                        &Default::default(),
-                        &options.compiler,
-                        &CompilerStack::default(),
-                    )
+                    .compile(inner_stack, &mut compiler_state, &options.compiler)
                     .map_err(|err| WasmCompilerError::CompilerError(anyhow::anyhow!("{}", err)))?;
                 compiler_state
                     .compiled_lambdas
@@ -320,24 +332,24 @@ pub fn compile_module(
                 }
                 Entry::Vacant(entry) => Ok(entry),
             }?;
-            let (instructions, target_uid_pointer, free_variables) = match compiled_thunk {
-                CompiledThunk::Pure {
-                    instructions,
+            let (thunk_function_body, target_uid_pointer, free_variables) = match compiled_thunk {
+                CompiledThunk::Pure(PureThunk {
+                    thunk_function_body,
                     target_uid_pointer,
                     ..
-                } => (instructions, target_uid_pointer, Vec::new()),
-                CompiledThunk::Capturing {
-                    instructions,
+                }) => (thunk_function_body, target_uid_pointer, Vec::new()),
+                CompiledThunk::Capturing(CapturingThunk {
+                    thunk_function_body,
                     target_uid_pointer,
                     free_variables,
                     ..
-                } => (instructions, target_uid_pointer, free_variables),
+                }) => (thunk_function_body, target_uid_pointer, free_variables),
             };
             entry.insert(CompiledLambda {
                 params: ParamsSignature::from_iter(
                     free_variables.iter().map(|_| ValueType::HeapPointer),
                 ),
-                body: instructions,
+                body: thunk_function_body,
             });
             Ok((term_hash, (compiled_function_id, target_uid_pointer)))
         })
@@ -358,7 +370,8 @@ pub fn compile_module(
         )
     }?;
 
-    // Emit WASM bytecode for each of the compiled functions, in topologically-sorted order (deepest first)
+    // Emit WASM bytecode for each of the compiled functions in order
+    // (this relies on the functions having been topologically sorted so that later functions can reference prior ones)
     let function_ids = compiled_functions.fold(
         Ok(WasmCompiledFunctionMappings::default()),
         |results, (compiled_function_id, compiled_lambda)| {
@@ -368,7 +381,7 @@ pub fn compile_module(
             let function_id = generate_stateful_function(
                 &mut ast,
                 params.iter(),
-                &body,
+                body,
                 &export_mappings,
                 memory_id,
                 main_function_table_id,
@@ -570,9 +583,9 @@ fn get_compiled_instruction_call_graph_depth(
     memoization_cache: &mut HashMap<CompiledFunctionId, usize>,
 ) -> Result<usize, WasmCompilerError> {
     match instruction {
-        CompiledInstruction::Const(ConstValue::FunctionPointer(FunctionPointer::Lambda(
-            target,
-        ))) => {
+        CompiledInstruction::Const(instruction::core::Const {
+            value: ConstValue::FunctionPointer(FunctionPointer::Lambda(target)),
+        }) => {
             let target_depth = get_compiled_function_call_graph_depth(
                 *target,
                 compiled_functions,
@@ -580,19 +593,14 @@ fn get_compiled_instruction_call_graph_depth(
             )?;
             Ok(target_depth + 1)
         }
-        CompiledInstruction::CallCompiledFunction { target, .. } => {
-            let target_depth = get_compiled_function_call_graph_depth(
-                *target,
-                compiled_functions,
-                memoization_cache,
-            )?;
-            Ok(target_depth + 1)
+        CompiledInstruction::Block(instruction::core::Block { body, .. }) => {
+            get_compiled_block_call_graph_depth(body, compiled_functions, memoization_cache)
         }
-        CompiledInstruction::If {
-            block_type: _,
+        CompiledInstruction::If(instruction::core::If {
             consequent,
             alternative,
-        } => {
+            ..
+        }) => {
             let consequent_depth = get_compiled_block_call_graph_depth(
                 consequent,
                 compiled_functions,
@@ -605,10 +613,17 @@ fn get_compiled_instruction_call_graph_depth(
             )?;
             Ok(consequent_depth.max(alternative_depth))
         }
-        CompiledInstruction::ConditionalBreak {
-            block_type: _,
-            handler,
-        } => get_compiled_block_call_graph_depth(handler, compiled_functions, memoization_cache),
+        CompiledInstruction::CallCompiledFunction(instruction::runtime::CallCompiledFunction {
+            target,
+            ..
+        }) => {
+            let target_depth = get_compiled_function_call_graph_depth(
+                *target,
+                compiled_functions,
+                memoization_cache,
+            )?;
+            Ok(target_depth + 1)
+        }
         _ => Ok(0),
     }
 }

@@ -14,8 +14,8 @@ use serde_json::Value as JsonValue;
 use crate::{
     allocator::Arena,
     compiler::{
-        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
-        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings,
+        instruction, runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState, ConstValue,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::TypedTerm,
@@ -169,22 +169,23 @@ impl<A: Arena + Clone> Internable for ArenaRef<FloatTerm, A> {
 impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<FloatTerm, A> {
     fn compile(
         &self,
+        stack: CompilerStack,
         _state: &mut CompilerState,
-        _bindings: &CompilerVariableBindings,
         _options: &CompilerOptions,
-        _stack: &CompilerStack,
     ) -> CompilerResult<A> {
         let value = self.value();
-        let mut instructions = CompiledBlock::default();
+        let block = CompiledBlockBuilder::new(stack);
         // Push the value argument onto the stack
         // => [value]
-        instructions.push(CompiledInstruction::f64_const(value));
+        let block = block.push(instruction::core::Const {
+            value: ConstValue::F64(value),
+        });
         // Invoke the term constructor
         // => [FloatTerm]
-        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-            RuntimeBuiltin::CreateFloat,
-        ));
-        Ok(instructions)
+        let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+            target: RuntimeBuiltin::CreateFloat,
+        });
+        block.finish()
     }
 }
 

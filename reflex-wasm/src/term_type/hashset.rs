@@ -15,8 +15,8 @@ use serde_json::Value as JsonValue;
 use crate::{
     allocator::Arena,
     compiler::{
-        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
-        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings,
+        instruction, runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{
@@ -223,26 +223,22 @@ impl<A: Arena + Clone> Internable for ArenaRef<HashsetTerm, A> {
 impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<HashsetTerm, A> {
     fn compile(
         &self,
+        stack: CompilerStack,
         state: &mut CompilerState,
-        bindings: &CompilerVariableBindings,
         options: &CompilerOptions,
-        stack: &CompilerStack,
     ) -> CompilerResult<A> {
         let entries = self.entries();
-        let mut instructions = CompiledBlock::default();
+        let block = CompiledBlockBuilder::new(stack);
         // Allocate the entries argument onto the stack
         // => [HashmapTerm]
-        instructions.append_block(
-            entries
-                .as_inner()
-                .compile(state, bindings, options, stack)?,
-        );
+        let block =
+            block.append_inner(|stack| entries.as_inner().compile(stack, state, options))?;
         // Invoke the term constructor
         // => [HashsetTerm]
-        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-            RuntimeBuiltin::CreateHashset,
-        ));
-        Ok(instructions)
+        let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+            target: RuntimeBuiltin::CreateHashset,
+        });
+        block.finish()
     }
 }
 

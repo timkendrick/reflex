@@ -12,7 +12,11 @@ fn application_term_builtin_target() {
     let (actual, expected) = run_scenario(&scenario).unwrap();
     assert_eq!(actual, expected);
 
-    let scenario = ApplicationTermBuiltinDynamicArgsScenario;
+    let scenario = ApplicationTermBuiltinSingleDynamicArgScenario;
+    let (actual, expected) = run_scenario(&scenario).unwrap();
+    assert_eq!(actual, expected);
+
+    let scenario = ApplicationTermBuiltinMultipleDynamicArgsScenario;
     let (actual, expected) = run_scenario(&scenario).unwrap();
     assert_eq!(actual, expected);
 
@@ -137,9 +141,41 @@ where
     }
 }
 
-struct ApplicationTermBuiltinDynamicArgsScenario;
+struct ApplicationTermBuiltinSingleDynamicArgScenario;
 
-impl<T, TFactory> WasmTestScenario<T, TFactory> for ApplicationTermBuiltinDynamicArgsScenario
+impl<T, TFactory> WasmTestScenario<T, TFactory> for ApplicationTermBuiltinSingleDynamicArgScenario
+where
+    T: Expression<Builtin = stdlib::Stdlib>,
+    TFactory: ExpressionFactory<T>,
+{
+    fn input(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> T {
+        factory.create_application_term(
+            factory.create_builtin_term(stdlib::Add),
+            allocator.create_pair(
+                factory.create_application_term(
+                    factory.create_builtin_term(stdlib::Add),
+                    allocator.create_pair(factory.create_int_term(3), factory.create_int_term(4)),
+                ),
+                factory.create_int_term(5),
+            ),
+        )
+    }
+
+    fn expected(
+        &self,
+        factory: &TFactory,
+        _allocator: &impl HeapAllocator<T>,
+    ) -> (T, Vec<T::Signal>) {
+        let result = factory.create_int_term(3 + 4 + 5);
+        let dependencies = Default::default();
+        (result, dependencies)
+    }
+}
+
+struct ApplicationTermBuiltinMultipleDynamicArgsScenario;
+
+impl<T, TFactory> WasmTestScenario<T, TFactory>
+    for ApplicationTermBuiltinMultipleDynamicArgsScenario
 where
     T: Expression<Builtin = stdlib::Stdlib>,
     TFactory: ExpressionFactory<T>,

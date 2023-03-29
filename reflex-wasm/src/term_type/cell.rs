@@ -11,8 +11,8 @@ use serde_json::Value as JsonValue;
 use crate::{
     allocator::{Arena, ArenaAllocator},
     compiler::{
-        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
-        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings, ValueType,
+        instruction, runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState, ConstValue, ValueType,
     },
     hash::{TermHash, TermHashState, TermHasher, TermSize},
     term_type::TermType,
@@ -142,40 +142,48 @@ impl<A: Arena + Clone> Internable for ArenaRef<CellTerm, A> {
 impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<CellTerm, A> {
     fn compile(
         &self,
+        stack: CompilerStack,
         _state: &mut CompilerState,
-        _bindings: &CompilerVariableBindings,
         _options: &CompilerOptions,
-        _stack: &CompilerStack,
     ) -> CompilerResult<A> {
         let capacity = self.capacity();
         let fields = self.fields();
-        let mut instructions = CompiledBlock::default();
+        let block = CompiledBlockBuilder::new(stack);
         // Push the capacity argument onto the stack
         // => [capacity]
-        instructions.push(CompiledInstruction::u32_const(capacity));
+        let block = block.push(instruction::core::Const {
+            value: ConstValue::U32(capacity),
+        });
         // Allocate the cell term
         // => [CellTerm]
-        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-            RuntimeBuiltin::AllocateCell,
-        ));
+        let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+            target: RuntimeBuiltin::AllocateCell,
+        });
         // Write the cell contents into the newly-allocated cell term
-        for (index, value) in fields.enumerate() {
-            instructions.extend([
-                // Duplicate the cell term pointer onto the stack
-                // => [CellTerm, CellTerm]
-                CompiledInstruction::Duplicate(ValueType::HeapPointer),
-                // Push the field index onto the stack
-                // => [CellTerm, CellTerm, index]
-                CompiledInstruction::u32_const(index as u32),
-                // Push the cell value onto the stack
-                // => [CellTerm, CellTerm, index, value]
-                CompiledInstruction::u32_const(value),
-                // Update the cell term's field at the given index
-                // => [CellTerm]
-                CompiledInstruction::CallRuntimeBuiltin(RuntimeBuiltin::SetCellField),
-            ]);
-        }
-        Ok(instructions)
+        let block = fields.enumerate().fold(block, |block, (index, value)| {
+            // Duplicate the cell term pointer onto the stack
+            // => [CellTerm, CellTerm]
+            let block = block.push(instruction::core::Duplicate {
+                value_type: ValueType::HeapPointer,
+            });
+            // Push the field index onto the stack
+            // => [CellTerm, CellTerm, index]
+            let block = block.push(instruction::core::Const {
+                value: ConstValue::U32(index as u32),
+            });
+            // Push the cell value onto the stack
+            // => [CellTerm, CellTerm, index, value]
+            let block = block.push(instruction::core::Const {
+                value: ConstValue::U32(value),
+            });
+            // Update the cell term's field at the given index
+            // => [CellTerm]
+            let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+                target: RuntimeBuiltin::SetCellField,
+            });
+            block
+        });
+        block.finish()
     }
 }
 

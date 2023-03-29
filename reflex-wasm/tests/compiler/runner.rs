@@ -16,7 +16,7 @@ use reflex_wasm::{
             evaluate_compiled, validate_bytecode, CompilerTestError, WasmDependencyList,
             WasmEvaluationResult,
         },
-        TypeSignature, TypedStackType, ValueType,
+        CompilerStack, ParamsSignature, ValueType,
     },
     factory::WasmTermFactory,
     term_type::{ConditionTerm, SignalTerm, TypedTerm, WasmExpression},
@@ -46,11 +46,16 @@ pub(crate) fn run_scenario(
     let expression = scenario.input(&factory, &allocator);
     let state = scenario.state(&factory, &allocator);
     let expected = scenario.expected(&factory, &allocator);
-    match validate_bytecode(&expression, &factory, &compiler_options.compiler) {
+    match validate_bytecode(
+        &expression,
+        &factory,
+        CompilerStack::default(),
+        &compiler_options.compiler,
+    ) {
         Err(err) => panic!("{}", err),
-        Ok(block_type) => assert_eq!(
-            block_type,
-            TypedStackType::from(TypeSignature::new((), ValueType::HeapPointer)),
+        Ok(stack) => assert_eq!(
+            ParamsSignature::from_iter(stack.operands()),
+            ParamsSignature::Single(ValueType::HeapPointer),
         ),
     };
     let actual = evaluate_compiled(expression, state, &factory, &compiler_options)?;

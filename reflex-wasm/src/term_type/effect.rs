@@ -14,9 +14,9 @@ use serde_json::Value as JsonValue;
 use crate::{
     allocator::Arena,
     compiler::{
-        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
-        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings, ParamsSignature,
-        TypeSignature, ValueType,
+        error::CompilerError, instruction, runtime::builtin::RuntimeBuiltin, CompileWasm,
+        CompiledBlockBuilder, CompilerOptions, CompilerResult, CompilerStack, CompilerState,
+        ParamsSignature, TypeSignature, ValueType,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{ConditionTerm, TypedTerm, WasmExpression},
@@ -139,90 +139,105 @@ impl<A: Arena + Clone> Internable for ArenaRef<EffectTerm, A> {
 impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<EffectTerm, A> {
     fn compile(
         &self,
+        stack: CompilerStack,
         state: &mut CompilerState,
-        bindings: &CompilerVariableBindings,
         options: &CompilerOptions,
-        stack: &CompilerStack,
     ) -> CompilerResult<A> {
         let condition = self.condition();
-        let mut instructions = CompiledBlock::default();
+        let block = CompiledBlockBuilder::new(stack);
         // Yield the condition onto the stack (this will be used as the state key)
         // => [ConditionTerm]
-        instructions.append_block(
-            condition
-                .as_inner()
-                .compile(state, bindings, options, stack)?,
-        );
+        let block =
+            block.append_inner(|stack| condition.as_inner().compile(stack, state, options))?;
         // Duplicate the condition on the stack so that it can be assigned to a local variable
         // => [ConditionTerm, ConditionTerm]
-        instructions.push(CompiledInstruction::Duplicate(ValueType::HeapPointer));
+        let block = block.push(instruction::core::Duplicate {
+            value_type: ValueType::HeapPointer,
+        });
         // Enter a new temporary scope with the key assigned to a variable
         // => [ConditionTerm]
-        instructions.push(CompiledInstruction::ScopeStart(ValueType::HeapPointer));
+        let block = block.push(instruction::core::ScopeStart {
+            value_type: ValueType::HeapPointer,
+        });
         // Attempt to load the corresponding value from global state
         // => [Option<Term>]
-        instructions.push(CompiledInstruction::LoadStateValue);
+        let block = block.push(instruction::runtime::LoadStateValue);
         // Enter a new temporary scope with the result assigned to a variable
         // => []
-        instructions.push(CompiledInstruction::ScopeStart(ValueType::HeapPointer));
+        let block = block.push(instruction::core::ScopeStart {
+            value_type: ValueType::HeapPointer,
+        });
         // Load the result back from the temporary scope variable
         // => [Option<Term>]
-        instructions.push(CompiledInstruction::GetScopeValue {
+        let block = block.push(instruction::core::GetScopeValue {
             value_type: ValueType::HeapPointer,
             scope_offset: 0,
         });
         // Push the null pointer onto the stack
         // => [Option<Term>, Null]
-        instructions.push(CompiledInstruction::NullPointer);
+        let block = block.push(instruction::runtime::NullPointer);
         // Compare the pointers to determine whether a corresponding state value exists for the given key
         // => [bool]
-        instructions.push(CompiledInstruction::Eq(ValueType::HeapPointer));
+        let block = block.push(instruction::core::Eq {
+            value_type: ValueType::HeapPointer,
+        });
         // Branch based on whether a corresponding state value exists,
         // pushing the value onto the stack if the key was present, or a signal term if not
         // => [Term]
-        instructions.push(CompiledInstruction::If {
-            block_type: TypeSignature {
+        let block = block.append_inner(|stack| {
+            let block_type = TypeSignature {
                 params: ParamsSignature::Void,
                 results: ParamsSignature::Single(ValueType::HeapPointer),
-            },
-            // If there was no corresponding value for the given key, construct a signal from the condition
-            consequent: {
-                let mut instructions = CompiledBlock::default();
-                // Load the condition from the outer temporary scope and push onto the stack
-                // => [ConditionTerm]
-                instructions.push(CompiledInstruction::GetScopeValue {
-                    value_type: ValueType::HeapPointer,
-                    scope_offset: 1,
-                });
-                // Construct a new signal term from the condition and push it onto the stack
-                // => [SignalTerm]
-                instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-                    RuntimeBuiltin::CreateSignal,
-                ));
-                instructions
-            },
-            // Otherwise if there was a corresponding value for the given key, return the value
-            alternative: {
-                let mut instructions = CompiledBlock::default();
-                // Load the value from the inner temporary scope and push onto the stack
-                // => [Term]
-                instructions.push(CompiledInstruction::GetScopeValue {
-                    value_type: ValueType::HeapPointer,
-                    scope_offset: 0,
-                });
-                // Evaluate the term if necessary
-                // => [Term]
-                instructions.push(CompiledInstruction::Evaluate);
-                instructions
-            },
-        });
+            };
+            let inner_stack = stack.enter_block(&block_type)?;
+            let (consequent_stack, alternative_stack) = (inner_stack.clone(), inner_stack);
+            CompiledBlockBuilder::new(stack)
+                .push(instruction::core::If {
+                    block_type,
+                    // If there was no corresponding value for the given key, construct a signal from the condition
+                    consequent: {
+                        let block = CompiledBlockBuilder::new(consequent_stack);
+                        // Load the condition from the outer temporary scope and push onto the stack
+                        // => [ConditionTerm]
+                        let block = block.push(instruction::core::GetScopeValue {
+                            value_type: ValueType::HeapPointer,
+                            scope_offset: 1,
+                        });
+                        // Construct a new signal term from the condition and push it onto the stack
+                        // => [SignalTerm]
+                        let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+                            target: RuntimeBuiltin::CreateSignal,
+                        });
+                        block.finish::<CompilerError<_>>()
+                    }?,
+                    // Otherwise if there was a corresponding value for the given key, return the value
+                    alternative: {
+                        let block = CompiledBlockBuilder::new(alternative_stack);
+                        // Load the value from the inner temporary scope and push onto the stack
+                        // => [Term]
+                        let block = block.push(instruction::core::GetScopeValue {
+                            value_type: ValueType::HeapPointer,
+                            scope_offset: 0,
+                        });
+                        // Evaluate the term if necessary
+                        // => [Term]
+                        let block = block.push(instruction::runtime::Evaluate);
+                        block.finish::<CompilerError<_>>()
+                    }?,
+                })
+                .finish::<CompilerError<_>>()
+        })?;
         // Drop the inner temporary scope that was used to store the value
         // => [Term]
-        instructions.push(CompiledInstruction::ScopeEnd(ValueType::HeapPointer));
+        let block = block.push(instruction::core::ScopeEnd {
+            value_type: ValueType::HeapPointer,
+        });
         // Drop the outer temporary scope that was used to store the key
         // => [Term]
-        instructions.push(CompiledInstruction::ScopeEnd(ValueType::HeapPointer));
-        Ok(instructions)
+        let block = block.push(instruction::core::ScopeEnd {
+            value_type: ValueType::HeapPointer,
+        });
+        block.finish()
     }
 }
 

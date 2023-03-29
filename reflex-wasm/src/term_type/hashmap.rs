@@ -14,8 +14,9 @@ use serde_json::Value as JsonValue;
 use crate::{
     allocator::{Arena, ArenaAllocator},
     compiler::{
-        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
-        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings, ValueType,
+        error::CompilerError, instruction, runtime::builtin::RuntimeBuiltin, CompileWasm,
+        CompiledBlockBuilder, CompilerOptions, CompilerResult, CompilerStack, CompilerState,
+        ConstValue, ValueType,
     },
     hash::{TermHash, TermHashState, TermHasher, TermSize},
     term_type::{TermType, TypedTerm, WasmExpression},
@@ -582,55 +583,60 @@ impl<A: Arena + Clone> Internable for ArenaRef<HashmapTerm, A> {
 impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<HashmapTerm, A> {
     fn compile(
         &self,
+        stack: CompilerStack,
         state: &mut CompilerState,
-        bindings: &CompilerVariableBindings,
         options: &CompilerOptions,
-        stack: &CompilerStack,
     ) -> CompilerResult<A> {
         let capacity = self.capacity();
         let num_entries = self.num_entries();
         let keys = self.keys();
         let values = self.values();
-        let mut instructions = CompiledBlock::default();
+        let block = CompiledBlockBuilder::new(stack);
         // Push the capacity onto the stack
         // => [capacity]
-        instructions.push(CompiledInstruction::u32_const(capacity as u32));
+        let block = block.push(instruction::core::Const {
+            value: ConstValue::U32(capacity as u32),
+        });
         // Allocate the hashmap term
         // => [HashmapTerm]
-        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-            RuntimeBuiltin::AllocateHashmap,
-        ));
-        let stack = stack.push_lazy(ValueType::HeapPointer);
+        let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+            target: RuntimeBuiltin::AllocateHashmap,
+        });
         // Assign the hashmap entries
-        let _ = keys.zip(values).fold(Ok(()), |results, (key, value)| {
-            let _ = results?;
-            // Duplicate the hashmap term pointer onto the stack
-            // => [HashmapTerm, HashmapTerm]
-            instructions.push(CompiledInstruction::Duplicate(ValueType::HeapPointer));
-            let stack = stack.push_lazy(ValueType::HeapPointer);
-            // Yield the entry's key onto the stack
-            // => [HashmapTerm, HashmapTerm, Term]
-            instructions.append_block(key.compile(state, bindings, options, &stack)?);
-            let stack = stack.push_lazy(ValueType::HeapPointer);
-            // Yield the entry's value onto the stack
-            // => [HashmapTerm, HashmapTerm, Term, Term]
-            instructions.append_block(value.compile(state, bindings, options, &stack)?);
-            // Insert the entry into the hashmap
-            // => [HashmapTerm]
-            instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-                RuntimeBuiltin::InsertHashmapEntry,
-            ));
-            Ok(())
-        })?;
+        let block = keys.zip(values).fold(
+            Result::<_, CompilerError<_>>::Ok(block),
+            |block, (key, value)| {
+                let block = block?;
+                // Duplicate the hashmap term pointer onto the stack
+                // => [HashmapTerm, HashmapTerm]
+                let block = block.push(instruction::core::Duplicate {
+                    value_type: ValueType::HeapPointer,
+                });
+                // Yield the entry's key onto the stack
+                // => [HashmapTerm, HashmapTerm, Term]
+                let block = block.append_inner(|stack| key.compile(stack, state, options))?;
+                // Yield the entry's value onto the stack
+                // => [HashmapTerm, HashmapTerm, Term, Term]
+                let block = block.append_inner(|stack| value.compile(stack, state, options))?;
+                // Insert the entry into the hashmap
+                // => [HashmapTerm]
+                let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+                    target: RuntimeBuiltin::InsertHashmapEntry,
+                });
+                Ok(block)
+            },
+        )?;
         // Now that the hashmap entries have been added, push the number of entries onto the stack
         // => [HashmapTerm, num_entries]
-        instructions.push(CompiledInstruction::u32_const(num_entries as u32));
+        let block = block.push(instruction::core::Const {
+            value: ConstValue::U32(num_entries as u32),
+        });
         // Initialize the hashmap term with the length that is on the stack
         // => [HashmapTerm]
-        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-            RuntimeBuiltin::InitHashmap,
-        ));
-        Ok(instructions)
+        let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+            target: RuntimeBuiltin::InitHashmap,
+        });
+        block.finish()
     }
 }
 

@@ -3,458 +3,55 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 use std::{
     collections::{hash_map::Entry, HashMap, LinkedList},
-    iter::{once, repeat},
+    iter::once,
 };
 
 use reflex::{
-    core::{Arity, Eagerness, GraphNode, Internable, NodeId, StackOffset},
+    core::{Eagerness, GraphNode, Internable, NodeId, StackOffset},
     hash::IntMap,
 };
+use reflex_utils::Stack;
 
 use crate::{
     allocator::{Arena, ArenaAllocator, ArenaIterator, VecAllocator},
-    compiler::builtin::RuntimeBuiltin,
+    compiler::{
+        error::{
+            CompilerError, InvalidBlockResultTypeError, InvalidLexicalScopeValueTypeError,
+            InvalidOperandStackValueTypesError, TypedStackError,
+        },
+        instruction::CompiledInstruction,
+        runtime::builtin::RuntimeBuiltin,
+    },
     hash::{TermHashState, TermHasher, TermSize},
     serialize::{Serialize, SerializerState},
     stdlib::Stdlib,
     term_type::*,
     term_type::{list::compile_list, TermType, TermTypeDiscriminants, TypedTerm, WasmExpression},
-    ArenaPointer, ArenaRef, Array, FunctionIndex, IntoArenaRefIterator, PointerIter, Term,
+    ArenaPointer, ArenaRef, Array, IntoArenaRefIterator, PointerIter, Term,
 };
 
-pub mod builtin;
-pub mod globals;
+pub mod error;
+pub mod instruction;
+pub mod runtime;
 pub mod wasm;
-
-#[derive(Clone)]
-pub enum CompilerError<A: Arena> {
-    InvalidFunctionTarget(FunctionIndex),
-    InvalidFunctionArgs {
-        target: ArenaRef<Term, A>,
-        arity: Arity,
-        args: Vec<ArenaRef<Term, A>>,
-    },
-    UnboundVariable(StackOffset),
-}
-
-impl<A: Arena + Clone> std::fmt::Display for CompilerError<A> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::InvalidFunctionTarget(target) => {
-                write!(f, "Invalid function index: {target}",)
-            }
-            Self::InvalidFunctionArgs {
-                target,
-                arity,
-                args,
-            } => write!(
-                f,
-                "Invalid function invocation for {target}: expected {} arguments, received ({})",
-                arity.required().len(),
-                args.iter()
-                    .map(|arg| format!("{}", arg))
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ),
-            Self::UnboundVariable(scope_offset) => {
-                write!(f, "Unbound variable scope offset {scope_offset}")
-            }
-        }
-    }
-}
 
 pub type CompilerResult<A> = Result<CompiledBlock, CompilerError<A>>;
 
-/// Virtual stack machine instruction set
-///
-/// This is a proprietary instruction set for a stack machine interpreter, with the intended goal of providing some
-/// useful high-level operations while still being straightforward to translate to WebAssembly instructions.
-///
-/// The instruction set assumes two separate stacks, which correspond to the WebAssembly stack and WebAssembly function locals respectively:
-///   1. The operand stack, which stores function arguments and return values
-///   2. The lexical scope stack, which is used store local variables (similar to  virtual registers).
-///     Each lexical scope stack frame holds a single variable, which can be loaded onto the operand stack from anywhere within
-///     the lexical scope. Variables stored in the lexical scopes cannot be mutated (although mutation can be simulated
-///     by using a SSA-style approach).
-#[derive(Debug, Clone, PartialEq)]
-pub enum CompiledInstruction {
-    // 'Low-level' instructions (generic stack machine instructions)
-    /// Push a constant value onto the operand stack
-    Const(ConstValue),
-    /// Pop a target heap pointer address from the operand stack, read the value at that offset within the heap memory and push the value onto the operand stack
-    ReadHeapValue(ValueType),
-    /// Pop a value from the operand stack, then pop the target heap pointer address from the operand stack, then write the value to that offset in the heap memory
-    WriteHeapValue(ValueType),
-    /// Duplicate the value at the top of the operand stack
-    Duplicate(ValueType),
-    /// Pop the term at the top of the operand stack and discard it
-    Drop(ValueType),
-    /// Pop the top item of the operand stack and enter a new lexical scope whose variable is assigned to that value
-    ScopeStart(ValueType),
-    /// Pop the latest lexical scope
-    ScopeEnd(ValueType),
-    /// Push a variable defined in a containing lexical scope onto the operand stack (where `0` is the current lexical scope, `1` is the immediate parent of the current lexical scope, etc)
-    GetScopeValue {
-        value_type: ValueType,
-        scope_offset: StackOffset,
-    },
-    /// Pop the top three values from the operand stack, and if the top item is not `0`, push the bottom value back onto the stack, otherwise push the middle value onto the stack
-    Select(ValueType),
-    // Pop the top item of the operand stack, and if the value is not `0` then enter the 'consequent' block, otherwise enter the 'alternative' block
-    If {
-        // TODO: Determine block type signature by analyzing inner blocks
-        block_type: TypeSignature,
-        consequent: CompiledBlock,
-        alternative: CompiledBlock,
-    },
-    /// Pop the top item from the operand stack, and if the value is not `0` then enter the `handler` block, otherwise continue with the current block
-    ConditionalBreak {
-        /// Description of operand stack items to carry over into the continuation block, along with the result type
-        /// of the inner block
-        /// (note that the inner block result type must be identical to the overall result type of the enclosing block)
-        // TODO: Determine evaluation continuation block stack depth automatically by analyzing preceding instructions
-        block_type: TypeSignature,
-        /// Handler block to invoke if the condition was triggered
-        ///
-        /// This will have access to any captured stack values, and must return the same result type as the main block
-        handler: CompiledBlock,
-    },
-    /// Pop the top two values from the operand stack, and push a constant `1` if they are equal, or `0` if not
-    Eq(ValueType),
-    /// Push a null pointer onto the operand stack
-    NullPointer,
-
-    // 'High-level' instructions (these make assumptions about the runtime environment - i.e. state, dependencies etc)
-    /// Pop a term pointer from the operand stack, look that key up in the global state object,
-    /// and push either the corresponding value term reference or a null pointer depending on whether the key exists
-    LoadStateValue,
-    /// Invoke an interpreter builtin function, popping the required number of arguments from the operand stack
-    /// (arguments are passed to the function in the same order they were added to the operand stack, i.e. not reversed)
-    CallRuntimeBuiltin(RuntimeBuiltin),
-    /// Invoke a standard library function known at compile-time, popping the required number of arguments from the operand stack
-    /// (arguments are passed to the function in the same order they were added to the operand stack, i.e. not reversed)
-    /// If the function has variadic arguments, the final argument is assumed to be a heap pointer to a list term containing the variadic arguments
-    CallStdlib(Stdlib),
-    /// Invoke a user-defined function known at compile-time, popping the required number of arguments from the operand stack
-    /// (arguments are passed to the function in the same order they were added to the operand stack, i.e. not reversed)
-    CallCompiledFunction {
-        /// Type signature of the target function
-        signature: TypeSignature,
-        /// ID of the target function
-        target: CompiledFunctionId,
-    },
-    /// Pop the argument list term pointer from the operand stack, then pop the function target index from the operand stack,
-    /// then invoke the corresponding function, pushing the result onto the operand stack
-    CallDynamic(TypeSignature),
-    /// Pop the top item of the operand stack, evaluate it, and push the result onto the operand stack.
-    Evaluate,
-    /// Pop the argument list term pointer from the operand stack, then pop the target term pointer from the operand stack,
-    /// then apply the corresponding target term to the arguments list, pushing the result onto the operand stack
-    Apply,
-}
-
-impl TypedCompilerBlock for CompiledInstruction {
-    fn get_type(
-        &self,
-        _operand_stack: &[ValueType],
-        lexical_scopes: &[ValueType],
-    ) -> TypedStackResult<TypedStackType> {
-        || -> TypedStackResult<TypedStackType> {
-            match self {
-                CompiledInstruction::Const(value) => {
-                    Ok(TypeSignature::new((), value.get_type()).into())
-                }
-                CompiledInstruction::ReadHeapValue(value_type) => {
-                    Ok(TypeSignature::new(ValueType::HeapPointer, *value_type).into())
-                }
-                CompiledInstruction::WriteHeapValue(value_type) => {
-                    Ok(TypeSignature::new((ValueType::HeapPointer, *value_type), ()).into())
-                }
-                CompiledInstruction::Duplicate(value_type) => {
-                    Ok(TypeSignature::new(*value_type, (*value_type, *value_type)).into())
-                }
-                CompiledInstruction::Drop(value_type) => {
-                    Ok(TypeSignature::new(*value_type, ()).into())
-                }
-                CompiledInstruction::ScopeStart(value_type) => Ok(TypedStackType {
-                    operand_stack: TypeSignature::new(*value_type, ()),
-                    lexical_scopes: Some(LexicalScopeDelta::Start {
-                        value_types: vec![*value_type],
-                    }),
-                }),
-                CompiledInstruction::ScopeEnd(value_type) => Ok(TypedStackType {
-                    operand_stack: TypeSignature::new((), ()),
-                    lexical_scopes: Some(LexicalScopeDelta::End {
-                        value_types: vec![*value_type],
-                    }),
-                }),
-                CompiledInstruction::GetScopeValue {
-                    value_type,
-                    scope_offset: _,
-                } => Ok(TypeSignature::new((), *value_type).into()),
-                CompiledInstruction::Select(value_type) => Ok(TypeSignature::new(
-                    (*value_type, *value_type, ValueType::U32),
-                    *value_type,
-                )
-                .into()),
-                CompiledInstruction::If {
-                    block_type,
-                    consequent,
-                    alternative,
-                } => {
-                    let inner_params = block_type.params.iter().collect::<Vec<_>>();
-                    let consequent_type = consequent.get_type(&inner_params, lexical_scopes)?;
-                    let alternative_type = alternative.get_type(&inner_params, lexical_scopes)?;
-                    if &consequent_type.operand_stack != block_type {
-                        Err(
-                            TypedStackErrorReason::InvalidBlockType(InvalidBlockTypeError {
-                                expected: block_type.clone().into(),
-                                received: consequent_type,
-                            })
-                            .into(),
-                        )
-                    } else if &alternative_type.operand_stack != block_type {
-                        Err(
-                            TypedStackErrorReason::InvalidBlockType(InvalidBlockTypeError {
-                                expected: block_type.clone().into(),
-                                received: alternative_type,
-                            })
-                            .into(),
-                        )
-                    } else {
-                        Ok(TypeSignature::new(
-                            ParamsSignature::from_iter(
-                                block_type.params.iter().chain([ValueType::U32]),
-                            ),
-                            block_type.results.clone(),
-                        )
-                        .into())
-                    }
-                }
-                CompiledInstruction::ConditionalBreak {
-                    block_type,
-                    handler,
-                } => {
-                    let inner_params = block_type.params.iter().collect::<Vec<_>>();
-                    let handler_type = handler.get_type(&inner_params, lexical_scopes)?;
-                    // TODO: Assert that the overall enclosing block type is identical to conditional break handler block type
-                    if &handler_type.operand_stack != block_type {
-                        Err(
-                            TypedStackErrorReason::InvalidBlockType(InvalidBlockTypeError {
-                                expected: block_type.clone().into(),
-                                received: handler_type,
-                            })
-                            .into(),
-                        )
-                    } else {
-                        Ok(TypeSignature::new(
-                            {
-                                let condition_type = ValueType::U32;
-                                let params = ParamsSignature::from_iter(
-                                    block_type.params.iter().chain(once(condition_type)),
-                                );
-                                params
-                            },
-                            block_type.params.clone(),
-                        )
-                        .into())
-                    }
-                }
-                CompiledInstruction::Eq(value_type) => {
-                    Ok(TypeSignature::new((*value_type, *value_type), ValueType::U32).into())
-                }
-                CompiledInstruction::NullPointer => {
-                    Ok(TypeSignature::new((), ValueType::HeapPointer).into())
-                }
-                CompiledInstruction::LoadStateValue => {
-                    Ok(TypeSignature::new(ValueType::HeapPointer, ValueType::HeapPointer).into())
-                }
-                CompiledInstruction::CallRuntimeBuiltin(builtin) => Ok(builtin.signature().into()),
-                CompiledInstruction::CallStdlib(stdlib) => {
-                    let arity = stdlib.arity();
-                    let num_positional_args = arity.required().len() + arity.optional().len();
-                    // Variadic arguments are passed as a heap pointer to an argument list
-                    let num_variadic_args = arity.variadic().map(|_| 1).unwrap_or(0);
-                    let num_args = num_positional_args + num_variadic_args;
-                    let arg_types = (0..num_args).map(|_| ValueType::HeapPointer);
-                    Ok(TypeSignature::new(
-                        ParamsSignature::from_iter(arg_types),
-                        ValueType::HeapPointer,
-                    )
-                    .into())
-                }
-                CompiledInstruction::CallCompiledFunction {
-                    signature,
-                    target: _,
-                } => Ok(signature.clone().into()),
-                CompiledInstruction::CallDynamic(_) => Ok(TypeSignature::new(
-                    (ValueType::U32, ValueType::HeapPointer),
-                    ValueType::HeapPointer,
-                )
-                .into()),
-                CompiledInstruction::Evaluate => {
-                    Ok(TypeSignature::new(ValueType::HeapPointer, ValueType::HeapPointer).into())
-                }
-                CompiledInstruction::Apply => Ok(TypeSignature::new(
-                    (ValueType::HeapPointer, ValueType::HeapPointer),
-                    ValueType::HeapPointer,
-                )
-                .into()),
-            }
-        }()
-        .map_err(|err| match &err.instruction {
-            Some(_) => err,
-            None => TypedStackError {
-                instruction: Some(self.clone()),
-                error: err.error,
-            },
-        })
-    }
-}
-
-impl std::fmt::Display for CompiledInstruction {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Const(..) => write!(f, "Const"),
-            Self::ReadHeapValue(..) => write!(f, "ReadHeapValue"),
-            Self::WriteHeapValue(..) => write!(f, "WriteHeapValue"),
-            Self::Duplicate(..) => write!(f, "Duplicate"),
-            Self::Drop(..) => write!(f, "Drop"),
-            Self::ScopeStart(..) => write!(f, "ScopeStart"),
-            Self::ScopeEnd(..) => write!(f, "ScopeEnd"),
-            Self::GetScopeValue { .. } => write!(f, "GetScopeValue"),
-            Self::Select(..) => write!(f, "Select"),
-            Self::If { .. } => write!(f, "If"),
-            Self::ConditionalBreak { .. } => write!(f, "ConditionalBreak"),
-            Self::Eq(..) => write!(f, "Eq"),
-            Self::NullPointer => write!(f, "NullPointer"),
-            Self::LoadStateValue => write!(f, "LoadStateValue"),
-            Self::CallRuntimeBuiltin(..) => write!(f, "CallRuntimeBuiltin"),
-            Self::CallStdlib(..) => write!(f, "CallStdlib"),
-            Self::CallCompiledFunction { .. } => write!(f, "CallCompiledFunction"),
-            Self::CallDynamic(..) => write!(f, "CallDynamic"),
-            Self::Evaluate => write!(f, "Evaluate"),
-            Self::Apply => write!(f, "Apply"),
-        }
-    }
-}
-
 pub trait TypedCompilerBlock {
-    fn get_type(
-        &self,
-        operand_stack: &[ValueType],
-        lexical_scopes: &[ValueType],
-    ) -> TypedStackResult<TypedStackType>;
+    fn get_type(&self, stack: &CompilerStack) -> Result<CompilerStack, TypedStackError>;
 }
 
-pub type TypedStackResult<T> = Result<T, TypedStackError>;
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct TypedStackError {
-    instruction: Option<CompiledInstruction>,
-    error: TypedStackErrorReason,
+#[derive(PartialEq, Eq, Clone, Copy, Hash, Debug)]
+pub(crate) enum Strictness {
+    Strict,
+    NonStrict,
 }
-
-impl std::error::Error for TypedStackError {}
-
-impl std::fmt::Display for TypedStackError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self.instruction {
-            Some(instruction) => write!(f, "Invalid {} instruction: {}", instruction, self.error),
-            None => write!(f, "{}", self.error),
-        }
-    }
-}
-
-impl From<TypedStackErrorReason> for TypedStackError {
-    fn from(value: TypedStackErrorReason) -> Self {
-        Self {
-            instruction: None,
-            error: value,
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum TypedStackErrorReason {
-    InsufficientOperandStackDepth(InsufficientOperandStackErrorDepth),
-    InsufficientLexicalScopeDepth(InsufficientLexicalScopeDepthError),
-    InvalidStackValueTypes(InvalidStackValueTypesError),
-    InvalidBlockType(InvalidBlockTypeError),
-}
-
-impl std::fmt::Display for TypedStackErrorReason {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Strictness {
+    pub fn is_strict(&self) -> bool {
         match self {
-            Self::InsufficientOperandStackDepth(inner) => std::fmt::Display::fmt(inner, f),
-            Self::InsufficientLexicalScopeDepth(inner) => std::fmt::Display::fmt(inner, f),
-            Self::InvalidStackValueTypes(inner) => std::fmt::Display::fmt(inner, f),
-            Self::InvalidBlockType(inner) => std::fmt::Display::fmt(inner, f),
+            Self::Strict => true,
+            _ => false,
         }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct InsufficientOperandStackErrorDepth {
-    expected: ParamsSignature,
-    received: ParamsSignature,
-}
-
-impl std::fmt::Display for InsufficientOperandStackErrorDepth {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Insufficient items on stack: Expected {}, received {}",
-            self.expected, self.received
-        )
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub struct InsufficientLexicalScopeDepthError {
-    expected: StackOffset,
-    received: StackOffset,
-}
-
-impl std::fmt::Display for InsufficientLexicalScopeDepthError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Insufficient lexical scope depth: Expected {}, received {}",
-            self.expected, self.received
-        )
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct InvalidStackValueTypesError {
-    expected: ParamsSignature,
-    received: ParamsSignature,
-}
-
-impl std::fmt::Display for InvalidStackValueTypesError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Invalid values on stack: Expected {}, received {}",
-            self.expected, self.received
-        )
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct InvalidBlockTypeError {
-    expected: TypedStackType,
-    received: TypedStackType,
-}
-
-impl std::fmt::Display for InvalidBlockTypeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Invalid block type: Expected {}, received {}",
-            self.expected, self.received
-        )
     }
 }
 
@@ -490,9 +87,27 @@ pub enum ParamsSignature {
 
 impl ParamsSignature {
     pub fn iter(&self) -> ParamsSignatureIter<'_> {
-        ParamsSignatureIter {
-            signature: self,
-            index: 0,
+        ParamsSignatureIter::new(&self)
+    }
+    pub fn get(&self, index: usize) -> Option<ValueType> {
+        match self {
+            &ParamsSignature::Void => None,
+            &ParamsSignature::Single(inner) => match index {
+                0 => Some(inner),
+                _ => None,
+            },
+            &ParamsSignature::Pair(first, second) => match index {
+                0 => Some(first),
+                1 => Some(second),
+                _ => None,
+            },
+            &ParamsSignature::Triple(first, second, third) => match index {
+                0 => Some(first),
+                1 => Some(second),
+                2 => Some(third),
+                _ => None,
+            },
+            ParamsSignature::Multiple(values) => values.get(index).copied(),
         }
     }
     pub fn len(&self) -> usize {
@@ -592,67 +207,48 @@ impl std::fmt::Display for ParamsSignature {
 #[derive(Debug, Clone, Copy)]
 pub struct ParamsSignatureIter<'a> {
     signature: &'a ParamsSignature,
-    index: usize,
+    start_index: usize,
+    end_index: usize,
+}
+
+impl<'a> ParamsSignatureIter<'a> {
+    fn new(signature: &'a ParamsSignature) -> Self {
+        Self {
+            start_index: 0,
+            end_index: signature.len(),
+            signature,
+        }
+    }
+}
+
+impl<'a> DoubleEndedIterator for ParamsSignatureIter<'a> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if self.start_index >= self.end_index {
+            return None;
+        }
+        let item = self.signature.get(self.end_index - 1);
+        self.end_index -= 1;
+        item
+    }
 }
 
 impl<'a> Iterator for ParamsSignatureIter<'a> {
     type Item = ValueType;
     fn next(&mut self) -> Option<Self::Item> {
-        let item = match self.signature {
-            ParamsSignature::Void => None,
-            ParamsSignature::Single(inner) => match self.index {
-                0 => Some(*inner),
-                _ => None,
-            },
-            ParamsSignature::Pair(first, second) => match self.index {
-                0 => Some(*first),
-                1 => Some(*second),
-                _ => None,
-            },
-            ParamsSignature::Triple(first, second, third) => match self.index {
-                0 => Some(*first),
-                1 => Some(*second),
-                2 => Some(*third),
-                _ => None,
-            },
-            ParamsSignature::Multiple(values) => values.get(self.index).copied(),
-        };
-        if item.is_some() {
-            self.index += 1;
+        if self.start_index >= self.end_index {
+            return None;
         }
+        let item = self.signature.get(self.start_index);
+        self.start_index += 1;
         item
     }
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let length = self.signature.len() - self.index;
+        let length = self.end_index - self.start_index;
         (length, Some(length))
     }
 }
 
 impl<'a> ExactSizeIterator for ParamsSignatureIter<'a> {}
-
-impl CompiledInstruction {
-    pub fn i32_const(value: i32) -> Self {
-        Self::Const(ConstValue::I32(value))
-    }
-    pub fn u32_const(value: u32) -> Self {
-        Self::Const(ConstValue::U32(value))
-    }
-    pub fn i64_const(value: i64) -> Self {
-        Self::Const(ConstValue::I64(value))
-    }
-    pub fn f32_const(value: f32) -> Self {
-        Self::Const(ConstValue::F32(value))
-    }
-    pub fn f64_const(value: f64) -> Self {
-        Self::Const(ConstValue::F64(value))
-    }
-    pub fn heap_pointer(value: ArenaPointer) -> Self {
-        Self::Const(ConstValue::HeapPointer(value))
-    }
-    pub fn function_pointer(value: impl Into<FunctionPointer>) -> Self {
-        Self::Const(ConstValue::FunctionPointer(value.into()))
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ConstValue {
@@ -667,6 +263,28 @@ pub enum ConstValue {
     // Pointer to an indirect function call wrapper
     FunctionPointer(FunctionPointer),
 }
+
+impl std::hash::Hash for ConstValue {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            Self::I32(value) => std::hash::Hash::hash(value, state),
+            Self::U32(value) => std::hash::Hash::hash(value, state),
+            Self::I64(value) => std::hash::Hash::hash(value, state),
+            Self::U64(value) => std::hash::Hash::hash(value, state),
+            Self::F32(value) => std::hash::Hash::hash(
+                &if value.is_nan() { f32::NAN } else { *value }.to_bits(),
+                state,
+            ),
+            Self::F64(value) => std::hash::Hash::hash(
+                &if value.is_nan() { f64::NAN } else { *value }.to_bits(),
+                state,
+            ),
+            Self::HeapPointer(value) => std::hash::Hash::hash(value, state),
+            Self::FunctionPointer(value) => std::hash::Hash::hash(value, state),
+        }
+    }
+}
+
 impl ConstValue {
     pub fn get_type(&self) -> ValueType {
         match self {
@@ -725,232 +343,88 @@ impl std::fmt::Display for ValueType {
     }
 }
 
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Default, Copy, Clone, Debug)]
 pub struct CompilerOptions {
     pub lazy_record_values: bool,
     pub lazy_list_items: bool,
     pub lazy_variable_initializers: bool,
 }
 
-#[derive(Default, Debug, Clone, PartialEq)]
+#[derive(Clone, Debug)]
+pub struct CompiledBlockBuilder {
+    result: Result<CompiledBlock, TypedStackError>,
+    stack: CompilerStack,
+}
+
+impl CompiledBlockBuilder {
+    pub fn new(stack: CompilerStack) -> Self {
+        Self {
+            stack,
+            result: Ok(CompiledBlock::default()),
+        }
+    }
+}
+
+impl CompiledBlockBuilder {
+    #[must_use]
+    pub fn push(self, instruction: impl Into<CompiledInstruction>) -> Self {
+        let Self { result, stack } = self;
+        let (result, stack) = result
+            .and_then(|mut instructions| {
+                let instruction = Into::<CompiledInstruction>::into(instruction);
+                instruction.get_type(&stack).map(|updated_stack| {
+                    instructions.push(instruction);
+                    (Ok(instructions), updated_stack)
+                })
+            })
+            .unwrap_or_else(|err| (Err(err), stack));
+        Self { result, stack }
+    }
+    #[must_use]
+    fn append_block(self, block: CompiledBlock) -> Self {
+        let Self { result, stack } = self;
+        let (result, stack) = result
+            .and_then(|mut instructions| {
+                block.get_type(&stack).map(|updated_stack| {
+                    instructions.extend(block);
+                    (Ok(instructions), updated_stack)
+                })
+            })
+            .unwrap_or_else(|err| (Err(err), stack));
+        Self { result, stack }
+    }
+    #[must_use]
+    pub fn append_inner<E>(
+        self,
+        factory: impl FnOnce(CompilerStack) -> Result<CompiledBlock, E>,
+    ) -> Result<Self, E> {
+        let block = factory(self.stack.clone())?;
+        Ok(self.append_block(block))
+    }
+    pub fn finish<E: From<TypedStackError>>(self) -> Result<CompiledBlock, E> {
+        self.result.map_err(Into::into)
+    }
+    pub(crate) fn into_parts(self) -> Result<(CompiledBlock, CompilerStack), TypedStackError> {
+        let Self { stack, result } = self;
+        result.map(|block| (block, stack))
+    }
+}
+
+#[derive(Default, PartialEq, Clone, Hash, Debug)]
 pub struct CompiledBlock {
     instructions: LinkedList<CompiledInstruction>,
 }
 
-impl TypedCompilerBlock for CompiledBlock {
-    fn get_type(
-        &self,
-        operand_stack: &[ValueType],
-        lexical_scopes: &[ValueType],
-    ) -> TypedStackResult<TypedStackType> {
-        validate_block_type(
-            self.instructions.iter(),
-            operand_stack.iter().copied().collect(),
-            lexical_scopes.iter().copied().collect(),
-        )
-    }
-}
-
-fn validate_block_type<'a>(
-    instructions: impl IntoIterator<Item = &'a CompiledInstruction>,
-    operand_stack: Vec<ValueType>,
-    lexical_scopes: Vec<ValueType>,
-) -> TypedStackResult<TypedStackType> {
-    let params = ParamsSignature::from_iter(operand_stack.iter().copied());
-    // Perform type checking for the block by simulating a virtual stack
-    let (operand_stack, lexical_scopes) = instructions.into_iter().fold(
-        Ok((operand_stack, lexical_scopes)),
-        |result, instruction| {
-            let (mut operand_stack, mut lexical_scopes) = result?;
-            let TypedStackType {
-                operand_stack: stack_updates,
-                lexical_scopes: lexical_scope_updates,
-            } = instruction.get_type(&operand_stack, &lexical_scopes)?;
-            let num_existing_operands = operand_stack.len();
-            let num_popped_operands = stack_updates.params.len();
-            // Assert that enough operands are present on the simulated operand stack
-            if num_popped_operands > num_existing_operands {
-                return Err(TypedStackError {
-                    instruction: Some(instruction.clone()),
-                    error: TypedStackErrorReason::InsufficientOperandStackDepth(
-                        InsufficientOperandStackErrorDepth {
-                            expected: stack_updates.params,
-                            received: ParamsSignature::from_iter(operand_stack),
-                        },
-                    ),
-                });
-            }
-            // Pop the instruction parameter types from the simulated operand stack
-            let popped_items = operand_stack
-                .drain((operand_stack.len() - num_popped_operands)..)
-                .collect::<Vec<_>>();
-            // Assert that all operands on the simulated operand stack are the expected types
-            for (expected, received) in stack_updates
-                .params
-                .iter()
-                .zip(popped_items.iter().copied())
-            {
-                if expected != received {
-                    return Err(TypedStackError {
-                        instruction: Some(instruction.clone()),
-                        error: TypedStackErrorReason::InvalidStackValueTypes(
-                            InvalidStackValueTypesError {
-                                expected: stack_updates.params,
-                                received: ParamsSignature::from_iter(popped_items),
-                            },
-                        ),
-                    });
-                }
-            }
-            // Push the instruction result types onto the simulated operand stack
-            operand_stack.extend(stack_updates.results);
-            // Enter/leave any lexical scopes as appropriate
-            if let Some(scope_updates) = lexical_scope_updates {
-                match scope_updates {
-                    LexicalScopeDelta::Start { value_types } => {
-                        lexical_scopes.extend(value_types);
-                    }
-                    LexicalScopeDelta::End { value_types } => {
-                        let num_existing_scopes = lexical_scopes.len();
-                        let num_popped_scopes = value_types.len();
-                        // Assert that enough scopes are present on the simulated lexical scope stack
-                        if num_popped_scopes > num_existing_scopes {
-                            return Err(TypedStackError {
-                                instruction: Some(instruction.clone()),
-                                error: TypedStackErrorReason::InsufficientLexicalScopeDepth(
-                                    InsufficientLexicalScopeDepthError {
-                                        expected: num_popped_scopes,
-                                        received: num_existing_scopes,
-                                    },
-                                ),
-                            });
-                        }
-                        // Pop the scoped variable types from the simulated lexical scope stack
-                        let popped_items = lexical_scopes
-                            .drain((lexical_scopes.len() - num_popped_scopes)..)
-                            .collect::<Vec<_>>();
-                        // Assert that all variables on the simulated lexical scope stack are the expected types
-                        for (expected, received) in value_types
-                            .iter()
-                            .copied()
-                            .zip(popped_items.iter().copied())
-                        {
-                            if expected != received {
-                                return Err(TypedStackError {
-                                    instruction: Some(instruction.clone()),
-                                    error: TypedStackErrorReason::InvalidStackValueTypes(
-                                        InvalidStackValueTypesError {
-                                            expected: ParamsSignature::from_iter(value_types),
-                                            received: ParamsSignature::from_iter(popped_items),
-                                        },
-                                    ),
-                                });
-                            }
-                        }
-                    }
-                }
-            }
-            Ok((operand_stack, lexical_scopes))
-        },
-    )?;
-    Ok(TypedStackType {
-        operand_stack: TypeSignature::new(params, ParamsSignature::from_iter(operand_stack)),
-        lexical_scopes: if lexical_scopes.is_empty() {
-            None
-        } else {
-            Some(LexicalScopeDelta::Start {
-                value_types: lexical_scopes,
-            })
-        },
-    })
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TypedStackType {
-    pub operand_stack: TypeSignature,
-    pub lexical_scopes: Option<LexicalScopeDelta>,
-}
-
-impl From<TypeSignature> for TypedStackType {
-    fn from(value: TypeSignature) -> Self {
-        Self {
-            operand_stack: value,
-            lexical_scopes: None,
-        }
-    }
-}
-
-impl std::fmt::Display for TypedStackType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let _ = write!(f, "{}", self.operand_stack)?;
-        if let Some(scope_updates) = self.lexical_scopes.as_ref() {
-            write!(f, " {} {}", self.operand_stack, scope_updates)
-        } else {
-            Ok(())
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum LexicalScopeDelta {
-    Start { value_types: Vec<ValueType> },
-    End { value_types: Vec<ValueType> },
-}
-
-impl std::fmt::Display for LexicalScopeDelta {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Start { value_types } => write!(
-                f,
-                "+[{}]",
-                value_types
-                    .iter()
-                    .map(|item| format!("{}", item))
-                    .collect::<Vec<_>>()
-                    .join(" ")
-            ),
-            Self::End { value_types } => write!(
-                f,
-                "-[{}]",
-                value_types
-                    .iter()
-                    .map(|item| format!("{}", item))
-                    .collect::<Vec<_>>()
-                    .join(" ")
-            ),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct CompiledFunction {
-    pub num_args: usize,
-    pub body: CompiledBlock,
-}
-
 impl CompiledBlock {
-    pub fn push(&mut self, item: CompiledInstruction) {
-        self.instructions.push_back(item)
+    fn push(&mut self, instruction: impl Into<CompiledInstruction>) {
+        self.instructions.push_back(instruction.into())
     }
-    pub fn append_block(&mut self, block: CompiledBlock) {
-        self.instructions.extend(block)
+    fn extend(&mut self, instructions: CompiledBlock) {
+        let CompiledBlock { instructions } = instructions;
+        self.instructions.extend(instructions)
     }
     pub fn iter(&self) -> std::collections::linked_list::Iter<'_, CompiledInstruction> {
         self.instructions.iter()
-    }
-}
-
-impl FromIterator<CompiledInstruction> for CompiledBlock {
-    fn from_iter<I: IntoIterator<Item = CompiledInstruction>>(iter: I) -> Self {
-        CompiledBlock {
-            instructions: iter.into_iter().collect::<LinkedList<_>>(),
-        }
-    }
-}
-
-impl Extend<CompiledInstruction> for CompiledBlock {
-    fn extend<T: IntoIterator<Item = CompiledInstruction>>(&mut self, iter: T) {
-        self.instructions.extend(iter)
     }
 }
 
@@ -970,6 +444,23 @@ impl<'a> IntoIterator for &'a CompiledBlock {
     }
 }
 
+impl TypedCompilerBlock for CompiledBlock {
+    fn get_type(&self, stack: &CompilerStack) -> Result<CompilerStack, TypedStackError> {
+        self.instructions
+            .iter()
+            .fold(Ok(stack.clone()), |result, instruction| {
+                let stack = result?;
+                instruction.get_type(&stack)
+            })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CompiledFunction {
+    pub num_args: usize,
+    pub body: Vec<CompiledInstruction>,
+}
+
 pub struct CompilerState {
     pub(crate) serializer_state: SerializerState,
     pub(crate) heap: VecAllocator,
@@ -980,23 +471,6 @@ pub struct CompilerState {
 pub struct CompiledLambda {
     pub params: ParamsSignature,
     pub body: CompiledBlock,
-}
-
-#[derive(Clone, Debug)]
-pub enum CompiledThunk {
-    Pure {
-        instructions: CompiledBlock,
-        application_term: ArenaPointer,
-        // Placeholder pointer to where the compiled lambda ID should be written once known
-        target_uid_pointer: ArenaPointer,
-    },
-    Capturing {
-        free_variables: Vec<StackOffset>,
-        instructions: CompiledBlock,
-        target_term: ArenaPointer,
-        // Placeholder pointer to where the compiled lambda ID should be written once known
-        target_uid_pointer: ArenaPointer,
-    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1084,131 +558,321 @@ impl CompilerState {
 pub trait CompileWasm<A: Arena> {
     fn compile(
         &self,
+        stack: CompilerStack,
         state: &mut CompilerState,
-        bindings: &CompilerVariableBindings,
         options: &CompilerOptions,
-        stack: &CompilerStack,
     ) -> CompilerResult<A>;
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Default, Clone, Debug)]
 pub struct CompilerStack {
-    values: Vec<CompilerStackValue>,
+    operands: Stack<ValueType>,
+    blocks: Stack<ParamsSignature>,
+    bindings: CompilerVariableBindings,
 }
 
 impl CompilerStack {
-    #[must_use]
-    pub fn push_strict(&self) -> Self {
-        self.append(once(CompilerStackValue::Strict))
-    }
-    #[must_use]
-    pub fn push_lazy(&self, value_type: ValueType) -> Self {
-        self.append(once(CompilerStackValue::Lazy(value_type)))
-    }
-    #[must_use]
-    pub fn pop(&self) -> Self {
-        Self::from_iter(self.values.iter().copied().take(self.values.len() - 1))
-    }
-    #[must_use]
-    pub fn append(&self, values: impl IntoIterator<Item = CompilerStackValue>) -> Self {
-        Self::from_iter(self.values.iter().copied().chain(values))
-    }
-    pub fn iter(
-        &self,
-    ) -> impl Iterator<Item = CompilerStackValue> + ExactSizeIterator + DoubleEndedIterator + '_
-    {
-        self.values.iter().copied()
-    }
-    pub fn rev(
-        &self,
-    ) -> impl Iterator<Item = CompilerStackValue> + ExactSizeIterator + DoubleEndedIterator + '_
-    {
-        self.iter().rev()
-    }
-    pub fn value_types(
-        &self,
-    ) -> impl Iterator<Item = ValueType> + ExactSizeIterator + DoubleEndedIterator + '_ {
-        self.iter().map(|value| value.get_type())
-    }
-    pub fn depth(&self) -> usize {
-        self.values.len()
-    }
-    pub fn is_empty(&self) -> bool {
-        self.values.is_empty()
-    }
-}
-
-impl FromIterator<CompilerStackValue> for CompilerStack {
-    fn from_iter<T: IntoIterator<Item = CompilerStackValue>>(iter: T) -> Self {
+    pub fn from_free_variables(
+        scope_offsets: impl IntoIterator<Item = (StackOffset, ValueType)>,
+    ) -> Self {
         Self {
-            values: iter.into_iter().collect(),
+            operands: Default::default(),
+            blocks: Default::default(),
+            bindings: CompilerVariableBindings::from_free_variables(scope_offsets),
         }
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum CompilerStackValue {
-    /// Strict stack values point to terms in the the heap, and will be checked for signals before returning from the active block
-    Strict,
-    /// Lazy stack values will be disposed when exiting the active block without checking for signals
-    Lazy(ValueType),
-}
-
-impl CompilerStackValue {
-    pub fn get_type(&self) -> ValueType {
-        match self {
-            Self::Strict => ValueType::HeapPointer,
-            Self::Lazy(value_type) => *value_type,
+    pub fn push_operand(&self, value_type: ValueType) -> Self {
+        self.push_operands(&ParamsSignature::Single(value_type))
+    }
+    pub fn pop_operand(&self, value_type: ValueType) -> Result<Self, TypedStackError> {
+        self.pop_operands(&ParamsSignature::Single(value_type))
+    }
+    pub fn assert_operand(&self, value_type: ValueType) -> Result<&Self, TypedStackError> {
+        self.assert_operands(&ParamsSignature::Single(value_type))
+    }
+    pub fn assert_operands(&self, value_types: &ParamsSignature) -> Result<&Self, TypedStackError> {
+        let _ = self.pop_operands(value_types)?.push_operands(value_types);
+        Ok(self)
+    }
+    pub fn push_operands(&self, value_types: &ParamsSignature) -> Self {
+        Self {
+            operands: self.operands.append(value_types.iter()),
+            blocks: self.blocks.clone(),
+            bindings: self.bindings.clone(),
         }
     }
-    pub fn is_strict(&self) -> bool {
-        matches!(self, Self::Strict)
+    pub fn pop_operands(&self, value_types: &ParamsSignature) -> Result<Self, TypedStackError> {
+        let updated_operands =
+            value_types
+                .iter()
+                .rev()
+                .fold(Ok(self.operands.clone()), |results, value_type| {
+                    let operands = results?;
+                    let (&existing_type, remaining_operands) =
+                        operands.peek_and_pop().ok_or_else(|| {
+                            TypedStackError::InvalidOperandStackValueTypes(
+                                InvalidOperandStackValueTypesError {
+                                    expected: value_types.clone(),
+                                    received: ParamsSignature::from_iter(
+                                        self.operands
+                                            .rev()
+                                            .copied()
+                                            .collect::<Vec<_>>()
+                                            .into_iter()
+                                            .rev(),
+                                    ),
+                                },
+                            )
+                        })?;
+                    if existing_type != value_type {
+                        return Err(TypedStackError::InvalidOperandStackValueTypes(
+                            InvalidOperandStackValueTypesError {
+                                expected: value_types.clone(),
+                                received: ParamsSignature::from_iter(
+                                    self.operands
+                                        .rev()
+                                        .copied()
+                                        .collect::<Vec<_>>()
+                                        .into_iter()
+                                        .rev(),
+                                ),
+                            },
+                        ));
+                    }
+                    Ok(remaining_operands)
+                })?;
+        Ok(Self {
+            operands: updated_operands,
+            blocks: self.blocks.clone(),
+            bindings: self.bindings.clone(),
+        })
+    }
+    pub fn num_operands(&self) -> usize {
+        self.operands.len()
+    }
+    pub fn operands(&self) -> impl Iterator<Item = ValueType> + '_ {
+        self.operands.rev().copied().collect::<Vec<_>>().into_iter()
+    }
+    pub fn enter_scope(&self, value_type: ValueType) -> Self {
+        Self {
+            operands: self.operands.clone(),
+            blocks: self.blocks.clone(),
+            bindings: self.bindings.push_internal(value_type),
+        }
+    }
+    pub fn declare_variable(&self, value_type: ValueType) -> Self {
+        Self {
+            operands: self.operands.clone(),
+            blocks: self.blocks.clone(),
+            bindings: self.bindings.push_variable(value_type),
+        }
+    }
+    pub fn lookup_variable(&self, scope_offset: StackOffset) -> Option<usize> {
+        self.bindings.lookup_variable(scope_offset)
+    }
+    pub fn leave_scope(&self, value_type: ValueType) -> Result<Self, TypedStackError> {
+        let updated_bindings = self
+            .bindings
+            .pop()
+            .ok_or(None)
+            .and_then(|(existing_scope, remaining_scopes)| {
+                let existing_type = existing_scope.get_type();
+                if existing_type == value_type {
+                    Ok(remaining_scopes)
+                } else {
+                    Err(Some(existing_type))
+                }
+            })
+            .map_err(|existing_type| {
+                TypedStackError::InvalidLexicalScopeValueType(InvalidLexicalScopeValueTypeError {
+                    scope_offset: 0,
+                    scope_offset_types: self.bindings.lexical_scopes().collect::<Vec<_>>(),
+                    expected: value_type,
+                    received: existing_type,
+                })
+            })?;
+        Ok(Self {
+            operands: self.operands.clone(),
+            blocks: self.blocks.clone(),
+            bindings: updated_bindings,
+        })
+    }
+    pub fn assert_lexical_scope(
+        &self,
+        scope_offset: usize,
+        value_type: ValueType,
+    ) -> Result<&Self, TypedStackError> {
+        self.bindings
+            .get_scope_value_type(scope_offset)
+            .ok_or(None)
+            .and_then(|existing_type| {
+                if existing_type == value_type {
+                    Ok(self)
+                } else {
+                    Err(Some(existing_type))
+                }
+            })
+            .map_err(|existing_type| {
+                TypedStackError::InvalidLexicalScopeValueType(InvalidLexicalScopeValueTypeError {
+                    scope_offset,
+                    scope_offset_types: self.bindings.lexical_scopes().collect::<Vec<_>>(),
+                    expected: value_type,
+                    received: existing_type,
+                })
+            })
+    }
+    pub fn bindings(&self) -> &CompilerVariableBindings {
+        &self.bindings
+    }
+    pub fn enter_block(&self, block_type: &TypeSignature) -> Result<Self, TypedStackError> {
+        let TypeSignature { params, results } = block_type;
+        // Blocks capture only the specified block parameters from the current operand stack
+        let inner_stack = Stack::from_iter(params.iter());
+        let updated_blocks = self.blocks.push(results.clone());
+        Ok(Self {
+            operands: inner_stack,
+            blocks: updated_blocks,
+            bindings: self.bindings.clone(),
+        })
+    }
+    pub fn leave_block(&self, result_type: &ParamsSignature) -> Result<Self, TypedStackError> {
+        let updated_blocks = self
+            .blocks
+            .peek_and_pop()
+            .ok_or(None)
+            .and_then(|(existing_type, remaining_blocks)| {
+                if existing_type == result_type {
+                    Ok(remaining_blocks)
+                } else {
+                    Err(Some(existing_type.clone()))
+                }
+            })
+            .map_err(|existing_type| {
+                TypedStackError::InvalidBlockResultType(InvalidBlockResultTypeError {
+                    block_types: self.blocks.rev().cloned().collect::<Vec<_>>(),
+                    expected: result_type.clone(),
+                    received: existing_type,
+                })
+            })?;
+        Ok(Self {
+            operands: self.operands.clone(),
+            blocks: updated_blocks,
+            bindings: self.bindings.clone(),
+        })
+    }
+    pub fn active_block(&self) -> Option<&ParamsSignature> {
+        self.blocks.peek()
+    }
+    pub fn blocks(&self) -> impl Iterator<Item = &'_ ParamsSignature> + '_ {
+        self.blocks.rev().collect::<Vec<_>>().into_iter()
     }
 }
 
-#[derive(Default, Clone, Debug)]
-pub struct CompilerVariableBindings<'a> {
-    /// Mapping of 'application' variable scopes to actual 'compiler' stack offsets
-    free_variables: Option<&'a IntMap<StackOffset, StackOffset>>,
-    /// Stack of 'compiler' lexical scopes, where each stack frame is one of the predetermined frame types
-    local_scopes: Vec<CompilerVariableStackFrame>,
+#[derive(Default, Debug)]
+pub struct CompilerVariableBindings {
+    /// Free variables captured from the global environment
+    free_variables: Option<std::rc::Rc<CompilerFreeVariables>>,
+    /// Stack of 'stack machine' lexical scopes, where each stack frame is one of the predetermined frame types
+    local_scopes: Stack<CompilerVariableStackFrame>,
+}
+
+#[derive(Debug)]
+struct CompilerFreeVariables {
+    /// Mapping of 'application' variable scopes to actual 'stack machine' stack offsets
+    mappings: IntMap<StackOffset, usize>,
+    /// Types of the captured variables, ordered from outermost to innermost
+    value_types: ParamsSignature,
+}
+
+impl Clone for CompilerVariableBindings {
+    fn clone(&self) -> Self {
+        Self {
+            free_variables: self.free_variables.clone(),
+            local_scopes: self.local_scopes.clone(),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
 pub enum CompilerVariableStackFrame {
     /// Application-level variable declaration
-    Local,
-    /// Application-level variable alias
-    Alias(StackOffset),
-    /// Internal compiler stack frame
-    Internal,
+    Variable(ValueType),
+    /// Internal stack machine stack frame
+    Internal(ValueType),
 }
 
-impl<'a> CompilerVariableBindings<'a> {
-    pub fn from_mappings(mappings: &'a IntMap<StackOffset, StackOffset>) -> Self {
+impl CompilerVariableStackFrame {
+    pub fn get_type(&self) -> ValueType {
+        match self {
+            Self::Variable(value_type) => *value_type,
+            Self::Internal(value_type) => *value_type,
+        }
+    }
+}
+
+impl CompilerVariableBindings {
+    pub fn from_free_variables(
+        scope_offsets: impl IntoIterator<Item = (StackOffset, ValueType)>,
+    ) -> Self {
+        // Sort the free variables from outermost (high-offset) to innermost (low-offset)
+        // (this is to reflect the order in which function parameter offsets are defined)
+        let sorted_scope_offsets = {
+            let mut offsets = scope_offsets.into_iter().collect::<Vec<_>>();
+            offsets.sort_by_key(|(scope_offset, _)| *scope_offset);
+            offsets.reverse();
+            offsets
+        };
+        // Prepare to map the free variable scope offsets to their corresponding compiler stack offsets and value types
+        let (scope_offsets, stack_offsets, variable_types) = {
+            // Stack offsets are zero-indexed and sequential; the iterator is reversed in order to emit stack offsets
+            // from outermost (high-offset) to innermost (low-offset) to match the order of the sorted free variables
+            let stack_offsets = (0..sorted_scope_offsets.len()).rev();
+            (
+                sorted_scope_offsets
+                    .iter()
+                    .map(|(scope_offset, _)| *scope_offset),
+                stack_offsets,
+                sorted_scope_offsets
+                    .iter()
+                    .map(|(_, value_type)| *value_type),
+            )
+        };
         Self {
-            free_variables: Some(mappings),
+            free_variables: Some(std::rc::Rc::new(CompilerFreeVariables {
+                // Create a mapping of global free variable offsets to local compiler stack offsets
+                mappings: scope_offsets.zip(stack_offsets).collect::<IntMap<_, _>>(),
+                value_types: ParamsSignature::from_iter(variable_types),
+            })),
             local_scopes: Default::default(),
         }
     }
-    pub fn get(&self, scope_offset: StackOffset) -> Option<StackOffset> {
+    pub fn push_internal(&self, value_type: ValueType) -> Self {
+        self.push(CompilerVariableStackFrame::Internal(value_type))
+    }
+    pub fn push_variable(&self, value_type: ValueType) -> Self {
+        self.push(CompilerVariableStackFrame::Variable(value_type))
+    }
+    pub fn get_scope_value_type(&self, offset: usize) -> Option<ValueType> {
+        self.lexical_scopes().skip(offset).next()
+    }
+    pub fn lookup_variable(&self, scope_offset: StackOffset) -> Option<usize> {
         let Self {
             free_variables,
             local_scopes,
         } = self;
         enum ScopeResult {
-            /// Iteration has terminated successfully with the given target compiler stack offset
-            Ok(StackOffset),
+            /// Iteration has terminated successfully with the given target stack machine stack offset
+            Ok(usize),
             /// Iteration has not yet terminated successfully
             Pending {
                 /// Application variable scope offset of desired target variable
                 target_offset: StackOffset,
-                /// Target compiler stack offset accumulated so far during the iteration
-                num_scopes: StackOffset,
+                /// Target stack machine stack offset accumulated so far during the iteration
+                num_scopes: usize,
             },
         }
         // Iterate backwards through the local scopes to find a potential match
-        let result = local_scopes.iter().rev().fold(
+        let result = local_scopes.rev().fold(
             ScopeResult::Pending {
                 target_offset: scope_offset,
                 num_scopes: 0,
@@ -1221,74 +885,66 @@ impl<'a> CompilerVariableBindings<'a> {
                     target_offset,
                     num_scopes,
                 } => {
-                    // If we have reached the target offset, inspect the current local scope binding and respond accordingly
-                    if target_offset == 0 {
-                        match local_binding {
-                            // If this is a local variable declararation, we have reached our desired scope offset
-                            CompilerVariableStackFrame::Local => ScopeResult::Ok(num_scopes),
-                            // If this is a local variable alias, continue iterating to locate the alias target
-                            CompilerVariableStackFrame::Alias(alias_offset) => {
-                                ScopeResult::Pending {
-                                    target_offset: *alias_offset,
-                                    // Aliases are 'invisible' to the compiler stack, so no need to increment the number of accumulated scopes
-                                    num_scopes,
-                                }
+                    match local_binding {
+                        // If this is a 'gap' created by an intermediate stack machine scope, continue iterating
+                        CompilerVariableStackFrame::Internal(..) => ScopeResult::Pending {
+                            target_offset,
+                            num_scopes: num_scopes + 1,
+                        },
+                        CompilerVariableStackFrame::Variable(..) => {
+                            // If we have reached the target offset, we have figured out our desired scope offset
+                            if target_offset == 0 {
+                                return ScopeResult::Ok(num_scopes);
                             }
-                            // Otherwise if this is a 'gap' created by an intermediate compiler scope, continue iterating
-                            CompilerVariableStackFrame::Internal => ScopeResult::Pending {
-                                target_offset,
-                                num_scopes: num_scopes + 1,
-                            },
-                        }
-                    } else {
-                        match local_binding {
-                            // If this is a local variable declaration, decrement the target scope offset accordingly and continue iterating
-                            CompilerVariableStackFrame::Local => ScopeResult::Pending {
+                            // This is an unrelated local variable declaration, decrement the target scope offset accordingly and continue iterating
+                            ScopeResult::Pending {
                                 target_offset: target_offset - 1,
                                 num_scopes: num_scopes + 1,
-                            },
-                            // If this is a local variable alias, decrement the target scope offset accordingly and continue iterating
-                            CompilerVariableStackFrame::Alias(_) => ScopeResult::Pending {
-                                target_offset: target_offset - 1,
-                                // Aliases are 'invisible' to the compiler stack, so no need to increment the number of accumulated scopes
-                                num_scopes,
-                            },
-                            // Otherwise if this is a 'gap' created by an intermediate compiler scope, continue iterating
-                            CompilerVariableStackFrame::Internal => ScopeResult::Pending {
-                                target_offset,
-                                num_scopes: num_scopes + 1,
-                            },
+                            }
                         }
                     }
                 }
             },
         );
         match result {
-            // If the result yielded the compiler stack offset of a local variable, return the result
+            // If the result yielded the stack offset of a local stack machine stack entry, return the result
             ScopeResult::Ok(stack_offset) => Some(stack_offset),
-            // Otherwise if all local variables have been exhausted, look up the variable in the global scope
+            // Otherwise if all local stack values have been exhausted, look up the variable in the global scope
             ScopeResult::Pending {
                 target_offset,
                 num_scopes,
-            } => free_variables.and_then(|free_variables| {
+            } => free_variables.as_ref().and_then(|free_variables| {
                 free_variables
+                    .mappings
                     .get(&target_offset)
                     .copied()
                     .map(|free_variable_offset| free_variable_offset + num_scopes)
             }),
         }
     }
-    pub fn offset(&self, depth: StackOffset) -> Self {
-        self.append(repeat(CompilerVariableStackFrame::Internal).take(depth))
-    }
-    pub fn push_local(&self) -> Self {
-        self.push(CompilerVariableStackFrame::Local)
-    }
-    pub fn push_alias(&self, scope_offset: StackOffset) -> Self {
-        self.push(CompilerVariableStackFrame::Alias(scope_offset))
+    fn lexical_scopes(&self) -> impl Iterator<Item = ValueType> + '_ {
+        self.local_scopes.rev().map(|frame| frame.get_type()).chain(
+            self.free_variables
+                .as_ref()
+                .into_iter()
+                .flat_map(|free_variables| free_variables.value_types.iter().rev()),
+        )
     }
     fn push(&self, binding: CompilerVariableStackFrame) -> Self {
         self.append(once(binding))
+    }
+    fn pop(&self) -> Option<(CompilerVariableStackFrame, Self)> {
+        self.local_scopes
+            .peek_and_pop()
+            .map(|(value, local_scopes)| {
+                (
+                    *value,
+                    Self {
+                        free_variables: self.free_variables.clone(),
+                        local_scopes,
+                    },
+                )
+            })
     }
     fn append(&self, scopes: impl IntoIterator<Item = CompilerVariableStackFrame>) -> Self {
         let Self {
@@ -1296,8 +952,8 @@ impl<'a> CompilerVariableBindings<'a> {
             local_scopes,
         } = self;
         Self {
-            free_variables: *free_variables,
-            local_scopes: local_scopes.iter().copied().chain(scopes).collect(),
+            free_variables: free_variables.clone(),
+            local_scopes: local_scopes.append(scopes),
         }
     }
 }
@@ -1324,6 +980,34 @@ impl<A: Arena + Clone> CompiledFunctionCallArgs<A> {
     }
     pub fn len(&self) -> usize {
         self.partial_args.len() + self.args.len()
+    }
+}
+
+impl<A: Arena + Clone> std::fmt::Display for CompiledFunctionCallArgs<A> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let max_displayed_items = 100;
+        let items = self.iter();
+        let num_items = items.len();
+        write!(
+            f,
+            "[{}]",
+            if num_items <= max_displayed_items {
+                items
+                    .map(|item| format!("{}", item))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            } else {
+                items
+                    .take(max_displayed_items - 1)
+                    .map(|item| format!("{}", item))
+                    .chain(once(format!(
+                        "...{} more items",
+                        num_items - (max_displayed_items - 1)
+                    )))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            }
+        )
     }
 }
 
@@ -1359,60 +1043,66 @@ impl<'a, A: Arena + Clone> ExactSizeIterator for CompiledFunctionCallArgsIter<'a
 impl<A: Arena + Clone> CompileWasm<A> for CompiledFunctionCallArgs<A> {
     fn compile(
         &self,
+        stack: CompilerStack,
         state: &mut CompilerState,
-        bindings: &CompilerVariableBindings,
         options: &CompilerOptions,
-        stack: &CompilerStack,
     ) -> CompilerResult<A> {
         if self.partial_args.is_empty() {
             // If there are no partially-applied arguments, delegate to the existing argument list compilation
             // (this can make use of static term inlining)
-            self.args.compile(state, bindings, options, stack)
+            self.args.compile(stack, state, options)
         } else {
             // Otherwise if there are partially-applied arguments, compile the combined argument sequence into a list
             // TODO: Investigate chained iterators for partially-applied arguments
             let num_items = self.len();
-            let mut instructions = CompiledBlock::default();
+            let block = CompiledBlockBuilder::new(stack);
             // Push the list capacity onto the stack
             // => [capacity]
-            instructions.push(CompiledInstruction::u32_const(num_items as u32));
+            let block = block.push(instruction::core::Const {
+                value: ConstValue::U32(num_items as u32),
+            });
             // Allocate the list term
             // => [ListTerm]
-            instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-                RuntimeBuiltin::AllocateList,
-            ));
+            let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+                target: RuntimeBuiltin::AllocateList,
+            });
             // Assign the list items
-            for (index, arg) in self.iter().enumerate() {
-                // Duplicate the list term pointer onto the stack
-                // => [ListTerm, ListTerm]
-                instructions.push(CompiledInstruction::Duplicate(ValueType::HeapPointer));
-                // Push the item index onto the stack
-                // => [ListTerm, ListTerm, index]
-                instructions.push(CompiledInstruction::u32_const(index as u32));
-                // Yield the child item onto the stack
-                // => [ListTerm, ListTerm, index, Term]
-                let child_stack = stack.append([
-                    CompilerStackValue::Lazy(ValueType::HeapPointer),
-                    CompilerStackValue::Lazy(ValueType::HeapPointer),
-                    CompilerStackValue::Lazy(ValueType::U32),
-                ]);
-                let child_block = arg.compile(state, bindings, options, &child_stack)?;
-                instructions.append_block(child_block);
-                // Set the list term's value at the given index to the child item
-                // => [ListTerm]
-                instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-                    RuntimeBuiltin::SetListItem,
-                ));
-            }
+            let block = self.iter().enumerate().fold(
+                Result::<_, CompilerError<_>>::Ok(block),
+                |results, (index, arg)| {
+                    let block = results?;
+                    // Duplicate the list term pointer onto the stack
+                    // => [ListTerm, ListTerm]
+                    let block = block.push(instruction::core::Duplicate {
+                        value_type: ValueType::HeapPointer,
+                    });
+                    // Push the item index onto the stack
+                    // => [ListTerm, ListTerm, index]
+                    let block = block.push(instruction::core::Const {
+                        value: ConstValue::U32(index as u32),
+                    });
+                    // Yield the child item onto the stack
+                    // => [ListTerm, ListTerm, index, Term]
+                    let block = block.append_inner(|stack| arg.compile(stack, state, options))?;
+                    // Set the list term's value at the given index to the child item
+                    // => [ListTerm]
+                    let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+                        target: RuntimeBuiltin::SetListItem,
+                    });
+                    Ok(block)
+                },
+            )?;
             // Now that all the items have been added, push the list length onto the stack
             // => [ListTerm, length]
-            instructions.push(CompiledInstruction::u32_const(num_items as u32));
+            let block = block.push(instruction::core::Const {
+                value: ConstValue::U32(num_items as u32),
+            });
             // Initialize the list term with the length that is on the stack
             // => [ListTerm]
-            instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-                RuntimeBuiltin::InitList,
-            ));
-            Ok(instructions)
+            let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+                target: RuntimeBuiltin::InitList,
+            });
+            block.finish()
         }
     }
 }
@@ -1424,9 +1114,11 @@ pub(crate) fn intern_static_value<A: Arena + Clone>(
     // TODO: Avoid need to manually track serializer state heap allocator offset during compiler static interning
     state.serializer_state.next_offset = state.heap.end_offset();
     let heap_pointer = Serialize::serialize(value, &mut state.heap, &mut state.serializer_state);
-    return Ok(CompiledBlock::from_iter([CompiledInstruction::Const(
-        ConstValue::HeapPointer(heap_pointer),
-    )]));
+    let block = CompiledBlockBuilder::new(CompilerStack::default());
+    let block = block.push(instruction::core::Const {
+        value: ConstValue::HeapPointer(heap_pointer),
+    });
+    block.finish()
 }
 
 #[derive(Debug, Clone)]
@@ -1447,14 +1139,13 @@ impl<A: Arena + Clone> MaybeLazyExpression<A> {
 impl<A: Arena + Clone> CompileWasm<A> for MaybeLazyExpression<A> {
     fn compile(
         &self,
+        stack: CompilerStack,
         state: &mut CompilerState,
-        bindings: &CompilerVariableBindings,
         options: &CompilerOptions,
-        stack: &CompilerStack,
     ) -> CompilerResult<A> {
         match self {
-            MaybeLazyExpression::Eager(inner) => inner.compile(state, bindings, options, stack),
-            MaybeLazyExpression::Lazy(inner) => inner.compile(state, bindings, options, stack),
+            MaybeLazyExpression::Eager(inner) => inner.compile(stack, state, options),
+            MaybeLazyExpression::Lazy(inner) => inner.compile(stack, state, options),
         }
     }
 }
@@ -1473,13 +1164,12 @@ impl<A: Arena + Clone> LazyExpression<A> {
 impl<A: Arena + Clone> CompileWasm<A> for LazyExpression<A> {
     fn compile(
         &self,
+        stack: CompilerStack,
         state: &mut CompilerState,
-        bindings: &CompilerVariableBindings,
         options: &CompilerOptions,
-        stack: &CompilerStack,
     ) -> CompilerResult<A> {
         if self.inner.is_static() {
-            return self.inner.compile(state, bindings, options, stack);
+            return self.inner.compile(stack, state, options);
         }
         if self.inner.should_intern(Eagerness::Lazy) {
             intern_static_value(&self.inner, state)
@@ -1496,33 +1186,26 @@ impl<A: Arena + Clone> CompileWasm<A> for LazyExpression<A> {
                         free_variables if free_variables.is_empty() => None,
                         free_variables => Some(free_variables),
                     };
-                    let free_variable_mappings = free_variables
-                        .as_ref()
-                        .map(|free_variables| {
-                            // Construct a mapping of application-level scope offsets to captured compiler stack offsets
-                            let mut scope_offsets =
-                                free_variables.iter().copied().collect::<Vec<_>>();
-                            scope_offsets.sort();
-                            scope_offsets
-                                .into_iter()
-                                .enumerate()
-                                .map(|(captured_offset, scope_offset)| {
-                                    (scope_offset, captured_offset)
-                                })
-                                .rev()
-                                .collect::<IntMap<_, _>>()
-                        })
-                        .unwrap_or_default();
-                    let inner_bindings =
-                        CompilerVariableBindings::from_mappings(&free_variable_mappings);
-                    let thunk_function_body = self.inner.compile(
-                        state,
-                        &inner_bindings,
-                        options,
-                        &CompilerStack::default(),
-                    )?;
+                    // Create a new compiler stack to be used within the thunk body,
+                    // with all the free variables captured on the compiler stack as global variable mappings
+                    // and a block wrapper to catch short-circuiting signals
+                    let inner_stack = match free_variables.as_ref() {
+                        Some(free_variables) => CompilerStack::from_free_variables(
+                            free_variables
+                                .iter()
+                                .copied()
+                                .map(|scope_offset| (scope_offset, ValueType::HeapPointer)),
+                        ),
+                        None => CompilerStack::default(),
+                    }
+                    .enter_block(&TypeSignature {
+                        params: ParamsSignature::Void,
+                        results: ParamsSignature::Single(ValueType::HeapPointer),
+                    })
+                    .map_err(CompilerError::StackError)?;
+                    let thunk_function_body = self.inner.compile(inner_stack, state, options)?;
                     // Create a placeholder term to represent the compiled function
-                    let (target_term, target_uid_pointer) = {
+                    let (compiled_function_term, target_uid_pointer) = {
                         let term_pointer = state.heap.allocate(Term::new(
                             TermType::Builtin(BuiltinTerm {
                                 // The compiled function ID will be filled in with the actual value by the linker
@@ -1569,42 +1252,46 @@ impl<A: Arena + Clone> CompileWasm<A> for LazyExpression<A> {
                             };
                             let application_pointer = state.heap.allocate(Term::new(
                                 TermType::Application(ApplicationTerm {
-                                    target: target_term,
+                                    target: compiled_function_term,
                                     args: empty_list,
                                     cache: Default::default(),
                                 }),
                                 &state.heap,
                             ));
-                            CompiledThunk::Pure {
+                            CompiledThunk::Pure(PureThunk {
                                 application_term: application_pointer,
-                                instructions: thunk_function_body,
+                                thunk_function_body,
                                 target_uid_pointer,
-                            }
+                            })
                         }
-                        Some(bindings) => CompiledThunk::Capturing {
+                        Some(bindings) => CompiledThunk::Capturing(CapturingThunk {
                             free_variables: bindings.into_iter().collect(),
-                            instructions: thunk_function_body,
-                            target_term,
+                            thunk_function_body,
+                            compiled_function_term,
                             target_uid_pointer,
-                        },
+                        }),
                     };
                     state.compiled_thunks.entry(thunk_id).or_insert(thunk)
                 }
             };
-            let mut instructions = CompiledBlock::default();
             match compiled_thunk {
-                CompiledThunk::Pure {
+                CompiledThunk::Pure(PureThunk {
                     application_term, ..
-                } => {
-                    instructions.push(CompiledInstruction::Const(ConstValue::HeapPointer(
-                        *application_term,
-                    )));
+                }) => {
+                    // Pure thunks can be evaluated against an empty stack
+                    let block = CompiledBlockBuilder::new(CompilerStack::default());
+                    // Push a pointer to the precompiled application term onto the stack
+                    // => [ApplicationTerm]
+                    let block = block.push(instruction::core::Const {
+                        value: ConstValue::HeapPointer(*application_term),
+                    });
+                    block.finish()
                 }
-                CompiledThunk::Capturing {
+                CompiledThunk::Capturing(CapturingThunk {
                     free_variables,
-                    target_term,
+                    compiled_function_term,
                     ..
-                } => {
+                }) => {
                     let captured_variables = {
                         let mut captured_variables = free_variables
                             .iter()
@@ -1614,7 +1301,7 @@ impl<A: Arena + Clone> CompileWasm<A> for LazyExpression<A> {
                                     ClosureCapture {
                                         scope_offset: stack_offset,
                                     },
-                                    Eagerness::Lazy,
+                                    Strictness::NonStrict,
                                 )
                             })
                             .collect::<Vec<_>>();
@@ -1629,49 +1316,82 @@ impl<A: Arena + Clone> CompileWasm<A> for LazyExpression<A> {
                         captured_variables.reverse();
                         captured_variables
                     };
-                    instructions.push(CompiledInstruction::Const(ConstValue::HeapPointer(
-                        *target_term,
-                    )));
-                    let inner_stack = stack.push_lazy(ValueType::HeapPointer);
-                    instructions.append_block(compile_list(
-                        captured_variables,
-                        state,
-                        bindings,
-                        options,
-                        &inner_stack,
-                    )?);
-                    instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-                        RuntimeBuiltin::CreateApplication,
-                    ));
+                    // Capturing thunks capture their variables from the current stack
+                    let block = CompiledBlockBuilder::new(stack);
+                    // Push a pointer to the precompiled thunk target function onto the stack
+                    // => [BuiltinTerm]
+                    let block = block.push(instruction::core::Const {
+                        value: ConstValue::HeapPointer(*compiled_function_term),
+                    });
+                    // Yield the list of captured variables onto the stack
+                    // => [BuiltinTerm, ListTerm]
+                    let block = block.append_inner(|stack| {
+                        compile_list(captured_variables, stack, state, options)
+                    })?;
+                    // Create an application term that applies the thunk function to the list of captured variables
+                    // => [ApplicationTerm]
+                    let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+                        target: RuntimeBuiltin::CreateApplication,
+                    });
+                    block.finish()
                 }
             }
-            Ok(instructions)
         }
     }
+}
+
+#[derive(Clone, Debug)]
+pub enum CompiledThunk {
+    Pure(PureThunk),
+    Capturing(CapturingThunk),
+}
+
+#[derive(Clone, Debug)]
+pub struct PureThunk {
+    /// Bytecode instructions for the compiled thunk
+    pub thunk_function_body: CompiledBlock,
+    /// Pointer to the heap-allocated application term instance
+    /// (pure thunks contain no free variables and therefore the same application term instance can be shared across all usages)
+    pub application_term: ArenaPointer,
+    /// Placeholder pointer to where the compiled lambda ID should be written once known
+    pub target_uid_pointer: ArenaPointer,
+}
+
+#[derive(Clone, Debug)]
+pub struct CapturingThunk {
+    /// List of variable scope offsets of any free variables referenced within the thunk
+    pub free_variables: Vec<StackOffset>,
+    /// Bytecode instructions for the compiled thunk
+    pub thunk_function_body: CompiledBlock,
+    /// Pointer to the heap-allocated term instance corresponding to the compiled thunk function
+    /// (this can be used as a function application target, passing the free variable values as arguments)
+    pub compiled_function_term: ArenaPointer,
+    /// Placeholder pointer to where the compiled lambda ID should be written once known
+    pub target_uid_pointer: ArenaPointer,
 }
 
 #[derive(Debug, Clone, Copy)]
 struct ClosureCapture {
     scope_offset: StackOffset,
 }
+
 impl<A: Arena + Clone> CompileWasm<A> for ClosureCapture {
     fn compile(
         &self,
+        stack: CompilerStack,
         _state: &mut CompilerState,
-        bindings: &CompilerVariableBindings,
         _options: &CompilerOptions,
-        _stack: &CompilerStack,
     ) -> CompilerResult<A> {
         let Self { scope_offset } = self;
-        if let Some(stack_offset) = bindings.get(*scope_offset) {
-            let mut instructions = CompiledBlock::default();
+        if let Some(stack_offset) = stack.bindings.lookup_variable(*scope_offset) {
+            let block = CompiledBlockBuilder::new(stack);
             // Copy the lexically-scoped variable onto the stack
             // => [Term]
-            instructions.push(CompiledInstruction::GetScopeValue {
+            let block = block.push(instruction::core::GetScopeValue {
                 value_type: ValueType::HeapPointer,
                 scope_offset: stack_offset,
             });
-            Ok(instructions)
+            block.finish()
         } else {
             Err(CompilerError::UnboundVariable(*scope_offset))
         }
@@ -1681,10 +1401,9 @@ impl<A: Arena + Clone> CompileWasm<A> for ClosureCapture {
 impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<Term, A> {
     fn compile(
         &self,
+        stack: CompilerStack,
         state: &mut CompilerState,
-        bindings: &CompilerVariableBindings,
         options: &CompilerOptions,
-        stack: &CompilerStack,
     ) -> CompilerResult<A> {
         if self.should_intern(Eagerness::Eager) {
             return intern_static_value(self, state);
@@ -1693,163 +1412,163 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<Term, A> {
             TermTypeDiscriminants::Application => self
                 .as_typed_term::<ApplicationTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::Boolean => self
                 .as_typed_term::<BooleanTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::Builtin => self
                 .as_typed_term::<BuiltinTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::Cell => self
                 .as_typed_term::<CellTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::Condition => self
                 .as_typed_term::<ConditionTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::Constructor => self
                 .as_typed_term::<ConstructorTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::Date => self
                 .as_typed_term::<DateTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::Effect => self
                 .as_typed_term::<EffectTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::Float => self
                 .as_typed_term::<FloatTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::Hashmap => self
                 .as_typed_term::<HashmapTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::Hashset => self
                 .as_typed_term::<HashsetTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::Int => self
                 .as_typed_term::<IntTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::Lambda => self
                 .as_typed_term::<LambdaTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::Let => self
                 .as_typed_term::<LetTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::List => self
                 .as_typed_term::<ListTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::Nil => self
                 .as_typed_term::<NilTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::Partial => self
                 .as_typed_term::<PartialTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::Pointer => self
                 .as_typed_term::<PointerTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::Record => self
                 .as_typed_term::<RecordTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::Signal => self
                 .as_typed_term::<SignalTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::String => self
                 .as_typed_term::<StringTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::Symbol => self
                 .as_typed_term::<SymbolTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::Tree => self
                 .as_typed_term::<TreeTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::Variable => self
                 .as_typed_term::<VariableTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::EmptyIterator => self
                 .as_typed_term::<EmptyIteratorTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::EvaluateIterator => self
                 .as_typed_term::<EvaluateIteratorTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::FilterIterator => self
                 .as_typed_term::<FilterIteratorTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::FlattenIterator => self
                 .as_typed_term::<FlattenIteratorTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::HashmapKeysIterator => self
                 .as_typed_term::<HashmapKeysIteratorTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::HashmapValuesIterator => self
                 .as_typed_term::<HashmapValuesIteratorTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::IndexedAccessorIterator => self
                 .as_typed_term::<IndexedAccessorIteratorTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::IntegersIterator => self
                 .as_typed_term::<IntegersIteratorTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::IntersperseIterator => self
                 .as_typed_term::<IntersperseIteratorTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::MapIterator => self
                 .as_typed_term::<MapIteratorTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::OnceIterator => self
                 .as_typed_term::<OnceIteratorTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::RangeIterator => self
                 .as_typed_term::<RangeIteratorTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::RepeatIterator => self
                 .as_typed_term::<RepeatIteratorTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::SkipIterator => self
                 .as_typed_term::<SkipIteratorTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::TakeIterator => self
                 .as_typed_term::<TakeIteratorTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
             TermTypeDiscriminants::ZipIterator => self
                 .as_typed_term::<ZipIteratorTerm>()
                 .as_inner()
-                .compile(state, bindings, options, stack),
+                .compile(stack, state, options),
         }
     }
 }
@@ -1875,8 +1594,8 @@ pub mod tests {
             WasmCompilerOptions, WasmProgram,
         },
         compiler::{
-            CompileWasm, CompilerOptions, CompilerStack, CompilerState, CompilerVariableBindings,
-            TypedCompilerBlock, TypedStackError, TypedStackType,
+            CompileWasm, CompilerOptions, CompilerStack, CompilerState, TypedCompilerBlock,
+            TypedStackError,
         },
         factory::WasmTermFactory,
         interpreter::{InterpreterError, WasmInterpreter},
@@ -1887,6 +1606,8 @@ pub mod tests {
         },
         ArenaPointer, ArenaRef, Term,
     };
+
+    use super::*;
 
     const RUNTIME_BYTES: &[u8] = include_bytes!("../../build/runtime.wasm");
 
@@ -1993,7 +1714,7 @@ pub mod tests {
     pub enum BytecodeValidationError<T: Expression> {
         Deserialize(T),
         Compiler(String),
-        StackValidation(TypedStackError),
+        StackError(TypedStackError),
     }
 
     impl<T: Expression + std::fmt::Display> std::fmt::Display for BytecodeValidationError<T> {
@@ -2001,7 +1722,7 @@ pub mod tests {
             match self {
                 Self::Deserialize(term) => write!(f, "Failed to deserialize expression: {term}"),
                 Self::Compiler(err) => write!(f, "Compiler error: {err}"),
-                Self::StackValidation(err) => write!(f, "Stack error: {err}"),
+                Self::StackError(err) => write!(f, "Stack error: {err}"),
             }
         }
     }
@@ -2009,8 +1730,9 @@ pub mod tests {
     pub fn validate_bytecode<T: Expression>(
         expression: &T,
         factory: &impl ExpressionFactory<T>,
+        stack: CompilerStack,
         compiler_options: &CompilerOptions,
-    ) -> Result<TypedStackType, BytecodeValidationError<T>>
+    ) -> Result<CompilerStack, BytecodeValidationError<T>>
     where
         T::Builtin: Into<crate::stdlib::Stdlib>,
     {
@@ -2022,19 +1744,20 @@ pub mod tests {
             .map_err(BytecodeValidationError::Deserialize)?;
         let mut compiler_state =
             CompilerState::from_heap_snapshot::<Term>(arena.borrow().as_bytes());
+        let block_stack = stack
+            .enter_block(&TypeSignature {
+                params: ParamsSignature::Void,
+                results: ParamsSignature::Single(ValueType::HeapPointer),
+            })
+            .map_err(BytecodeValidationError::StackError)?;
         let compiled_expression = expression
-            .compile(
-                &mut compiler_state,
-                &CompilerVariableBindings::default(),
-                compiler_options,
-                &CompilerStack::default(),
-            )
+            .compile(block_stack.clone(), &mut compiler_state, compiler_options)
             .map_err(|err| format!("{}", err))
             .map_err(BytecodeValidationError::Compiler)?;
-        let block_type = compiled_expression
-            .get_type(&Vec::new(), &Vec::new())
-            .map_err(BytecodeValidationError::StackValidation)?;
-        Ok(block_type)
+        let result_stack = compiled_expression
+            .get_type(&block_stack)
+            .map_err(BytecodeValidationError::StackError)?;
+        Ok(result_stack)
     }
 
     pub fn evaluate_compiled<T: Expression>(

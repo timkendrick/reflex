@@ -17,9 +17,9 @@ use serde_json::Value as JsonValue;
 use crate::{
     allocator::{Arena, ArenaAllocator},
     compiler::{
-        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
-        CompilerResult, CompilerStack, CompilerStackValue, CompilerState, CompilerVariableBindings,
-        LazyExpression, ParamsSignature, TypeSignature, ValueType,
+        error::CompilerError, instruction, runtime::builtin::RuntimeBuiltin, CompileWasm,
+        CompiledBlockBuilder, CompilerOptions, CompilerResult, CompilerStack, CompilerState,
+        ConstValue, LazyExpression, ParamsSignature, Strictness, ValueType,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{TermType, TypedTerm, WasmExpression},
@@ -315,34 +315,32 @@ impl<A: Arena + Clone> Internable for ArenaRef<ListTerm, A> {
 impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<ListTerm, A> {
     fn compile(
         &self,
+        stack: CompilerStack,
         state: &mut CompilerState,
-        bindings: &CompilerVariableBindings,
         options: &CompilerOptions,
-        stack: &CompilerStack,
     ) -> CompilerResult<A> {
         let items = self.iter();
         if options.lazy_list_items {
             compile_list(
-                items.map(|item| (LazyExpression::new(item), Eagerness::Lazy)),
-                state,
-                bindings,
-                options,
+                items.map(|item| (LazyExpression::new(item), Strictness::NonStrict)),
                 stack,
+                state,
+                options,
             )
         } else {
             compile_list(
                 items.map(|item| {
-                    let eagerness = if item.is_static() && item.as_signal_term().is_none() {
-                        Eagerness::Lazy
+                    // Skip signal-testing for list items that are already fully evaluated to a non-signal value
+                    let strictness = if item.is_static() && item.as_signal_term().is_none() {
+                        Strictness::NonStrict
                     } else {
-                        Eagerness::Eager
+                        Strictness::Strict
                     };
-                    (item, eagerness)
+                    (item, strictness)
                 }),
-                state,
-                bindings,
-                options,
                 stack,
+                state,
+                options,
             )
         }
     }
@@ -350,301 +348,200 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<ListTerm, A> {
 
 pub(crate) fn compile_list<A: Arena + Clone, T: CompileWasm<A>>(
     items: impl IntoIterator<
-        Item = (T, Eagerness),
-        IntoIter = impl ExactSizeIterator<Item = (T, Eagerness)>,
+        Item = (T, Strictness),
+        IntoIter = impl ExactSizeIterator<Item = (T, Strictness)>,
     >,
+    stack: CompilerStack,
     state: &mut CompilerState,
-    bindings: &CompilerVariableBindings,
     options: &CompilerOptions,
-    stack: &CompilerStack,
 ) -> CompilerResult<A> {
     let items = items.into_iter();
     let num_items = items.len();
-    let mut instructions = CompiledBlock::default();
+    let block = CompiledBlockBuilder::new(stack);
     // Push the list capacity onto the stack
-    // => [capacity]
-    instructions.push(CompiledInstruction::u32_const(num_items as u32));
+    // => [u32]
+    let block = block.push(instruction::core::Const {
+        value: ConstValue::U32(num_items as u32),
+    });
     // Allocate the list term
     // => [ListTerm]
-    instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-        RuntimeBuiltin::AllocateList,
-    ));
-    let stack = stack.push_lazy(ValueType::HeapPointer);
-    // Any strict list items need to be tested for signals, so we yield all the list items onto the operand stack,
-    // followed by a signal term pointer (or Nil term pointer) containing the aggregate of all signals encountered
-    // amongst the strict list items, where the Nil term will be used as a placeholder if there were no signals
+    let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+        target: RuntimeBuiltin::AllocateList,
+    });
+    // Any strict list items need to be tested for signals, so while assigning the list items we keep track of a
+    // combined signal term pointer (or null pointer) containing the aggregate of all signals encountered amongst the
+    // strict list items, where the null pointer will be used as a placeholder if there were no signals
     // encountered amongst the strict list items. This check will be omitted if there are no strict list items.
     //
-    // Yield each list item in turn onto the stack, and for each strict list item, create a new temporary lexical scope
-    // containing the combined signal result with the accumulated signal result from all previous strict list items
-    let num_signal_scopes =
-        items
-            .enumerate()
-            .fold(Ok(0usize), |results, (index, (item, eagerness))| {
-                let num_signal_scopes = results?;
-                let is_strict = matches!(eagerness, Eagerness::Eager);
-                // Compile the list item
-                let compiled_item = {
-                    let mut instructions = CompiledBlock::default();
-                    // Duplicate the list term pointer onto the stack
-                    // => [ListTerm, ListTerm]
-                    instructions.push(CompiledInstruction::Duplicate(ValueType::HeapPointer));
-                    let stack = stack.push_lazy(ValueType::HeapPointer);
-                    // Push the item index onto the stack
-                    // => [ListTerm, ListTerm, index]
-                    instructions.push(CompiledInstruction::u32_const(index as u32));
-                    let stack = stack.push_lazy(ValueType::U32);
-                    // Compile the list item in eager or lazy mode as appropriate, ensuring any variables encountered
-                    // within the list items skip over any intermediate signal-testing locals
-                    // => [ListTerm, ListTerm, index, Term]
-                    let item_bindings = bindings.offset(num_signal_scopes);
-                    instructions.append_block(item.compile(
-                        state,
-                        &item_bindings,
-                        options,
-                        &stack,
-                    )?);
-                    // If this is a strict list item, combine any signal result with the existing accumulated signal result from previous list items
-                    if is_strict {
-                        // Pop the result from the stack and assign as the variable of a short-lived lexical scope
-                        // to use for testing whether this list item's value is a signal
-                        // => []
-                        instructions.push(CompiledInstruction::ScopeStart(ValueType::HeapPointer));
-                        // Push a copy of the result onto back onto the stack to be added to the list
-                        // => [Term]
-                        instructions.push(CompiledInstruction::GetScopeValue {
-                            value_type: ValueType::HeapPointer,
-                            scope_offset: 0,
-                        });
-                        // Push a copy of the result onto the stack (true case)
-                        // => [Term, Term]
-                        instructions.push(CompiledInstruction::GetScopeValue {
-                            value_type: ValueType::HeapPointer,
-                            scope_offset: 0,
-                        });
-                        // Push the null pointer onto the stack (false case)
-                        // => [Term, Term, NULL]
-                        instructions.push(CompiledInstruction::NullPointer);
-                        // Push another copy of the result onto the stack
-                        // => [Term, Term, NULL, Term]
-                        instructions.push(CompiledInstruction::GetScopeValue {
-                            value_type: ValueType::HeapPointer,
-                            scope_offset: 0,
-                        });
-                        // Invoke the builtin method to determine whether the item is a signal or not
-                        // => [Term, Term, NULL, bool]
-                        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-                            RuntimeBuiltin::IsSignal,
-                        ));
-                        // Pop the comparison result from the stack and select one of the two preceding values, leaving
-                        // either the signal term pointer (true case) or the null pointer (false case) on the stack
-                        // depending on whether the list item value is a signal term pointer
-                        // => [Term, Option<SignalTerm>]
-                        instructions.push(CompiledInstruction::Select(ValueType::HeapPointer));
-                        // Discard this list item's temporary signal-testing lexical scope
-                        instructions.push(CompiledInstruction::ScopeEnd(ValueType::HeapPointer));
-                        // If there have been previous strict list items, combine the current signal result with the
-                        // accumulated signal result
-                        if num_signal_scopes > 0 {
-                            // Push the existing accumulated signal result onto the stack
-                            // => [Term, Option<SignalTerm>, Option<SignalTerm>]
-                            instructions.push(CompiledInstruction::GetScopeValue {
-                                value_type: ValueType::HeapPointer,
-                                scope_offset: 0,
-                            });
-                            // Invoke the builtin method to combine the existing accumulated signal with the current signal
-                            // => [Term, Option<SignalTerm>]
-                            instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-                                RuntimeBuiltin::CombineSignals,
-                            ));
-                        }
-                        // Pop the combined signal result off the stack and assign it to a new lexical scope that
-                        // tracks the latest accumulated signal result (SSA equivalent of mutating an accumulator
-                        // variable), leaving the evaluated list item on top of the stack.
-                        // While this may appear to require many more locals than mutating a single accumulator
-                        // variable, in practice the chain of nested SSA scopes can be optimized away during a later
-                        // compiler optimization pass
-                        // => [Term]
-                        instructions.push(CompiledInstruction::ScopeStart(ValueType::HeapPointer));
-                    }
-                    instructions
-                };
-                // Yield the item onto the stack
+    // Assign each list item in turn, and for each strict list item, create a new temporary lexical scope containing the
+    // combined signal result with the accumulated signal result from all previous strict list items
+    // => [ListTerm]
+    let (block, num_signal_scopes) = items.enumerate().fold(
+        Result::<_, CompilerError<_>>::Ok((block, 0usize)),
+        |result, (index, (item, strictness))| {
+            let (block, num_signal_scopes) = result?;
+            // Push a copy of the list term pointer onto the stack
+            // => [ListTerm, ListTerm]
+            let block = block.push(instruction::core::Duplicate {
+                value_type: ValueType::HeapPointer,
+            });
+            // Push the item index onto the stack
+            // => [ListTerm, ListTerm, index]
+            let block = block.push(instruction::core::Const {
+                value: ConstValue::U32(index as u32),
+            });
+            // Yield the list item onto the stack
+            // => [ListTerm, ListTerm, index, Term]
+            let block = block.append_inner(|stack| item.compile(stack, state, options))?;
+            // If this item needs to be tested for signals, combine the item's signal result with the accumulated signal result
+            // => [ListTerm, ListTerm, index, Term]
+            let (block, num_signal_scopes) = if strictness.is_strict() {
+                // Pop the list item from the top of the stack and assign to a temporary lexical scope variable
+                // => [ListTerm, ListTerm, index]
+                let block = block.push(instruction::core::ScopeStart {
+                    value_type: ValueType::HeapPointer,
+                });
+                // Push the list item back onto the top of the stack
                 // => [ListTerm, ListTerm, index, Term]
-                instructions.append_block(compiled_item);
-                // Set the list term's value at the given index to the child item
-                // => [ListTerm]
-                instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-                    RuntimeBuiltin::SetListItem,
-                ));
-                // If this is a strict list item, we will have created a temporary lexical scope to keep track of the
-                // combined signal result for this list item (taking into account the accumulated signal result from
-                // previous list items)
-                // We need to keep track of how many temporary lexical scopes have been created, so we know how many to
-                // discard once we're done building up the accumulated signal
-                if is_strict {
-                    Ok(num_signal_scopes + 1)
-                } else {
-                    // If this was not a strict list item, no extra signal scopes introduced
-                    Ok(num_signal_scopes)
-                }
-            })?;
-    // Now that all the list items have been added to the list, short-circuit if a signal was encountered while
-    // evaluating the strict list items, leaving the list on top of the stack
-    // => [ListTerm]
-    if num_signal_scopes > 0 {
-        // If there are strict list items, we want to push a combined signal result onto the stack,
-        // ensuring there is a valid term on top of the stack by replacing the potential null signal pointer
-        // with a Nil placeholder term (this prevents null pointer exceptions when testing whether to break)
-        //
-        // Push a placeholder Nil term pointer onto the stack (true branch)
-        // => [ListTerm, NilTerm]
-        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-            RuntimeBuiltin::CreateNil,
-        ));
-        // Push the combined signal result onto the stack (false branch)
-        // (the combined signal result from processing the final list item will be in the most recent lexical scope)
-        // => [ListTerm, NilTerm, Option<SignalTerm>]
-        instructions.push(CompiledInstruction::GetScopeValue {
-            value_type: ValueType::HeapPointer,
-            scope_offset: 0,
-        });
-        // Push another copy of the signal result onto the stack for comparing against the null pointer
-        // => [ListTerm, NilTerm, Option<SignalTerm>, Option<SignalTerm>]
-        instructions.push(CompiledInstruction::GetScopeValue {
-            value_type: ValueType::HeapPointer,
-            scope_offset: 0,
-        });
-        // Push a null pointer onto the stack
-        // => [ListTerm, NilTerm, Option<SignalTerm>, Option<SignalTerm>, NULL]
-        instructions.push(CompiledInstruction::NullPointer);
-        // Invoke the builtin function to determine whether the signal result is equal to the null pointer
-        // => [ListTerm, NilTerm, Option<SignalTerm>, bool]
-        instructions.push(CompiledInstruction::Eq(ValueType::HeapPointer));
-        // Select either the Nil placeholder term pointer or the signal result term pointer respectively,
-        // based on whether the signal result was null
-        // => [ListTerm, Term]
-        instructions.push(CompiledInstruction::Select(ValueType::HeapPointer));
-        let stack = stack.push_strict();
-        // Now that we have the final accumulated signal, we can drop all the temporary lexical scopes that were
-        // used to store all the intermediate combined signals
-        for _ in 0..num_signal_scopes {
-            instructions.push(CompiledInstruction::ScopeEnd(ValueType::HeapPointer));
-        }
-        // Duplicate the signal result onto the stack
-        // => [ListTerm, Term, Term]
-        instructions.push(CompiledInstruction::Duplicate(ValueType::HeapPointer));
-        // Push a boolean onto the stack indicating whether a signal term was encountered
-        // => [ListTerm, Term, bool]
-        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-            RuntimeBuiltin::IsSignal,
-        ));
-        // Short circuit if a signal term was encountered amongst the strict list items, retaining the
-        // list items and signal result on the stack
-        // TODO: Consolidate signal-testing code across multiple use cases
-        // => [ListTerm, Term]
-        instructions.push(CompiledInstruction::ConditionalBreak {
-            // Retain the list item term pointers followed by the signal result term pointer on the stack
-            block_type: TypeSignature {
-                params: ParamsSignature::from_iter(stack.value_types()),
-                results: ParamsSignature::Single(ValueType::HeapPointer),
-            },
-            // Return the signal term
-            handler: {
-                let mut instructions = CompiledBlock::default();
-                // If there were any captured values saved onto the operand stack we need to discard them and then
-                // push the signal term pointer back on top of the stack
-                if stack.depth() > 1 {
-                    // Pop the signal result term pointer from the top of the stack and store in a new temporary lexical scope
-                    instructions.push(CompiledInstruction::ScopeStart(ValueType::HeapPointer));
-                    let stack = stack.pop();
-                    // Discard any preceding stack values that had been captured for use in the continuation block closure
-                    let num_signal_scopes =
-                        stack
-                            .rev()
-                            .fold(Ok(0usize), |num_signal_scopes, stack_value| {
-                                let num_signal_scopes = num_signal_scopes?;
-                                match stack_value {
-                                    CompilerStackValue::Lazy(value_type) => {
-                                        // If the captured stack value does not need to be checked for signals,
-                                        // pop it from the operand stack and move on
-                                        instructions.push(CompiledInstruction::Drop(value_type));
-                                        Ok(num_signal_scopes)
-                                    }
-                                    CompilerStackValue::Strict => {
-                                        // Pop the captured value from the operand stack and store it in a temporary scope for signal-testing
-                                        instructions.push(CompiledInstruction::ScopeStart(
-                                            ValueType::HeapPointer,
-                                        ));
-                                        // Reinstate a copy of the captured value on the operand stack (true branch)
-                                        instructions.push(CompiledInstruction::GetScopeValue {
-                                            value_type: ValueType::HeapPointer,
-                                            scope_offset: 0,
-                                        });
-                                        // Push a null pointer onto the operand stack (false branch)
-                                        instructions.push(CompiledInstruction::NullPointer);
-                                        // Push another copy of the captured value onto the operand stack for signal comparison
-                                        instructions.push(CompiledInstruction::GetScopeValue {
-                                            value_type: ValueType::HeapPointer,
-                                            scope_offset: 0,
-                                        });
-                                        // Dispose the temporary signal-testing scope
-                                        instructions.push(CompiledInstruction::ScopeEnd(
-                                            ValueType::HeapPointer,
-                                        ));
-                                        // Determine whether the captured value is a signal (condition)
-                                        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-                                            RuntimeBuiltin::IsSignal,
-                                        ));
-                                        // Select either the captured value or the null pointer depending on whether the captured value is a signal
-                                        instructions.push(CompiledInstruction::Select(
-                                            ValueType::HeapPointer,
-                                        ));
-                                        // Push the existing accumulated signal onto the operand stack
-                                        instructions.push(CompiledInstruction::GetScopeValue {
-                                            value_type: ValueType::HeapPointer,
-                                            scope_offset: 0,
-                                        });
-                                        // Combine with the existing accumulated signal
-                                        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-                                            RuntimeBuiltin::CombineSignals,
-                                        ));
-                                        // Create a new lexical scope containing the accumulated signal result
-                                        instructions.push(CompiledInstruction::ScopeStart(
-                                            ValueType::HeapPointer,
-                                        ));
-                                        Ok(num_signal_scopes + 1)
-                                    }
-                                }
-                            })?;
-                    // Push the accumulated signal term pointer onto the top of the stack
-                    instructions.push(CompiledInstruction::GetScopeValue {
+                let block = block.push(instruction::core::GetScopeValue {
+                    scope_offset: 0,
+                    value_type: ValueType::HeapPointer,
+                });
+                // If this is not the first strict item, push the accumulated signal term onto the top of the stack
+                // (the combined signal result from processing the previous list item will be in the penultimate lexical scope)
+                // => [ListTerm, ListTerm, index, Term, {Option<SignalTerm>}]
+                let block = if num_signal_scopes > 0 {
+                    block.push(instruction::core::GetScopeValue {
+                        scope_offset: 1,
                         value_type: ValueType::HeapPointer,
-                        scope_offset: 0,
-                    });
-                    // Drop the temporary signal-testing scopes
-                    for _ in 0..num_signal_scopes {
-                        instructions.push(CompiledInstruction::ScopeEnd(ValueType::HeapPointer));
-                    }
-                    // Drop the temporary signal result term lexical scope
-                    instructions.push(CompiledInstruction::ScopeEnd(ValueType::HeapPointer));
-                }
-                instructions
-            },
-        });
-        // Drop the Nil signal placeholder term pointer, leaving just the list term
-        // => [ListTerm]
-        instructions.push(CompiledInstruction::Drop(ValueType::HeapPointer));
-    }
-    // Now that all the items have been added, push the list length onto the stack
-    // => [ListTerm, length]
-    instructions.push(CompiledInstruction::u32_const(num_items as u32));
-    // Initialize the list term with the length that is on the stack
+                    })
+                } else {
+                    block
+                };
+                // Push another copy of the list item back onto the top of the stack
+                // (this will be used as the 'true' branch of the signal-testing select instruction)
+                // => [ListTerm, ListTerm, index, Term, {Option<SignalTerm>}, Term]
+                let block = block.push(instruction::core::GetScopeValue {
+                    scope_offset: 0,
+                    value_type: ValueType::HeapPointer,
+                });
+                // Push a null pointer onto the top of the stack
+                // (this will be used as the 'false' branch of the signal-testing select instruction)
+                // => [ListTerm, ListTerm, index, Term, {Option<SignalTerm>}, Term, NULL]
+                let block = block.push(instruction::runtime::NullPointer);
+                // Push another copy of the list item onto the top of the stack
+                // (this will be used to test whether the term is a signal term)
+                // => [ListTerm, ListTerm, index, Term, {Option<SignalTerm>}, Term, NULL, Term]
+                let block = block.push(instruction::core::GetScopeValue {
+                    scope_offset: 0,
+                    value_type: ValueType::HeapPointer,
+                });
+                // Determine whether the list item is a signal term
+                // => [ListTerm, ListTerm, index, Term, {Option<SignalTerm>}, Term, NULL, bool]
+                let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+                    target: RuntimeBuiltin::IsSignal,
+                });
+                // Determine whether the list item is a signal term
+                // => [ListTerm, ListTerm, index, Term, {Option<SignalTerm>}, Option<SignalTerm>]
+                let block = block.push(instruction::core::Select {
+                    value_type: ValueType::HeapPointer,
+                });
+                // Dispose the temporary lexical scope variable used to store the list item
+                // => [ListTerm, ListTerm, index, Term, {Option<SignalTerm>}, Option<SignalTerm>]
+                let block = block.push(instruction::core::ScopeEnd {
+                    value_type: ValueType::HeapPointer,
+                });
+                // If there have been previous strict items, combine this item's optional signal term pointer
+                // with the accumulated signal term pointer that has already been added to the stack,
+                // => [ListTerm, ListTerm, index, Term, Option<SignalTerm>]
+                let block = if num_signal_scopes > 0 {
+                    block.push(instruction::runtime::CallRuntimeBuiltin {
+                        target: RuntimeBuiltin::CombineSignals,
+                    })
+                } else {
+                    block
+                };
+                // Pop the combined signal result from the stack and assign it to a new lexical scope that tracks
+                // the latest accumulated signal result (SSA equivalent of mutating an accumulator variable).
+                // While this may appear to require many more locals than mutating a single accumulator
+                // variable, in practice the chain of nested SSA scopes can be optimized away during a later
+                // compiler optimization pass
+                // => [ListTerm, ListTerm, index, Term]
+                let block = block.push(instruction::core::ScopeStart {
+                    value_type: ValueType::HeapPointer,
+                });
+                (block, num_signal_scopes + 1)
+            } else {
+                (block, num_signal_scopes)
+            };
+            // Set the list term's value at the given index to the child item
+            // => [ListTerm]
+            let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+                target: RuntimeBuiltin::SetListItem,
+            });
+            Ok((block, num_signal_scopes))
+        },
+    )?;
+    // Push the list length onto the stack
+    // => [ListTerm, u32]
+    let block = block.push(instruction::core::Const {
+        value: ConstValue::U32(num_items as u32),
+    });
+    // Initialize the list term
     // => [ListTerm]
-    instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-        RuntimeBuiltin::InitList,
-    ));
-    Ok(instructions)
+    let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+        target: RuntimeBuiltin::InitList,
+    });
+    // If there were strict list items and one or more of the strict list items was a signal,
+    // replace the list term on top of the operand stack with the combined signal result term
+    // => [Term]
+    let block = if num_signal_scopes > 0 {
+        // The combined signal result from processing the final list item will be in the most recently-declared lexical scope
+        let combined_signal_scope_offset = 0;
+        // Push the combined signal result onto the stack
+        // (this will be used as the 'false' branch of the select instruction)
+        // => [ListTerm, Option<SignalTerm>]
+        let block = block.push(instruction::core::GetScopeValue {
+            scope_offset: combined_signal_scope_offset,
+            value_type: ValueType::HeapPointer,
+        });
+        // Push another copy of the combined signal result onto the stack for comparing against the null pointer
+        // => [ListTerm, Option<SignalTerm>, Option<SignalTerm>]
+        let block = block.push(instruction::core::GetScopeValue {
+            value_type: ValueType::HeapPointer,
+            scope_offset: combined_signal_scope_offset,
+        });
+        // Dispose any temporary signal-testing lexical scopes
+        // => [Term]
+        let block = (0..num_signal_scopes).fold(block, |block, _| {
+            block.push(instruction::core::ScopeEnd {
+                value_type: ValueType::HeapPointer,
+            })
+        });
+        // Push a null pointer onto the stack to use for comparing against the combined signal term result
+        // => [ListTerm, Option<SignalTerm>, Option<SignalTerm>, NULL]
+        let block = block.push(instruction::runtime::NullPointer);
+        // Determine whether the combined signal result is not equal to the null pointer
+        // => [ListTerm, Option<SignalTerm>, bool]
+        let block = block.push(instruction::core::Ne {
+            value_type: ValueType::HeapPointer,
+        });
+        // If a combined signal result was encountered, break out of the current control flow block, otherwise continue
+        // => [ListTerm, NULL]
+        let block = block.push(instruction::core::ConditionalBreak {
+            target_block: 0,
+            result_type: ParamsSignature::Single(ValueType::HeapPointer),
+        });
+        // Dispose of the combined signal null pointer
+        // => [ListTerm]
+        let block = block.push(instruction::core::Drop {
+            value_type: ValueType::HeapPointer,
+        });
+        block
+    } else {
+        block
+    };
+    block.finish()
 }
 
 #[cfg(test)]

@@ -14,8 +14,8 @@ use serde_json::Value as JsonValue;
 use crate::{
     allocator::Arena,
     compiler::{
-        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
-        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings,
+        instruction, runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{TreeTerm, TypedTerm, WasmExpression},
@@ -147,26 +147,22 @@ impl<A: Arena + Clone> Internable for ArenaRef<SignalTerm, A> {
 impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<SignalTerm, A> {
     fn compile(
         &self,
+        stack: CompilerStack,
         state: &mut CompilerState,
-        bindings: &CompilerVariableBindings,
         options: &CompilerOptions,
-        stack: &CompilerStack,
     ) -> CompilerResult<A> {
         let conditions = self.conditions();
-        let mut instructions = CompiledBlock::default();
+        let block = CompiledBlockBuilder::new(stack);
         // Push the conditions argument onto the stack
         // => [TreeTerm]
-        instructions.append_block(
-            conditions
-                .as_inner()
-                .compile(state, bindings, options, stack)?,
-        );
+        let block =
+            block.append_inner(|stack| conditions.as_inner().compile(stack, state, options))?;
         // Invoke the term constructor
         // => [SignalTerm]
-        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-            RuntimeBuiltin::CreateSignal,
-        ));
-        Ok(instructions)
+        let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+            target: RuntimeBuiltin::CreateSignal,
+        });
+        block.finish()
     }
 }
 

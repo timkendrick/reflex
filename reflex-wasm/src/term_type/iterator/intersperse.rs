@@ -11,8 +11,8 @@ use serde_json::Value as JsonValue;
 use crate::{
     allocator::Arena,
     compiler::{
-        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
-        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings, ValueType,
+        instruction, runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState,
     },
     hash::{TermHash, TermHasher, TermSize},
     ArenaPointer, ArenaRef, Term,
@@ -133,27 +133,25 @@ impl<A: Arena + Clone> Internable for ArenaRef<IntersperseIteratorTerm, A> {
 impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<IntersperseIteratorTerm, A> {
     fn compile(
         &self,
+        stack: CompilerStack,
         state: &mut CompilerState,
-        bindings: &CompilerVariableBindings,
         options: &CompilerOptions,
-        stack: &CompilerStack,
     ) -> CompilerResult<A> {
         let source = self.source();
         let separator = self.separator();
-        let mut instructions = CompiledBlock::default();
+        let block = CompiledBlockBuilder::new(stack);
         // Push the source argument onto the stack
         // => [Term]
-        instructions.append_block(source.compile(state, bindings, options, stack)?);
-        let stack = stack.push_lazy(ValueType::HeapPointer);
+        let block = block.append_inner(|stack| source.compile(stack, state, options))?;
         // Push the separator argument onto the stack
         // => [Term, Term]
-        instructions.append_block(separator.compile(state, bindings, options, &stack)?);
+        let block = block.append_inner(|stack| separator.compile(stack, state, options))?;
         // Invoke the term constructor
         // => [IntersperseIteratorTerm]
-        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-            RuntimeBuiltin::CreateIntersperseIterator,
-        ));
-        Ok(instructions)
+        let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+            target: RuntimeBuiltin::CreateIntersperseIterator,
+        });
+        block.finish()
     }
 }
 

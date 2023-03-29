@@ -11,8 +11,8 @@ use serde_json::Value as JsonValue;
 use crate::{
     allocator::Arena,
     compiler::{
-        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
-        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings,
+        instruction, runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState, ConstValue,
     },
     hash::{TermHash, TermHasher, TermSize},
     utils::{chunks_to_i64, i64_to_chunks},
@@ -123,26 +123,29 @@ impl<A: Arena + Clone> Internable for ArenaRef<RangeIteratorTerm, A> {
 impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<RangeIteratorTerm, A> {
     fn compile(
         &self,
+        stack: CompilerStack,
         _state: &mut CompilerState,
-        _bindings: &CompilerVariableBindings,
         _options: &CompilerOptions,
-        _stack: &CompilerStack,
     ) -> CompilerResult<A> {
         let offset = self.offset();
         let length = self.length();
-        let mut instructions = CompiledBlock::default();
+        let block = CompiledBlockBuilder::new(stack);
         // Push the offset argument onto the stack
         // => [offset]
-        instructions.push(CompiledInstruction::i64_const(offset));
+        let block = block.push(instruction::core::Const {
+            value: ConstValue::I64(offset),
+        });
         // Push the length argument onto the stack
         // => [offset, length]
-        instructions.push(CompiledInstruction::u32_const(length));
+        let block = block.push(instruction::core::Const {
+            value: ConstValue::U32(length),
+        });
         // Invoke the term constructor
         // => [RangeIteratorTerm]
-        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-            RuntimeBuiltin::CreateRangeIterator,
-        ));
-        Ok(instructions)
+        let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+            target: RuntimeBuiltin::CreateRangeIterator,
+        });
+        block.finish()
     }
 }
 

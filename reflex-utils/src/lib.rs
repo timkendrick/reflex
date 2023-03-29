@@ -9,7 +9,9 @@ mod partition_results;
 pub mod json;
 pub mod reconnect;
 pub mod serialize;
+pub mod stack;
 
 pub use self::file_writer::*;
 pub use self::iter::*;
 pub use self::partition_results::*;
+pub use self::stack::*;

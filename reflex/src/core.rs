@@ -707,13 +707,13 @@ impl Arity {
             variadic,
         })
     }
-    pub fn required(&self) -> impl ExactSizeIterator<Item = ArgType> {
+    pub fn required(&self) -> impl ExactSizeIterator<Item = ArgType> + Clone {
         match self {
             Self::Homogeneous(arity) => PositionalArityIterator::Homogeneous(arity.required()),
             Self::Heterogeneous(arity) => PositionalArityIterator::Heterogeneous(arity.required()),
         }
     }
-    pub fn optional(&self) -> impl ExactSizeIterator<Item = ArgType> {
+    pub fn optional(&self) -> impl ExactSizeIterator<Item = ArgType> + Clone {
         match self {
             Self::Homogeneous(arity) => PositionalArityIterator::Homogeneous(arity.optional()),
             Self::Heterogeneous(arity) => PositionalArityIterator::Heterogeneous(arity.optional()),
@@ -731,7 +731,7 @@ impl Arity {
             Self::Heterogeneous(arity) => Self::Heterogeneous(arity.partial(offset)),
         }
     }
-    pub fn iter(&self) -> impl Iterator<Item = ArgType> {
+    pub fn iter(&self) -> impl Iterator<Item = ArgType> + Clone {
         self.required()
             .chain(self.optional())
             .chain(self.variadic().into_iter().flat_map(repeat))
@@ -839,6 +839,7 @@ impl std::fmt::Display for HeterogeneousArity {
         )
     }
 }
+#[derive(Clone, Copy, Debug)]
 pub enum PositionalArityIterator {
     Homogeneous(HomogeneousArityIterator),
     Heterogeneous(HeterogeneousArityIterator),
@@ -875,6 +876,7 @@ impl ExactSizeIterator for PositionalArityIterator {
         }
     }
 }
+#[derive(Clone, Copy, Debug)]
 pub struct HomogeneousArityIterator(usize);
 impl Iterator for HomogeneousArityIterator {
     type Item = ArgType;
@@ -905,6 +907,7 @@ impl ExactSizeIterator for HomogeneousArityIterator {
         remaining
     }
 }
+#[derive(Clone, Copy, Debug)]
 pub struct HeterogeneousArityIterator(&'static [ArgType], usize);
 impl Iterator for HeterogeneousArityIterator {
     type Item = ArgType;

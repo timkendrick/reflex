@@ -10,8 +10,8 @@ use serde_json::Value as JsonValue;
 use crate::{
     allocator::Arena,
     compiler::{
-        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
-        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings,
+        instruction, runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState, ConstValue,
     },
     hash::{TermHash, TermHasher, TermSize},
     ArenaPointer, ArenaRef, Term,
@@ -123,26 +123,27 @@ impl<A: Arena + Clone> Internable for ArenaRef<IndexedAccessorIteratorTerm, A> {
 impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<IndexedAccessorIteratorTerm, A> {
     fn compile(
         &self,
+        stack: CompilerStack,
         state: &mut CompilerState,
-        bindings: &CompilerVariableBindings,
         options: &CompilerOptions,
-        stack: &CompilerStack,
     ) -> CompilerResult<A> {
         let source = self.source();
         let index = self.index();
-        let mut instructions = CompiledBlock::default();
+        let block = CompiledBlockBuilder::new(stack);
         // Push the source argument onto the stack
         // => [Term]
-        instructions.extend(source.compile(state, bindings, options, stack)?);
+        let block = block.append_inner(|stack| source.compile(stack, state, options))?;
         // Push the index argument onto the stack
         // => [Term, index]
-        instructions.push(CompiledInstruction::u32_const(index as u32));
+        let block = block.push(instruction::core::Const {
+            value: ConstValue::U32(index as u32),
+        });
         // Invoke the term constructor
         // => [IndexedAccessorIteratorTerm]
-        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-            RuntimeBuiltin::CreateIndexedAccessorIterator,
-        ));
-        Ok(instructions)
+        let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+            target: RuntimeBuiltin::CreateIndexedAccessorIterator,
+        });
+        block.finish()
     }
 }
 

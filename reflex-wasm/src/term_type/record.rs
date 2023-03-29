@@ -15,9 +15,8 @@ use serde_json::{Map as JsonMap, Value as JsonValue};
 use crate::{
     allocator::Arena,
     compiler::{
-        builtin::RuntimeBuiltin, CompileWasm, CompiledBlock, CompiledInstruction, CompilerOptions,
-        CompilerResult, CompilerStack, CompilerState, CompilerVariableBindings, LazyExpression,
-        ValueType,
+        instruction, runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState, LazyExpression, Strictness,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{list::compile_list, ListTerm, TypedTerm, WasmExpression},
@@ -266,52 +265,50 @@ impl<A: Arena + Clone> Internable for ArenaRef<RecordTerm, A> {
 impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<RecordTerm, A> {
     fn compile(
         &self,
+        stack: CompilerStack,
         state: &mut CompilerState,
-        bindings: &CompilerVariableBindings,
         options: &CompilerOptions,
-        stack: &CompilerStack,
     ) -> CompilerResult<A> {
         let keys = self.keys();
         let values = self.values();
         let values_list = values.as_inner();
         let values = values_list.iter();
-        let mut instructions = CompiledBlock::default();
+        let block = CompiledBlockBuilder::new(stack);
         // Push the keys argument onto the stack
         // => [ListTerm]
-        instructions.append_block(keys.as_inner().compile(state, bindings, options, stack)?);
-        let stack = stack.push_lazy(ValueType::HeapPointer);
-        // Push the values argument onto the stack
+        let block = block.append_inner(|stack| keys.as_inner().compile(stack, state, options))?;
+        // Push the property values list argument onto the stack
         // => [ListTerm]
-        instructions.append_block(if options.lazy_record_values {
-            compile_list(
-                values.map(|item| (LazyExpression::new(item), Eagerness::Lazy)),
-                state,
-                bindings,
-                options,
-                &stack,
-            )
-        } else {
-            compile_list(
-                values.map(|item| {
-                    let eagerness = if item.is_static() && item.as_signal_term().is_none() {
-                        Eagerness::Lazy
-                    } else {
-                        Eagerness::Eager
-                    };
-                    (item, eagerness)
-                }),
-                state,
-                bindings,
-                options,
-                &stack,
-            )
-        }?);
+        let block = block.append_inner(|stack| {
+            if options.lazy_record_values {
+                compile_list(
+                    values.map(|item| (LazyExpression::new(item), Strictness::NonStrict)),
+                    stack,
+                    state,
+                    options,
+                )
+            } else {
+                compile_list(
+                    values.map(|item| {
+                        let eagerness = if item.is_static() && item.as_signal_term().is_none() {
+                            Strictness::NonStrict
+                        } else {
+                            Strictness::Strict
+                        };
+                        (item, eagerness)
+                    }),
+                    stack,
+                    state,
+                    options,
+                )
+            }
+        })?;
         // Invoke the term constructor
         // => [RecordTerm]
-        instructions.push(CompiledInstruction::CallRuntimeBuiltin(
-            RuntimeBuiltin::CreateRecord,
-        ));
-        Ok(instructions)
+        let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+            target: RuntimeBuiltin::CreateRecord,
+        });
+        block.finish()
     }
 }
 
