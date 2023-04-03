@@ -441,7 +441,7 @@ where
                             )
                         };
                         let start_time = Instant::now();
-                        let result = state.instance.interpret(state.entry_point, runtime_state);
+                        let result = state.instance.evaluate(state.entry_point, runtime_state);
                         let elapsed_time = start_time.elapsed();
                         match &self.metric_names.query_worker_evaluate_duration {
                             Cow::Borrowed(metric_name) => {

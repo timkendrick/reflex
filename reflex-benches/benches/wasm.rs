@@ -36,7 +36,7 @@ fn simple_addition_benchmark(c: &mut Criterion) {
                 let (input, state) = generate_3_plus_5_wasm(&mut interpreter);
                 (interpreter, input, state)
             },
-            |(mut interpreter, input, state)| interpreter.interpret(input, state),
+            |(mut interpreter, input, state)| interpreter.evaluate(input, state),
             criterion::BatchSize::PerIteration,
         );
     });
@@ -59,7 +59,7 @@ fn deep_addition_benchmark(c: &mut Criterion) {
                     let (input, state) = generate_deep_add_wasm(&mut interpreter, *i);
                     (interpreter, input, state)
                 },
-                |(mut interpreter, input, state)| interpreter.interpret(input, state),
+                |(mut interpreter, input, state)| interpreter.evaluate(input, state),
                 criterion::BatchSize::PerIteration,
             );
         });

@@ -312,7 +312,7 @@ impl WasmInterpreter {
     }
 
     #[must_use]
-    pub fn interpret(
+    pub fn evaluate(
         &mut self,
         input: ArenaPointer,
         state: ArenaPointer,
@@ -712,7 +712,7 @@ mod tests {
             .deref()
             .borrow_mut()
             .deref_mut()
-            .interpret(input.into(), state.into())
+            .evaluate(input.into(), state.into())
             .unwrap()
             .bind(Rc::clone(&interpreter));
 
@@ -765,7 +765,7 @@ mod tests {
             .deref()
             .borrow_mut()
             .deref_mut()
-            .interpret(input.into(), state.into())
+            .evaluate(input.into(), state.into())
             .unwrap()
             .bind(Rc::clone(&interpreter));
 
@@ -863,7 +863,7 @@ mod tests {
             .deref()
             .borrow_mut()
             .deref_mut()
-            .interpret(input.into(), state.into())
+            .evaluate(input.into(), state.into())
             .unwrap()
             .bind(Rc::clone(&interpreter));
 
@@ -903,7 +903,7 @@ mod tests {
             .deref()
             .borrow_mut()
             .deref_mut()
-            .interpret(input.into(), updated_state.into())
+            .evaluate(input.into(), updated_state.into())
             .unwrap()
             .bind(Rc::clone(&interpreter));
 
