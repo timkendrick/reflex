@@ -424,6 +424,19 @@ pub struct ArenaArrayIter<'a, T: Sized + Copy, A: Arena> {
     _item: PhantomData<T>,
 }
 
+impl<'a, T: Sized + Copy, A: Arena> Clone for ArenaArrayIter<'a, T, A> {
+    fn clone(&self) -> Self {
+        Self {
+            length: self.length.clone(),
+            offset: self.offset.clone(),
+            arena: self.arena,
+            _item: PhantomData,
+        }
+    }
+}
+
+impl<'a, T: Sized + Copy, A: Arena> Copy for ArenaArrayIter<'a, T, A> {}
+
 impl<'a, T: Sized + Copy, A: Arena> Iterator for ArenaArrayIter<'a, T, A> {
     type Item = T;
     fn next(&mut self) -> Option<Self::Item> {
