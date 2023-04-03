@@ -69,13 +69,13 @@
   ;; If any of the strict arguments evaluated to a signal, return a combined short-circuited signal
   (if
     (@fold $result $arg_name
-      (@get $strict_arg_names)
+      (@chain (@get $strict_arg_names) (@get $strict_vararg_names))
       (i32.const 0x00000000)
       (i32.or (@get $result) (call $Term::Signal::is (local.get (@get $arg_name)))))
     (then
       (return
         (@fold $result $arg_name
-          (@get $strict_arg_names)
+          (@chain (@get $strict_arg_names) (@get $strict_vararg_names))
           (global.get $NULL)
           (call $Term::Signal::traits::union
             (@get $result)
