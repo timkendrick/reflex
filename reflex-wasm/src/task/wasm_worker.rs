@@ -336,7 +336,11 @@ where
                                     &self.factory,
                                     &mut wasm_factory,
                                 ),
-                                QueryEvaluationMode::Standalone => todo!(),
+                                QueryEvaluationMode::Standalone => compile_wasm_expression(
+                                    &self.query,
+                                    &self.factory,
+                                    &mut wasm_factory,
+                                ),
                             };
                             let elapsed_time = compiler_start_time.elapsed();
                             {
