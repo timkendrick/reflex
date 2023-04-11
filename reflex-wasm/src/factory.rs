@@ -33,7 +33,7 @@ use crate::{
         StringTerm, SymbolTerm, TermType, TermTypeDiscriminants, TreeTerm, TypedTerm, VariableTerm,
         WasmExpression,
     },
-    ArenaPointer, ArenaRef, Term,
+    ArenaPointer, ArenaRef, FunctionIndex, Term,
 };
 
 #[derive(Debug)]
@@ -255,9 +255,15 @@ where
                 .collect::<Result<Vec<_>, _>>()?;
             let args = allocator.create_list(args);
             Ok(factory.create_partial_application_term(target, args))
-        } else if let Some(_) = expression.as_builtin_term() {
-            // TODO: Allow converting builtin terms across factories
-            Err(expression.clone())
+        } else if let Some(builtin) = expression.as_builtin_term() {
+            let index = FunctionIndex::from(builtin.as_inner().read_value(|term| term.uid));
+            // FIXME: Determine arity of compiled WASM functions when translating to shared expressions
+            Ok(factory.create_compiled_function_term(
+                InstructionPointer::new(u32::from(index) as usize),
+                HashId::default(),
+                0,
+                0,
+            ))
         } else if let Some(term) = expression.as_record_term() {
             let term = term.as_inner();
             let keys = term
@@ -855,18 +861,30 @@ where
     // TODO: Remove compiled function term type
     fn create_compiled_function_term(
         &self,
-        _address: InstructionPointer,
+        address: InstructionPointer,
         _hash: HashId,
         _required_args: StackOffset,
         _optional_args: StackOffset,
     ) -> ArenaRef<Term, Self> {
-        let message =
-            self.create_static_string("Compiled functions not supported in WASM interpreter");
-        let payload = self.create_string_term(message);
-        let token = self.create_nil_term();
-        let signal = self.create_signal(SignalType::Error, payload, token);
-        let signal_list = self.create_signal_list([signal]);
-        self.create_signal_term(signal_list)
+        let index = address.get();
+        if index < 0x000000000000FFFF {
+            let target = FunctionIndex::from(index as u32);
+            let term = Term::new(
+                TermType::Builtin(BuiltinTerm {
+                    uid: u32::from(target),
+                }),
+                &*self.arena.borrow(),
+            );
+            let pointer = self.arena.borrow_mut().deref_mut().allocate(term);
+            ArenaRef::<Term, Self>::new(self.clone(), pointer)
+        } else {
+            let message = self.create_string(format!("Invalid WASM function index: {}", index));
+            let payload = self.create_string_term(message);
+            let token = self.create_nil_term();
+            let signal = self.create_signal(SignalType::Error, payload, token);
+            let signal_list = self.create_signal_list([signal]);
+            self.create_signal_term(signal_list)
+        }
     }
 
     fn create_record_term(

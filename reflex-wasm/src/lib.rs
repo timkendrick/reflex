@@ -295,7 +295,7 @@ pub struct TermHeader {
     hash: TermHashState,
 }
 
-#[derive(PartialOrd, Ord, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(PartialOrd, Ord, PartialEq, Eq, Clone, Copy, Hash, Debug)]
 #[repr(transparent)]
 pub struct ArenaPointer(u32);
 impl ArenaPointer {
@@ -334,11 +334,6 @@ impl From<ArenaPointer> for u32 {
 impl From<u32> for ArenaPointer {
     fn from(value: u32) -> Self {
         Self(value)
-    }
-}
-impl std::fmt::Debug for ArenaPointer {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:#016x}", self.0)
     }
 }
 

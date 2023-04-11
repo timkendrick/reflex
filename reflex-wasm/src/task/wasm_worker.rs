@@ -2,24 +2,23 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 use crate::{
-    allocator::{Arena, ArenaAllocator},
+    allocator::ArenaAllocator,
     cli::compile::WasmProgram,
     factory::WasmTermFactory,
     interpreter::{InterpreterError, UnboundEvaluationResult, WasmInterpreter},
     term_type::{
-        symbol::SymbolTerm, ApplicationTerm, HashmapTerm, IntTerm, ListTerm, TermType, TreeTerm,
-        TypedTerm, WasmExpression,
+        symbol::SymbolTerm, ApplicationTerm, ConditionTerm, HashmapTerm, ListTerm, TermType,
+        TreeTerm, TypedTerm, WasmExpression,
     },
-    utils::{from_twos_complement_i64, into_twos_complement_i64},
     ArenaPointer, ArenaRef, Term,
 };
 use metrics::histogram;
 use reflex::{
     core::{
-        DependencyList, EvaluationResult, Expression, ExpressionFactory, HeapAllocator,
-        IntTermType, SignalType, StateToken,
+        ConditionType, DependencyList, EvaluationResult, Expression, ExpressionFactory,
+        HeapAllocator, SignalType, StateToken,
     },
-    hash::{HashId, IntMap},
+    hash::IntMap,
 };
 use reflex_dispatcher::{
     Action, ActorEvents, HandlerContext, MessageData, MessageOffset, NoopDisposeCallback,
@@ -70,12 +69,16 @@ where
 }
 
 #[derive(Named, Clone, Serialize, Deserialize)]
+#[serde(bound(
+    serialize = "T: Serialize, <T as Expression>::Signal: Serialize",
+    deserialize = "T: Deserialize<'de>, <T as Expression>::Signal: Deserialize<'de>"
+))]
 pub struct WasmWorkerTaskFactory<
     T: Expression,
     TFactory: ExpressionFactory<T>,
     TAllocator: HeapAllocator<T>,
 > {
-    pub cache_id: HashId,
+    pub cache_key: T::Signal,
     pub query: T,
     pub graph_root_factory_export_name: String,
     pub evaluation_mode: QueryEvaluationMode,
@@ -100,7 +103,7 @@ where
     type Actor = WasmWorker<T, TFactory, TAllocator>;
     fn create(self) -> Self::Actor {
         let Self {
-            cache_id,
+            cache_key,
             query,
             graph_root_factory_export_name,
             evaluation_mode,
@@ -114,7 +117,7 @@ where
         let factory = TFactory::default();
         let allocator = TAllocator::default();
         WasmWorker {
-            cache_id,
+            cache_key,
             query,
             graph_root_factory_export_name,
             evaluation_mode,
@@ -134,7 +137,7 @@ where
     TFactory: ExpressionFactory<T>,
     TAllocator: HeapAllocator<T>,
 {
-    cache_id: HashId,
+    cache_key: T::Signal,
     query: T,
     graph_root_factory_export_name: String,
     evaluation_mode: QueryEvaluationMode,
@@ -181,12 +184,12 @@ impl<T: Expression> WasmWorkerInitializedState<T> {
 
 dispatcher!({
     pub enum WasmWorkerAction<T: Expression> {
-        Inbox(BytecodeInterpreterInitAction),
+        Inbox(BytecodeInterpreterInitAction<T>),
         Inbox(BytecodeInterpreterEvaluateAction<T>),
-        Inbox(BytecodeInterpreterGcAction),
+        Inbox(BytecodeInterpreterGcAction<T>),
 
         Outbox(BytecodeInterpreterResultAction<T>),
-        Outbox(BytecodeInterpreterGcCompleteAction),
+        Outbox(BytecodeInterpreterGcCompleteAction<T>),
     }
 
     impl<T, TFactory, TAllocator, TAction, TTask> Dispatcher<TAction, TTask>
@@ -213,12 +216,12 @@ dispatcher!({
             ActorEvents::Sync(inbox)
         }
 
-        fn accept(&self, _action: &BytecodeInterpreterInitAction) -> bool {
+        fn accept(&self, _action: &BytecodeInterpreterInitAction<T>) -> bool {
             true
         }
         fn schedule(
             &self,
-            _action: &BytecodeInterpreterInitAction,
+            _action: &BytecodeInterpreterInitAction<T>,
             _state: &Self::State,
         ) -> Option<SchedulerMode> {
             Some(SchedulerMode::Async)
@@ -226,7 +229,7 @@ dispatcher!({
         fn handle(
             &self,
             state: &mut Self::State,
-            action: &BytecodeInterpreterInitAction,
+            action: &BytecodeInterpreterInitAction<T>,
             metadata: &MessageData,
             context: &mut impl HandlerContext,
         ) -> Option<SchedulerTransition<TAction, TTask>> {
@@ -253,12 +256,12 @@ dispatcher!({
             self.handle_bytecode_interpreter_evaluate(state, action, metadata, context)
         }
 
-        fn accept(&self, _action: &BytecodeInterpreterGcAction) -> bool {
+        fn accept(&self, _action: &BytecodeInterpreterGcAction<T>) -> bool {
             true
         }
         fn schedule(
             &self,
-            _action: &BytecodeInterpreterGcAction,
+            _action: &BytecodeInterpreterGcAction<T>,
             _state: &Self::State,
         ) -> Option<SchedulerMode> {
             Some(SchedulerMode::Blocking)
@@ -266,7 +269,7 @@ dispatcher!({
         fn handle(
             &self,
             state: &mut Self::State,
-            action: &BytecodeInterpreterGcAction,
+            action: &BytecodeInterpreterGcAction<T>,
             metadata: &MessageData,
             context: &mut impl HandlerContext,
         ) -> Option<SchedulerTransition<TAction, TTask>> {
@@ -324,17 +327,20 @@ where
     fn handle_bytecode_interpreter_init<TAction, TTask>(
         &self,
         state: &mut WasmWorkerState<T>,
-        action: &BytecodeInterpreterInitAction,
+        action: &BytecodeInterpreterInitAction<T>,
         _metadata: &MessageData,
         _context: &mut impl HandlerContext,
     ) -> Option<SchedulerTransition<TAction, TTask>>
     where
         TAction: Action
             + From<BytecodeInterpreterResultAction<T>>
-            + From<BytecodeInterpreterGcCompleteAction>,
+            + From<BytecodeInterpreterGcCompleteAction<T>>,
         TTask: TaskFactory<TAction, TTask>,
     {
-        let BytecodeInterpreterInitAction { cache_id: _ } = action;
+        let BytecodeInterpreterInitAction { cache_key } = action;
+        if cache_key.id() != self.cache_key.id() {
+            return None;
+        }
         match state {
             WasmWorkerState::Uninitialized => {
                 *state = match {
@@ -412,14 +418,17 @@ where
     where
         TAction: Action
             + From<BytecodeInterpreterResultAction<T>>
-            + From<BytecodeInterpreterGcCompleteAction>,
+            + From<BytecodeInterpreterGcCompleteAction<T>>,
         TTask: TaskFactory<TAction, TTask>,
     {
         let BytecodeInterpreterEvaluateAction {
-            cache_id: _,
+            cache_key,
             state_index,
             state_updates,
         } = action;
+        if cache_key.id() != self.cache_key.id() {
+            return None;
+        }
         let result = match state {
             WasmWorkerState::Uninitialized => {
                 Err(MaybeOwned::Owned(WasmWorkerError::Unititialized))
@@ -429,35 +438,27 @@ where
                 let state_index = *state_index;
                 state.state_index = state_index;
                 let state_update_status =
-                    state_updates
-                        .iter()
-                        .fold(Ok(()), |result, (state_token, value)| {
-                            let _ = result?;
-                            let wasm_factory =
-                                WasmTermFactory::from(Rc::new(RefCell::new(&mut state.instance)));
-                            let value_pointer =
-                                import_wasm_expression(value, &self.factory, &wasm_factory)
-                                    .map_err(WasmWorkerError::SerializationError)?;
-                            match state.state_values.entry(*state_token) {
-                                Entry::Occupied(mut entry) => {
-                                    let (_key, state_value) = entry.get_mut();
-                                    *state_value = value_pointer;
-                                }
-                                Entry::Vacant(entry) => {
-                                    let key_pointer = {
-                                        let term = Term::new(
-                                            TermType::Int(IntTerm::from(from_twos_complement_i64(
-                                                *state_token,
-                                            ))),
-                                            &state.instance,
-                                        );
-                                        state.instance.allocate(term)
-                                    };
-                                    entry.insert((key_pointer, value_pointer));
-                                }
+                    state_updates.iter().fold(Ok(()), |result, (key, value)| {
+                        let _ = result?;
+                        let wasm_factory =
+                            WasmTermFactory::from(Rc::new(RefCell::new(&mut state.instance)));
+                        let state_token = key.id();
+                        let key_pointer = import_wasm_condition(key, &self.factory, &wasm_factory)
+                            .map_err(WasmWorkerError::SerializationError)?;
+                        let value_pointer =
+                            import_wasm_expression(value, &self.factory, &wasm_factory)
+                                .map_err(WasmWorkerError::SerializationError)?;
+                        match state.state_values.entry(state_token) {
+                            Entry::Occupied(mut entry) => {
+                                let (_key, state_value) = entry.get_mut();
+                                *state_value = value_pointer;
                             }
-                            Ok(())
-                        });
+                            Entry::Vacant(entry) => {
+                                entry.insert((key_pointer, value_pointer));
+                            }
+                        }
+                        Ok(())
+                    });
                 match state_update_status {
                     Err(err) => Err(MaybeOwned::Owned(err)),
                     Ok(_) => {
@@ -530,7 +531,7 @@ where
                 Some(SchedulerTransition::new(once(SchedulerCommand::Send(
                     self.caller_pid,
                     BytecodeInterpreterResultAction {
-                        cache_id: self.cache_id,
+                        cache_key: cache_key.clone(),
                         state_index: *state_index,
                         result,
                         statistics,
@@ -547,7 +548,7 @@ where
                 Some(SchedulerTransition::new(once(SchedulerCommand::Send(
                     self.caller_pid,
                     BytecodeInterpreterResultAction {
-                        cache_id: self.cache_id,
+                        cache_key: cache_key.clone(),
                         state_index: *state_index,
                         result,
                         statistics: Default::default(),
@@ -560,18 +561,21 @@ where
     fn handle_bytecode_interpreter_gc<TAction, TTask>(
         &self,
         state: &mut WasmWorkerState<T>,
-        action: &BytecodeInterpreterGcAction,
+        action: &BytecodeInterpreterGcAction<T>,
         _metadata: &MessageData,
         _context: &mut impl HandlerContext,
     ) -> Option<SchedulerTransition<TAction, TTask>>
     where
-        TAction: Action + From<BytecodeInterpreterGcCompleteAction>,
+        TAction: Action + From<BytecodeInterpreterGcCompleteAction<T>>,
         TTask: TaskFactory<TAction, TTask>,
     {
         let BytecodeInterpreterGcAction {
-            cache_id,
+            cache_key,
             state_index,
         } = action;
+        if cache_key.id() != self.cache_key.id() {
+            return None;
+        }
         match state {
             WasmWorkerState::Uninitialized | WasmWorkerState::Error(_) => None,
             WasmWorkerState::Initialized(state) => {
@@ -602,7 +606,7 @@ where
                 Some(SchedulerTransition::new(once(SchedulerCommand::Send(
                     self.caller_pid,
                     BytecodeInterpreterGcCompleteAction {
-                        cache_id: *cache_id,
+                        cache_key: cache_key.clone(),
                         statistics: state.get_statistics(),
                     }
                     .into(),
@@ -619,34 +623,52 @@ fn parse_wasm_interpreter_result<'heap, T: Expression>(
     allocator: &impl HeapAllocator<T>,
     arena: &Rc<RefCell<&'heap mut WasmInterpreter>>,
 ) -> EvaluationResult<T> {
-    EvaluationResult::new(
-        export_wasm_expression(result, factory, allocator, arena).unwrap_or_else(|term| {
-            create_error_expression(
-                if let Some(condition) = term.as_condition_term() {
-                    format!("{}", condition)
-                } else {
-                    format!("Unable to translate evaluation result: {}", term)
-                },
-                factory,
-                allocator,
+    let (result, dependencies) = export_wasm_expression(result, factory, allocator, arena)
+        .and_then(|result| {
+            let dependencies = dependencies
+                .map(|dependencies| {
+                    parse_wasm_interpreter_result_dependencies(
+                        dependencies,
+                        factory,
+                        allocator,
+                        arena,
+                    )
+                })
+                .transpose()?;
+            Ok((result, dependencies))
+        })
+        .unwrap_or_else(|term| {
+            (
+                create_error_expression(
+                    if let Some(condition) = term.as_condition_term() {
+                        format!("{}", condition)
+                    } else {
+                        format!("Unable to translate evaluation result: {}", term)
+                    },
+                    factory,
+                    allocator,
+                ),
+                None,
             )
-        }),
-        dependencies
-            .map(|dependencies| {
-                parse_wasm_interpreter_result_dependencies(&dependencies.as_inner())
-            })
-            .unwrap_or_default(),
-    )
+        });
+    EvaluationResult::new(result, dependencies.unwrap_or_default())
 }
 
-fn parse_wasm_interpreter_result_dependencies<A: Arena + Clone>(
-    dependencies: &ArenaRef<TreeTerm, A>,
-) -> DependencyList {
-    DependencyList::from_iter(dependencies.nodes().filter_map(|dependency| {
-        dependency
-            .as_int_term()
-            .map(|term| into_twos_complement_i64(term.value()))
-    }))
+fn parse_wasm_interpreter_result_dependencies<'heap, T: Expression>(
+    dependencies: &ArenaRef<TypedTerm<TreeTerm>, Rc<RefCell<&'heap mut WasmInterpreter>>>,
+    factory: &impl ExpressionFactory<T>,
+    allocator: &impl HeapAllocator<T>,
+    arena: &Rc<RefCell<&'heap mut WasmInterpreter>>,
+) -> Result<DependencyList, WasmExpression<Rc<RefCell<&'heap mut WasmInterpreter>>>> {
+    dependencies
+        .as_inner()
+        .nodes()
+        .map(|dependency| match dependency.as_condition_term() {
+            None => Err(dependency),
+            Some(condition) => export_wasm_condition(condition, factory, allocator, arena)
+                .map(|effect| effect.id()),
+        })
+        .collect::<Result<DependencyList, _>>()
 }
 
 fn create_error_expression<T: Expression>(
@@ -728,6 +750,18 @@ where
     Ok(term.as_pointer())
 }
 
+fn import_wasm_condition<'heap, T: Expression>(
+    condition: &T::Signal,
+    factory: &impl ExpressionFactory<T>,
+    wasm_factory: &WasmTermFactory<&'heap mut WasmInterpreter>,
+) -> Result<ArenaPointer, T>
+where
+    T::Builtin: Into<crate::stdlib::Stdlib>,
+{
+    let term = wasm_factory.import_condition(condition, factory)?;
+    Ok(term.as_pointer())
+}
+
 fn export_wasm_expression<'heap, T: Expression>(
     expression: &WasmExpression<Rc<RefCell<&'heap mut WasmInterpreter>>>,
     factory: &impl ExpressionFactory<T>,
@@ -736,4 +770,14 @@ fn export_wasm_expression<'heap, T: Expression>(
 ) -> Result<T, WasmExpression<Rc<RefCell<&'heap mut WasmInterpreter>>>> {
     let wasm_factory = WasmTermFactory::from(Rc::clone(arena));
     wasm_factory.export(expression, factory, allocator)
+}
+
+fn export_wasm_condition<'heap, T: Expression>(
+    condition: &ArenaRef<TypedTerm<ConditionTerm>, Rc<RefCell<&'heap mut WasmInterpreter>>>,
+    factory: &impl ExpressionFactory<T>,
+    allocator: &impl HeapAllocator<T>,
+    arena: &Rc<RefCell<&'heap mut WasmInterpreter>>,
+) -> Result<T::Signal, WasmExpression<Rc<RefCell<&'heap mut WasmInterpreter>>>> {
+    let wasm_factory = WasmTermFactory::from(Rc::clone(arena));
+    wasm_factory.export_condition(condition, factory, allocator)
 }
