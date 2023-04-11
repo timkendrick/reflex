@@ -1,17 +1,11 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use crate::{
-    allocator::ArenaAllocator,
-    cli::compile::WasmProgram,
-    factory::WasmTermFactory,
-    interpreter::{InterpreterError, UnboundEvaluationResult, WasmInterpreter},
-    term_type::{
-        symbol::SymbolTerm, ApplicationTerm, ConditionTerm, HashmapTerm, ListTerm, TermType,
-        TreeTerm, TypedTerm, WasmExpression,
-    },
-    ArenaPointer, ArenaRef, Term,
+use std::{
+    borrow::Cow, cell::RefCell, collections::hash_map::Entry, iter::once, marker::PhantomData,
+    ops::Deref, rc::Rc, sync::Arc, time::Instant,
 };
+
 use metrics::histogram;
 use reflex::{
     core::{
@@ -24,7 +18,6 @@ use reflex_dispatcher::{
     Action, ActorEvents, HandlerContext, MessageData, MessageOffset, NoopDisposeCallback,
     ProcessId, SchedulerCommand, SchedulerMode, SchedulerTransition, TaskFactory, TaskInbox,
 };
-use reflex_engine::task::bytecode_worker::BytecodeWorkerAction;
 use reflex_macros::{blanket_trait, dispatcher, Named};
 use reflex_runtime::{
     action::bytecode_interpreter::{
@@ -34,11 +27,20 @@ use reflex_runtime::{
     action::bytecode_interpreter::{BytecodeInterpreterGcCompleteAction, BytecodeWorkerStatistics},
     AsyncExpression, AsyncExpressionFactory, AsyncHeapAllocator, QueryEvaluationMode,
 };
-use serde::{Deserialize, Serialize};
-use std::{
-    borrow::Cow, cell::RefCell, collections::hash_map::Entry, iter::once, marker::PhantomData,
-    ops::Deref, rc::Rc, sync::Arc, time::Instant,
+use reflex_wasm::{
+    allocator::ArenaAllocator,
+    cli::compile::WasmProgram,
+    factory::WasmTermFactory,
+    interpreter::{InterpreterError, UnboundEvaluationResult, WasmInterpreter},
+    term_type::{
+        symbol::SymbolTerm, ApplicationTerm, ConditionTerm, HashmapTerm, ListTerm, TermType,
+        TreeTerm, TypedTerm, WasmExpression,
+    },
+    ArenaPointer, ArenaRef, Term,
 };
+use serde::{Deserialize, Serialize};
+
+use crate::task::bytecode_worker::BytecodeWorkerAction;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct WasmWorkerMetricNames {
@@ -97,7 +99,7 @@ where
     T: AsyncExpression,
     TFactory: AsyncExpressionFactory<T> + Default,
     TAllocator: AsyncHeapAllocator<T> + Default,
-    T::Builtin: Into<crate::stdlib::Stdlib>,
+    T::Builtin: Into<reflex_wasm::stdlib::Stdlib>,
     TAction: Action + WasmWorkerAction<T> + Send + 'static,
     TTask: TaskFactory<TAction, TTask>,
 {
@@ -202,7 +204,7 @@ dispatcher!({
         T: Expression,
         TFactory: ExpressionFactory<T>,
         TAllocator: HeapAllocator<T>,
-        T::Builtin: Into<crate::stdlib::Stdlib>,
+        T::Builtin: Into<reflex_wasm::stdlib::Stdlib>,
         TAction: Action,
         TTask: TaskFactory<TAction, TTask>,
     {
@@ -326,7 +328,7 @@ where
     T: Expression,
     TFactory: ExpressionFactory<T>,
     TAllocator: HeapAllocator<T>,
-    T::Builtin: Into<crate::stdlib::Stdlib>,
+    T::Builtin: Into<reflex_wasm::stdlib::Stdlib>,
 {
     fn handle_bytecode_interpreter_init<TAction, TTask>(
         &self,
@@ -760,7 +762,7 @@ fn compile_graphql_query<'heap, T: Expression>(
     arena: &mut WasmTermFactory<&'heap mut WasmInterpreter>,
 ) -> Result<ArenaPointer, T>
 where
-    T::Builtin: Into<crate::stdlib::Stdlib>,
+    T::Builtin: Into<reflex_wasm::stdlib::Stdlib>,
 {
     let compiled_query_function = compile_wasm_expression(query, factory, arena)?;
     let graph_root = {
@@ -803,7 +805,7 @@ fn compile_wasm_expression<'heap, T: Expression>(
     wasm_factory: &WasmTermFactory<&'heap mut WasmInterpreter>,
 ) -> Result<ArenaPointer, T>
 where
-    T::Builtin: Into<crate::stdlib::Stdlib>,
+    T::Builtin: Into<reflex_wasm::stdlib::Stdlib>,
 {
     import_wasm_expression(expression, factory, wasm_factory)
 }
@@ -814,7 +816,7 @@ fn import_wasm_expression<'heap, T: Expression>(
     wasm_factory: &WasmTermFactory<&'heap mut WasmInterpreter>,
 ) -> Result<ArenaPointer, T>
 where
-    T::Builtin: Into<crate::stdlib::Stdlib>,
+    T::Builtin: Into<reflex_wasm::stdlib::Stdlib>,
 {
     let term = wasm_factory.import(expression, factory)?;
     Ok(term.as_pointer())
@@ -826,7 +828,7 @@ fn import_wasm_condition<'heap, T: Expression>(
     wasm_factory: &WasmTermFactory<&'heap mut WasmInterpreter>,
 ) -> Result<ArenaPointer, T>
 where
-    T::Builtin: Into<crate::stdlib::Stdlib>,
+    T::Builtin: Into<reflex_wasm::stdlib::Stdlib>,
 {
     let term = wasm_factory.import_condition(condition, factory)?;
     Ok(term.as_pointer())

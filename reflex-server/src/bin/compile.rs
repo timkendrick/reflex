@@ -8,9 +8,8 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use reflex_lang::{allocator::DefaultAllocator, SharedTermFactory};
 use reflex_parser::Syntax;
-use reflex_wasm::cli::compile::{
-    loader::create_loader, parse_and_compile_module, WasmCompilerMode, WasmCompilerOptions,
-};
+use reflex_server::cli::compile::{create_loader, parse_and_compile_module};
+use reflex_wasm::cli::compile::{WasmCompilerMode, WasmCompilerOptions};
 
 // Reflex WebAssembly compiler
 #[derive(Parser, Debug)]
@@ -73,10 +72,10 @@ fn main() -> Result<()> {
         &source,
         syntax,
         &input_path,
-        &export_name,
-        &runtime_bytes,
         create_loader(empty(), &factory, &allocator),
         std::env::vars(),
+        &export_name,
+        &runtime_bytes,
         &factory,
         &allocator,
         compiler_mode,

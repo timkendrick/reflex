@@ -20,7 +20,6 @@ use reflex_dispatcher::{
     Action, ActorEvents, HandlerContext, MessageData, MessageOffset, NoopDisposeCallback,
     ProcessId, SchedulerCommand, SchedulerMode, SchedulerTransition, TaskFactory, TaskInbox,
 };
-use reflex_engine::actor::bytecode_interpreter::BytecodeInterpreterMetricLabels;
 use reflex_macros::{dispatcher, Named};
 use reflex_runtime::{
     action::{
@@ -38,9 +37,10 @@ use reflex_runtime::{
     },
     QueryInvalidationStrategy,
 };
+use reflex_wasm::cli::compile::WasmProgram;
 
 use crate::{
-    cli::compile::WasmProgram,
+    actor::bytecode_interpreter::BytecodeInterpreterMetricLabels,
     task::wasm_worker::{WasmWorkerMetricNames, WasmWorkerTask, WasmWorkerTaskFactory},
 };
 

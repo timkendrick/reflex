@@ -36,7 +36,10 @@ use reflex_engine::{
         BytecodeInterpreter, BytecodeInterpreterAction, BytecodeInterpreterMetricLabels,
         BytecodeInterpreterMetricNames,
     },
-    task::bytecode_worker::{BytecodeWorkerAction, BytecodeWorkerTask, BytecodeWorkerTaskFactory},
+    task::{
+        bytecode_worker::{BytecodeWorkerAction, BytecodeWorkerTask, BytecodeWorkerTaskFactory},
+        wasm_worker::WasmWorkerTaskFactory,
+    },
 };
 use reflex_grpc::{
     action::*,
@@ -100,7 +103,6 @@ use reflex_scheduler::tokio::{
     TokioSchedulerLogger,
 };
 use reflex_utils::reconnect::{NoopReconnectTimeout, ReconnectTimeout};
-use reflex_wasm::task::wasm_worker::WasmWorkerTaskFactory;
 
 /// Reflex runtime evaluator
 #[derive(Parser)]

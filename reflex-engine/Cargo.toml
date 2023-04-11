@@ -13,5 +13,6 @@ reflex-interpreter = { path = "../reflex-interpreter" }
 reflex-macros = { path = "../reflex-macros" }
 reflex-runtime = { path = "../reflex-runtime" }
 reflex-utils = { path = "../reflex-utils" }
+reflex-wasm = { path = "../reflex-wasm" }
 serde = { version = "1.0", features = ["derive"] }
 metrics = "0.18"

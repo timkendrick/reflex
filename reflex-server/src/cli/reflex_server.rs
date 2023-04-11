@@ -37,7 +37,9 @@ use nom::{
     IResult,
 };
 use reflex::core::{Applicable, Expression, Reducible, Rewritable};
-use reflex_engine::actor::bytecode_interpreter::BytecodeInterpreterMetricLabels;
+use reflex_engine::{
+    actor::bytecode_interpreter::BytecodeInterpreterMetricLabels, task::wasm_worker::WasmWorkerTask,
+};
 use reflex_graphql::{GraphQlOperation, GraphQlParserBuiltin, GraphQlSchema};
 use reflex_handlers::utils::tls::{parse_ca_certs, rustls};
 use reflex_json::JsonValue;
@@ -47,7 +49,7 @@ use reflex_runtime::{
 use reflex_scheduler::tokio::{
     TokioInbox, TokioSchedulerInstrumentation, TokioSchedulerLogger, TokioThreadPoolFactory,
 };
-use reflex_wasm::{cli::compile::WasmProgram, task::wasm_worker::WasmWorkerTask};
+use reflex_wasm::cli::compile::WasmProgram;
 use serde::{Deserialize, Serialize};
 
 use crate::{

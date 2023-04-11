@@ -6,17 +6,14 @@ use std::{
     collections::{hash_map::Entry, HashMap},
     env::temp_dir,
     ops::{Deref, DerefMut},
-    path::{Path, PathBuf},
+    path::PathBuf,
     rc::Rc,
 };
 
 use reflex::{
     cache::SubstitutionCache,
-    core::{
-        Expression, ExpressionFactory, HeapAllocator, LambdaTermType, Reducible, Rewritable, Uuid,
-    },
+    core::{Expression, ExpressionFactory, HeapAllocator, LambdaTermType, Rewritable, Uuid},
 };
-use reflex_parser::{create_parser, ParserBuiltin, Syntax, SyntaxParser};
 use serde::{Deserialize, Serialize};
 use walrus::{
     self, ir::Value, ActiveData, ActiveDataLocation, DataKind, ElementId, ElementKind, ExportItem,
@@ -43,8 +40,6 @@ use crate::{
     term_type::{LambdaTerm, TermType, TypedTerm},
     ArenaPointer, ArenaRef, FunctionIndex, Term, WASM_PAGE_SIZE,
 };
-
-pub mod loader;
 
 #[derive(Debug)]
 pub enum WasmCompilerError {
@@ -146,14 +141,10 @@ impl WasmProgram {
     }
 }
 
-pub fn parse_and_compile_module<T: Expression + 'static>(
-    source: &str,
-    syntax: Syntax,
-    input_path: &Path,
+pub fn compile_wasm_module<T: Expression + 'static>(
+    expression: &T,
     export_name: &str,
     runtime: &[u8],
-    module_loader: impl Fn(&str, &Path) -> Option<Result<T, String>> + 'static,
-    env_vars: impl IntoIterator<Item = (String, String)>,
     factory: &(impl ExpressionFactory<T> + Clone + 'static),
     allocator: &(impl HeapAllocator<T> + Clone + 'static),
     compiler_mode: WasmCompilerMode,
@@ -161,28 +152,14 @@ pub fn parse_and_compile_module<T: Expression + 'static>(
     unoptimized: bool,
 ) -> Result<WasmProgram, WasmCompilerError>
 where
-    T::Builtin: ParserBuiltin + Into<crate::stdlib::Stdlib>,
     // TODO: Remove unnecessary trait bounds
-    T: Rewritable<T> + Reducible<T>,
+    T: Rewritable<T>,
+    T::Builtin: Into<crate::stdlib::Stdlib>,
 {
-    // Parse the input file into an expression
-    let parser = create_parser(
-        syntax,
-        Some(input_path),
-        Some(module_loader),
-        env_vars,
-        factory,
-        allocator,
-    );
-
-    let expression = parser
-        .parse(source)
-        .map_err(|err| WasmCompilerError::ParseError(input_path.into(), err))?;
-
     // Abstract any free variables from any internal lambda functions within the expression
     let expression = expression
         .hoist_free_variables(factory, allocator)
-        .unwrap_or(expression);
+        .unwrap_or_else(|| expression.clone());
 
     // Partially-evaluate any pure expressions within the expression
     let expression = expression

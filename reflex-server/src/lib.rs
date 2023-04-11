@@ -55,6 +55,7 @@ pub use service::*;
 
 pub mod builtins;
 pub mod cli {
+    pub mod compile;
     pub mod execute_query;
     pub mod reflex_server;
     pub mod task;

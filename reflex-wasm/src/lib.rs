@@ -22,7 +22,6 @@ pub use wasi_common;
 pub use wasmtime;
 pub use wasmtime_wasi;
 
-pub mod actor;
 pub mod allocator;
 pub mod cli;
 pub mod compiler;
@@ -32,7 +31,6 @@ pub mod hash;
 pub mod interpreter;
 pub mod serialize;
 pub mod stdlib;
-pub mod task;
 pub mod term_type;
 pub mod utils;
 

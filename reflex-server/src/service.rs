@@ -24,8 +24,12 @@ use reflex_dispatcher::{
     utils::take_until_final_item::TakeUntilFinalItem, Action, Actor, AsyncScheduler, Handler,
     HandlerContext, Matcher, ProcessId, Redispatcher, SchedulerTransition, TaskFactory,
 };
-use reflex_engine::actor::bytecode_interpreter::{
-    BytecodeInterpreterAction, BytecodeInterpreterMetricLabels,
+use reflex_engine::{
+    actor::{
+        bytecode_interpreter::{BytecodeInterpreterAction, BytecodeInterpreterMetricLabels},
+        wasm_interpreter::{WasmInterpreter, WasmInterpreterMetricNames},
+    },
+    task::wasm_worker::WasmWorkerTask,
 };
 use reflex_graphql::{
     create_json_error_object,
@@ -45,11 +49,7 @@ use reflex_scheduler::tokio::{
     TokioInbox, TokioScheduler, TokioSchedulerBuilder, TokioSchedulerInstrumentation,
     TokioSchedulerLogger, TokioThreadPoolFactory,
 };
-use reflex_wasm::{
-    actor::wasm_interpreter::{WasmInterpreter, WasmInterpreterMetricNames},
-    cli::compile::WasmProgram,
-    task::wasm_worker::WasmWorkerTask,
-};
+use reflex_wasm::cli::compile::WasmProgram;
 use uuid::Uuid;
 
 use crate::{

@@ -5,24 +5,15 @@ license = "Apache-2.0"
 authors = ["Marshall Wace LLP <opensource@mwam.com>", "Tim Kendrick <t.kendrick@mwam.com>", "Jordan Hall <j.hall@mwam.com>", "Chris Campbell <c.campbell@mwam.com>"]
 edition = "2021"
 
-[[bin]]
-name = "compile"
-path = "src/bin/compile.rs"
-
-
 [dependencies]
 reflex = { path = "../reflex" }
 reflex-dispatcher = { path = "../reflex-dispatcher" }
-reflex-engine = { path = "../reflex-engine" }
 reflex-graphql = { path = "../reflex-graphql" }
-reflex-grpc = { path = "../reflex-grpc" }
 reflex-handlers = { path = "../reflex-handlers" }
 reflex-js = { path = "../reflex-js" }
 reflex-json = { path = "../reflex-json" }
 reflex-lang = { path = "../reflex-lang" }
 reflex-macros = { path = "../reflex-macros" }
-reflex-parser = { path = "../reflex-parser" }
-reflex-runtime = { path = "../reflex-runtime" }
 reflex-stdlib = { path = "../reflex-stdlib" }
 reflex-utils = { path = "../reflex-utils" }
 anyhow = "1.0"
