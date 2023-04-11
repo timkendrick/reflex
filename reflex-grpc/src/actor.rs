@@ -1288,16 +1288,15 @@ fn parse_grpc_effect_args<T: AsyncExpression>(
     effect: &T::Signal,
     factory: &impl ExpressionFactory<T>,
 ) -> Result<GrpcEffectArgs<T>, String> {
-    let payload = effect.payload();
-    let payload = payload.as_deref();
+    let payload = match effect.signal_type() {
+        SignalType::Custom { payload, .. } => Ok(payload),
+        _ => Err(format!("Invalid {EFFECT_TYPE_GRPC} signal: {effect}")),
+    }?;
     let args = factory
-        .match_list_term(payload)
+        .match_list_term(&payload)
         .filter(|args| args.items().as_deref().len() == 6)
         .ok_or_else(|| {
-            format!(
-                "Invalid grpc signal: Expected 6 arguments, received {}",
-                payload
-            )
+            format!("Invalid {EFFECT_TYPE_GRPC} signal: Expected 6 arguments, received {payload}")
         })?;
     let args = args.items();
     let mut args = args.as_deref().iter().map(|item| item.as_deref().clone());
@@ -1335,7 +1334,9 @@ fn parse_grpc_effect_args<T: AsyncExpression>(
                 })
                 .collect(),
         }),
-        _ => Err(format!("Invalid grpc signal arguments: {}", payload)),
+        _ => Err(format!(
+            "Invalid {EFFECT_TYPE_GRPC} signal arguments: {payload}",
+        )),
     }
 }
 
@@ -1403,11 +1404,9 @@ fn create_pending_expression<T: Expression>(
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
 ) -> T {
-    factory.create_signal_term(allocator.create_signal_list(once(allocator.create_signal(
-        SignalType::Pending,
-        factory.create_nil_term(),
-        factory.create_nil_term(),
-    ))))
+    factory.create_signal_term(
+        allocator.create_signal_list(once(allocator.create_signal(SignalType::Pending))),
+    )
 }
 
 fn format_grpc_error_message(
@@ -1467,13 +1466,15 @@ fn create_error_expression<T: Expression>(
 }
 
 fn create_aggregate_error_expression<T: Expression>(
-    payload: impl IntoIterator<Item = T>,
+    payloads: impl IntoIterator<Item = T>,
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
 ) -> T {
     factory.create_signal_term(
-        allocator.create_signal_list(payload.into_iter().map(|payload| {
-            allocator.create_signal(SignalType::Error, payload, factory.create_nil_term())
-        })),
+        allocator.create_signal_list(
+            payloads
+                .into_iter()
+                .map(|payload| allocator.create_signal(SignalType::Error { payload })),
+        ),
     )
 }

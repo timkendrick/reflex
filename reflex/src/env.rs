@@ -15,13 +15,11 @@ pub fn create_env_args_accessor<T: Expression>(
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
 ) -> T::Signal {
-    allocator.create_signal(
-        SignalType::Custom(
-            factory.create_string_term(allocator.create_static_string(EVENT_TYPE_ENV)),
-        ),
-        factory.create_list_term(allocator.create_empty_list()),
-        factory.create_nil_term(),
-    )
+    allocator.create_signal(SignalType::Custom {
+        effect_type: factory.create_string_term(allocator.create_static_string(EVENT_TYPE_ENV)),
+        payload: factory.create_list_term(allocator.create_empty_list()),
+        token: factory.create_nil_term(),
+    })
 }
 
 pub fn inject_env_vars<'a, T: Expression + Rewritable<T> + Reducible<T>>(

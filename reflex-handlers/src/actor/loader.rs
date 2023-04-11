@@ -788,15 +788,13 @@ fn prefix_error_message_effects<T: Expression>(
         allocator.create_signal_list(term.signals().as_deref().iter().map(|signal| {
             let signal = signal.as_deref();
             if let Some(message) = as_error_message_effect(signal, factory) {
-                allocator.create_signal(
-                    signal.signal_type().clone(),
-                    factory.create_string_term(allocator.create_string(format!(
+                allocator.create_signal(SignalType::Error {
+                    payload: factory.create_string_term(allocator.create_string(format!(
                         "{}{}",
                         prefix,
                         message.as_str().deref(),
                     ))),
-                    signal.token().as_deref().clone(),
-                )
+                })
             } else {
                 signal.clone()
             }
@@ -808,14 +806,12 @@ fn as_error_message_effect<'a, T: Expression + 'a>(
     effect: &'a T::Signal,
     factory: &impl ExpressionFactory<T>,
 ) -> Option<T::String> {
-    if !matches!(effect.signal_type(), SignalType::Error) {
-        return None;
+    match effect.signal_type() {
+        SignalType::Error { payload, .. } => factory
+            .match_string_term(&payload)
+            .map(|term| term.value().as_deref().clone()),
+        _ => None,
     }
-    let payload = effect.payload();
-    let payload = payload.as_deref();
-    factory
-        .match_string_term(payload)
-        .map(|term| term.value().as_deref().clone())
 }
 
 struct LoaderEffectArgs<T: Expression> {
@@ -828,17 +824,19 @@ fn parse_loader_effect_args<T: Expression + Applicable<T>>(
     effect: &T::Signal,
     factory: &impl ExpressionFactory<T>,
 ) -> Result<LoaderEffectArgs<T>, String> {
-    let payload = effect.payload();
-    let payload = payload.as_deref();
-    let args = factory
-        .match_list_term(payload)
-        .filter(|args| args.items().as_deref().len() == 3)
-        .ok_or_else(|| {
-            format!(
-                "Invalid loader signal: Expected 3 arguments, received {}",
-                payload
-            )
-        })?;
+    let payload = match effect.signal_type() {
+        SignalType::Custom { payload, .. } => Ok(payload),
+        _ => Err(format!("Invalid {EFFECT_TYPE_LOADER} signal: {effect}")),
+    }?;
+    let args =
+        factory
+            .match_list_term(&payload)
+            .filter(|args| args.items().as_deref().len() == 3)
+            .ok_or_else(|| {
+                format!(
+                    "Invalid {EFFECT_TYPE_LOADER} signal: Expected 3 arguments, received {payload}",
+                )
+            })?;
     let args = args.items();
     let mut args = args.as_deref().iter().map(|item| item.as_deref().clone());
     let name = args.next().unwrap();
@@ -853,8 +851,7 @@ fn parse_loader_effect_args<T: Expression + Applicable<T>>(
             Ok(LoaderEffectArgs { name, loader, key })
         }
         _ => Err(format!(
-            "Invalid loader factory: Expected <function:1>, received {}",
-            loader
+            "Invalid {EFFECT_TYPE_LOADER} factory: Expected <function:1>, received {loader}",
         )),
     }
 }
@@ -871,11 +868,9 @@ fn create_pending_expression<T: Expression>(
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
 ) -> T {
-    factory.create_signal_term(allocator.create_signal_list(once(allocator.create_signal(
-        SignalType::Pending,
-        factory.create_nil_term(),
-        factory.create_nil_term(),
-    ))))
+    factory.create_signal_term(
+        allocator.create_signal_list(once(allocator.create_signal(SignalType::Pending))),
+    )
 }
 
 fn create_error_expression<T: Expression>(
@@ -884,8 +879,8 @@ fn create_error_expression<T: Expression>(
     allocator: &impl HeapAllocator<T>,
 ) -> T {
     factory.create_signal_term(allocator.create_signal_list(once(allocator.create_signal(
-        SignalType::Error,
-        factory.create_string_term(allocator.create_string(message)),
-        factory.create_nil_term(),
+        SignalType::Error {
+            payload: factory.create_string_term(allocator.create_string(message)),
+        },
     ))))
 }

@@ -2167,11 +2167,9 @@ mod tests {
         factory: &impl ExpressionFactory<T>,
         allocator: &impl HeapAllocator<T>,
     ) -> T::Signal {
-        allocator.create_signal(
-            SignalType::Error,
-            factory.create_string_term(allocator.create_string(message)),
-            factory.create_nil_term(),
-        )
+        allocator.create_signal(SignalType::Error {
+            payload: factory.create_string_term(allocator.create_string(message)),
+        })
     }
 
     #[test]

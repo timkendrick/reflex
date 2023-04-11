@@ -24,14 +24,14 @@ pub fn format_signal_result<T: Expression<SignalTerm = V>, V: SignalTermType<T>>
 
 fn format_signal<T: Expression<Signal = V>, V: ConditionType<T>>(signal: &V) -> String {
     match signal.signal_type() {
-        SignalType::Error => {
-            format!("Error: {}", signal.payload().as_deref())
+        SignalType::Error { payload } => {
+            format!("Error: {payload}")
         }
-        SignalType::Custom(signal_type) => format!(
-            "<{}>{}",
-            signal_type,
-            format!(" {}", signal.payload().as_deref())
-        ),
+        SignalType::Custom {
+            effect_type,
+            payload,
+            ..
+        } => format!("<{effect_type}> {payload}",),
         SignalType::Pending => String::from("<pending>"),
     }
 }

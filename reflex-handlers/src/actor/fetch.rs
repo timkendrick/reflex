@@ -526,16 +526,15 @@ fn parse_fetch_effect_args<T: Expression>(
     effect: &T::Signal,
     factory: &impl ExpressionFactory<T>,
 ) -> Result<FetchRequest, String> {
-    let payload = effect.payload();
-    let payload = payload.as_deref();
+    let payload = match effect.signal_type() {
+        SignalType::Custom { payload, .. } => Ok(payload),
+        _ => Err(format!("Invalid {EFFECT_TYPE_FETCH} signal: {effect}")),
+    }?;
     let args = factory
-        .match_list_term(payload)
+        .match_list_term(&payload)
         .filter(|args| args.items().as_deref().len() == 4)
         .ok_or_else(|| {
-            format!(
-                "Invalid fetch signal: Expected 4 arguments, received {}",
-                payload
-            )
+            format!("Invalid {EFFECT_TYPE_FETCH} signal: Expected 4 arguments, received {payload}")
         })?;
     let args = args.items();
     let mut args = args.as_deref().iter().map(|item| item.as_deref().clone());
@@ -557,7 +556,9 @@ fn parse_fetch_effect_args<T: Expression>(
                 body: body.map(Bytes::from),
             })
         }
-        _ => Err(format!("Invalid fetch signal arguments: {}", payload)),
+        _ => Err(format!(
+            "Invalid {EFFECT_TYPE_FETCH} signal arguments: {payload}",
+        )),
     }
 }
 
@@ -635,11 +636,9 @@ fn create_pending_expression<T: Expression>(
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
 ) -> T {
-    factory.create_signal_term(allocator.create_signal_list(once(allocator.create_signal(
-        SignalType::Pending,
-        factory.create_nil_term(),
-        factory.create_nil_term(),
-    ))))
+    factory.create_signal_term(
+        allocator.create_signal_list(once(allocator.create_signal(SignalType::Pending))),
+    )
 }
 
 fn create_error_expression<T: Expression>(
@@ -648,8 +647,8 @@ fn create_error_expression<T: Expression>(
     allocator: &impl HeapAllocator<T>,
 ) -> T {
     factory.create_signal_term(allocator.create_signal_list(once(allocator.create_signal(
-        SignalType::Error,
-        factory.create_string_term(allocator.create_string(message)),
-        factory.create_nil_term(),
+        SignalType::Error {
+            payload: factory.create_string_term(allocator.create_string(message)),
+        },
     ))))
 }

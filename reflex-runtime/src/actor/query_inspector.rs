@@ -128,8 +128,8 @@ fn is_unresolved_effect_state<T: Expression>(
 
 fn is_unresolved_effect<T: Expression>(effect: &impl ConditionType<T>) -> bool {
     match effect.signal_type() {
-        SignalType::Error => false,
-        SignalType::Pending | SignalType::Custom(_) => true,
+        SignalType::Error { .. } => false,
+        SignalType::Pending | SignalType::Custom { .. } => true,
     }
 }
 
@@ -189,16 +189,30 @@ impl<T: Expression> QueryInspectorWorkerState<T> {
 }
 
 fn serialize_effect<T: Expression>(effect: &impl ConditionType<T>) -> JsonValue {
-    json!({
-        "id": JsonValue::Number(effect.id().into()),
-        "type": match effect.signal_type() {
-            SignalType::Custom(signal_type) => reflex_json::sanitize(&signal_type).unwrap_or_else(|_| json!({})),
-            SignalType::Error => JsonValue::String(String::from("error")),
-            SignalType::Pending => JsonValue::String(String::from("pending")),
-        },
-        "payload": reflex_json::sanitize(effect.payload().as_deref()).unwrap_or_else(|_| json!({})),
-        "token": reflex_json::sanitize(effect.token().as_deref()).unwrap_or_else(|_| json!({})),
-    })
+    match effect.signal_type() {
+        SignalType::Custom {
+            effect_type,
+            payload,
+            token,
+        } => json!({
+            "id": JsonValue::Number(effect.id().into()),
+            "type": reflex_json::sanitize(&effect_type).unwrap_or_else(|_| json!({})),
+            "payload": reflex_json::sanitize(&payload).unwrap_or_else(|_| json!({})),
+            "token": reflex_json::sanitize(&token).unwrap_or_else(|_| json!({})),
+        }),
+        SignalType::Error { payload } => json!({
+            "id": JsonValue::Number(effect.id().into()),
+            "type": "error",
+            "payload": reflex_json::sanitize(&payload).unwrap_or_else(|_| json!({})),
+            "token": JsonValue::Null,
+        }),
+        SignalType::Pending => json!({
+            "id": JsonValue::Number(effect.id().into()),
+            "type": "pending",
+            "payload": JsonValue::Null,
+            "token": JsonValue::Null,
+        }),
+    }
 }
 
 dispatcher!({

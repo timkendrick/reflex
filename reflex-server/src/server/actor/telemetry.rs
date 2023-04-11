@@ -939,7 +939,7 @@ fn get_query_result_effects<'a, T: Expression>(
             .signals()
             .as_deref()
             .iter()
-            .filter(|signal| matches!(signal.as_deref().signal_type(), SignalType::Custom(_)))
+            .filter(|signal| matches!(signal.as_deref().signal_type(), SignalType::Custom { .. }))
             .map(|item| item.as_deref().clone())
             .collect::<Vec<_>>(),
     }
@@ -1004,8 +1004,8 @@ fn parse_graphql_operation_traceparent_extensions(
 
 fn format_effect_label<T: Expression<Signal = V>, V: ConditionType<T>>(effect: &V) -> String {
     match effect.signal_type() {
-        SignalType::Custom(signal_type) => format!("{}", signal_type),
-        signal_type => format!("{}", signal_type),
+        SignalType::Custom { effect_type, .. } => format!("{effect_type}"),
+        signal_type => format!("{signal_type}"),
     }
 }
 
@@ -1021,27 +1021,34 @@ fn format_effect_attributes<T: Expression>(
     effect: &T::Signal,
     factory: &impl ExpressionFactory<T>,
 ) -> Vec<(String, String)> {
-    let payload = effect.payload();
-    let token = effect.token();
-    let payload = payload.as_deref();
-    let token = token.as_deref();
+    let (payload, token) = match effect.signal_type() {
+        SignalType::Pending => (None, None),
+        SignalType::Error { payload } => (Some(payload), None),
+        SignalType::Custom { payload, token, .. } => (Some(payload), Some(token)),
+    };
     vec![
         (String::from("effect.id"), format!("{}", effect.id())),
         (String::from("effect.type"), format_effect_label(effect)),
         (
             String::from("effect.payload"),
-            reflex_json::sanitize(payload)
-                .map(|json| json.to_string())
-                .unwrap_or_else(|_| format!("<expression:{}>", payload.id())),
+            payload
+                .map(|value| {
+                    reflex_json::sanitize(&value)
+                        .map(|json| json.to_string())
+                        .unwrap_or_else(|_| format!("<expression:{}>", value.id()))
+                })
+                .unwrap_or_default(),
         ),
         (
             String::from("effect.token"),
-            match factory.match_symbol_term(token) {
-                Some(symbol) => format!("<symbol:{}>", symbol.id()),
-                None => reflex_json::sanitize(token)
-                    .map(|json| json.to_string())
-                    .unwrap_or_else(|_| format!("<expression:{}>", token.id())),
-            },
+            token
+                .map(|value| match factory.match_symbol_term(&value) {
+                    Some(symbol) => format!("<symbol:{}>", symbol.id()),
+                    None => reflex_json::sanitize(&value)
+                        .map(|json| json.to_string())
+                        .unwrap_or_else(|_| format!("<expression:{}>", value.id())),
+                })
+                .unwrap_or_default(),
         ),
     ]
 }

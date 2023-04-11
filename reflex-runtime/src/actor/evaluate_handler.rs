@@ -162,26 +162,33 @@ pub fn create_evaluate_effect<T: Expression>(
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
 ) -> T::Signal {
-    allocator.create_signal(
-        SignalType::Custom(create_evaluate_effect_type(factory, allocator)),
-        factory.create_list_term(allocator.create_list([
+    allocator.create_signal(SignalType::Custom {
+        effect_type: create_evaluate_effect_type(factory, allocator),
+        payload: factory.create_list_term(allocator.create_list([
             factory.create_string_term(allocator.create_string(label)),
             query,
             evaluation_mode.serialize(factory),
             invalidation_strategy.serialize(factory),
         ])),
-        factory.create_nil_term(),
-    )
+        token: factory.create_nil_term(),
+    })
 }
 
 pub fn parse_evaluate_effect_query<T: Expression>(
     effect: &T::Signal,
     factory: &impl ExpressionFactory<T>,
 ) -> Option<(String, T, QueryEvaluationMode, QueryInvalidationStrategy)> {
-    let payload = effect.payload();
-    let payload = payload.as_deref();
+    let payload = match effect.signal_type() {
+        SignalType::Custom {
+            // TODO: Assert correct effect type when parsing evaluate effect parameters
+            effect_type: _,
+            payload,
+            ..
+        } => Some(payload),
+        _ => None,
+    }?;
     let args = factory
-        .match_list_term(payload)
+        .match_list_term(&payload)
         .filter(|args| args.items().as_deref().len() == 4)?;
     let args = args.items();
     let mut args = args.as_deref().iter().map(|item| item.as_deref().clone());
@@ -543,24 +550,22 @@ impl<T: Expression> WorkerState<T> {
     fn current_result_status(&self, factory: &impl ExpressionFactory<T>) -> WorkerResultStatus {
         match self.latest_result() {
             None => WorkerResultStatus::Blocked,
-            Some(result) => {
-                match factory.match_signal_term(result.result()) {
-                    None => WorkerResultStatus::Active,
-                    Some(signal) => {
-                        if signal.signals().as_deref().iter().any(|signal| {
-                            matches!(&signal.as_deref().signal_type(), SignalType::Error)
-                        }) {
-                            WorkerResultStatus::Error
-                        } else if signal.signals().as_deref().iter().any(|signal| {
-                            matches!(&signal.as_deref().signal_type(), SignalType::Pending)
-                        }) {
-                            WorkerResultStatus::Pending
-                        } else {
-                            WorkerResultStatus::Blocked
-                        }
+            Some(result) => match factory.match_signal_term(result.result()) {
+                None => WorkerResultStatus::Active,
+                Some(signal) => {
+                    if signal.signals().as_deref().iter().any(|signal| {
+                        matches!(&signal.as_deref().signal_type(), SignalType::Error { .. })
+                    }) {
+                        WorkerResultStatus::Error
+                    } else if signal.signals().as_deref().iter().any(|signal| {
+                        matches!(&signal.as_deref().signal_type(), SignalType::Pending)
+                    }) {
+                        WorkerResultStatus::Pending
+                    } else {
+                        WorkerResultStatus::Blocked
                     }
                 }
-            }
+            },
         }
     }
     fn dependencies<'a>(&'a self) -> Option<impl Iterator<Item = &'a T::Signal> + 'a> {
@@ -1106,7 +1111,7 @@ where
                     .iter()
                     .filter(|effect| {
                         let effect = effect.as_deref();
-                        matches!(effect.signal_type(), SignalType::Custom(_))
+                        matches!(effect.signal_type(), SignalType::Custom { .. })
                             && worker_dependencies.contains(effect.id())
                     })
                     .filter(|effect| {
@@ -1485,28 +1490,26 @@ fn group_effects_by_type<T: Expression<Signal = V>, V: ConditionType<T>>(
 ) -> impl Iterator<Item = (T, Vec<V>)> {
     effects
         .into_iter()
-        .filter(|signal| matches!(signal.signal_type(), SignalType::Custom(_)))
+        .filter_map(|signal| match signal.signal_type() {
+            SignalType::Custom { effect_type, .. } => Some((effect_type, signal)),
+            _ => None,
+        })
         .fold(
             IntMap::<StateToken, (T, Vec<V>)>::default(),
-            |mut result, signal| {
-                let mut existing_entry = get_custom_signal_type(&signal)
-                    .and_then(|signal_type| result.get_mut(&signal_type.id()));
-                if let Some((_signal_type, existing_signals)) = existing_entry.as_mut() {
-                    existing_signals.push(signal);
-                } else if let Some(signal_type) = get_custom_signal_type(&signal) {
-                    result.insert(signal_type.id(), (signal_type, vec![signal]));
+            |mut result, (effect_type, signal)| {
+                match result.entry(effect_type.id()) {
+                    Entry::Occupied(mut entry) => {
+                        let (_effect_type, existing_signals) = entry.get_mut();
+                        existing_signals.push(signal);
+                    }
+                    Entry::Vacant(entry) => {
+                        entry.insert((effect_type, vec![signal]));
+                    }
                 }
                 result
             },
         )
         .into_values()
-}
-
-fn get_custom_signal_type<T: Expression<Signal = V>, V: ConditionType<T>>(effect: &V) -> Option<T> {
-    match effect.signal_type() {
-        SignalType::Custom(signal_type) => Some(signal_type),
-        _ => None,
-    }
 }
 
 fn is_unresolved_result<T: Expression>(
@@ -1526,7 +1529,7 @@ fn is_unresolved_result<T: Expression>(
 
 fn is_unresolved_effect<T: Expression<Signal = V>, V: ConditionType<T>>(effect: &V) -> bool {
     match effect.signal_type() {
-        SignalType::Error => false,
-        SignalType::Pending | SignalType::Custom(_) => true,
+        SignalType::Error { .. } => false,
+        SignalType::Pending | SignalType::Custom { .. } => true,
     }
 }
