@@ -507,7 +507,13 @@ fn sort_compiled_functions_by_call_graph_depth(
             Ok((compiled_function_id, compiled_lambda, depth))
         })
         .collect::<Result<Vec<_>, _>>()?;
-    functions_with_depths.sort_by_key(|(_, _, depth)| *depth);
+    functions_with_depths.sort_by_key(|(compiled_function_id, _, depth)| {
+        // Sorting shallowest nodes first ensures that child nodes occur before their respective parents
+        let primary_sort = *depth;
+        // Ensure deterministic sort order for nodes at the same depth by sorting by function hash
+        let secondary_sort = *compiled_function_id;
+        (primary_sort, secondary_sort)
+    });
     Ok(functions_with_depths
         .into_iter()
         .map(|(compiled_function_id, compiled_lambda, _)| (compiled_function_id, compiled_lambda)))

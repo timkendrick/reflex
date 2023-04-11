@@ -488,6 +488,18 @@ impl From<TermHashState> for CompiledFunctionId {
     }
 }
 
+impl PartialOrd for CompiledFunctionId {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        u64::from(self.0).partial_cmp(&u64::from(other.0))
+    }
+}
+
+impl Ord for CompiledFunctionId {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        u64::from(self.0).cmp(&u64::from(other.0))
+    }
+}
+
 impl std::fmt::Display for CompiledFunctionId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<fn:{:#08}>", u64::from(self.0))
