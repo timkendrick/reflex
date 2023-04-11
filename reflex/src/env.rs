@@ -30,7 +30,8 @@ pub fn inject_env_vars<'a, T: Expression + Rewritable<T> + Reducible<T>>(
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
 ) -> T {
-    let env = create_record(
+    let env_accessor = create_env_args_accessor(factory, allocator);
+    let env_values = create_record(
         vars.into_iter().map(|(key, value)| {
             (
                 factory.create_string_term(allocator.create_string(key)),
@@ -40,12 +41,10 @@ pub fn inject_env_vars<'a, T: Expression + Rewritable<T> + Reducible<T>>(
         factory,
         allocator,
     );
-    let mut state = StateCache::default();
-    state.set(create_env_args_accessor(factory, allocator).id(), env);
     expression
         .substitute_dynamic(
             true,
-            &state,
+            &StateCache::from_iter([(env_accessor.id(), env_values)]),
             factory,
             allocator,
             &mut SubstitutionCache::new(),
