@@ -311,16 +311,16 @@ impl ArenaPointer {
         let Self(offset) = self;
         offset == 0
     }
-    pub(crate) fn offset(self, offset: u32) -> Self {
-        let Self(existing_offset) = self;
-        Self(existing_offset + offset)
-    }
-    pub(crate) fn as_non_null(self) -> Option<Self> {
+    pub fn as_non_null(self) -> Option<Self> {
         if self.is_null() {
             None
         } else {
             Some(self)
         }
+    }
+    pub(crate) fn offset(self, offset: u32) -> Self {
+        let Self(existing_offset) = self;
+        Self(existing_offset + offset)
     }
 }
 impl From<ArenaPointer> for u32 {
