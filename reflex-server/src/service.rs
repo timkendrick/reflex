@@ -487,6 +487,7 @@ where
         async_tasks: TAsyncTasks,
         blocking_tasks: TBlockingTasks,
         effect_throttle: Option<Duration>,
+        dump_query_errors: bool,
     ) -> Result<Self, String>
     where
         T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T>,
@@ -592,6 +593,7 @@ where
                     metric_names.interpreter,
                     get_worker_metric_labels,
                     main_pid,
+                    dump_query_errors,
                 ))
                 .map(TTask::Actor::from),
             )

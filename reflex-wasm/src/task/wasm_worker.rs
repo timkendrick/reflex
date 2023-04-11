@@ -15,8 +15,8 @@ use crate::{
 use metrics::histogram;
 use reflex::{
     core::{
-        ConditionType, DependencyList, EvaluationResult, Expression, ExpressionFactory,
-        HeapAllocator, SignalType, StateToken,
+        ConditionListType, ConditionType, DependencyList, EvaluationResult, Expression,
+        ExpressionFactory, HeapAllocator, RefType, SignalTermType, SignalType, StateToken,
     },
     hash::IntMap,
 };
@@ -85,6 +85,7 @@ pub struct WasmWorkerTaskFactory<
     pub wasm_module: Arc<WasmProgram>,
     pub metric_names: WasmWorkerMetricNames,
     pub caller_pid: ProcessId,
+    pub dump_query_errors: bool,
     pub _expression: PhantomData<T>,
     pub _factory: PhantomData<TFactory>,
     pub _allocator: PhantomData<TAllocator>,
@@ -110,6 +111,7 @@ where
             wasm_module,
             metric_names,
             caller_pid,
+            dump_query_errors,
             _expression,
             _factory,
             _allocator,
@@ -126,6 +128,7 @@ where
             allocator,
             metric_names,
             caller_pid,
+            dump_query_errors,
         }
     }
 }
@@ -146,6 +149,7 @@ where
     allocator: TAllocator,
     metric_names: WasmWorkerMetricNames,
     caller_pid: ProcessId,
+    dump_query_errors: bool,
 }
 
 pub enum WasmWorkerState<T: Expression> {
@@ -473,6 +477,11 @@ where
                                 &mut state.instance,
                             )
                         };
+                        let initial_heap_snapshot = match self.dump_query_errors {
+                            true => Some(state.instance.dump_heap()),
+                            false => None,
+                        }
+                        .unwrap_or_default();
                         let start_time = Instant::now();
                         let result = state.instance.evaluate(state.entry_point, runtime_state);
                         let elapsed_time = start_time.elapsed();
@@ -513,6 +522,67 @@ where
                                             &arena,
                                         )
                                     };
+                                    if self.dump_query_errors {
+                                        if let Some(signal) = self
+                                            .factory
+                                            .match_signal_term(result.result())
+                                            .filter(|signal| {
+                                                signal.signals().as_deref().iter().any(|effect| {
+                                                    matches!(
+                                                        effect.as_deref().signal_type(),
+                                                        SignalType::Error
+                                                    )
+                                                })
+                                            })
+                                        {
+                                            println!("Query error: {result_pointer:?}");
+                                            for err in
+                                                signal.signals().as_deref().iter().filter_map(
+                                                    |effect| {
+                                                        let effect = effect.as_deref();
+                                                        match effect.signal_type() {
+                                                            SignalType::Error => Some(
+                                                                effect.payload().as_deref().clone(),
+                                                            ),
+                                                            _ => None,
+                                                        }
+                                                    },
+                                                )
+                                            {
+                                                println!(" {err}");
+                                            }
+                                            if let Some(pointer) = dependencies_pointer {
+                                                println!(" Dependencies: {dependencies_pointer:?}");
+                                                let dependencies =
+                                                    ArenaRef::<TypedTerm<TreeTerm>, _>::new(
+                                                        Rc::clone(&arena),
+                                                        pointer,
+                                                    );
+                                                for condition in dependencies.as_inner().nodes() {
+                                                    let condition_pointer = condition.as_pointer();
+                                                    println!(
+                                                        "  {condition_pointer:?}: {condition}"
+                                                    );
+                                                }
+                                            }
+                                            let output_filename = format!(
+                                                "{}_{}_{}_{}.bin",
+                                                cache_key.id(),
+                                                state_index.map(usize::from).unwrap_or(0),
+                                                u32::from(state.entry_point),
+                                                u32::from(runtime_state)
+                                            );
+                                            println!("Dumping heap to {output_filename}...");
+                                            std::fs::write(output_filename, initial_heap_snapshot)
+                                                .expect("Failed to dump heap");
+                                            println!("Heap dump complete");
+                                            println!(
+                                                "Invoking function evaluate({}, {})",
+                                                u32::from(state.entry_point),
+                                                u32::from(runtime_state)
+                                            );
+                                        }
+                                    }
                                     result
                                 };
                                 state.latest_result = Some(result.clone());

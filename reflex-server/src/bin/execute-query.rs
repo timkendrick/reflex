@@ -84,6 +84,9 @@ pub struct Args {
     /// Log runtime actions
     #[clap(long)]
     log: Option<Option<LogFormat>>,
+    /// Dump heap snapshots for any queries that return error results
+    #[clap(long)]
+    dump_query_errors: bool,
 }
 impl Into<ExecuteQueryCliOptions> for Args {
     fn into(self) -> ExecuteQueryCliOptions {
@@ -171,6 +174,7 @@ async fn main() -> Result<()> {
                 .map(Some),
             _ => Ok(None),
         }?;
+    let dump_query_errors = args.dump_query_errors;
     let factory: TFactory = SharedTermFactory::<TBuiltin>::default();
     let allocator: TAllocator = DefaultAllocator::default();
     let tracer = match OpenTelemetryConfig::parse_env(std::env::vars())? {
@@ -247,6 +251,7 @@ async fn main() -> Result<()> {
         TokioRuntimeMonitorMetricNames::default(),
         TokioRuntimeThreadPoolFactory::new(tokio::runtime::Handle::current()),
         TokioRuntimeThreadPoolFactory::new(tokio::runtime::Handle::current()),
+        dump_query_errors,
     )
     .await
     .map(|response| println!("{}", response))

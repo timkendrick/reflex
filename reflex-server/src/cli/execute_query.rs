@@ -104,6 +104,7 @@ pub async fn cli<
     tokio_runtime_metric_names: TokioRuntimeMonitorMetricNames,
     async_tasks: TAsyncTasks,
     blocking_tasks: TBlockingTasks,
+    dump_query_errors: bool,
 ) -> Result<String>
 where
     T: AsyncExpression
@@ -234,6 +235,7 @@ where
         async_tasks,
         blocking_tasks,
         effect_throttle,
+        dump_query_errors,
     )
     .map_err(|err| anyhow!(err))
     .context("Failed to initialize server")?;

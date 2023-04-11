@@ -436,6 +436,7 @@ pub fn cli<
     async_tasks: TAsyncTasks,
     blocking_tasks: TBlockingTasks,
     effect_throttle: Option<Duration>,
+    dump_query_errors: bool,
 ) -> Result<impl Future<Output = Result<(), hyper::Error>>>
 where
     T: AsyncExpression + Expression<String = String> + Rewritable<T> + Reducible<T> + Applicable<T>,
@@ -532,6 +533,7 @@ where
         async_tasks,
         blocking_tasks,
         effect_throttle,
+        dump_query_errors,
     )
     .map_err(|err| anyhow!(err))
     .context("Failed to initialize server")?;

@@ -90,6 +90,9 @@ struct Args {
     /// Log runtime actions
     #[clap(long)]
     log: Option<Option<LogFormat>>,
+    /// Dump heap snapshots for any queries that return error results
+    #[clap(long)]
+    dump_query_errors: bool,
 }
 impl Into<ReflexServerCliOptions> for Args {
     fn into(self) -> ReflexServerCliOptions {
@@ -186,6 +189,7 @@ pub async fn main() -> Result<()> {
                 .map(Some),
             _ => Ok(None),
         }?;
+    let dump_query_errors = args.dump_query_errors;
     let schema = if let Some(schema_path) = &args.schema {
         Some(load_graphql_schema(schema_path.as_path())?)
     } else {
@@ -285,6 +289,7 @@ pub async fn main() -> Result<()> {
             TokioRuntimeThreadPoolFactory::new(tokio::runtime::Handle::current()),
             TokioRuntimeThreadPoolFactory::new(tokio::runtime::Handle::current()),
             effect_throttle,
+            dump_query_errors,
         )
         .with_context(|| anyhow!("Server startup failed"))?;
     server.await.with_context(|| anyhow!("Server error"))

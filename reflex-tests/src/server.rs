@@ -137,6 +137,7 @@ pub fn serve_graphql(
     );
     let async_tasks = TokioRuntimeThreadPoolFactory::new(tokio::runtime::Handle::current());
     let blocking_tasks = TokioRuntimeThreadPoolFactory::new(tokio::runtime::Handle::current());
+    let dump_query_errors = true;
     let app = GraphQlWebServer::<TAction, TTask>::new(
         wasm_module,
         entry_point_export_name,
@@ -174,6 +175,7 @@ pub fn serve_graphql(
         async_tasks,
         blocking_tasks,
         None,
+        dump_query_errors,
     )
     .map_err(WasmTestError::Server)?;
     let service = make_service_fn({
