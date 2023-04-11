@@ -4,6 +4,7 @@ members = [
   "reflex-benches",
   "reflex-cli",
   "reflex-dispatcher",
+  "reflex-engine",
   "reflex-graphql",
   "reflex-grpc",
   "reflex-handlers",

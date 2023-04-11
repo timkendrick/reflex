@@ -1833,6 +1833,7 @@ dependencies = [
  "pin-project",
  "reflex",
  "reflex-dispatcher",
+ "reflex-engine",
  "reflex-graphql",
  "reflex-grpc",
  "reflex-handlers",
@@ -1859,6 +1860,20 @@ dependencies = [
  "pin-project",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "reflex-engine"
+version = "0.1.0"
+dependencies = [
+ "metrics",
+ "reflex",
+ "reflex-dispatcher",
+ "reflex-interpreter",
+ "reflex-macros",
+ "reflex-runtime",
+ "reflex-utils",
+ "serde",
 ]
 
 [[package]]
@@ -2062,7 +2077,6 @@ dependencies = [
  "quantiles",
  "reflex",
  "reflex-dispatcher",
- "reflex-interpreter",
  "reflex-json",
  "reflex-macros",
  "reflex-utils",
@@ -2105,6 +2119,7 @@ dependencies = [
  "pin-project",
  "reflex",
  "reflex-dispatcher",
+ "reflex-engine",
  "reflex-graphql",
  "reflex-grpc",
  "reflex-handlers",

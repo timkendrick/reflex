@@ -28,8 +28,7 @@ use reflex_interpreter::{
     InterpreterOptions,
 };
 use reflex_macros::{dispatcher, Named};
-
-use crate::{
+use reflex_runtime::{
     action::{
         bytecode_interpreter::{
             BytecodeInterpreterEvaluateAction, BytecodeInterpreterGcAction,
@@ -40,13 +39,14 @@ use crate::{
             EvaluateResultAction, EvaluateStartAction, EvaluateStopAction, EvaluateUpdateAction,
         },
     },
-    task::bytecode_worker::{
-        BytecodeWorkerMetricNames, BytecodeWorkerTask, BytecodeWorkerTaskFactory,
-    },
     utils::quantiles::{
         generate_quantile_metric_labels, publish_quantile_bucketed_metric, QuantileBucket,
     },
     AsyncExpression, AsyncExpressionFactory, AsyncHeapAllocator, QueryInvalidationStrategy,
+};
+
+use crate::task::bytecode_worker::{
+    BytecodeWorkerMetricNames, BytecodeWorkerTask, BytecodeWorkerTaskFactory,
 };
 
 // TODO: Allow tweaking bytecode interpreter GC trigger

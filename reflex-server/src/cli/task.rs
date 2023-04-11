@@ -5,6 +5,12 @@
 use opentelemetry::trace::Tracer;
 use reflex::core::{Applicable, Expression, Reducible, Rewritable};
 use reflex_dispatcher::{Action, Redispatcher};
+use reflex_engine::{
+    actor::bytecode_interpreter::{
+        BytecodeInterpreter, BytecodeInterpreterAction, BytecodeInterpreterMetricLabels,
+    },
+    task::bytecode_worker::{BytecodeWorkerAction, BytecodeWorkerTask, BytecodeWorkerTaskFactory},
+};
 use reflex_graphql::GraphQlParserBuiltin;
 use reflex_grpc::{
     actor::{GrpcHandler, GrpcHandlerAction},
@@ -27,14 +33,7 @@ use reflex_interpreter::compiler::Compile;
 use reflex_macros::{blanket_trait, task_factory_enum, Matcher};
 use reflex_protobuf::types::WellKnownTypesTranscoder;
 use reflex_runtime::{
-    actor::bytecode_interpreter::{
-        BytecodeInterpreter, BytecodeInterpreterAction, BytecodeInterpreterMetricLabels,
-    },
-    task::{
-        bytecode_worker::{BytecodeWorkerAction, BytecodeWorkerTask, BytecodeWorkerTaskFactory},
-        evaluate_handler::EffectThrottleTaskFactory,
-        RuntimeTask, RuntimeTaskFactory,
-    },
+    task::{evaluate_handler::EffectThrottleTaskFactory, RuntimeTask, RuntimeTaskFactory},
     AsyncExpression, AsyncExpressionFactory, AsyncHeapAllocator,
 };
 use reflex_utils::reconnect::ReconnectTimeout;
