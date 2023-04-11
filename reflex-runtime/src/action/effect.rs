@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use reflex::core::{ConditionType, Expression, RefType, StateToken};
+use reflex::core::{ConditionType, Expression, RefType};
 use reflex_dispatcher::{Action, Named, SerializableAction, SerializedAction};
 use reflex_json::{JsonMap, JsonValue};
 use reflex_macros::Named;
@@ -207,6 +207,10 @@ impl<T: Expression> SerializableAction for EffectUnsubscribeAction<T> {
 }
 
 #[derive(Named, PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+#[serde(bound(
+    serialize = "T: Serialize, <T as Expression>::Signal: Serialize",
+    deserialize = "T: Deserialize<'de>, <T as Expression>::Signal: Deserialize<'de>"
+))]
 pub struct EffectEmitAction<T: Expression> {
     pub effect_types: Vec<EffectUpdateBatch<T>>,
 }
@@ -246,9 +250,13 @@ impl SerializableAction for EffectThrottleEmitAction {
 }
 
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+#[serde(bound(
+    serialize = "T: Serialize, <T as Expression>::Signal: Serialize",
+    deserialize = "T: Deserialize<'de>, <T as Expression>::Signal: Deserialize<'de>"
+))]
 pub struct EffectUpdateBatch<T: Expression> {
     pub effect_type: T,
-    pub updates: Vec<(StateToken, T)>,
+    pub updates: Vec<(T::Signal, T)>,
 }
 
 fn sanitize_expression<T: Expression>(arg: &T) -> JsonValue {

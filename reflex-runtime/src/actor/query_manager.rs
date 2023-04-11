@@ -23,12 +23,11 @@ use crate::{
         query::{QueryEmitAction, QuerySubscribeAction, QueryUnsubscribeAction},
     },
     actor::evaluate_handler::{
-        create_evaluate_effect, create_evaluate_effect_type, parse_evaluate_effect_result,
+        create_evaluate_effect, create_evaluate_effect_type, is_evaluate_effect_type,
+        parse_evaluate_effect_result,
     },
     QueryEvaluationMode, QueryInvalidationStrategy,
 };
-
-use super::evaluate_handler::is_evaluate_effect_type;
 
 #[derive(Clone, Copy, Debug)]
 pub struct QueryManagerMetricNames {
@@ -222,7 +221,8 @@ where
             &self.factory,
             &self.allocator,
         );
-        match state.subscriptions.entry(query_effect.id()) {
+        let subscription_id = query_effect.id();
+        match state.subscriptions.entry(subscription_id) {
             // For any queries that are already actively subscribed, emit the latest result if one exists
             // (this is necessary because the caller that triggered this action might be expecting a result)
             Entry::Occupied(mut entry) => {
@@ -278,7 +278,8 @@ where
             &self.factory,
             &self.allocator,
         );
-        let mut entry = match state.subscriptions.entry(query_effect.id()) {
+        let subscription_id = query_effect.id();
+        let mut entry = match state.subscriptions.entry(subscription_id) {
             Entry::Vacant(_) => None,
             Entry::Occupied(entry) => Some(entry),
         }?;
@@ -317,8 +318,9 @@ where
                 .iter()
                 .filter(|batch| is_evaluate_effect_type(&batch.effect_type, &self.factory))
                 .flat_map(|batch| batch.updates.iter())
-                .filter_map(|(effect_id, update)| {
-                    let subscription = state.subscriptions.get_mut(effect_id)?;
+                .filter_map(|(key, update)| {
+                    let subscription_id = key.id();
+                    let subscription = state.subscriptions.get_mut(&subscription_id)?;
                     let result = parse_evaluate_effect_result(update, &self.factory)?;
                     subscription.result.replace(result.clone());
                     Some((subscription.query.clone(), result))

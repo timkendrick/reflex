@@ -3,7 +3,7 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use std::{
-    collections::{hash_map::Entry, HashMap, HashSet},
+    collections::{hash_map::Entry, HashMap},
     iter::once,
     marker::PhantomData,
 };
@@ -13,7 +13,7 @@ use reflex::{
         ConditionType, Expression, ExpressionFactory, ExpressionListType, FloatTermType,
         HeapAllocator, IntTermType, IntValue, ListTermType, RefType, SignalType, StateToken,
     },
-    hash::HashId,
+    hash::{HashId, IntMap},
 };
 use reflex_dispatcher::{
     Action, ActorEvents, HandlerContext, MessageData, NoopDisposeCallback, ProcessId,
@@ -56,7 +56,7 @@ impl<T: Expression> Default for VariableHandlerState<T> {
 
 struct VariableState<T: Expression> {
     value: Option<T>,
-    effect_ids: HashSet<StateToken>,
+    effects: IntMap<StateToken, T::Signal>,
 }
 
 #[derive(Named, Clone)]
@@ -225,22 +225,22 @@ where
                         Entry::Vacant(entry) => {
                             entry.insert(VariableState {
                                 value: None,
-                                effect_ids: once(effect.id()).collect(),
+                                effects: [(effect.id(), effect.clone())].into_iter().collect(),
                             });
-                            (effect.id(), initial_value)
+                            (effect.clone(), initial_value)
                         }
                         Entry::Occupied(mut entry) => {
                             let value = {
                                 let existing_value = entry.get().value.as_ref().cloned();
                                 existing_value.unwrap_or(initial_value)
                             };
-                            entry.get_mut().effect_ids.insert(effect.id());
-                            (effect.id(), value)
+                            entry.get_mut().effects.insert(effect.id(), effect.clone());
+                            (effect.clone(), value)
                         }
                     }
                 }
                 Err(err) => (
-                    effect.id(),
+                    effect.clone(),
                     create_error_expression(err, &self.factory, &self.allocator),
                 ),
             }
@@ -276,35 +276,33 @@ where
             .flat_map(|effect| {
                 let entry = parse_set_effect_args(effect, &self.factory, &self.allocator);
                 let (value, updates) = match entry {
-                    Ok((state_token, value)) => {
-                        let (value, updates) = match state
-                            .subscriptions
-                            .entry(VariableKeyHash::new(&state_token))
-                        {
-                            Entry::Vacant(entry) => {
-                                let updated_value = value;
-                                entry.insert(VariableState {
-                                    value: Some(updated_value.clone()),
-                                    effect_ids: Default::default(),
-                                });
-                                (updated_value, None)
-                            }
-                            Entry::Occupied(mut entry) => {
-                                let updated_value = value;
-                                entry.get_mut().value = Some(updated_value.clone());
-                                let updates = entry
-                                    .get()
-                                    .effect_ids
-                                    .iter()
-                                    .cloned()
-                                    .map({
-                                        let updated_value = updated_value.clone();
-                                        move |state_token| (state_token, updated_value.clone())
-                                    })
-                                    .collect::<Vec<_>>();
-                                (updated_value, Some(updates))
-                            }
-                        };
+                    Ok((key, value)) => {
+                        let (value, updates) =
+                            match state.subscriptions.entry(VariableKeyHash::new(&key)) {
+                                Entry::Vacant(entry) => {
+                                    let updated_value = value;
+                                    entry.insert(VariableState {
+                                        value: Some(updated_value.clone()),
+                                        effects: Default::default(),
+                                    });
+                                    (updated_value, None)
+                                }
+                                Entry::Occupied(mut entry) => {
+                                    let updated_value = value;
+                                    entry.get_mut().value = Some(updated_value.clone());
+                                    let updates = entry
+                                        .get()
+                                        .effects
+                                        .values()
+                                        .cloned()
+                                        .map({
+                                            let updated_value = updated_value.clone();
+                                            move |effect| (effect, updated_value.clone())
+                                        })
+                                        .collect::<Vec<_>>();
+                                    (updated_value, Some(updates))
+                                }
+                            };
                         (value, updates)
                     }
                     Err(err) => (
@@ -315,9 +313,9 @@ where
                 updates
                     .into_iter()
                     .flatten()
-                    .chain(once((effect.id(), value)))
+                    .chain(once((effect.clone(), value)))
             })
-            .collect();
+            .collect::<Vec<_>>();
         Some(SchedulerTransition::new(once(SchedulerCommand::Send(
             self.main_pid,
             EffectEmitAction {
@@ -349,37 +347,35 @@ where
             .flat_map(move |effect| {
                 let entry = parse_increment_effect_args(effect, &self.factory, &self.allocator);
                 let (value, actions) = match entry {
-                    Ok(state_token) => {
-                        let (value, actions) = match state
-                            .subscriptions
-                            .entry(VariableKeyHash::new(&state_token))
-                        {
-                            Entry::Vacant(entry) => {
-                                let updated_value =
-                                    increment_variable(None, &self.factory, &self.allocator);
-                                entry.insert(VariableState {
-                                    value: Some(updated_value.clone()),
-                                    effect_ids: Default::default(),
-                                });
-                                (updated_value, None)
-                            }
-                            Entry::Occupied(mut entry) => {
-                                let updated_value = increment_variable(
-                                    entry.get().value.as_ref(),
-                                    &self.factory,
-                                    &self.allocator,
-                                );
-                                entry.get_mut().value = Some(updated_value.clone());
-                                let updates = entry
-                                    .get()
-                                    .effect_ids
-                                    .iter()
-                                    .cloned()
-                                    .map(|state_token| (state_token, updated_value.clone()))
-                                    .collect::<Vec<_>>();
-                                (updated_value, Some(updates))
-                            }
-                        };
+                    Ok(key) => {
+                        let (value, actions) =
+                            match state.subscriptions.entry(VariableKeyHash::new(&key)) {
+                                Entry::Vacant(entry) => {
+                                    let updated_value =
+                                        increment_variable(None, &self.factory, &self.allocator);
+                                    entry.insert(VariableState {
+                                        value: Some(updated_value.clone()),
+                                        effects: Default::default(),
+                                    });
+                                    (updated_value, None)
+                                }
+                                Entry::Occupied(mut entry) => {
+                                    let updated_value = increment_variable(
+                                        entry.get().value.as_ref(),
+                                        &self.factory,
+                                        &self.allocator,
+                                    );
+                                    entry.get_mut().value = Some(updated_value.clone());
+                                    let updates = entry
+                                        .get()
+                                        .effects
+                                        .values()
+                                        .cloned()
+                                        .map(|key| (key, updated_value.clone()))
+                                        .collect::<Vec<_>>();
+                                    (updated_value, Some(updates))
+                                }
+                            };
                         (value, actions)
                     }
                     Err(err) => (
@@ -390,9 +386,9 @@ where
                 actions
                     .into_iter()
                     .flatten()
-                    .chain(once((effect.id(), value)))
+                    .chain(once((effect.clone(), value)))
             })
-            .collect();
+            .collect::<Vec<_>>();
         Some(SchedulerTransition::new(once(SchedulerCommand::Send(
             self.main_pid,
             EffectEmitAction {
@@ -437,7 +433,7 @@ where
                                     decrement_variable(None, &self.factory, &self.allocator);
                                 entry.insert(VariableState {
                                     value: Some(updated_value.clone()),
-                                    effect_ids: Default::default(),
+                                    effects: Default::default(),
                                 });
                                 (updated_value, None)
                             }
@@ -450,10 +446,10 @@ where
                                 entry.get_mut().value = Some(updated_value.clone());
                                 let updates = entry
                                     .get()
-                                    .effect_ids
-                                    .iter()
+                                    .effects
+                                    .values()
                                     .cloned()
-                                    .map(|state_token| (state_token, updated_value.clone()))
+                                    .map(|key| (key, updated_value.clone()))
                                     .collect::<Vec<_>>();
                                 (updated_value, Some(updates))
                             }
@@ -468,9 +464,9 @@ where
                 updates
                     .into_iter()
                     .flatten()
-                    .chain(once((effect.id(), value)))
+                    .chain(once((effect.clone(), value)))
             })
-            .collect();
+            .collect::<Vec<_>>();
         Some(SchedulerTransition::new(once(SchedulerCommand::Send(
             self.main_pid,
             EffectEmitAction {
@@ -529,8 +525,8 @@ where
                     .subscriptions
                     .entry(VariableKeyHash::new(&state_token))
                 {
-                    entry.get_mut().effect_ids.remove(&effect.id());
-                    if entry.get().effect_ids.is_empty() {
+                    entry.get_mut().effects.remove(&effect.id());
+                    if entry.get().effects.is_empty() {
                         entry.remove();
                     }
                 };
@@ -631,9 +627,9 @@ fn parse_set_effect_args<T: Expression>(
         })?;
     let args = args.items();
     let mut args = args.as_deref().iter().map(|item| item.as_deref().clone());
-    let state_token = args.next().unwrap();
+    let key = args.next().unwrap();
     let value = args.next().unwrap();
-    Ok((state_token, value))
+    Ok((key, value))
 }
 
 fn parse_increment_effect_args<T: Expression>(
@@ -654,8 +650,8 @@ fn parse_increment_effect_args<T: Expression>(
         })?;
     let args = args.items();
     let mut args = args.as_deref().iter().map(|item| item.as_deref().clone());
-    let state_token = args.next().unwrap();
-    Ok(state_token)
+    let key = args.next().unwrap();
+    Ok(key)
 }
 
 fn parse_decrement_effect_args<T: Expression>(
@@ -676,8 +672,8 @@ fn parse_decrement_effect_args<T: Expression>(
         })?;
     let args = args.items();
     let mut args = args.as_deref().iter().map(|item| item.as_deref().clone());
-    let state_token = args.next().unwrap();
-    Ok(state_token)
+    let key = args.next().unwrap();
+    Ok(key)
 }
 
 fn create_error_expression<T: Expression>(

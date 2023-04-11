@@ -524,17 +524,17 @@ impl<'a, T: Expression> From<&'a ServerCliAction<T>> for Option<&'a EvaluateUpda
     }
 }
 
-impl<T: Expression> From<EvaluateStopAction> for ServerCliAction<T> {
-    fn from(value: EvaluateStopAction) -> Self {
+impl<T: Expression> From<EvaluateStopAction<T>> for ServerCliAction<T> {
+    fn from(value: EvaluateStopAction<T>) -> Self {
         EvaluateActions::<T>::from(value).into()
     }
 }
-impl<T: Expression> From<ServerCliAction<T>> for Option<EvaluateStopAction> {
+impl<T: Expression> From<ServerCliAction<T>> for Option<EvaluateStopAction<T>> {
     fn from(value: ServerCliAction<T>) -> Self {
         Option::<EvaluateActions<T>>::from(value).and_then(|value| value.into())
     }
 }
-impl<'a, T: Expression> From<&'a ServerCliAction<T>> for Option<&'a EvaluateStopAction> {
+impl<'a, T: Expression> From<&'a ServerCliAction<T>> for Option<&'a EvaluateStopAction<T>> {
     fn from(value: &'a ServerCliAction<T>) -> Self {
         Option::<&'a EvaluateActions<T>>::from(value).and_then(|value| value.into())
     }
@@ -840,17 +840,19 @@ impl<'a, T: Expression> From<&'a ServerCliAction<T>> for Option<&'a GraphQlServe
     }
 }
 
-impl<T: Expression> From<BytecodeInterpreterInitAction> for ServerCliAction<T> {
-    fn from(value: BytecodeInterpreterInitAction) -> Self {
+impl<T: Expression> From<BytecodeInterpreterInitAction<T>> for ServerCliAction<T> {
+    fn from(value: BytecodeInterpreterInitAction<T>) -> Self {
         BytecodeInterpreterActions::<T>::from(value).into()
     }
 }
-impl<T: Expression> From<ServerCliAction<T>> for Option<BytecodeInterpreterInitAction> {
+impl<T: Expression> From<ServerCliAction<T>> for Option<BytecodeInterpreterInitAction<T>> {
     fn from(value: ServerCliAction<T>) -> Self {
         Option::<BytecodeInterpreterActions<T>>::from(value).and_then(|value| value.into())
     }
 }
-impl<'a, T: Expression> From<&'a ServerCliAction<T>> for Option<&'a BytecodeInterpreterInitAction> {
+impl<'a, T: Expression> From<&'a ServerCliAction<T>>
+    for Option<&'a BytecodeInterpreterInitAction<T>>
+{
     fn from(value: &'a ServerCliAction<T>) -> Self {
         Option::<&'a BytecodeInterpreterActions<T>>::from(value).and_then(|value| value.into())
     }
@@ -892,35 +894,37 @@ impl<'a, T: Expression> From<&'a ServerCliAction<T>>
     }
 }
 
-impl<T: Expression> From<BytecodeInterpreterGcCompleteAction> for ServerCliAction<T> {
-    fn from(value: BytecodeInterpreterGcCompleteAction) -> Self {
+impl<T: Expression> From<BytecodeInterpreterGcCompleteAction<T>> for ServerCliAction<T> {
+    fn from(value: BytecodeInterpreterGcCompleteAction<T>) -> Self {
         BytecodeInterpreterActions::<T>::from(value).into()
     }
 }
-impl<T: Expression> From<ServerCliAction<T>> for Option<BytecodeInterpreterGcCompleteAction> {
+impl<T: Expression> From<ServerCliAction<T>> for Option<BytecodeInterpreterGcCompleteAction<T>> {
     fn from(value: ServerCliAction<T>) -> Self {
         Option::<BytecodeInterpreterActions<T>>::from(value).and_then(|value| value.into())
     }
 }
 impl<'a, T: Expression> From<&'a ServerCliAction<T>>
-    for Option<&'a BytecodeInterpreterGcCompleteAction>
+    for Option<&'a BytecodeInterpreterGcCompleteAction<T>>
 {
     fn from(value: &'a ServerCliAction<T>) -> Self {
         Option::<&'a BytecodeInterpreterActions<T>>::from(value).and_then(|value| value.into())
     }
 }
 
-impl<T: Expression> From<BytecodeInterpreterGcAction> for ServerCliAction<T> {
-    fn from(value: BytecodeInterpreterGcAction) -> Self {
+impl<T: Expression> From<BytecodeInterpreterGcAction<T>> for ServerCliAction<T> {
+    fn from(value: BytecodeInterpreterGcAction<T>) -> Self {
         BytecodeInterpreterActions::<T>::from(value).into()
     }
 }
-impl<T: Expression> From<ServerCliAction<T>> for Option<BytecodeInterpreterGcAction> {
+impl<T: Expression> From<ServerCliAction<T>> for Option<BytecodeInterpreterGcAction<T>> {
     fn from(value: ServerCliAction<T>) -> Self {
         Option::<BytecodeInterpreterActions<T>>::from(value).and_then(|value| value.into())
     }
 }
-impl<'a, T: Expression> From<&'a ServerCliAction<T>> for Option<&'a BytecodeInterpreterGcAction> {
+impl<'a, T: Expression> From<&'a ServerCliAction<T>>
+    for Option<&'a BytecodeInterpreterGcAction<T>>
+{
     fn from(value: &'a ServerCliAction<T>) -> Self {
         Option::<&'a BytecodeInterpreterActions<T>>::from(value).and_then(|value| value.into())
     }

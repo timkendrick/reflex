@@ -13,7 +13,7 @@ use reflex::{
         ExpressionFactory, HeapAllocator, RefType, SignalTermType, SignalType, StateToken,
         SymbolTermType,
     },
-    hash::HashId,
+    hash::{HashId, IntMap},
 };
 use reflex_dispatcher::{
     Action, ActorEvents, HandlerContext, MessageData, NoopDisposeCallback, ProcessId,
@@ -92,8 +92,8 @@ where
 
 pub struct TelemetryMiddlewareState<T: Expression> {
     active_queries: HashMap<Uuid, TelemetryMiddlewareQueryState>,
-    active_workers: HashMap<StateToken, T::Signal>,
-    effect_mappings: HashMap<HashId, TelemetryMiddlewareEffectState<T>>,
+    active_workers: IntMap<StateToken, T::Signal>,
+    effect_mappings: IntMap<StateToken, TelemetryMiddlewareEffectState<T>>,
 }
 impl<T: Expression> Default for TelemetryMiddlewareState<T> {
     fn default() -> Self {
@@ -146,7 +146,7 @@ dispatcher!({
         Inbox(EffectEmitAction<T>),
         Inbox(EvaluateStartAction<T>),
         Inbox(EvaluateResultAction<T>),
-        Inbox(EvaluateStopAction),
+        Inbox(EvaluateStopAction<T>),
 
         Outbox(TelemetryMiddlewareTransactionStartAction),
         Outbox(TelemetryMiddlewareTransactionEndAction),
@@ -298,12 +298,12 @@ dispatcher!({
             self.handle_evaluate_start(state, action, metadata, context)
         }
 
-        fn accept(&self, _action: &EvaluateStopAction) -> bool {
+        fn accept(&self, _action: &EvaluateStopAction<T>) -> bool {
             true
         }
         fn schedule(
             &self,
-            _action: &EvaluateStopAction,
+            _action: &EvaluateStopAction<T>,
             _state: &Self::State,
         ) -> Option<SchedulerMode> {
             Some(SchedulerMode::Async)
@@ -311,7 +311,7 @@ dispatcher!({
         fn handle(
             &self,
             state: &mut Self::State,
-            action: &EvaluateStopAction,
+            action: &EvaluateStopAction<T>,
             metadata: &MessageData,
             context: &mut impl HandlerContext,
         ) -> Option<SchedulerTransition<TAction, TTask>> {
@@ -639,13 +639,14 @@ where
         TTask: TaskFactory<TAction, TTask>,
     {
         let EvaluateStartAction {
-            cache_id,
+            cache_key,
             query,
             label,
             evaluation_mode,
             invalidation_strategy,
         } = action;
-        match state.active_workers.entry(*cache_id) {
+        let worker_id = cache_key.id();
+        match state.active_workers.entry(worker_id) {
             Entry::Occupied(_) => None,
             Entry::Vacant(entry) => {
                 entry.insert(create_evaluate_effect(
@@ -663,7 +664,7 @@ where
     fn handle_evaluate_stop<TAction, TTask>(
         &self,
         state: &mut TelemetryMiddlewareState<T>,
-        action: &EvaluateStopAction,
+        action: &EvaluateStopAction<T>,
         _metadata: &MessageData,
         _context: &mut impl HandlerContext,
     ) -> Option<SchedulerTransition<TAction, TTask>>
@@ -671,8 +672,9 @@ where
         TAction: Action,
         TTask: TaskFactory<TAction, TTask>,
     {
-        let EvaluateStopAction { cache_id } = action;
-        state.active_workers.remove(cache_id);
+        let EvaluateStopAction { cache_key } = action;
+        let worker_id = cache_key.id();
+        state.active_workers.remove(&worker_id);
         None
     }
     fn handle_evaluate_result<TAction, TTask>(
@@ -687,9 +689,10 @@ where
         TTask: TaskFactory<TAction, TTask>,
     {
         let EvaluateResultAction {
-            cache_id, result, ..
+            cache_key, result, ..
         } = action;
-        let evaluate_effect = state.active_workers.get(cache_id)?;
+        let worker_id = cache_key.id();
+        let evaluate_effect = state.active_workers.get(&worker_id)?;
         let (query_transaction_id, previous_result) = state
             .effect_mappings
             .get_mut(&evaluate_effect.id())
@@ -769,24 +772,25 @@ where
             updates
                 .iter()
                 .flat_map(|batch| batch.updates.iter())
-                .filter_map(|(effect_id, update)| {
-                    let update = state
-                        .effect_mappings
-                        .get_mut(effect_id)
-                        .map(|effect_state| {
-                            effect_state.latest_value.replace(update.clone());
-                            if effect_state.query_result.is_some() {
-                                let completed_transaction_id = effect_state.end_transaction();
-                                Ok(completed_transaction_id)
-                            } else {
-                                match effect_state.end_transaction() {
-                                    Some(completed_transaction_id) => {
-                                        Ok(Some(completed_transaction_id))
+                .filter_map(|(effect, update)| {
+                    let update =
+                        state
+                            .effect_mappings
+                            .get_mut(&effect.id())
+                            .map(|effect_state| {
+                                effect_state.latest_value.replace(update.clone());
+                                if effect_state.query_result.is_some() {
+                                    let completed_transaction_id = effect_state.end_transaction();
+                                    Ok(completed_transaction_id)
+                                } else {
+                                    match effect_state.end_transaction() {
+                                        Some(completed_transaction_id) => {
+                                            Ok(Some(completed_transaction_id))
+                                        }
+                                        None => Err(effect_state.effect.clone()),
                                     }
-                                    None => Err(effect_state.effect.clone()),
                                 }
-                            }
-                        })?;
+                            })?;
                     match update {
                         Err(effect) => Some(Err(effect)),
                         Ok(completed_transaction_id) => match completed_transaction_id {

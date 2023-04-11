@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use reflex::core::{EvaluationResult, Expression, StateToken};
+use reflex::core::{ConditionType, EvaluationResult, Expression};
 use reflex_dispatcher::{Action, MessageOffset, Named, SerializableAction, SerializedAction};
 use reflex_json::JsonValue;
 use reflex_macros::Named;
@@ -10,10 +10,14 @@ use serde::{Deserialize, Serialize};
 use crate::{QueryEvaluationMode, QueryInvalidationStrategy};
 
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+#[serde(bound(
+    serialize = "T: Serialize, <T as Expression>::Signal: Serialize",
+    deserialize = "T: Deserialize<'de>, <T as Expression>::Signal: Deserialize<'de>"
+))]
 pub enum EvaluateActions<T: Expression> {
     Start(EvaluateStartAction<T>),
     Update(EvaluateUpdateAction<T>),
-    Stop(EvaluateStopAction),
+    Stop(EvaluateStopAction<T>),
     Result(EvaluateResultAction<T>),
 }
 impl<T: Expression> Action for EvaluateActions<T> {}
@@ -82,12 +86,12 @@ impl<'a, T: Expression> From<&'a EvaluateActions<T>> for Option<&'a EvaluateUpda
     }
 }
 
-impl<T: Expression> From<EvaluateStopAction> for EvaluateActions<T> {
-    fn from(value: EvaluateStopAction) -> Self {
+impl<T: Expression> From<EvaluateStopAction<T>> for EvaluateActions<T> {
+    fn from(value: EvaluateStopAction<T>) -> Self {
         Self::Stop(value)
     }
 }
-impl<T: Expression> From<EvaluateActions<T>> for Option<EvaluateStopAction> {
+impl<T: Expression> From<EvaluateActions<T>> for Option<EvaluateStopAction<T>> {
     fn from(value: EvaluateActions<T>) -> Self {
         match value {
             EvaluateActions::Stop(value) => Some(value),
@@ -95,7 +99,7 @@ impl<T: Expression> From<EvaluateActions<T>> for Option<EvaluateStopAction> {
         }
     }
 }
-impl<'a, T: Expression> From<&'a EvaluateActions<T>> for Option<&'a EvaluateStopAction> {
+impl<'a, T: Expression> From<&'a EvaluateActions<T>> for Option<&'a EvaluateStopAction<T>> {
     fn from(value: &'a EvaluateActions<T>) -> Self {
         match value {
             EvaluateActions::Stop(value) => Some(value),
@@ -127,8 +131,12 @@ impl<'a, T: Expression> From<&'a EvaluateActions<T>> for Option<&'a EvaluateResu
 }
 
 #[derive(Named, PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+#[serde(bound(
+    serialize = "T: Serialize, <T as Expression>::Signal: Serialize",
+    deserialize = "T: Deserialize<'de>, <T as Expression>::Signal: Deserialize<'de>"
+))]
 pub struct EvaluateStartAction<T: Expression> {
-    pub cache_id: StateToken,
+    pub cache_key: T::Signal,
     pub label: String,
     pub query: T,
     pub evaluation_mode: QueryEvaluationMode,
@@ -138,7 +146,7 @@ impl<T: Expression> Action for EvaluateStartAction<T> {}
 impl<T: Expression> SerializableAction for EvaluateStartAction<T> {
     fn to_json(&self) -> SerializedAction {
         SerializedAction::from_iter([
-            ("cache_id", JsonValue::from(self.cache_id)),
+            ("cache_id", JsonValue::from(self.cache_key.id())),
             ("label", JsonValue::from(self.label.clone())),
             ("query_id", JsonValue::from(self.query.id())),
             (
@@ -160,16 +168,20 @@ impl<T: Expression> SerializableAction for EvaluateStartAction<T> {
 }
 
 #[derive(Named, PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+#[serde(bound(
+    serialize = "T: Serialize, <T as Expression>::Signal: Serialize",
+    deserialize = "T: Deserialize<'de>, <T as Expression>::Signal: Deserialize<'de>"
+))]
 pub struct EvaluateUpdateAction<T: Expression> {
-    pub cache_id: StateToken,
+    pub cache_key: T::Signal,
     pub state_index: Option<MessageOffset>,
-    pub state_updates: Vec<(StateToken, T)>,
+    pub state_updates: Vec<(T::Signal, T)>,
 }
 impl<T: Expression> Action for EvaluateUpdateAction<T> {}
 impl<T: Expression> SerializableAction for EvaluateUpdateAction<T> {
     fn to_json(&self) -> SerializedAction {
         SerializedAction::from_iter([
-            ("cache_id", JsonValue::from(self.cache_id)),
+            ("cache_id", JsonValue::from(self.cache_key.id())),
             (
                 "state_index",
                 match self.state_index {
@@ -186,18 +198,26 @@ impl<T: Expression> SerializableAction for EvaluateUpdateAction<T> {
 }
 
 #[derive(Named, PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
-pub struct EvaluateStopAction {
-    pub cache_id: StateToken,
+#[serde(bound(
+    serialize = "<T as Expression>::Signal: Serialize",
+    deserialize = "<T as Expression>::Signal: Deserialize<'de>"
+))]
+pub struct EvaluateStopAction<T: Expression> {
+    pub cache_key: T::Signal,
 }
-impl SerializableAction for EvaluateStopAction {
+impl<T: Expression> SerializableAction for EvaluateStopAction<T> {
     fn to_json(&self) -> SerializedAction {
-        SerializedAction::from_iter([("cache_id", JsonValue::from(self.cache_id))])
+        SerializedAction::from_iter([("cache_id", JsonValue::from(self.cache_key.id()))])
     }
 }
 
 #[derive(Named, PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+#[serde(bound(
+    serialize = "T: Serialize, <T as Expression>::Signal: Serialize",
+    deserialize = "T: Deserialize<'de>, <T as Expression>::Signal: Deserialize<'de>"
+))]
 pub struct EvaluateResultAction<T: Expression> {
-    pub cache_id: StateToken,
+    pub cache_key: T::Signal,
     pub state_index: Option<MessageOffset>,
     pub result: EvaluationResult<T>,
 }
@@ -205,7 +225,7 @@ impl<T: Expression> Action for EvaluateResultAction<T> {}
 impl<T: Expression> SerializableAction for EvaluateResultAction<T> {
     fn to_json(&self) -> SerializedAction {
         SerializedAction::from_iter([
-            ("cache_id", JsonValue::from(self.cache_id)),
+            ("cache_id", JsonValue::from(self.cache_key.id())),
             (
                 "state_index",
                 match self.state_index {

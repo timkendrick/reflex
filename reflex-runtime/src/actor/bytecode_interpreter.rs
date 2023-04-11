@@ -239,7 +239,7 @@ impl<T: Expression> BytecodeWorkerUpdateQueue<T> {
             QueryInvalidationStrategy::Exact => Self::Exact(Default::default()),
         }
     }
-    fn push_update_batch(&mut self, updates: &Vec<(StateToken, T)>) {
+    fn push_update_batch(&mut self, updates: &Vec<(T::Signal, T)>) {
         match self {
             Self::Single(queue) => {
                 let initial_batch = std::mem::take(&mut queue.updates);
@@ -247,7 +247,7 @@ impl<T: Expression> BytecodeWorkerUpdateQueue<T> {
                     initial_batch.into_iter().chain(
                         updates
                             .iter()
-                            .map(|(state_token, value)| (*state_token, value.clone())),
+                            .map(|(key, value)| (key.clone(), value.clone())),
                     ),
                 ))
             }
@@ -255,23 +255,23 @@ impl<T: Expression> BytecodeWorkerUpdateQueue<T> {
                 queue.updates.extend(
                     updates
                         .iter()
-                        .map(|(state_token, value)| (*state_token, value.clone())),
+                        .map(|(key, value)| (key.id(), (key.clone(), value.clone()))),
                 );
             }
             Self::Exact(queue) => queue.batches.push_back(updates.clone()),
         }
     }
-    fn pop_update_batch(&mut self) -> Vec<(StateToken, T)> {
+    fn pop_update_batch(&mut self) -> Vec<(T::Signal, T)> {
         match self {
             Self::Single(queue) => std::mem::take(&mut queue.updates),
-            Self::Combined(queue) => std::mem::take(&mut queue.updates).into_iter().collect(),
+            Self::Combined(queue) => std::mem::take(&mut queue.updates).into_values().collect(),
             Self::Exact(queue) => queue.batches.pop_front().unwrap_or_default(),
         }
     }
 }
 
 struct SingleWorkerUpdateQueue<T: Expression> {
-    updates: Vec<(StateToken, T)>,
+    updates: Vec<(T::Signal, T)>,
 }
 impl<T: Expression> Default for SingleWorkerUpdateQueue<T> {
     fn default() -> Self {
@@ -282,7 +282,7 @@ impl<T: Expression> Default for SingleWorkerUpdateQueue<T> {
 }
 
 struct CombinedWorkerUpdateQueue<T: Expression> {
-    updates: IntMap<StateToken, T>,
+    updates: IntMap<StateToken, (T::Signal, T)>,
 }
 impl<T: Expression> Default for CombinedWorkerUpdateQueue<T> {
     fn default() -> Self {
@@ -291,23 +291,26 @@ impl<T: Expression> Default for CombinedWorkerUpdateQueue<T> {
         }
     }
 }
-impl<T: Expression> FromIterator<(StateToken, T)> for CombinedWorkerUpdateQueue<T> {
-    fn from_iter<TIter: IntoIterator<Item = (StateToken, T)>>(iter: TIter) -> Self {
+impl<T: Expression> FromIterator<(T::Signal, T)> for CombinedWorkerUpdateQueue<T> {
+    fn from_iter<TIter: IntoIterator<Item = (T::Signal, T)>>(iter: TIter) -> Self {
         Self {
-            updates: iter.into_iter().collect(),
+            updates: iter
+                .into_iter()
+                .map(|(key, value)| (key.id(), (key, value)))
+                .collect(),
         }
     }
 }
 impl<T: Expression> IntoIterator for CombinedWorkerUpdateQueue<T> {
-    type Item = (StateToken, T);
-    type IntoIter = std::collections::hash_map::IntoIter<StateToken, T>;
+    type Item = (T::Signal, T);
+    type IntoIter = std::collections::hash_map::IntoValues<StateToken, (T::Signal, T)>;
     fn into_iter(self) -> Self::IntoIter {
-        self.updates.into_iter()
+        self.updates.into_values()
     }
 }
 
 struct ExactWorkerUpdateQueue<T: Expression> {
-    batches: VecDeque<Vec<(StateToken, T)>>,
+    batches: VecDeque<Vec<(T::Signal, T)>>,
 }
 impl<T: Expression> Default for ExactWorkerUpdateQueue<T> {
     fn default() -> Self {
@@ -321,14 +324,14 @@ dispatcher!({
     pub enum BytecodeInterpreterAction<T: Expression> {
         Inbox(EvaluateStartAction<T>),
         Inbox(EvaluateUpdateAction<T>),
-        Inbox(EvaluateStopAction),
+        Inbox(EvaluateStopAction<T>),
         Inbox(BytecodeInterpreterResultAction<T>),
-        Inbox(BytecodeInterpreterGcCompleteAction),
+        Inbox(BytecodeInterpreterGcCompleteAction<T>),
 
         Outbox(EvaluateResultAction<T>),
-        Outbox(BytecodeInterpreterInitAction),
+        Outbox(BytecodeInterpreterInitAction<T>),
         Outbox(BytecodeInterpreterEvaluateAction<T>),
-        Outbox(BytecodeInterpreterGcAction),
+        Outbox(BytecodeInterpreterGcAction<T>),
     }
 
     impl<T, TFactory, TAllocator, TMetricLabels, TAction, TTask> Dispatcher<TAction, TTask>
@@ -395,12 +398,12 @@ dispatcher!({
             self.handle_evaluate_update(state, action, metadata, context)
         }
 
-        fn accept(&self, _action: &EvaluateStopAction) -> bool {
+        fn accept(&self, _action: &EvaluateStopAction<T>) -> bool {
             true
         }
         fn schedule(
             &self,
-            _action: &EvaluateStopAction,
+            _action: &EvaluateStopAction<T>,
             _state: &Self::State,
         ) -> Option<SchedulerMode> {
             Some(SchedulerMode::Async)
@@ -408,7 +411,7 @@ dispatcher!({
         fn handle(
             &self,
             state: &mut Self::State,
-            action: &EvaluateStopAction,
+            action: &EvaluateStopAction<T>,
             metadata: &MessageData,
             context: &mut impl HandlerContext,
         ) -> Option<SchedulerTransition<TAction, TTask>> {
@@ -435,12 +438,12 @@ dispatcher!({
             self.handle_bytecode_interpreter_result(state, action, metadata, context)
         }
 
-        fn accept(&self, _action: &BytecodeInterpreterGcCompleteAction) -> bool {
+        fn accept(&self, _action: &BytecodeInterpreterGcCompleteAction<T>) -> bool {
             true
         }
         fn schedule(
             &self,
-            _action: &BytecodeInterpreterGcCompleteAction,
+            _action: &BytecodeInterpreterGcCompleteAction<T>,
             _state: &Self::State,
         ) -> Option<SchedulerMode> {
             Some(SchedulerMode::Async)
@@ -448,7 +451,7 @@ dispatcher!({
         fn handle(
             &self,
             state: &mut Self::State,
-            action: &BytecodeInterpreterGcCompleteAction,
+            action: &BytecodeInterpreterGcCompleteAction<T>,
             metadata: &MessageData,
             context: &mut impl HandlerContext,
         ) -> Option<SchedulerTransition<TAction, TTask>> {
@@ -468,7 +471,7 @@ where
     fn handle_gc_complete_action<TAction, TTask>(
         &self,
         state: &mut BytecodeInterpreterState<T>,
-        action: &BytecodeInterpreterGcCompleteAction,
+        action: &BytecodeInterpreterGcCompleteAction<T>,
         _metadata: &MessageData,
         _context: &mut impl HandlerContext,
     ) -> Option<SchedulerTransition<TAction, TTask>>
@@ -477,10 +480,11 @@ where
         TTask: TaskFactory<TAction, TTask>,
     {
         let BytecodeInterpreterGcCompleteAction {
-            cache_id,
+            cache_key,
             statistics,
         } = action;
-        self.update_worker_cache_metrics(state, *cache_id, *statistics);
+        let worker_id = cache_key.id();
+        self.update_worker_cache_metrics(state, worker_id, *statistics);
         None
     }
     fn handle_evaluate_start<TAction, TTask>(
@@ -494,19 +498,20 @@ where
         TFactory: Default,
         TAllocator: Default,
         TAction: Action
-            + From<BytecodeInterpreterInitAction>
+            + From<BytecodeInterpreterInitAction<T>>
             + From<BytecodeInterpreterEvaluateAction<T>>,
         TTask:
             TaskFactory<TAction, TTask> + From<BytecodeWorkerTaskFactory<T, TFactory, TAllocator>>,
     {
         let EvaluateStartAction {
-            cache_id,
+            cache_key,
             label,
             query,
             evaluation_mode,
             invalidation_strategy,
         } = action;
-        let actions = match state.workers.entry(*cache_id) {
+        let worker_id = cache_key.id();
+        let actions = match state.workers.entry(worker_id) {
             Entry::Occupied(_) => None,
             Entry::Vacant(entry) => {
                 let task_pid = context.generate_pid();
@@ -526,7 +531,7 @@ where
                     SchedulerCommand::Task(
                         task_pid,
                         BytecodeWorkerTaskFactory {
-                            cache_id: *cache_id,
+                            cache_key: cache_key.clone(),
                             query: query.clone(),
                             evaluation_mode: *evaluation_mode,
                             compiler_options: self.compiler_options,
@@ -556,14 +561,14 @@ where
                     SchedulerCommand::Send(
                         task_pid,
                         BytecodeInterpreterInitAction {
-                            cache_id: *cache_id,
+                            cache_key: cache_key.clone(),
                         }
                         .into(),
                     ),
                     SchedulerCommand::Send(
                         task_pid,
                         BytecodeInterpreterEvaluateAction {
-                            cache_id: *cache_id,
+                            cache_key: cache_key.clone(),
                             state_index: None,
                             state_updates: Default::default(),
                         }
@@ -574,12 +579,12 @@ where
         }?;
         match state.grouped_worker_metrics.entry(label.clone()) {
             Entry::Occupied(mut entry) => {
-                entry.get_mut().active_workers.insert(*cache_id);
+                entry.get_mut().active_workers.insert(worker_id);
             }
             Entry::Vacant(entry) => {
                 let worker_labels = self.get_worker_metric_labels.labels(label.as_str());
                 entry.insert(WorkerMetricsState {
-                    active_workers: IntSet::from_iter(once(*cache_id)),
+                    active_workers: IntSet::from_iter(once(worker_id)),
                     quantile_metric_labels: generate_quantile_metric_labels(
                         &QUANTILE_BUCKETS,
                         &worker_labels,
@@ -598,16 +603,17 @@ where
     ) -> Option<SchedulerTransition<TAction, TTask>>
     where
         TAction: Action
-            + From<BytecodeInterpreterInitAction>
+            + From<BytecodeInterpreterInitAction<T>>
             + From<BytecodeInterpreterEvaluateAction<T>>,
         TTask: TaskFactory<TAction, TTask>,
     {
         let EvaluateUpdateAction {
-            cache_id,
+            cache_key,
             state_index,
             state_updates,
         } = action;
-        let worker_state = state.workers.get_mut(cache_id)?;
+        let cache_id = cache_key.id();
+        let worker_state = state.workers.get_mut(&cache_id)?;
         worker_state.state_index = *state_index;
         let evaluate_action = match &mut worker_state.status {
             BytecodeInterpreterWorkerStatus::Working(update_queue) => {
@@ -615,7 +621,7 @@ where
                 None
             }
             BytecodeInterpreterWorkerStatus::Idle => Some(BytecodeInterpreterEvaluateAction {
-                cache_id: *cache_id,
+                cache_key: cache_key.clone(),
                 state_index: *state_index,
                 state_updates: state_updates.clone(),
             }),
@@ -632,7 +638,7 @@ where
     fn handle_evaluate_stop<TAction, TTask>(
         &self,
         state: &mut BytecodeInterpreterState<T>,
-        action: &EvaluateStopAction,
+        action: &EvaluateStopAction<T>,
         _metadata: &MessageData,
         _context: &mut impl HandlerContext,
     ) -> Option<SchedulerTransition<TAction, TTask>>
@@ -640,15 +646,16 @@ where
         TAction: Action,
         TTask: TaskFactory<TAction, TTask>,
     {
-        let EvaluateStopAction { cache_id } = action;
+        let EvaluateStopAction { cache_key } = action;
+        let cache_id = cache_key.id();
         // Reset the metrics for this worker
-        self.update_worker_cache_metrics(state, *cache_id, Default::default());
+        self.update_worker_cache_metrics(state, cache_id, Default::default());
         // Remove the worker
-        let worker_state = state.workers.remove(cache_id)?;
+        let worker_state = state.workers.remove(&cache_id)?;
         let worker_pid = worker_state.pid;
         // Clean up the worker metrics
         if let Entry::Occupied(mut entry) = state.grouped_worker_metrics.entry(worker_state.label) {
-            entry.get_mut().active_workers.remove(cache_id);
+            entry.get_mut().active_workers.remove(&cache_id);
             let is_final_worker_in_group = entry.get().active_workers.is_empty();
             if is_final_worker_in_group {
                 entry.remove();
@@ -669,17 +676,18 @@ where
         TAction: Action
             + From<EvaluateResultAction<T>>
             + From<BytecodeInterpreterEvaluateAction<T>>
-            + From<BytecodeInterpreterGcAction>,
+            + From<BytecodeInterpreterGcAction<T>>,
         TTask: TaskFactory<TAction, TTask>,
     {
         let BytecodeInterpreterResultAction {
-            cache_id,
+            cache_key,
             state_index,
             result,
             statistics,
         } = action;
-        self.update_worker_cache_metrics(state, *cache_id, *statistics);
-        let worker_state = state.workers.get_mut(cache_id)?;
+        let cache_id = cache_key.id();
+        self.update_worker_cache_metrics(state, cache_id, *statistics);
+        let worker_state = state.workers.get_mut(&cache_id)?;
         let queued_evaluation = match std::mem::replace(
             &mut worker_state.status,
             BytecodeInterpreterWorkerStatus::Idle,
@@ -691,7 +699,7 @@ where
                 } else {
                     Some((
                         BytecodeInterpreterEvaluateAction {
-                            cache_id: *cache_id,
+                            cache_key: cache_key.clone(),
                             state_index: worker_state.state_index,
                             state_updates: pending_updates,
                         },
@@ -709,7 +717,7 @@ where
             if should_gc {
                 worker_state.updates_since_gc = 0;
                 Some(BytecodeInterpreterGcAction {
-                    cache_id: *cache_id,
+                    cache_key: cache_key.clone(),
                     state_index: *state_index,
                 })
             } else {
@@ -721,7 +729,7 @@ where
             once(SchedulerCommand::Send(
                 self.main_pid,
                 EvaluateResultAction {
-                    cache_id: *cache_id,
+                    cache_key: cache_key.clone(),
                     state_index: *state_index,
                     result: result.clone(),
                 }

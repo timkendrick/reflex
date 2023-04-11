@@ -3,8 +3,9 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use std::{
-    collections::{hash_map::Entry, HashMap, HashSet, VecDeque},
-    iter::once,
+    collections::{hash_map::Entry, VecDeque},
+    hash::{Hash, Hasher},
+    iter::{empty, once},
     marker::PhantomData,
     ops::Deref,
     time::{Duration, Instant},
@@ -18,10 +19,9 @@ use reflex::{
     core::{
         ConditionListType, ConditionType, DependencyList, DynamicState, EvaluationResult,
         Expression, ExpressionFactory, ExpressionListType, HeapAllocator, IntTermType, IntValue,
-        ListTermType, RefType, SignalTermType, SignalType, StateCache, StateToken, StringTermType,
-        StringValue,
+        ListTermType, RefType, SignalTermType, SignalType, StateToken, StringTermType, StringValue,
     },
-    hash::{HashId, IntMap, IntSet},
+    hash::{FnvHasher, HashId, IntMap, IntSet},
 };
 use reflex_dispatcher::{
     Action, ActorEvents, HandlerContext, MessageData, MessageOffset, NoopDisposeCallback,
@@ -307,19 +307,16 @@ where
 pub struct EvaluateHandlerState<T: Expression> {
     // TODO: Use newtypes for state hashmap keys
     workers: IntMap<StateToken, WorkerState<T>>,
-    // TODO: Use expressions as state tokens, removing need to map state tokens back to originating effects
-    effects: IntMap<StateToken, T::Signal>,
     state_cache: GlobalStateCache<T>,
     /// Whitelist to keep track of effects that must be processed immediately to ensure exactly-once processing guarantees (non-whitelisted effect updates are eligible for throttling)
     immediate_effects: IntSet<StateToken>,
     /// Accumulated set of pending deferred updates, to be applied at the next throttle timeout
-    deferred_updates: Option<IntMap<StateToken, T>>,
+    deferred_updates: Option<IntMap<StateToken, (T::Signal, T)>>,
 }
 impl<T: Expression> Default for EvaluateHandlerState<T> {
     fn default() -> Self {
         Self {
             workers: Default::default(),
-            effects: Default::default(),
             state_cache: Default::default(),
             immediate_effects: Default::default(),
             deferred_updates: Default::default(),
@@ -330,32 +327,87 @@ struct WorkerState<T: Expression> {
     subscription_count: usize,
     effect: T::Signal,
     status: WorkerStatus<T>,
-    state_index: Option<MessageOffset>,
-    state_values: HashMap<StateToken, T>,
+    state_values: WorkerStateCache<T>,
     metric_labels: [(&'static str, String); 1],
 }
 struct GlobalStateCache<T: Expression> {
-    state_index: Option<MessageOffset>,
-    combined_state: StateCache<T>,
+    combined_state: WorkerStateCache<T>,
     /// Queued updates waiting to be sent to query evaluation workers
     /// Batches are removed from the queue at the point at which all workers have been sent the update
-    update_batches: VecDeque<(MessageOffset, Vec<(StateToken, T)>)>,
+    update_batches: VecDeque<(MessageOffset, Vec<(T::Signal, T)>)>,
 }
 impl<T: Expression> Default for GlobalStateCache<T> {
     fn default() -> Self {
         Self {
-            state_index: Default::default(),
             combined_state: Default::default(),
             update_batches: Default::default(),
         }
     }
 }
+
+#[derive(Clone, Debug)]
+pub struct WorkerStateCache<T: Expression> {
+    state_index: Option<MessageOffset>,
+    state_values: IntMap<StateToken, (T::Signal, T)>,
+}
+
+impl<T: Expression> Default for WorkerStateCache<T> {
+    fn default() -> Self {
+        Self {
+            state_index: None,
+            state_values: Default::default(),
+        }
+    }
+}
+
+impl<T: Expression> WorkerStateCache<T> {
+    pub fn state_index(&self) -> Option<MessageOffset> {
+        self.state_index
+    }
+    pub fn len(&self) -> usize {
+        self.state_values.len()
+    }
+    pub fn update_values(
+        &mut self,
+        state_index: MessageOffset,
+        updates: impl IntoIterator<Item = (T::Signal, T)>,
+    ) {
+        self.state_index = Some(state_index);
+        self.state_values.extend(
+            updates
+                .into_iter()
+                .map(|(key, value)| (key.id(), (key, value))),
+        )
+    }
+    pub fn gc(&mut self, retained_keys: &DependencyList) {
+        self.state_values
+            .retain(|state_token, _| retained_keys.contains(*state_token));
+        self.state_values.shrink_to_fit();
+    }
+}
+
+impl<T: Expression> DynamicState<T> for WorkerStateCache<T> {
+    fn id(&self) -> HashId {
+        let mut hasher = FnvHasher::default();
+        self.state_index.hash(&mut hasher);
+        hasher.finish()
+    }
+    fn has(&self, key: &StateToken) -> bool {
+        self.state_values.contains_key(key)
+    }
+    fn get(&self, key: &StateToken) -> Option<&T> {
+        self.state_values.get(key).map(|(_key, value)| value)
+    }
+}
+
 enum WorkerStatus<T: Expression> {
     Busy {
         previous_result: Option<(Option<MessageOffset>, EvaluationResult<T>)>,
+        active_effects: IntMap<StateToken, T::Signal>,
     },
     Idle {
         latest_result: (Option<MessageOffset>, EvaluationResult<T>),
+        active_effects: IntMap<StateToken, T::Signal>,
     },
 }
 enum WorkerResultStatus {
@@ -368,7 +420,7 @@ impl<T: Expression> EvaluateHandlerState<T> {
     fn apply_batch<TAction, TTask>(
         &mut self,
         state_index: MessageOffset,
-        updates: Vec<(StateToken, T)>,
+        updates: Vec<(T::Signal, T)>,
         main_pid: ProcessId,
         metric_names: EvaluateHandlerMetricNames,
     ) -> Option<SchedulerTransition<TAction, TTask>>
@@ -378,9 +430,14 @@ impl<T: Expression> EvaluateHandlerState<T> {
     {
         let updated_state_tokens = updates
             .iter()
-            .map(|(state_token, _)| *state_token)
+            .map(|(state_token, _)| state_token.id())
             .collect::<IntSet<_>>();
-        self.state_cache.state_index = Some(state_index);
+        self.state_cache.combined_state.update_values(
+            state_index,
+            updates
+                .iter()
+                .map(|(key, value)| (key.clone(), value.clone())),
+        );
         self.state_cache
             .update_batches
             .push_back((state_index, updates));
@@ -391,6 +448,7 @@ impl<T: Expression> EvaluateHandlerState<T> {
             .filter_map(|worker| match &mut worker.status {
                 WorkerStatus::Idle {
                     latest_result: (_, result),
+                    ..
                 } => {
                     let has_invalidated_dependencies = result
                         .dependencies()
@@ -399,7 +457,7 @@ impl<T: Expression> EvaluateHandlerState<T> {
                     if has_invalidated_dependencies {
                         Some(worker)
                     } else {
-                        worker.state_index = Some(state_index);
+                        worker.state_values.update_values(state_index, empty());
                         None
                     }
                 }
@@ -423,20 +481,16 @@ impl<T: Expression> EvaluateHandlerState<T> {
             Some(SchedulerTransition::new(worker_update_actions))
         }
     }
-    fn combined_effects<'a>(&'a self) -> impl Iterator<Item = &'a T::Signal> + 'a {
-        self.workers.values().flat_map(|worker| {
-            once(&worker.effect).into_iter().chain(
-                worker
-                    .dependencies_iter()
-                    .flat_map(|state_token| self.effects.get(&state_token)),
-            )
-        })
+    fn has_active_effect(&self, effect: &T::Signal) -> bool {
+        self.workers
+            .values()
+            .any(|worker| worker.effect.id() == effect.id() || worker.has_active_effect(effect))
     }
     fn gc_worker_state_history(&mut self, metric_names: EvaluateHandlerMetricNames) {
         let oldest_active_state_index = self
             .workers
             .values()
-            .filter_map(|worker| worker.state_index)
+            .filter_map(|worker| worker.state_values.state_index())
             .min();
         self.state_cache
             .delete_outdated_update_batches(oldest_active_state_index, metric_names);
@@ -477,9 +531,11 @@ impl<T: Expression> WorkerState<T> {
         match &self.status {
             WorkerStatus::Busy {
                 previous_result: Some((_, result)),
+                ..
             } => Some(result),
             WorkerStatus::Idle {
                 latest_result: (_, result),
+                ..
             } => Some(result),
             _ => None,
         }
@@ -507,52 +563,71 @@ impl<T: Expression> WorkerState<T> {
             }
         }
     }
-    fn dependencies(&self) -> Option<&DependencyList> {
-        self.latest_result().map(|result| result.dependencies())
+    fn dependencies<'a>(&'a self) -> Option<impl Iterator<Item = &'a T::Signal> + 'a> {
+        let (result, active_effects) = match &self.status {
+            WorkerStatus::Busy {
+                previous_result: Some((_, result)),
+                active_effects,
+            } => Some((result, active_effects)),
+            WorkerStatus::Idle {
+                latest_result: (_, result),
+                active_effects,
+            } => Some((result, active_effects)),
+            _ => None,
+        }?;
+        Some(
+            result
+                .dependencies()
+                .iter()
+                .filter_map(|effect_id| active_effects.get(&effect_id)),
+        )
     }
-    fn dependencies_iter(&self) -> impl Iterator<Item = StateToken> + '_ {
+    fn dependencies_iter<'a>(&'a self) -> impl Iterator<Item = &'a T::Signal> + 'a {
         self.dependencies()
             .into_iter()
             .flat_map(|dependencies| dependencies)
     }
-    fn update_state_cache<'a>(
-        &'a mut self,
-        state_index: Option<MessageOffset>,
+    fn has_active_effect(&self, effect: &T::Signal) -> bool {
+        match &self.status {
+            WorkerStatus::Busy { active_effects, .. } => active_effects.contains_key(&effect.id()),
+            WorkerStatus::Idle { active_effects, .. } => active_effects.contains_key(&effect.id()),
+        }
+    }
+    fn update_state_cache(
+        &mut self,
+        state_index: MessageOffset,
         updates: impl IntoIterator<
-            Item = (StateToken, T),
-            IntoIter = impl Iterator<Item = (StateToken, T)> + 'a,
+            Item = (T::Signal, T),
+            IntoIter = impl Iterator<Item = (T::Signal, T)>,
         >,
-    ) -> impl Iterator<Item = (StateToken, T)> + 'a {
-        self.state_index = state_index;
-        updates.into_iter().filter_map(|(state_token, value)| {
-            match self.state_values.entry(state_token) {
-                Entry::Occupied(mut entry) => {
-                    if entry.get().id() == value.id() {
-                        None
-                    } else {
-                        entry.insert(value.clone());
-                        Some((state_token, value))
-                    }
-                }
-                Entry::Vacant(entry) => {
-                    entry.insert(value.clone());
-                    Some((state_token, value))
-                }
-            }
-        })
+    ) -> impl Iterator<Item = (T::Signal, T)> + '_ {
+        let state_updates = updates
+            .into_iter()
+            .filter(|(key, value)| {
+                let state_token = key.id();
+                let is_unchanged = self
+                    .state_values
+                    .get(&state_token)
+                    .filter(|existing_value| existing_value.id() == value.id())
+                    .is_some();
+                !is_unchanged
+            })
+            .collect::<Vec<_>>();
+        self.state_values.update_values(
+            state_index,
+            state_updates
+                .iter()
+                .map(|(key, value)| (key.clone(), value.clone())),
+        );
+        state_updates.into_iter()
     }
 }
 impl<T: Expression> GlobalStateCache<T> {
-    fn get_current_value(&self, state_token: StateToken) -> Option<(StateToken, T)> {
-        self.combined_state
-            .get(&state_token)
-            .map(|value| (state_token, value.clone()))
-    }
     fn get_updates_since<'a>(
         &'a self,
         state_index: Option<MessageOffset>,
         dependencies: &'a DependencyList,
-    ) -> impl Iterator<Item = (StateToken, T)> + 'a {
+    ) -> impl Iterator<Item = (T::Signal, T)> + 'a {
         self.update_batches
             .iter()
             .skip_while(move |(offset, _)| {
@@ -565,8 +640,11 @@ impl<T: Expression> GlobalStateCache<T> {
             .flat_map(|(_, updates)| {
                 updates
                     .iter()
-                    .filter(|(state_token, _)| dependencies.contains(*state_token))
-                    .map(|(state_token, value)| (*state_token, value.clone()))
+                    .filter(|(key, _)| {
+                        let state_token = key.id();
+                        dependencies.contains(state_token)
+                    })
+                    .map(|(key, value)| (key.clone(), value.clone()))
             })
     }
     fn delete_outdated_update_batches(
@@ -588,21 +666,10 @@ impl<T: Expression> GlobalStateCache<T> {
         }
         self.update_state_cache_metrics(metric_names);
     }
-    fn gc(
-        &mut self,
-        retained_keys: impl IntoIterator<Item = StateToken>,
-        metric_names: EvaluateHandlerMetricNames,
-    ) {
+    fn gc(&mut self, retained_keys: &DependencyList, metric_names: EvaluateHandlerMetricNames) {
         // TODO: [perf] Compare performance of rebuilding new state cache vs removing keys from existing cache
         let start_time = Instant::now();
-        self.combined_state = retained_keys
-            .into_iter()
-            .filter_map(|state_token| {
-                self.combined_state
-                    .get(&state_token)
-                    .map(|value| (state_token, value.clone()))
-            })
-            .collect();
+        self.combined_state.gc(retained_keys);
         let elapsed_time = start_time.elapsed();
         histogram!(metric_names.state_gc_duration, elapsed_time.as_secs_f64());
         self.update_state_cache_metrics(metric_names);
@@ -632,7 +699,7 @@ dispatcher!({
         Outbox(EffectEmitAction<T>),
         Outbox(EvaluateStartAction<T>),
         Outbox(EvaluateUpdateAction<T>),
-        Outbox(EvaluateStopAction),
+        Outbox(EvaluateStopAction<T>),
     }
 
     impl<T, TFactory, TAllocator, TAction, TTask> Dispatcher<TAction, TTask>
@@ -816,7 +883,7 @@ where
                             worker
                                 .latest_result()
                                 .filter(|result| !is_unresolved_result(result, &self.factory))
-                                .map(|result| Err((state_token, result.result().clone())))
+                                .map(|result| Err((effect.clone(), result.result().clone())))
                         }
                         // For any queries that are not yet subscribed, kick off evaluation of that query
                         Entry::Vacant(entry) => {
@@ -832,15 +899,16 @@ where
                                 effect: effect.clone(),
                                 status: WorkerStatus::Busy {
                                     previous_result: None,
+                                    active_effects: Default::default(),
                                 },
-                                state_index: None,
                                 state_values: Default::default(),
                                 metric_labels,
                             });
+                            let cache_key = effect.clone();
                             Some(Ok(SchedulerCommand::Send(
                                 self.main_pid,
                                 EvaluateStartAction {
-                                    cache_id: state_token,
+                                    cache_key,
                                     query,
                                     label,
                                     evaluation_mode,
@@ -880,7 +948,7 @@ where
         _context: &mut impl HandlerContext,
     ) -> Option<SchedulerTransition<TAction, TTask>>
     where
-        TAction: Action + From<EvaluateStopAction> + From<EffectUnsubscribeAction<T>>,
+        TAction: Action + From<EvaluateStopAction<T>> + From<EffectUnsubscribeAction<T>>,
         TTask: TaskFactory<TAction, TTask>,
     {
         let EffectUnsubscribeAction {
@@ -921,40 +989,29 @@ where
                         0.0,
                         &subscription.metric_labels,
                     );
-                    Some((state_token, subscription))
+                    Some(subscription)
                 } else {
                     None
                 }
             })
             .collect::<Vec<_>>();
-        let remaining_effect_ids = state
-            .combined_effects()
-            .map(|effect| effect.id())
-            .collect::<HashSet<_>>();
-        let removed_worker_effects = unsubscribed_workers
-            .iter()
-            .map(|(_, worker)| &worker.effect)
-            .filter(|effect| !remaining_effect_ids.contains(&effect.id()));
-        for effect in removed_worker_effects {
-            state.effects.remove(&effect.id());
-        }
-        let removed_effects = unsubscribed_workers
-            .iter()
-            .flat_map(|(_, worker)| worker.dependencies_iter())
-            .filter(|state_token| !remaining_effect_ids.contains(&state_token))
-            .filter_map(|removed_effect_id| state.effects.remove(&removed_effect_id));
-        let removed_queries = unsubscribed_workers.iter().map(|(cache_key, _)| *cache_key);
+        let removed_queries = unsubscribed_workers.iter().map(|worker| &worker.effect);
         let stop_actions = removed_queries.map(|cache_key| {
             SchedulerCommand::Send(
                 self.main_pid,
                 EvaluateStopAction {
-                    cache_id: cache_key,
+                    cache_key: cache_key.clone(),
                 }
                 .into(),
             )
         });
+        let unsubscribed_effects = unsubscribed_workers
+            .iter()
+            .flat_map(|worker| once(&worker.effect).chain(worker.dependencies_iter()))
+            .filter(|effect| !state.has_active_effect(effect))
+            .cloned();
         let unsubscribe_actions =
-            group_effects_by_type(removed_effects).map(|(effect_type, effects)| {
+            group_effects_by_type(unsubscribed_effects).map(|(effect_type, effects)| {
                 SchedulerCommand::Send(
                     self.main_pid,
                     EffectUnsubscribeAction {
@@ -967,9 +1024,13 @@ where
         let actions = stop_actions.chain(unsubscribe_actions).collect::<Vec<_>>();
         let has_unsubscribed_effects = !actions.is_empty();
         if has_unsubscribed_effects {
-            state
-                .state_cache
-                .gc(remaining_effect_ids, self.metric_names);
+            let retained_keys = state
+                .workers
+                .iter()
+                .flat_map(|(_, worker)| once(&worker.effect).chain(worker.dependencies_iter()))
+                .map(|effect| effect.id())
+                .collect::<DependencyList>();
+            state.state_cache.gc(&retained_keys, self.metric_names);
         }
         let has_unsubscribed_workers = !unsubscribed_workers.is_empty();
         if has_unsubscribed_workers {
@@ -994,14 +1055,15 @@ where
         TTask: TaskFactory<TAction, TTask>,
     {
         let EvaluateResultAction {
-            cache_id: cache_key,
+            cache_key,
             state_index,
             result,
         } = action;
-        let worker_state_index = state
-            .workers
-            .get(cache_key)
-            .map(|worker| worker.state_index)?;
+        let worker_id = cache_key.id();
+        let (worker, worker_state_index) = state.workers.get_mut(&worker_id).map(|worker| {
+            let worker_state_index = worker.state_values.state_index();
+            (worker, worker_state_index)
+        })?;
         let is_outdated_action = match (state_index, worker_state_index) {
             (Some(state_index), Some(worker_state_index)) => worker_state_index > *state_index,
             _ => false,
@@ -1009,39 +1071,115 @@ where
         if is_outdated_action {
             return None;
         }
-        let existing_effect_ids = state
-            .combined_effects()
-            .map(|effect| effect.id())
-            .collect::<HashSet<_>>();
-        let worker = state.workers.get_mut(cache_key)?;
-        let added_effects = parse_newly_added_expression_effects(
-            result.result(),
-            &existing_effect_ids,
-            &self.factory,
+        let existing_status = std::mem::replace(
+            &mut worker.status,
+            WorkerStatus::Busy {
+                previous_result: None,
+                active_effects: Default::default(),
+            },
         );
-        for effect in added_effects.iter() {
-            state.effects.insert(effect.id(), effect.clone());
-        }
-        let updated_status = WorkerStatus::Idle {
-            latest_result: (worker_state_index, result.clone()),
-        };
-        let previous_status = std::mem::replace(&mut worker.status, updated_status);
-        let previous_dependencies = match previous_status {
+        let worker_dependencies = result.dependencies();
+        let (previous_worker_dependencies, previous_worker_effects) = match existing_status {
             WorkerStatus::Idle {
                 latest_result: (_, result),
+                active_effects,
             } => {
                 let (_, dependencies) = result.into_parts();
-                Some(dependencies)
+                (Some(dependencies), active_effects)
             }
-            WorkerStatus::Busy { previous_result } => previous_result.map(|(_, result)| {
-                let (_, dependencies) = result.into_parts();
-                dependencies
-            }),
+            WorkerStatus::Busy {
+                previous_result,
+                active_effects,
+            } => (
+                previous_result.map(|(_, result)| {
+                    let (_, dependencies) = result.into_parts();
+                    dependencies
+                }),
+                active_effects,
+            ),
+        };
+        let signal_result = self.factory.match_signal_term(&result.result());
+        let added_worker_effects = signal_result
+            .map(|term| {
+                term.signals()
+                    .as_deref()
+                    .iter()
+                    .filter(|effect| {
+                        let effect = effect.as_deref();
+                        matches!(effect.signal_type(), SignalType::Custom(_))
+                            && worker_dependencies.contains(effect.id())
+                    })
+                    .filter(|effect| {
+                        let effect = effect.as_deref();
+                        if let Some(previous_worker_dependencies) =
+                            previous_worker_dependencies.as_ref()
+                        {
+                            !previous_worker_dependencies.contains(effect.id())
+                        } else {
+                            true
+                        }
+                    })
+                    .map(|effect| effect.as_deref().clone())
+                    .map(|effect| (effect.id(), effect))
+                    .collect::<IntMap<_, _>>()
+            })
+            .unwrap_or_default();
+        let removed_worker_effects = previous_worker_effects
+            .iter()
+            .filter(|(effect_id, _)| !worker_dependencies.contains(**effect_id))
+            .map(|(effect_id, effect)| (*effect_id, effect.clone()))
+            .collect::<IntMap<_, _>>();
+        //  Determine which of this worker's added/removed effects are being globally subscribed/unsubscribed
+        // (note that this worker has had its effect cache temporarily emptied, so this effectively tests just the other workers)
+        let subscribed_effects = added_worker_effects
+            .values()
+            .filter(|effect| !state.has_active_effect(effect))
+            .cloned();
+        let unsubscribed_effects = removed_worker_effects
+            .values()
+            .filter(|effect| !state.has_active_effect(effect))
+            .cloned();
+        let effect_subscribe_actions = group_effects_by_type(subscribed_effects)
+            .map(|(effect_type, effects)| {
+                SchedulerCommand::Send(
+                    self.main_pid,
+                    EffectSubscribeAction {
+                        effect_type,
+                        effects,
+                    }
+                    .into(),
+                )
+            })
+            .collect::<Vec<_>>();
+        let effect_unsubscribe_actions = group_effects_by_type(unsubscribed_effects)
+            .map(|(effect_type, effects)| {
+                SchedulerCommand::Send(
+                    self.main_pid,
+                    EffectUnsubscribeAction {
+                        effect_type,
+                        effects,
+                    }
+                    .into(),
+                )
+            })
+            .collect::<Vec<_>>();
+        // Now that we have determined which effects have been globally subscribed and unsubscribed, update this worker's state
+        let worker = state.workers.get_mut(&worker_id)?;
+        worker.status = WorkerStatus::Idle {
+            latest_result: (*state_index, result.clone()),
+            active_effects: {
+                let mut updated_worker_effects = previous_worker_effects;
+                for removed_effect_id in removed_worker_effects.into_keys() {
+                    updated_worker_effects.remove(&removed_effect_id);
+                }
+                updated_worker_effects.extend(added_worker_effects);
+                updated_worker_effects
+            },
         };
         let reevaluate_action = {
             let reevaluate_action = update_worker_state(
                 worker,
-                match previous_dependencies {
+                match previous_worker_dependencies {
                     None => WorkerStateUpdateType::FirstResult,
                     Some(dependencies) => WorkerStateUpdateType::SubsequentResult {
                         previous_dependencies: dependencies,
@@ -1067,7 +1205,7 @@ where
                                 &self.allocator,
                             ),
                             updates: vec![(
-                                *cache_key,
+                                cache_key.clone(),
                                 create_evaluate_effect_result(
                                     result,
                                     &self.factory,
@@ -1079,37 +1217,6 @@ where
                     .into(),
                 ))
             };
-        let updated_effect_ids = state
-            .combined_effects()
-            .map(|effect| effect.id())
-            .collect::<HashSet<_>>();
-        let removed_effects = existing_effect_ids
-            .iter()
-            .filter(|effect_id| !updated_effect_ids.contains(effect_id))
-            .filter_map(|effect_id| state.effects.remove(&effect_id))
-            .collect::<Vec<_>>();
-        let effect_subscribe_actions =
-            group_effects_by_type(added_effects).map(|(effect_type, effects)| {
-                SchedulerCommand::Send(
-                    self.main_pid,
-                    EffectSubscribeAction {
-                        effect_type,
-                        effects,
-                    }
-                    .into(),
-                )
-            });
-        let effect_unsubscribe_actions =
-            group_effects_by_type(removed_effects).map(|(effect_type, effects)| {
-                SchedulerCommand::Send(
-                    self.main_pid,
-                    EffectUnsubscribeAction {
-                        effect_type,
-                        effects,
-                    }
-                    .into(),
-                )
-            });
         let actions = effect_emit_action
             .into_iter()
             .chain(reevaluate_action)
@@ -1151,15 +1258,16 @@ where
                     );
                     batch.updates.iter()
                 })
-                .filter_map(|(state_token, update)| {
+                .filter_map(|(key, update)| {
+                    let state_token = key.id();
                     let is_unchanged = existing_state
-                        .get(state_token)
+                        .get(&state_token)
                         .map(|existing_value| update.id() == existing_value.id())
                         .unwrap_or(false);
                     if is_unchanged {
                         None
                     } else {
-                        Some((*state_token, update.clone()))
+                        Some((key.clone(), update.clone()))
                     }
                 })
                 .collect()
@@ -1170,40 +1278,53 @@ where
         let (immediate_updates, throttle_operation) = match self.throttle {
             None => (updates, None),
             Some(throttle_duration) => {
+                enum UpdateType<V> {
+                    Immediate(V),
+                    Deferred(V),
+                }
+                let updates = updates.into_iter().map(|(key, value)| {
+                    let state_token = key.id();
+                    let is_immediate_update = state.immediate_effects.contains(&state_token)
+                        || match state.state_cache.combined_state.get(&state_token) {
+                            None => true,
+                            Some(existing_value) => {
+                                let existing_value_is_signal =
+                                    self.factory.match_signal_term(existing_value).is_some();
+                                existing_value_is_signal
+                            }
+                        };
+                    if is_immediate_update {
+                        UpdateType::Immediate((key, value))
+                    } else {
+                        UpdateType::Deferred((key, value))
+                    }
+                });
                 let (immediate_updates, deferred_updates): (Vec<_>, Vec<_>) =
-                    partition_results(updates.into_iter().map(|(state_token, value)| {
-                        let is_immediate_update = state.immediate_effects.contains(&state_token)
-                            || match state.state_cache.combined_state.get(&state_token) {
-                                None => true,
-                                Some(existing_value) => {
-                                    self.factory.match_signal_term(existing_value).is_some()
-                                }
-                            };
-                        state
-                            .state_cache
-                            .combined_state
-                            .set(state_token, value.clone());
-                        if is_immediate_update {
-                            Ok((state_token, value))
-                        } else {
-                            Err((state_token, value))
-                        }
+                    partition_results(updates.map(|update| match update {
+                        UpdateType::Immediate(update) => Ok(update),
+                        UpdateType::Deferred(update) => Err(update),
                     }));
                 let throttle_operation = if deferred_updates.is_empty() {
                     None
-                } else if let Some(pending_updates) = &mut state.deferred_updates {
-                    pending_updates.extend(deferred_updates);
-                    None
                 } else {
-                    state.deferred_updates = Some(deferred_updates.into_iter().collect());
-                    let task_pid = context.generate_pid();
-                    Some(SchedulerCommand::Task(
-                        task_pid,
-                        TTask::from(EffectThrottleTaskFactory {
-                            timeout: throttle_duration,
-                            caller_pid: context.pid(),
-                        }),
-                    ))
+                    let keyed_updates = deferred_updates.into_iter().map(|(key, value)| {
+                        let state_token = key.id();
+                        (state_token, (key, value))
+                    });
+                    if let Some(queued_updates) = &mut state.deferred_updates {
+                        queued_updates.extend(keyed_updates);
+                        None
+                    } else {
+                        state.deferred_updates = Some(keyed_updates.collect());
+                        let task_pid = context.generate_pid();
+                        Some(SchedulerCommand::Task(
+                            task_pid,
+                            TTask::from(EffectThrottleTaskFactory {
+                                timeout: throttle_duration,
+                                caller_pid: context.pid(),
+                            }),
+                        ))
+                    }
                 };
                 (immediate_updates, throttle_operation)
             }
@@ -1212,6 +1333,13 @@ where
             None
         } else {
             let state_index = metadata.offset;
+            // Ensure immediate updates are not subsequently reverted by deferred updates
+            if let Some(deferred_updates) = state.deferred_updates.as_mut() {
+                for (key, _) in immediate_updates.iter() {
+                    let state_token = key.id();
+                    deferred_updates.remove(&state_token);
+                }
+            }
             state.apply_batch(
                 state_index,
                 immediate_updates,
@@ -1250,7 +1378,7 @@ where
             let state_index = metadata.offset;
             state.apply_batch(
                 state_index,
-                updates.into_iter().collect(),
+                updates.into_values().collect(),
                 self.main_pid,
                 self.metric_names,
             )
@@ -1271,46 +1399,55 @@ fn update_worker_state<T: Expression>(
     global_state: &mut GlobalStateCache<T>,
     metric_names: EvaluateHandlerMetricNames,
 ) -> Option<EvaluateUpdateAction<T>> {
-    let dependencies = worker.dependencies().cloned()?;
-    let updates = match update_type {
+    let state_index = global_state.combined_state.state_index()?;
+    let worker_dependencies = worker.dependencies()?;
+    let state_updates = match update_type {
         WorkerStateUpdateType::FirstResult => {
             // Insert existing global state values for all dependencies
-            worker
-                .update_state_cache(
-                    global_state.state_index,
-                    dependencies
-                        .iter()
-                        .filter_map(|state_token| global_state.get_current_value(state_token)),
-                )
-                .collect::<Vec<_>>()
+            let added_dependencies = worker_dependencies;
+            let added_state_values = added_dependencies.filter_map(|key| {
+                let state_token = key.id();
+                global_state
+                    .combined_state
+                    .get(&state_token)
+                    .map(|value| (key.clone(), value.clone()))
+            });
+            added_state_values.collect::<Vec<_>>()
         }
         WorkerStateUpdateType::SubsequentResult {
             previous_dependencies,
         } => {
             // Insert state values for any newly-added dependencies not present in the last evaluation,
             // as well as any dependencies whose values have changed since the last evaluation
-            let added_dependencies = dependencies
-                .iter()
-                .filter(|state_token| !previous_dependencies.contains(*state_token));
-            let added_state_values = added_dependencies
-                .filter_map(|state_token| global_state.get_current_value(state_token));
+            let added_dependencies = worker.dependencies_iter().cloned().filter(|key| {
+                let state_token = key.id();
+                !previous_dependencies.contains(state_token)
+            });
+            let added_state_values = added_dependencies.filter_map(|key| {
+                let state_token = key.id();
+                global_state
+                    .combined_state
+                    .get(&state_token)
+                    .map(|value| (key.clone(), value.clone()))
+            });
+            let dependencies = DependencyList::from_iter(worker_dependencies.map(|key| key.id()));
             let updated_state_values =
-                global_state.get_updates_since(worker.state_index, &dependencies);
-            worker
-                .update_state_cache(
-                    global_state.state_index,
-                    added_state_values.chain(updated_state_values),
-                )
+                global_state.get_updates_since(worker.state_values.state_index(), &dependencies);
+            added_state_values
+                .chain(updated_state_values)
                 .collect::<Vec<_>>()
         }
         WorkerStateUpdateType::DependencyUpdate => {
             // Update any dependencies whose values have changed since the last evaluation
-            let updates = global_state.get_updates_since(worker.state_index, &dependencies);
-            worker
-                .update_state_cache(global_state.state_index, updates)
-                .collect::<Vec<_>>()
+            let dependencies = DependencyList::from_iter(worker_dependencies.map(|key| key.id()));
+            let updated_state_values =
+                global_state.get_updates_since(worker.state_values.state_index(), &dependencies);
+            updated_state_values.collect::<Vec<_>>()
         }
     };
+    let updates = worker
+        .update_state_cache(state_index, state_updates)
+        .collect::<Vec<_>>();
     if updates.is_empty() {
         return None;
     }
@@ -1323,17 +1460,22 @@ fn update_worker_state<T: Expression>(
         &mut worker.status,
         WorkerStatus::Busy {
             previous_result: None,
+            active_effects: Default::default(),
         },
     );
     worker.status = match existing_status {
-        WorkerStatus::Busy { previous_result } => WorkerStatus::Busy { previous_result },
-        WorkerStatus::Idle { latest_result } => WorkerStatus::Busy {
+        WorkerStatus::Idle {
+            latest_result,
+            active_effects,
+        } => WorkerStatus::Busy {
             previous_result: Some(latest_result),
+            active_effects,
         },
+        busy_status => busy_status,
     };
     Some(EvaluateUpdateAction {
-        cache_id: worker.effect.id(),
-        state_index: worker.state_index,
+        cache_key: worker.effect.clone(),
+        state_index: worker.state_values.state_index(),
         state_updates: updates,
     })
 }
@@ -1345,7 +1487,7 @@ fn group_effects_by_type<T: Expression<Signal = V>, V: ConditionType<T>>(
         .into_iter()
         .filter(|signal| matches!(signal.signal_type(), SignalType::Custom(_)))
         .fold(
-            IntMap::<HashId, (T, Vec<V>)>::default(),
+            IntMap::<StateToken, (T, Vec<V>)>::default(),
             |mut result, signal| {
                 let mut existing_entry = get_custom_signal_type(&signal)
                     .and_then(|signal_type| result.get_mut(&signal_type.id()));
@@ -1386,26 +1528,5 @@ fn is_unresolved_effect<T: Expression<Signal = V>, V: ConditionType<T>>(effect: 
     match effect.signal_type() {
         SignalType::Error => false,
         SignalType::Pending | SignalType::Custom(_) => true,
-    }
-}
-
-fn parse_newly_added_expression_effects<T: Expression>(
-    value: &T,
-    existing_effect_ids: &HashSet<StateToken>,
-    factory: &impl ExpressionFactory<T>,
-) -> Vec<T::Signal> {
-    match factory.match_signal_term(value) {
-        None => Vec::new(),
-        Some(term) => term
-            .signals()
-            .as_deref()
-            .iter()
-            .filter(|effect| {
-                let effect = effect.as_deref();
-                matches!(effect.signal_type(), SignalType::Custom(_))
-                    && !existing_effect_ids.contains(&effect.id())
-            })
-            .map(|effect| effect.as_deref().clone())
-            .collect(),
     }
 }

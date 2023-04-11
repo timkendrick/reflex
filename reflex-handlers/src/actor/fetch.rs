@@ -127,15 +127,22 @@ where
     }
 }
 
-#[derive(Default)]
-pub struct FetchHandlerState {
+pub struct FetchHandlerState<T: Expression> {
     tasks: HashMap<StateToken, RequestState>,
-    operation_effect_mappings: HashMap<Uuid, StateToken>,
+    operation_effect_mappings: HashMap<Uuid, T::Signal>,
 }
-impl FetchHandlerState {
+impl<T: Expression> Default for FetchHandlerState<T> {
+    fn default() -> Self {
+        Self {
+            tasks: Default::default(),
+            operation_effect_mappings: Default::default(),
+        }
+    }
+}
+impl<T: Expression> FetchHandlerState<T> {
     fn subscribe_fetch_task<TConnect>(
         &mut self,
-        effect_id: StateToken,
+        effect: &T::Signal,
         request: FetchRequest,
         client: &hyper::Client<TConnect, Body>,
         metric_names: &FetchHandlerMetricNames,
@@ -144,7 +151,7 @@ impl FetchHandlerState {
     where
         TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     {
-        let entry = match self.tasks.entry(effect_id) {
+        let entry = match self.tasks.entry(effect.id()) {
             Entry::Vacant(entry) => Some(entry),
             Entry::Occupied(_) => None,
         }?;
@@ -170,19 +177,19 @@ impl FetchHandlerState {
             metric_labels,
         });
         self.operation_effect_mappings
-            .insert(operation_id, effect_id);
+            .insert(operation_id, effect.clone());
         Some((task_pid, task))
     }
     fn unsubscribe_fetch_task(
         &mut self,
-        effect_id: StateToken,
+        effect: &T::Signal,
         metric_names: &FetchHandlerMetricNames,
     ) -> Option<ProcessId> {
         let RequestState {
             operation_id,
             task_pid,
             metric_labels,
-        } = self.tasks.remove(&effect_id)?;
+        } = self.tasks.remove(&effect.id())?;
         decrement_gauge!(
             metric_names.fetch_effect_active_request_count,
             1.0,
@@ -218,7 +225,7 @@ dispatcher!({
         TAction: Action,
         TTask: TaskFactory<TAction, TTask> + FetchHandlerTask<TConnect>,
     {
-        type State = FetchHandlerState;
+        type State = FetchHandlerState<T>;
         type Events<TInbox: TaskInbox<TAction>> = TInbox;
         type Dispose = NoopDisposeCallback;
 
@@ -323,7 +330,7 @@ where
 {
     fn handle_effect_subscribe<TAction, TTask>(
         &self,
-        state: &mut FetchHandlerState,
+        state: &mut FetchHandlerState<T>,
         action: &EffectSubscribeAction<T>,
         _metadata: &MessageData,
         context: &mut impl HandlerContext,
@@ -341,12 +348,11 @@ where
         }
         let (initial_values, tasks): (Vec<_>, Vec<_>) = effects
             .iter()
-            .filter_map(|effect| {
-                let state_token = effect.id();
-                match parse_fetch_effect_args(effect, &self.factory) {
+            .filter_map(
+                |effect| match parse_fetch_effect_args(effect, &self.factory) {
                     Ok(request) => {
                         match state.subscribe_fetch_task(
-                            effect.id(),
+                            effect,
                             request,
                             &self.client,
                             &self.metric_names,
@@ -355,7 +361,7 @@ where
                             None => None,
                             Some((task_pid, task)) => Some((
                                 (
-                                    state_token,
+                                    effect.clone(),
                                     create_pending_expression(&self.factory, &self.allocator),
                                 ),
                                 Some(SchedulerCommand::Task(task_pid, task.into())),
@@ -364,13 +370,13 @@ where
                     }
                     Err(err) => Some((
                         (
-                            state_token,
+                            effect.clone(),
                             create_error_expression(err, &self.factory, &self.allocator),
                         ),
                         None,
                     )),
-                }
-            })
+                },
+            )
             .unzip();
         let initial_values_action = if initial_values.is_empty() {
             None
@@ -394,7 +400,7 @@ where
     }
     fn handle_effect_unsubscribe<TAction, TTask>(
         &self,
-        state: &mut FetchHandlerState,
+        state: &mut FetchHandlerState<T>,
         action: &EffectUnsubscribeAction<T>,
         _metadata: &MessageData,
         _context: &mut impl HandlerContext,
@@ -412,14 +418,14 @@ where
         }
         let active_pids = effects
             .iter()
-            .filter_map(|effect| state.unsubscribe_fetch_task(effect.id(), &self.metric_names));
+            .filter_map(|effect| state.unsubscribe_fetch_task(effect, &self.metric_names));
         Some(SchedulerTransition::new(
             active_pids.map(SchedulerCommand::Kill),
         ))
     }
     fn handle_fetch_handler_fetch_complete<TAction, TTask>(
         &self,
-        state: &mut FetchHandlerState,
+        state: &mut FetchHandlerState<T>,
         action: &FetchHandlerFetchCompleteAction,
         _metadata: &MessageData,
         _context: &mut impl HandlerContext,
@@ -434,8 +440,8 @@ where
             body,
             ..
         } = action;
-        let effect_id = state.operation_effect_mappings.get(operation_id).cloned()?;
-        let task_pid = state.unsubscribe_fetch_task(effect_id, &self.metric_names)?;
+        let effect = state.operation_effect_mappings.get(operation_id).cloned()?;
+        let task_pid = state.unsubscribe_fetch_task(&effect, &self.metric_names)?;
         let factory = &self.factory;
         let allocator = &self.allocator;
         let result = match String::from_utf8(body.into_iter().copied().collect()) {
@@ -454,7 +460,7 @@ where
                 EffectEmitAction {
                     effect_types: vec![EffectUpdateBatch {
                         effect_type: create_fetch_effect_type(&self.factory, &self.allocator),
-                        updates: vec![(effect_id, result)],
+                        updates: vec![(effect, result)],
                     }],
                 }
                 .into(),
@@ -463,7 +469,7 @@ where
     }
     fn handle_fetch_handler_connection_error<TAction, TTask>(
         &self,
-        state: &mut FetchHandlerState,
+        state: &mut FetchHandlerState<T>,
         action: &FetchHandlerConnectionErrorAction,
         _metadata: &MessageData,
         _context: &mut impl HandlerContext,
@@ -477,8 +483,8 @@ where
             message,
             ..
         } = action;
-        let effect_id = state.operation_effect_mappings.get(operation_id).cloned()?;
-        let task_pid = state.unsubscribe_fetch_task(effect_id, &self.metric_names)?;
+        let effect = state.operation_effect_mappings.get(operation_id).cloned()?;
+        let task_pid = state.unsubscribe_fetch_task(&effect, &self.metric_names)?;
         let result = create_error_expression(message.clone(), &self.factory, &self.allocator);
         Some(SchedulerTransition::new([
             SchedulerCommand::Kill(task_pid),
@@ -487,7 +493,7 @@ where
                 EffectEmitAction {
                     effect_types: vec![EffectUpdateBatch {
                         effect_type: create_fetch_effect_type(&self.factory, &self.allocator),
-                        updates: vec![(effect_id, result)],
+                        updates: vec![(effect, result)],
                     }],
                 }
                 .into(),

@@ -52,8 +52,8 @@ impl<T: Expression> Default for QueryInspectorState<T> {
 }
 impl<T: Expression> QueryInspectorState<T> {
     pub fn to_json(&self, factory: &impl ExpressionFactory<T>) -> JsonValue {
-        let queries = self.active_workers.iter().map(|(cache_id, worker_state)| {
-            worker_state.to_json(*cache_id, &self.active_effects, factory)
+        let queries = self.active_workers.iter().map(|(worker_id, worker_state)| {
+            worker_state.to_json(*worker_id, &self.active_effects, factory)
         });
         let effects = self
             .active_effects
@@ -176,12 +176,12 @@ struct QueryInspectorWorkerState<T: Expression> {
 impl<T: Expression> QueryInspectorWorkerState<T> {
     fn to_json(
         &self,
-        cache_id: StateToken,
+        worker_id: StateToken,
         active_effects: &HashMap<StateToken, QueryInspectorEffectState<T>>,
         factory: &impl ExpressionFactory<T>,
     ) -> JsonValue {
         json!({
-            "id": cache_id,
+            "id": worker_id,
             "label": &self.label,
             "result": serialize_query_result(self.latest_result.as_ref(), active_effects, factory),
         })
@@ -204,7 +204,7 @@ fn serialize_effect<T: Expression>(effect: &impl ConditionType<T>) -> JsonValue 
 dispatcher!({
     pub enum QueryInspectorAction<T: Expression> {
         Inbox(EvaluateStartAction<T>),
-        Inbox(EvaluateStopAction),
+        Inbox(EvaluateStopAction<T>),
         Inbox(EvaluateResultAction<T>),
         Inbox(EffectSubscribeAction<T>),
         Inbox(EffectUnsubscribeAction<T>),
@@ -250,12 +250,12 @@ dispatcher!({
             self.handle_evaluate_start(state, action, metadata, context)
         }
 
-        fn accept(&self, _action: &EvaluateStopAction) -> bool {
+        fn accept(&self, _action: &EvaluateStopAction<T>) -> bool {
             true
         }
         fn schedule(
             &self,
-            _action: &EvaluateStopAction,
+            _action: &EvaluateStopAction<T>,
             _state: &Self::State,
         ) -> Option<SchedulerMode> {
             Some(SchedulerMode::Async)
@@ -263,7 +263,7 @@ dispatcher!({
         fn handle(
             &self,
             state: &mut Self::State,
-            action: &EvaluateStopAction,
+            action: &EvaluateStopAction<T>,
             metadata: &MessageData,
             context: &mut impl HandlerContext,
         ) -> Option<SchedulerTransition<TAction, TTask>> {
@@ -376,13 +376,14 @@ impl<T: Expression> QueryInspector<T> {
         TTask: TaskFactory<TAction, TTask>,
     {
         let EvaluateStartAction {
-            cache_id,
+            cache_key,
             label,
             query,
             evaluation_mode,
             invalidation_strategy,
         } = action;
-        match state.active_workers.entry(*cache_id) {
+        let worker_id = cache_key.id();
+        match state.active_workers.entry(worker_id) {
             Entry::Occupied(_) => None,
             Entry::Vacant(entry) => {
                 entry.insert(QueryInspectorWorkerState {
@@ -399,7 +400,7 @@ impl<T: Expression> QueryInspector<T> {
     fn handle_evaluate_stop<TAction, TTask>(
         &self,
         state: &mut QueryInspectorState<T>,
-        action: &EvaluateStopAction,
+        action: &EvaluateStopAction<T>,
         _metadata: &MessageData,
         _context: &mut impl HandlerContext,
     ) -> Option<SchedulerTransition<TAction, TTask>>
@@ -407,8 +408,9 @@ impl<T: Expression> QueryInspector<T> {
         TAction: Action,
         TTask: TaskFactory<TAction, TTask>,
     {
-        let EvaluateStopAction { cache_id } = action;
-        match state.active_workers.entry(*cache_id) {
+        let EvaluateStopAction { cache_key } = action;
+        let worker_id = cache_key.id();
+        match state.active_workers.entry(worker_id) {
             Entry::Occupied(entry) => {
                 entry.remove();
                 None
@@ -428,11 +430,12 @@ impl<T: Expression> QueryInspector<T> {
         TTask: TaskFactory<TAction, TTask>,
     {
         let EvaluateResultAction {
-            cache_id,
+            cache_key,
             state_index: _,
             result,
         } = action;
-        let worker_state = state.active_workers.get_mut(cache_id)?;
+        let worker_id = cache_key.id();
+        let worker_state = state.active_workers.get_mut(&worker_id)?;
         worker_state.latest_result.replace(result.clone());
         None
     }
@@ -496,8 +499,9 @@ impl<T: Expression> QueryInspector<T> {
         let EffectEmitAction {
             effect_types: updates,
         } = action;
-        for (state_token, value) in updates.iter().flat_map(|batch| batch.updates.iter()) {
-            if let Some(effect_state) = state.active_effects.get_mut(state_token) {
+        for (key, value) in updates.iter().flat_map(|batch| batch.updates.iter()) {
+            let state_token = key.id();
+            if let Some(effect_state) = state.active_effects.get_mut(&state_token) {
                 effect_state.value.replace(value.clone());
             }
         }

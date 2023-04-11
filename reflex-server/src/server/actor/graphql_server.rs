@@ -362,14 +362,15 @@ fn create_span<TTracer: Tracer<Span = impl Span + Send + Sync + 'static>>(
 
 pub struct GraphQlServerState<T: Expression, TSpan: Span> {
     // TODO: Use newtypes for state hashmap keys
-    // Active operations, keyed by query hash
+    /// Active operations, keyed by query hash
     operations: IntMap<HashId, GraphQlOperationState<T, TSpan>>,
-    // Mapping from subscription IDs to active operation query hash
-    subscription_operation_mappings: HashMap<Uuid, HashId>,
-    // Mapping from query evaluate effect ID to active operation query hash
-    evaluate_effect_mappings: IntMap<HashId, HashId>,
+    /// Mapping from subscription IDs to active operation query
+    subscription_operation_mappings: HashMap<Uuid, T>,
+    /// Mapping from query evaluate effect ID to active operation query
+    evaluate_effect_mappings: IntMap<StateToken, T>,
+    /// Mapping from query evaluate effect ID to query label
     // FIXME: remove
-    subquery_label_mappings: IntMap<HashId, String>,
+    subquery_label_mappings: IntMap<StateToken, String>,
 }
 impl<T: Expression, TSpan: Span> Default for GraphQlServerState<T, TSpan> {
     fn default() -> Self {
@@ -388,11 +389,11 @@ struct GraphQlOperationState<T: Expression, TSpan: Span> {
     operation_phase: Option<GraphQlOperationPhase>,
     metric_labels: Vec<(String, String)>,
     start_time: Option<Instant>,
-    // Latest emitted result
+    /// Latest emitted result
     result: Option<EvaluationResult<T>>,
-    // Effects this query currently depends on (determined by the most recent evaluation result)
+    /// Effects this query currently depends on (determined by the most recent evaluation result), keyed by effect ID
     active_effects: IntMap<StateToken, GraphQlOperationEffectState<T>>,
-    // Mapping from subscription IDs to active subcription state
+    /// Mapping from subscription IDs to active subcription state
     subscriptions: HashMap<Uuid, GraphQlSubscriptionState<TSpan>>,
 }
 
@@ -878,7 +879,7 @@ where
                         .insert(subscription_id, subscription_state);
                     state
                         .subscription_operation_mappings
-                        .insert(subscription_id, query.id());
+                        .insert(subscription_id, query.clone());
                     let GraphQlOperationState { query, result, .. } = entry.get();
                     let transition = SchedulerTransition::new(
                         once(SchedulerCommand::Send(
@@ -939,10 +940,10 @@ where
                     };
                     state
                         .evaluate_effect_mappings
-                        .insert(evaluate_effect.id(), query.id());
+                        .insert(evaluate_effect.id(), query.clone());
                     state
                         .subscription_operation_mappings
-                        .insert(subscription_id, query.id());
+                        .insert(subscription_id, query.clone());
                     entry.insert(GraphQlOperationState {
                         label: label.clone(),
                         query: query.clone(),
@@ -989,10 +990,10 @@ where
             subscription_id,
             _expression,
         } = action;
-        let operation_id = state
+        let subscribed_query = state
             .subscription_operation_mappings
             .remove(subscription_id)?;
-        let mut operation_state_entry = match state.operations.entry(operation_id) {
+        let mut operation_state_entry = match state.operations.entry(subscribed_query.id()) {
             Entry::Occupied(entry) => Some(entry),
             Entry::Vacant(_) => None,
         }?;
@@ -1067,8 +1068,9 @@ where
             variables,
             _expression: _,
         } = action;
-        let operation_id = state.subscription_operation_mappings.get(subscription_id)?;
-        let mut existing_operation_state_entry = match state.operations.entry(*operation_id) {
+        let subscribed_query = state.subscription_operation_mappings.get(subscription_id)?;
+        let mut existing_operation_state_entry = match state.operations.entry(subscribed_query.id())
+        {
             Entry::Occupied(entry) => Some(entry),
             Entry::Vacant(_) => None,
         }?;
@@ -1159,7 +1161,7 @@ where
                     let subscription_id = *subscription_id;
                     state
                         .subscription_operation_mappings
-                        .insert(subscription_id, updated_query.id());
+                        .insert(subscription_id, updated_query.clone());
                     let abort_event_attributes =
                         updated_operation.variables().iter().map(|(key, value)| {
                             KeyValue::new(format!("variables.{}", key), value.to_string())
@@ -1223,7 +1225,7 @@ where
                             );
                             state
                                 .evaluate_effect_mappings
-                                .insert(evaluate_effect.id(), updated_query.id());
+                                .insert(evaluate_effect.id(), updated_query.clone());
                             let operation_phase = GraphQlOperationPhase::Queued;
                             let trace = match existing_trace {
                                 Some(mut trace) => {
@@ -1385,18 +1387,21 @@ where
         TTask: TaskFactory<TAction, TTask>,
     {
         let EvaluateStartAction {
-            cache_id, label, ..
+            cache_key, label, ..
         } = action;
-        let query_id = match state.evaluate_effect_mappings.get(cache_id) {
-            Some(query_effect) => Some(query_effect),
+        let effect_id = cache_key.id();
+        let query = match state.evaluate_effect_mappings.get(&effect_id) {
+            Some(query) => Some(query),
             None => {
-                if let Entry::Vacant(entry) = state.subquery_label_mappings.entry(*cache_id) {
+                if let Entry::Vacant(entry) = state.subquery_label_mappings.entry(effect_id) {
                     entry.insert(label.clone());
                 };
                 let parent_traces = state
                     .operations
                     .values_mut()
-                    .filter(|operation_state| operation_state.active_effects.contains_key(cache_id))
+                    .filter(|operation_state| {
+                        operation_state.active_effects.contains_key(&effect_id)
+                    })
                     .flat_map(|operation_state| {
                         operation_state
                             .subscriptions
@@ -1405,11 +1410,11 @@ where
                     });
                 for trace in parent_traces {
                     trace.start_subquery_span(
-                        *cache_id,
+                        effect_id,
                         label,
                         [KeyValue::new(
                             Key::from("query_id"),
-                            Value::from(*cache_id as i64),
+                            Value::from(effect_id as i64),
                         )],
                         &self.tracer,
                     );
@@ -1417,7 +1422,7 @@ where
                 None
             }
         }?;
-        let operation_state = state.operations.get_mut(query_id)?;
+        let operation_state = state.operations.get_mut(&query.id())?;
         let active_traces = operation_state
             .subscriptions
             .values_mut()
@@ -1449,19 +1454,20 @@ where
         TTask: TaskFactory<TAction, TTask>,
     {
         let EvaluateUpdateAction {
-            cache_id,
+            cache_key,
             state_index,
             state_updates,
         } = action;
-        let query_id = match state.evaluate_effect_mappings.get(cache_id) {
-            Some(query_id) => Some(query_id),
+        let effect_id = cache_key.id();
+        let query = match state.evaluate_effect_mappings.get(&effect_id) {
+            Some(query) => Some(query),
             None => {
-                if let Some(label) = state.subquery_label_mappings.get(cache_id) {
+                if let Some(label) = state.subquery_label_mappings.get(&effect_id) {
                     let parent_traces = state
                         .operations
                         .values_mut()
                         .filter(|operation_state| {
-                            operation_state.active_effects.contains_key(cache_id)
+                            operation_state.active_effects.contains_key(&effect_id)
                         })
                         .flat_map(|operation_state| {
                             operation_state
@@ -1471,11 +1477,11 @@ where
                         });
                     for trace in parent_traces {
                         trace.start_subquery_span(
-                            *cache_id,
+                            effect_id,
                             label,
                             [KeyValue::new(
                                 Key::from("query_id"),
-                                Value::from(*cache_id as i64),
+                                Value::from(effect_id as i64),
                             )],
                             &self.tracer,
                         );
@@ -1484,9 +1490,9 @@ where
                 None
             }
         }?;
-        let operation_state = state.operations.get_mut(query_id)?;
-        for (state_token, value) in state_updates.iter() {
-            if let Some(effect_state) = operation_state.active_effects.get_mut(state_token) {
+        let operation_state = state.operations.get_mut(&query.id())?;
+        for (key, value) in state_updates.iter() {
+            if let Some(effect_state) = operation_state.active_effects.get_mut(&key.id()) {
                 effect_state.status = parse_effect_value_status(value, &self.factory);
             }
         }
@@ -1494,9 +1500,7 @@ where
             .subscriptions
             .values_mut()
             .filter_map(|subscription| subscription.trace.as_mut());
-        let updated_state_tokens = state_updates
-            .iter()
-            .map(|(state_token, _value)| *state_token);
+        let updated_state_tokens = state_updates.iter().map(|(key, _value)| key);
         let state_update_effect_type =
             count_state_updates(updated_state_tokens, &operation_state.active_effects);
         let effect_status_metrics =
@@ -1553,15 +1557,18 @@ where
         TTask: TaskFactory<TAction, TTask>,
     {
         let EvaluateResultAction {
-            cache_id, result, ..
+            cache_key, result, ..
         } = action;
-        let query_id = match state.evaluate_effect_mappings.get(cache_id) {
-            Some(query_id) => Some(query_id),
+        let effect_id = cache_key.id();
+        let query = match state.evaluate_effect_mappings.get(&effect_id) {
+            Some(query) => Some(query),
             None => {
                 let parent_traces = state
                     .operations
                     .values_mut()
-                    .filter(|operation_state| operation_state.active_effects.contains_key(cache_id))
+                    .filter(|operation_state| {
+                        operation_state.active_effects.contains_key(&effect_id)
+                    })
                     .flat_map(|operation_state| {
                         operation_state
                             .subscriptions
@@ -1569,12 +1576,12 @@ where
                             .filter_map(|subscription| subscription.trace.as_mut())
                     });
                 for trace in parent_traces {
-                    trace.end_subquery_span(*cache_id);
+                    trace.end_subquery_span(effect_id);
                 }
                 None
             }
         }?;
-        let operation_state = state.operations.get_mut(query_id)?;
+        let operation_state = state.operations.get_mut(&query.id())?;
         update_operation_effect_mappings(operation_state, result, &self.factory, &self.tracer);
         let query_status = GraphQlQueryStatus::get_state(Some(result.result()), &self.factory);
         let updated_phase = match query_status {
@@ -1632,8 +1639,8 @@ where
         }
         for operation_state in state.operations.values_mut() {
             for effect_type in filtered_effect_types.iter().copied() {
-                for (state_token, value) in effect_type.updates.iter() {
-                    if let Some(effect_state) = operation_state.active_effects.get_mut(state_token)
+                for (effect, value) in effect_type.updates.iter() {
+                    if let Some(effect_state) = operation_state.active_effects.get_mut(&effect.id())
                     {
                         effect_state.status = EffectStatus::Emitted {
                             value: value.clone(),
@@ -1829,13 +1836,16 @@ fn format_effect_status_type_metric_labels<'a, T: Expression + 'a>(
         })
 }
 
-fn count_state_updates<T: Expression>(
-    state_tokens: impl IntoIterator<Item = StateToken>,
-    active_effects: &IntMap<StateToken, GraphQlOperationEffectState<T>>,
-) -> HashMap<&SignalType<T>, usize> {
+fn count_state_updates<'a, 'b, T: Expression>(
+    state_tokens: impl IntoIterator<Item = &'a T::Signal>,
+    active_effects: &'b IntMap<StateToken, GraphQlOperationEffectState<T>>,
+) -> HashMap<&'b SignalType<T>, usize>
+where
+    T::Signal: 'a,
+{
     let effect_updates = state_tokens
         .into_iter()
-        .filter_map(|state_token| active_effects.get(&state_token));
+        .filter_map(|effect| active_effects.get(&effect.id()));
     let effect_types = effect_updates.map(|effect_state| &effect_state.signal_type);
     count_item_occurrences(effect_types)
 }

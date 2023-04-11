@@ -188,14 +188,14 @@ where
     }
 }
 
-pub struct GraphQlHandlerState {
+pub struct GraphQlHandlerState<T: Expression> {
     http_requests: HashMap<StateToken, HttpRequestState>,
-    http_operation_effect_mappings: HashMap<Uuid, StateToken>,
+    http_operation_effect_mappings: HashMap<Uuid, T::Signal>,
     websocket_requests: HashMap<StateToken, GraphQlConnectionId>,
-    websocket_connections: HashMap<GraphQlConnectionId, WebSocketConnectionState>,
+    websocket_connections: HashMap<GraphQlConnectionId, WebSocketConnectionState<T>>,
     websocket_connection_mappings: HashMap<GraphQlConnectionUrl, GraphQlConnectionId>,
 }
-impl Default for GraphQlHandlerState {
+impl<T: Expression> Default for GraphQlHandlerState<T> {
     fn default() -> Self {
         Self {
             http_requests: Default::default(),
@@ -211,12 +211,12 @@ struct HttpRequestState {
     task_pid: ProcessId,
     metric_labels: [(&'static str, String); 3],
 }
-struct WebSocketConnectionState {
+struct WebSocketConnectionState<T: Expression> {
     task_pid: ProcessId,
     url: GraphQlConnectionUrl,
     connection_params: Option<JsonValue>,
     operations: HashMap<StateToken, WebSocketOperationState>,
-    effects: HashMap<GraphQlOperationId, StateToken>,
+    effects: HashMap<GraphQlOperationId, T::Signal>,
     connection_attempt: usize,
     metric_labels: [(&'static str, String); 1],
 }
@@ -225,10 +225,10 @@ struct WebSocketOperationState {
     operation: GraphQlOperationPayload,
     metric_labels: [(&'static str, String); 3],
 }
-impl GraphQlHandlerState {
-    fn subscribe_http_operation<T, TFactory, TAllocator, TConnect, TAction, TTask>(
+impl<T: Expression> GraphQlHandlerState<T> {
+    fn subscribe_http_operation<TFactory, TAllocator, TConnect, TAction, TTask>(
         &mut self,
-        effect_id: StateToken,
+        effect: &T::Signal,
         url: GraphQlConnectionUrl,
         operation: GraphQlOperationPayload,
         headers: Option<HeaderMap>,
@@ -239,7 +239,6 @@ impl GraphQlHandlerState {
         context: &mut impl HandlerContext,
     ) -> Result<SchedulerCommand<TAction, TTask>, T>
     where
-        T: Expression,
         TFactory: ExpressionFactory<T>,
         TAllocator: HeapAllocator<T>,
         TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
@@ -290,7 +289,7 @@ impl GraphQlHandlerState {
                 let (task_pid, task) =
                     create_http_fetch_task(operation_id, client.clone(), request, context);
                 self.http_requests.insert(
-                    effect_id,
+                    effect.id(),
                     HttpRequestState {
                         operation_id,
                         task_pid,
@@ -298,14 +297,14 @@ impl GraphQlHandlerState {
                     },
                 );
                 self.http_operation_effect_mappings
-                    .insert(operation_id, effect_id);
+                    .insert(operation_id, effect.clone());
                 Ok(SchedulerCommand::Task(task_pid, task.into()))
             }
         }
     }
     fn unsubscribe_http_operation<TAction, TTask>(
         &mut self,
-        effect_id: StateToken,
+        effect: &T::Signal,
         metric_names: &GraphQlHandlerMetricNames,
     ) -> Option<SchedulerCommand<TAction, TTask>>
     where
@@ -316,7 +315,7 @@ impl GraphQlHandlerState {
             operation_id,
             task_pid,
             metric_labels,
-        } = self.http_requests.remove(&effect_id)?;
+        } = self.http_requests.remove(&effect.id())?;
         self.http_operation_effect_mappings.remove(&operation_id);
         decrement_gauge!(
             metric_names.graphql_effect_active_operation_count,
@@ -327,7 +326,7 @@ impl GraphQlHandlerState {
     }
     fn subscribe_websocket_operation<TAction, TTask>(
         &mut self,
-        effect_id: StateToken,
+        effect: &T::Signal,
         url: GraphQlConnectionUrl,
         operation: GraphQlOperationPayload,
         connection_params: Option<JsonValue>,
@@ -342,7 +341,7 @@ impl GraphQlHandlerState {
             Entry::Occupied(entry) => *entry.get(),
             Entry::Vacant(entry) => *entry.insert(GraphQlConnectionId(Uuid::new_v4())),
         };
-        self.websocket_requests.insert(effect_id, connection_id);
+        self.websocket_requests.insert(effect.id(), connection_id);
         let (connection_state, connect_tasks) =
             match self.websocket_connections.entry(connection_id) {
                 Entry::Occupied(entry) => (entry.into_mut(), None),
@@ -383,7 +382,7 @@ impl GraphQlHandlerState {
                     )
                 }
             };
-        let subscribe_task = match connection_state.operations.entry(effect_id) {
+        let subscribe_task = match connection_state.operations.entry(effect.id()) {
             Entry::Occupied(_) => None,
             Entry::Vacant(entry) => {
                 let operation_id = GraphQlOperationId(Uuid::new_v4());
@@ -416,7 +415,9 @@ impl GraphQlHandlerState {
                     operation: operation.clone(),
                     metric_labels,
                 });
-                connection_state.effects.insert(operation_id, effect_id);
+                connection_state
+                    .effects
+                    .insert(operation_id, effect.clone());
                 Some(SchedulerCommand::Send(
                     connection_state.task_pid,
                     GraphQlHandlerWebSocketClientMessageAction {
@@ -434,20 +435,20 @@ impl GraphQlHandlerState {
     }
     fn unsubscribe_websocket_operation<TAction, TTask>(
         &mut self,
-        effect_id: StateToken,
+        effect: &T::Signal,
         metric_names: &GraphQlHandlerMetricNames,
     ) -> Option<impl Iterator<Item = SchedulerCommand<TAction, TTask>>>
     where
         TAction: Action + From<GraphQlHandlerWebSocketClientMessageAction>,
         TTask: TaskFactory<TAction, TTask>,
     {
-        let connection_id = self.websocket_requests.remove(&effect_id)?;
+        let connection_id = self.websocket_requests.remove(&effect.id())?;
         let connection_state = self.websocket_connections.get_mut(&connection_id)?;
         let WebSocketOperationState {
             operation_id,
             operation: _,
             metric_labels,
-        } = connection_state.operations.remove(&effect_id)?;
+        } = connection_state.operations.remove(&effect.id())?;
         let is_final_subscription = connection_state.operations.is_empty();
         connection_state.effects.remove(&operation_id);
         decrement_gauge!(
@@ -523,7 +524,7 @@ dispatcher!({
         TAction: Action + Send + 'static,
         TTask: TaskFactory<TAction, TTask> + GraphQlHandlerTask<TConnect>,
     {
-        type State = GraphQlHandlerState;
+        type State = GraphQlHandlerState<T>;
         type Events<TInbox: TaskInbox<TAction>> = TInbox;
         type Dispose = NoopDisposeCallback;
 
@@ -690,7 +691,7 @@ where
 {
     fn handle_effect_subscribe<TAction, TTask>(
         &self,
-        state: &mut GraphQlHandlerState,
+        state: &mut GraphQlHandlerState<T>,
         action: &EffectSubscribeAction<T>,
         _metadata: &MessageData,
         context: &mut impl HandlerContext,
@@ -714,9 +715,8 @@ where
         }
         let (initial_values, tasks): (Vec<_>, Vec<_>) = effects
             .iter()
-            .filter_map(|effect| {
-                let state_token = effect.id();
-                match parse_graphql_effect_args(effect, &self.factory) {
+            .filter_map(
+                |effect| match parse_graphql_effect_args(effect, &self.factory) {
                     Ok(args) => {
                         let GraphQlEffectArgs {
                             url,
@@ -732,7 +732,7 @@ where
                                 )))
                             });
                             let websocket_actions = state.subscribe_websocket_operation(
-                                effect.id(),
+                                effect,
                                 url,
                                 operation,
                                 connection_params,
@@ -742,7 +742,7 @@ where
                             let initial_value =
                                 create_pending_expression(&self.factory, &self.allocator);
                             Some((
-                                (state_token, initial_value),
+                                (effect.clone(), initial_value),
                                 (Some(websocket_actions), None),
                             ))
                         } else {
@@ -765,7 +765,7 @@ where
                                 }
                             });
                             match state.subscribe_http_operation(
-                                effect.id(),
+                                effect,
                                 url,
                                 operation,
                                 headers,
@@ -779,7 +779,7 @@ where
                                     let http_actions = Some(subscribe_action);
                                     Some((
                                         (
-                                            state_token,
+                                            effect.clone(),
                                             create_pending_expression(
                                                 &self.factory,
                                                 &self.allocator,
@@ -788,19 +788,19 @@ where
                                         (None, http_actions),
                                     ))
                                 }
-                                Err(err) => Some(((state_token, err), (None, None))),
+                                Err(err) => Some(((effect.clone(), err), (None, None))),
                             }
                         }
                     }
                     Err(err) => Some((
                         (
-                            state_token,
+                            effect.clone(),
                             create_error_message_expression(err, &self.factory, &self.allocator),
                         ),
                         (None, None),
                     )),
-                }
-            })
+                },
+            )
             .unzip();
         let initial_values_action = if initial_values.is_empty() {
             None
@@ -826,7 +826,7 @@ where
     }
     fn handle_effect_unsubscribe<TAction, TTask>(
         &self,
-        state: &mut GraphQlHandlerState,
+        state: &mut GraphQlHandlerState<T>,
         action: &EffectUnsubscribeAction<T>,
         _metadata: &MessageData,
         _context: &mut impl HandlerContext,
@@ -843,10 +843,9 @@ where
             return None;
         }
         let unsubscribe_actions = effects.iter().flat_map(|effect| {
-            let effect_id = effect.id();
-            let http_actions = state.unsubscribe_http_operation(effect_id, &self.metric_names);
+            let http_actions = state.unsubscribe_http_operation(effect, &self.metric_names);
             let websocket_actions =
-                state.unsubscribe_websocket_operation(effect_id, &self.metric_names);
+                state.unsubscribe_websocket_operation(effect, &self.metric_names);
             http_actions
                 .into_iter()
                 .chain(websocket_actions.into_iter().flatten())
@@ -855,7 +854,7 @@ where
     }
     fn handle_graphql_handler_http_fetch_complete<TAction, TTask>(
         &self,
-        state: &mut GraphQlHandlerState,
+        state: &mut GraphQlHandlerState<T>,
         action: &GraphQlHandlerHttpFetchCompleteAction,
         _metadata: &MessageData,
         _context: &mut impl HandlerContext,
@@ -870,11 +869,11 @@ where
             status_code,
             body,
         } = action;
-        let effect_id = state
+        let effect = state
             .http_operation_effect_mappings
             .get(operation_id)
-            .copied()?;
-        let disconnect_action = state.unsubscribe_http_operation(effect_id, &self.metric_names)?;
+            .cloned()?;
+        let disconnect_action = state.unsubscribe_http_operation(&effect, &self.metric_names)?;
         let result =
             parse_graphql_http_response(*status_code, body, &self.factory, &self.allocator);
         Some(SchedulerTransition::new([
@@ -884,7 +883,7 @@ where
                 EffectEmitAction {
                     effect_types: vec![EffectUpdateBatch {
                         effect_type: create_graphql_effect_type(&self.factory, &self.allocator),
-                        updates: vec![(effect_id, result)],
+                        updates: vec![(effect, result)],
                     }],
                 }
                 .into(),
@@ -893,7 +892,7 @@ where
     }
     fn handle_graphql_handler_http_connection_error<TAction, TTask>(
         &self,
-        state: &mut GraphQlHandlerState,
+        state: &mut GraphQlHandlerState<T>,
         action: &GraphQlHandlerHttpConnectionErrorAction,
         _metadata: &MessageData,
         _context: &mut impl HandlerContext,
@@ -907,11 +906,11 @@ where
             url: _,
             message,
         } = action;
-        let effect_id = state
+        let effect = state
             .http_operation_effect_mappings
             .get(operation_id)
-            .copied()?;
-        let disconnect_action = state.unsubscribe_http_operation(effect_id, &self.metric_names)?;
+            .cloned()?;
+        let disconnect_action = state.unsubscribe_http_operation(&effect, &self.metric_names)?;
         let result =
             create_error_message_expression(message.clone(), &self.factory, &self.allocator);
         Some(SchedulerTransition::new([
@@ -921,7 +920,7 @@ where
                 EffectEmitAction {
                     effect_types: vec![EffectUpdateBatch {
                         effect_type: create_graphql_effect_type(&self.factory, &self.allocator),
-                        updates: vec![(effect_id, result)],
+                        updates: vec![(effect, result)],
                     }],
                 }
                 .into(),
@@ -930,7 +929,7 @@ where
     }
     fn handle_graphql_handler_websocket_connect_success<TAction, TTask>(
         &self,
-        state: &mut GraphQlHandlerState,
+        state: &mut GraphQlHandlerState<T>,
         action: &GraphQlHandlerWebSocketConnectSuccessAction,
         _metadata: &MessageData,
         _context: &mut impl HandlerContext,
@@ -950,7 +949,7 @@ where
     }
     fn handle_graphql_handler_websocket_connection_error<TAction, TTask>(
         &self,
-        state: &mut GraphQlHandlerState,
+        state: &mut GraphQlHandlerState<T>,
         action: &GraphQlHandlerWebSocketConnectionErrorAction,
         _metadata: &MessageData,
         context: &mut impl HandlerContext,
@@ -982,8 +981,8 @@ where
                         updates: connection_state
                             .effects
                             .values()
-                            .copied()
-                            .map(|effect_id| (effect_id, value.clone()))
+                            .cloned()
+                            .map(|effect| (effect, value.clone()))
                             .collect(),
                     }],
                 }
@@ -1051,7 +1050,7 @@ where
     }
     fn handle_graphql_handler_websocket_server_message<TAction, TTask>(
         &self,
-        state: &mut GraphQlHandlerState,
+        state: &mut GraphQlHandlerState<T>,
         action: &GraphQlHandlerWebSocketServerMessageAction,
         metadata: &MessageData,
         context: &mut impl HandlerContext,
@@ -1105,7 +1104,7 @@ where
     }
     fn handle_graphql_handler_websocket_server_message_connection_error<TAction, TTask>(
         &self,
-        connection_state: &mut WebSocketConnectionState,
+        connection_state: &mut WebSocketConnectionState<T>,
         payload: &JsonValue,
         _metadata: &MessageData,
         _context: &mut impl HandlerContext,
@@ -1127,8 +1126,8 @@ where
                         updates: connection_state
                             .effects
                             .values()
-                            .copied()
-                            .map(|effect_id| (effect_id, value.clone()))
+                            .cloned()
+                            .map(|effect| (effect, value.clone()))
                             .collect(),
                     }],
                 }
@@ -1138,7 +1137,7 @@ where
     }
     fn handle_graphql_handler_websocket_server_message_data<TAction, TTask>(
         &self,
-        connection_state: &mut WebSocketConnectionState,
+        connection_state: &mut WebSocketConnectionState<T>,
         operation_id: &str,
         payload: &JsonValue,
         _metadata: &MessageData,
@@ -1148,7 +1147,7 @@ where
         TAction: Action + From<EffectEmitAction<T>>,
         TTask: TaskFactory<TAction, TTask>,
     {
-        let effect_id = Uuid::parse_str(operation_id).ok().and_then(|uuid| {
+        let effect = Uuid::parse_str(operation_id).ok().and_then(|uuid| {
             let operation_id = GraphQlOperationId(uuid);
             connection_state.effects.get_mut(&operation_id)
         })?;
@@ -1158,7 +1157,7 @@ where
             EffectEmitAction {
                 effect_types: vec![EffectUpdateBatch {
                     effect_type: create_graphql_effect_type(&self.factory, &self.allocator),
-                    updates: vec![(*effect_id, value)],
+                    updates: vec![(effect.clone(), value)],
                 }],
             }
             .into(),
@@ -1166,7 +1165,7 @@ where
     }
     fn handle_graphql_handler_websocket_server_message_patch<TAction, TTask>(
         &self,
-        connection_state: &mut WebSocketConnectionState,
+        connection_state: &mut WebSocketConnectionState<T>,
         operation_id: &str,
         _payload: &JsonValue,
         _metadata: &MessageData,
@@ -1176,7 +1175,7 @@ where
         TAction: Action + From<EffectEmitAction<T>>,
         TTask: TaskFactory<TAction, TTask>,
     {
-        let effect_id = Uuid::parse_str(operation_id).ok().and_then(|uuid| {
+        let effect = Uuid::parse_str(operation_id).ok().and_then(|uuid| {
             let operation_id = GraphQlOperationId(uuid);
             connection_state.effects.get_mut(&operation_id)
         })?;
@@ -1191,7 +1190,7 @@ where
             EffectEmitAction {
                 effect_types: vec![EffectUpdateBatch {
                     effect_type: create_graphql_effect_type(&self.factory, &self.allocator),
-                    updates: vec![(*effect_id, value)],
+                    updates: vec![(effect.clone(), value)],
                 }],
             }
             .into(),
@@ -1199,7 +1198,7 @@ where
     }
     fn handle_graphql_handler_websocket_server_message_error<TAction, TTask>(
         &self,
-        connection_state: &mut WebSocketConnectionState,
+        connection_state: &mut WebSocketConnectionState<T>,
         operation_id: &str,
         payload: &JsonValue,
         _metadata: &MessageData,
@@ -1209,7 +1208,7 @@ where
         TAction: Action + From<EffectEmitAction<T>>,
         TTask: TaskFactory<TAction, TTask>,
     {
-        let effect_id = Uuid::parse_str(operation_id).ok().and_then(|uuid| {
+        let effect = Uuid::parse_str(operation_id).ok().and_then(|uuid| {
             let operation_id = GraphQlOperationId(uuid);
             connection_state.effects.get_mut(&operation_id)
         })?;
@@ -1219,7 +1218,7 @@ where
             EffectEmitAction {
                 effect_types: vec![EffectUpdateBatch {
                     effect_type: create_graphql_effect_type(&self.factory, &self.allocator),
-                    updates: vec![(*effect_id, value)],
+                    updates: vec![(effect.clone(), value)],
                 }],
             }
             .into(),
