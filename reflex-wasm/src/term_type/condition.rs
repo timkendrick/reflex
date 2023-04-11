@@ -5,8 +5,8 @@
 use std::{collections::HashSet, marker::PhantomData};
 
 use reflex::core::{
-    ConditionType, DependencyList, Eagerness, Expression, GraphNode, Internable, SerializeJson,
-    SignalType, StackOffset, StateToken,
+    ConditionType, DependencyList, Eagerness, GraphNode, Internable, SerializeJson, SignalType,
+    StackOffset, StateToken,
 };
 use serde_json::Value as JsonValue;
 use strum_macros::EnumDiscriminants;
@@ -97,43 +97,24 @@ impl TermHash for ConditionTerm {
 }
 
 impl<A: Arena + Clone> ArenaRef<ConditionTerm, A> {
-    pub fn signal_type(&self) -> SignalType<WasmExpression<A>> {
+    pub fn signal_type(&self) -> Result<SignalType<WasmExpression<A>>, ()> {
         match self.condition_type() {
-            ConditionTermDiscriminants::Custom => self
+            ConditionTermDiscriminants::Custom => Ok(self
                 .as_typed_condition::<CustomCondition>()
                 .as_inner()
-                .signal_type(),
-            ConditionTermDiscriminants::Pending => SignalType::Pending,
-            ConditionTermDiscriminants::Error => SignalType::Error,
-            ConditionTermDiscriminants::TypeError => SignalType::Error,
-            ConditionTermDiscriminants::InvalidFunctionTarget => SignalType::Error,
-            ConditionTermDiscriminants::InvalidFunctionArgs => SignalType::Error,
-            ConditionTermDiscriminants::InvalidPointer => SignalType::Error,
-        }
-    }
-    pub fn payload(&self) -> Option<ArenaRef<Term, A>> {
-        match self.condition_type() {
-            ConditionTermDiscriminants::Custom => Some(
-                self.as_typed_condition::<CustomCondition>()
-                    .as_inner()
-                    .payload(),
-            ),
-            ConditionTermDiscriminants::Error => Some(
-                self.as_typed_condition::<ErrorCondition>()
-                    .as_inner()
-                    .payload(),
-            ),
-            _ => None,
-        }
-    }
-    pub fn token(&self) -> Option<ArenaRef<Term, A>> {
-        match self.condition_type() {
-            ConditionTermDiscriminants::Custom => Some(
-                self.as_typed_condition::<CustomCondition>()
-                    .as_inner()
-                    .token(),
-            ),
-            _ => None,
+                .signal_type()),
+            ConditionTermDiscriminants::Pending => Ok(self
+                .as_typed_condition::<PendingCondition>()
+                .as_inner()
+                .signal_type()),
+            ConditionTermDiscriminants::Error => Ok(self
+                .as_typed_condition::<ErrorCondition>()
+                .as_inner()
+                .signal_type()),
+            ConditionTermDiscriminants::TypeError => Err(()),
+            ConditionTermDiscriminants::InvalidFunctionTarget => Err(()),
+            ConditionTermDiscriminants::InvalidFunctionArgs => Err(()),
+            ConditionTermDiscriminants::InvalidPointer => Err(()),
         }
     }
     pub(crate) fn condition_type(&self) -> ConditionTermDiscriminants {
@@ -304,19 +285,11 @@ impl<A: Arena + Clone> ConditionType<WasmExpression<A>> for ArenaRef<TypedTerm<C
         self.read_value(|term| term.id())
     }
     fn signal_type(&self) -> SignalType<WasmExpression<A>> {
-        self.as_inner().signal_type()
-    }
-    fn payload<'a>(&'a self) -> <WasmExpression<A> as Expression>::ExpressionRef<'a> {
-        // FIXME: Improve condition API
         self.as_inner()
-            .payload()
-            .unwrap_or_else(|| self.as_term().clone())
-    }
-    fn token<'a>(&'a self) -> <WasmExpression<A> as Expression>::ExpressionRef<'a> {
-        // FIXME: Improve condition API
-        self.as_inner()
-            .token()
-            .unwrap_or_else(|| self.as_term().clone())
+            .signal_type()
+            .unwrap_or_else(|_| SignalType::Error {
+                payload: self.as_term().clone(),
+            })
     }
 }
 
@@ -787,7 +760,13 @@ impl TermHash for CustomCondition {
 impl<A: Arena + Clone> ArenaRef<CustomCondition, A> {
     pub fn signal_type(&self) -> SignalType<WasmExpression<A>> {
         let effect_type = self.effect_type();
-        SignalType::Custom(effect_type)
+        let payload = self.payload();
+        let token = self.token();
+        SignalType::Custom {
+            effect_type,
+            payload,
+            token,
+        }
     }
 }
 
@@ -899,6 +878,12 @@ impl TermHash for PendingCondition {
     }
 }
 
+impl<A: Arena + Clone> ArenaRef<PendingCondition, A> {
+    pub fn signal_type(&self) -> SignalType<WasmExpression<A>> {
+        SignalType::Pending
+    }
+}
+
 impl<A: Arena + Clone> GraphNode for ArenaRef<PendingCondition, A> {
     fn size(&self) -> usize {
         1
@@ -968,6 +953,13 @@ impl TermHash for ErrorCondition {
     fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
         let payload_hash = arena.read_value::<Term, _>(self.payload, |term| term.id());
         hasher.hash(&payload_hash, arena)
+    }
+}
+
+impl<A: Arena + Clone> ArenaRef<ErrorCondition, A> {
+    pub fn signal_type(&self) -> SignalType<WasmExpression<A>> {
+        let payload = self.payload();
+        SignalType::Error { payload }
     }
 }
 

@@ -353,15 +353,27 @@ where
         T::Builtin: Into<crate::stdlib::Stdlib>,
     {
         let signal_type = match condition.signal_type() {
-            SignalType::Custom(effect_type) => {
-                self.import(&effect_type, factory).map(SignalType::Custom)
+            SignalType::Custom {
+                effect_type,
+                payload,
+                token,
+            } => {
+                let effect_type = self.import(&effect_type, factory)?;
+                let payload = self.import(&payload, factory)?;
+                let token = self.import(&token, factory)?;
+                Ok(SignalType::Custom {
+                    effect_type,
+                    payload,
+                    token,
+                })
             }
             SignalType::Pending => Ok(SignalType::Pending),
-            SignalType::Error => Ok(SignalType::Error),
+            SignalType::Error { payload } => {
+                let payload = self.import(&payload, factory)?;
+                Ok(SignalType::Error { payload })
+            }
         }?;
-        let payload = self.import(condition.payload().as_deref(), factory)?;
-        let token = self.import(condition.token().as_deref(), factory)?;
-        Ok(self.create_signal(signal_type, payload, token))
+        Ok(self.create_signal(signal_type))
     }
     pub fn export_condition<T: Expression>(
         &self,
@@ -370,15 +382,36 @@ where
         allocator: &impl HeapAllocator<T>,
     ) -> Result<T::Signal, WasmExpression<Rc<RefCell<A>>>> {
         let signal_type = match condition.signal_type() {
-            SignalType::Custom(effect_type) => self
-                .export(&effect_type, factory, allocator)
-                .map(SignalType::Custom),
-            SignalType::Pending => Ok(SignalType::Pending),
-            SignalType::Error => Ok(SignalType::Error),
-        }?;
-        let payload = self.export(condition.payload().as_deref(), factory, allocator)?;
-        let token = self.export(condition.token().as_deref(), factory, allocator)?;
-        Ok(allocator.create_signal(signal_type, payload, token))
+            SignalType::Custom {
+                effect_type,
+                payload,
+                token,
+            } => {
+                let effect_type = self.export(&effect_type, factory, allocator)?;
+                let payload = self.export(&payload, factory, allocator)?;
+                let token = self.export(&token, factory, allocator)?;
+                SignalType::Custom {
+                    effect_type,
+                    payload,
+                    token,
+                }
+            }
+            SignalType::Pending => SignalType::Pending,
+            SignalType::Error { payload } => {
+                let is_unserialized_error_condition =
+                    payload.as_pointer() == condition.as_term().as_pointer();
+                if is_unserialized_error_condition {
+                    SignalType::Error {
+                        payload: factory
+                            .create_string_term(allocator.create_string(format!("{condition}"))),
+                    }
+                } else {
+                    let payload = self.export(&payload, factory, allocator)?;
+                    SignalType::Error { payload }
+                }
+            }
+        };
+        Ok(allocator.create_signal(signal_type))
     }
 }
 
@@ -575,29 +608,42 @@ where
     fn create_signal(
         &self,
         effect_type: SignalType<ArenaRef<Term, Self>>,
-        payload: ArenaRef<Term, Self>,
-        token: ArenaRef<Term, Self>,
     ) -> <ArenaRef<Term, Self> as Expression>::Signal {
-        debug_assert!(
-            std::ptr::eq(
-                payload.arena.arena.deref().borrow().deref(),
-                self.arena.deref().borrow().deref(),
-            ) && std::ptr::eq(
-                token.arena.arena.deref().borrow().deref(),
-                self.arena.deref().borrow().deref(),
-            )
-        );
         let term = Term::new(
             TermType::Condition(match effect_type {
-                SignalType::Error => ConditionTerm::Error(ErrorCondition {
-                    payload: payload.pointer,
-                }),
+                SignalType::Error { payload } => {
+                    debug_assert!(std::ptr::eq(
+                        payload.arena.arena.deref().borrow().deref(),
+                        self.arena.deref().borrow().deref(),
+                    ));
+                    ConditionTerm::Error(ErrorCondition {
+                        payload: payload.pointer,
+                    })
+                }
                 SignalType::Pending => ConditionTerm::Pending(PendingCondition),
-                SignalType::Custom(effect_type) => ConditionTerm::Custom(CustomCondition {
-                    effect_type: effect_type.pointer,
-                    payload: payload.pointer,
-                    token: token.pointer,
-                }),
+                SignalType::Custom {
+                    effect_type,
+                    payload,
+                    token,
+                } => {
+                    debug_assert!(
+                        std::ptr::eq(
+                            effect_type.arena.arena.deref().borrow().deref(),
+                            self.arena.deref().borrow().deref(),
+                        ) && std::ptr::eq(
+                            payload.arena.arena.deref().borrow().deref(),
+                            self.arena.deref().borrow().deref(),
+                        ) && std::ptr::eq(
+                            token.arena.arena.deref().borrow().deref(),
+                            self.arena.deref().borrow().deref(),
+                        )
+                    );
+                    ConditionTerm::Custom(CustomCondition {
+                        effect_type: effect_type.pointer,
+                        payload: payload.pointer,
+                        token: token.pointer,
+                    })
+                }
             }),
             self.arena.deref().borrow().deref(),
         );
@@ -879,9 +925,9 @@ where
             ArenaRef::<Term, Self>::new(self.clone(), pointer)
         } else {
             let message = self.create_string(format!("Invalid WASM function index: {}", index));
-            let payload = self.create_string_term(message);
-            let token = self.create_nil_term();
-            let signal = self.create_signal(SignalType::Error, payload, token);
+            let signal = self.create_signal(SignalType::Error {
+                payload: self.create_string_term(message),
+            });
             let signal_list = self.create_signal_list([signal]);
             self.create_signal_term(signal_list)
         }

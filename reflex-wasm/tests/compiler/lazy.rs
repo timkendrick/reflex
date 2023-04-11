@@ -331,11 +331,12 @@ where
                     factory.create_string_term(allocator.create_static_string("foo")),
                 )),
                 allocator.create_unit_list(factory.create_effect_term(allocator.create_signal(
-                    SignalType::Custom(
-                        factory.create_string_term(allocator.create_static_string("foo")),
-                    ),
-                    factory.create_int_term(3),
-                    factory.create_nil_term(),
+                    SignalType::Custom {
+                        effect_type:
+                            factory.create_string_term(allocator.create_static_string("foo")),
+                        payload: factory.create_int_term(3),
+                        token: factory.create_nil_term(),
+                    },
                 ))),
             ),
             factory.create_application_term(
@@ -355,17 +356,17 @@ where
     ) -> (T, Vec<T::Signal>) {
         let result =
             factory.create_signal_term(allocator.create_signal_list([allocator.create_signal(
-                SignalType::Custom(
-                    factory.create_string_term(allocator.create_static_string("foo")),
-                ),
-                factory.create_int_term(3),
-                factory.create_nil_term(),
+                SignalType::Custom {
+                    effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+                    payload: factory.create_int_term(3),
+                    token: factory.create_nil_term(),
+                },
             )]));
-        let dependencies = vec![allocator.create_signal(
-            SignalType::Custom(factory.create_string_term(allocator.create_static_string("foo"))),
-            factory.create_int_term(3),
-            factory.create_nil_term(),
-        )];
+        let dependencies = vec![allocator.create_signal(SignalType::Custom {
+            effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+            payload: factory.create_int_term(3),
+            token: factory.create_nil_term(),
+        })];
         (result, dependencies)
     }
 }
@@ -387,13 +388,11 @@ where
 
     fn state(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> Vec<(T::Signal, T)> {
         vec![(
-            allocator.create_signal(
-                SignalType::Custom(
-                    factory.create_string_term(allocator.create_static_string("foo")),
-                ),
-                factory.create_int_term(3),
-                factory.create_nil_term(),
-            ),
+            allocator.create_signal(SignalType::Custom {
+                effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+                payload: factory.create_int_term(3),
+                token: factory.create_nil_term(),
+            }),
             factory.create_int_term(3),
         )]
     }
@@ -405,11 +404,12 @@ where
                     factory.create_string_term(allocator.create_static_string("foo")),
                 )),
                 allocator.create_unit_list(factory.create_effect_term(allocator.create_signal(
-                    SignalType::Custom(
-                        factory.create_string_term(allocator.create_static_string("foo")),
-                    ),
-                    factory.create_int_term(3),
-                    factory.create_nil_term(),
+                    SignalType::Custom {
+                        effect_type:
+                            factory.create_string_term(allocator.create_static_string("foo")),
+                        payload: factory.create_int_term(3),
+                        token: factory.create_nil_term(),
+                    },
                 ))),
             ),
             factory.create_application_term(
@@ -428,11 +428,11 @@ where
         allocator: &impl HeapAllocator<T>,
     ) -> (T, Vec<T::Signal>) {
         let result = factory.create_int_term(3);
-        let dependencies = vec![allocator.create_signal(
-            SignalType::Custom(factory.create_string_term(allocator.create_static_string("foo"))),
-            factory.create_int_term(3),
-            factory.create_nil_term(),
-        )];
+        let dependencies = vec![allocator.create_signal(SignalType::Custom {
+            effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+            payload: factory.create_int_term(3),
+            token: factory.create_nil_term(),
+        })];
         (result, dependencies)
     }
 }
@@ -460,13 +460,12 @@ where
                     factory.create_string_term(allocator.create_static_string("bar")),
                 )),
                 allocator.create_pair(
-                    factory.create_effect_term(allocator.create_signal(
-                        SignalType::Custom(
+                    factory.create_effect_term(allocator.create_signal(SignalType::Custom {
+                        effect_type:
                             factory.create_string_term(allocator.create_static_string("foo")),
-                        ),
-                        factory.create_int_term(3),
-                        factory.create_nil_term(),
-                    )),
+                        payload: factory.create_int_term(3),
+                        token: factory.create_nil_term(),
+                    })),
                     factory.create_int_term(3),
                 ),
             ),

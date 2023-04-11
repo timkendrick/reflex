@@ -532,20 +532,21 @@ where
                                                 signal.signals().as_deref().iter().any(|effect| {
                                                     matches!(
                                                         effect.as_deref().signal_type(),
-                                                        SignalType::Error
+                                                        SignalType::Error { .. }
                                                     )
                                                 })
                                             })
                                         {
-                                            println!("Query error: {result_pointer:?}");
+                                            println!("Query error: {cache_key}");
+                                            println!(" Result: {result_pointer:?}");
                                             for err in
                                                 signal.signals().as_deref().iter().filter_map(
                                                     |effect| {
                                                         let effect = effect.as_deref();
                                                         match effect.signal_type() {
-                                                            SignalType::Error => Some(
-                                                                effect.payload().as_deref().clone(),
-                                                            ),
+                                                            SignalType::Error { payload } => {
+                                                                Some(payload)
+                                                            }
                                                             _ => None,
                                                         }
                                                     },
@@ -749,9 +750,9 @@ fn create_error_expression<T: Expression>(
     allocator: &impl HeapAllocator<T>,
 ) -> T {
     factory.create_signal_term(allocator.create_signal_list(once(allocator.create_signal(
-        SignalType::Error,
-        factory.create_string_term(allocator.create_string(message)),
-        factory.create_nil_term(),
+        SignalType::Error {
+            payload: factory.create_string_term(allocator.create_string(message)),
+        },
     ))))
 }
 

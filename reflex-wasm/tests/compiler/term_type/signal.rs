@@ -34,9 +34,11 @@ where
 {
     fn input(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> T {
         factory.create_signal_term(allocator.create_signal_list([allocator.create_signal(
-            SignalType::Custom(factory.create_string_term(allocator.create_static_string("foo"))),
-            factory.create_int_term(3),
-            factory.create_nil_term(),
+            SignalType::Custom {
+                effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+                payload: factory.create_int_term(3),
+                token: factory.create_nil_term(),
+            },
         )]))
     }
 
@@ -47,11 +49,11 @@ where
     ) -> (T, Vec<T::Signal>) {
         let result =
             factory.create_signal_term(allocator.create_signal_list([allocator.create_signal(
-                SignalType::Custom(
-                    factory.create_string_term(allocator.create_static_string("foo")),
-                ),
-                factory.create_int_term(3),
-                factory.create_nil_term(),
+                SignalType::Custom {
+                    effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+                    payload: factory.create_int_term(3),
+                    token: factory.create_nil_term(),
+                },
             )]));
         let dependencies = Default::default();
         (result, dependencies)
@@ -66,11 +68,9 @@ where
     TFactory: ExpressionFactory<T>,
 {
     fn input(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> T {
-        factory.create_signal_term(allocator.create_signal_list([allocator.create_signal(
-            SignalType::Pending,
-            factory.create_nil_term(),
-            factory.create_nil_term(),
-        )]))
+        factory.create_signal_term(
+            allocator.create_signal_list([allocator.create_signal(SignalType::Pending)]),
+        )
     }
 
     fn expected(
@@ -78,12 +78,9 @@ where
         factory: &TFactory,
         allocator: &impl HeapAllocator<T>,
     ) -> (T, Vec<T::Signal>) {
-        let result =
-            factory.create_signal_term(allocator.create_signal_list([allocator.create_signal(
-                SignalType::Pending,
-                factory.create_nil_term(),
-                factory.create_nil_term(),
-            )]));
+        let result = factory.create_signal_term(
+            allocator.create_signal_list([allocator.create_signal(SignalType::Pending)]),
+        );
         let dependencies = Default::default();
         (result, dependencies)
     }
@@ -98,9 +95,9 @@ where
 {
     fn input(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> T {
         factory.create_signal_term(allocator.create_signal_list([allocator.create_signal(
-            SignalType::Error,
-            factory.create_string_term(allocator.create_static_string("foo")),
-            factory.create_nil_term(),
+            SignalType::Error {
+                payload: factory.create_string_term(allocator.create_static_string("foo")),
+            },
         )]))
     }
 
@@ -111,9 +108,9 @@ where
     ) -> (T, Vec<T::Signal>) {
         let result =
             factory.create_signal_term(allocator.create_signal_list([allocator.create_signal(
-                SignalType::Error,
-                factory.create_string_term(allocator.create_static_string("foo")),
-                factory.create_nil_term(),
+                SignalType::Error {
+                    payload: factory.create_string_term(allocator.create_static_string("foo")),
+                },
             )]));
         let dependencies = Default::default();
         (result, dependencies)
@@ -129,27 +126,21 @@ where
 {
     fn input(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> T {
         factory.create_signal_term(allocator.create_signal_list([
-            allocator.create_signal(
-                SignalType::Custom(
-                    factory.create_string_term(allocator.create_static_string("foo")),
-                ),
-                factory.create_int_term(3),
-                factory.create_nil_term(),
-            ),
-            allocator.create_signal(
-                SignalType::Custom(
-                    factory.create_string_term(allocator.create_static_string("bar")),
-                ),
-                factory.create_int_term(4),
-                factory.create_nil_term(),
-            ),
-            allocator.create_signal(
-                SignalType::Custom(
-                    factory.create_string_term(allocator.create_static_string("baz")),
-                ),
-                factory.create_int_term(5),
-                factory.create_nil_term(),
-            ),
+            allocator.create_signal(SignalType::Custom {
+                effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+                payload: factory.create_int_term(3),
+                token: factory.create_nil_term(),
+            }),
+            allocator.create_signal(SignalType::Custom {
+                effect_type: factory.create_string_term(allocator.create_static_string("bar")),
+                payload: factory.create_int_term(4),
+                token: factory.create_nil_term(),
+            }),
+            allocator.create_signal(SignalType::Custom {
+                effect_type: factory.create_string_term(allocator.create_static_string("baz")),
+                payload: factory.create_int_term(5),
+                token: factory.create_nil_term(),
+            }),
         ]))
     }
 
@@ -159,27 +150,21 @@ where
         allocator: &impl HeapAllocator<T>,
     ) -> (T, Vec<T::Signal>) {
         let result = factory.create_signal_term(allocator.create_signal_list([
-            allocator.create_signal(
-                SignalType::Custom(
-                    factory.create_string_term(allocator.create_static_string("foo")),
-                ),
-                factory.create_int_term(3),
-                factory.create_nil_term(),
-            ),
-            allocator.create_signal(
-                SignalType::Custom(
-                    factory.create_string_term(allocator.create_static_string("bar")),
-                ),
-                factory.create_int_term(4),
-                factory.create_nil_term(),
-            ),
-            allocator.create_signal(
-                SignalType::Custom(
-                    factory.create_string_term(allocator.create_static_string("baz")),
-                ),
-                factory.create_int_term(5),
-                factory.create_nil_term(),
-            ),
+            allocator.create_signal(SignalType::Custom {
+                effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+                payload: factory.create_int_term(3),
+                token: factory.create_nil_term(),
+            }),
+            allocator.create_signal(SignalType::Custom {
+                effect_type: factory.create_string_term(allocator.create_static_string("bar")),
+                payload: factory.create_int_term(4),
+                token: factory.create_nil_term(),
+            }),
+            allocator.create_signal(SignalType::Custom {
+                effect_type: factory.create_string_term(allocator.create_static_string("baz")),
+                payload: factory.create_int_term(5),
+                token: factory.create_nil_term(),
+            }),
         ]));
         let dependencies = Default::default();
         (result, dependencies)

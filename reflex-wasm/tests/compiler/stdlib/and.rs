@@ -63,7 +63,12 @@ fn stdlib_and() {
 
 struct StdlibAndStaticTruthyConditionStaticConsequentScenario;
 
-impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibAndStaticTruthyConditionStaticConsequentScenario where T: Expression<Builtin = stdlib::Stdlib>, TFactory: ExpressionFactory<T> {
+impl<T, TFactory> WasmTestScenario<T, TFactory>
+    for StdlibAndStaticTruthyConditionStaticConsequentScenario
+where
+    T: Expression<Builtin = stdlib::Stdlib>,
+    TFactory: ExpressionFactory<T>,
+{
     fn input(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> T {
         factory.create_application_term(
             factory.create_builtin_term(stdlib::And),
@@ -87,7 +92,12 @@ impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibAndStaticTruthyConditi
 
 struct StdlibAndStaticFalsyConditionStaticConsequentScenario;
 
-impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibAndStaticFalsyConditionStaticConsequentScenario where T: Expression<Builtin = stdlib::Stdlib>, TFactory: ExpressionFactory<T> {
+impl<T, TFactory> WasmTestScenario<T, TFactory>
+    for StdlibAndStaticFalsyConditionStaticConsequentScenario
+where
+    T: Expression<Builtin = stdlib::Stdlib>,
+    TFactory: ExpressionFactory<T>,
+{
     fn input(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> T {
         factory.create_application_term(
             factory.create_builtin_term(stdlib::And),
@@ -111,7 +121,12 @@ impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibAndStaticFalsyConditio
 
 struct StdlibAndStaticTruthyConditionDynamicConsequentScenario;
 
-impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibAndStaticTruthyConditionDynamicConsequentScenario where T: Expression<Builtin = stdlib::Stdlib>, TFactory: ExpressionFactory<T> {
+impl<T, TFactory> WasmTestScenario<T, TFactory>
+    for StdlibAndStaticTruthyConditionDynamicConsequentScenario
+where
+    T: Expression<Builtin = stdlib::Stdlib>,
+    TFactory: ExpressionFactory<T>,
+{
     fn input(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> T {
         factory.create_application_term(
             factory.create_builtin_term(stdlib::And),
@@ -138,7 +153,12 @@ impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibAndStaticTruthyConditi
 
 struct StdlibAndStaticFalsyConditionDynamicConsequentScenario;
 
-impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibAndStaticFalsyConditionDynamicConsequentScenario where T: Expression<Builtin = stdlib::Stdlib>, TFactory: ExpressionFactory<T> {
+impl<T, TFactory> WasmTestScenario<T, TFactory>
+    for StdlibAndStaticFalsyConditionDynamicConsequentScenario
+where
+    T: Expression<Builtin = stdlib::Stdlib>,
+    TFactory: ExpressionFactory<T>,
+{
     fn input(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> T {
         factory.create_application_term(
             factory.create_builtin_term(stdlib::And),
@@ -165,7 +185,12 @@ impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibAndStaticFalsyConditio
 
 struct StdlibAndDynamicTruthyConditionStaticConsequentScenario;
 
-impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibAndDynamicTruthyConditionStaticConsequentScenario where T: Expression<Builtin = stdlib::Stdlib>, TFactory: ExpressionFactory<T> {
+impl<T, TFactory> WasmTestScenario<T, TFactory>
+    for StdlibAndDynamicTruthyConditionStaticConsequentScenario
+where
+    T: Expression<Builtin = stdlib::Stdlib>,
+    TFactory: ExpressionFactory<T>,
+{
     fn input(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> T {
         factory.create_application_term(
             factory.create_builtin_term(stdlib::And),
@@ -192,7 +217,12 @@ impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibAndDynamicTruthyCondit
 
 struct StdlibAndDynamicFalsyConditionStaticConsequentScenario;
 
-impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibAndDynamicFalsyConditionStaticConsequentScenario where T: Expression<Builtin = stdlib::Stdlib>, TFactory: ExpressionFactory<T> {
+impl<T, TFactory> WasmTestScenario<T, TFactory>
+    for StdlibAndDynamicFalsyConditionStaticConsequentScenario
+where
+    T: Expression<Builtin = stdlib::Stdlib>,
+    TFactory: ExpressionFactory<T>,
+{
     fn input(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> T {
         factory.create_application_term(
             factory.create_builtin_term(stdlib::And),
@@ -219,7 +249,12 @@ impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibAndDynamicFalsyConditi
 
 struct StdlibAndDynamicTruthyConditionDynamicConsequentScenario;
 
-impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibAndDynamicTruthyConditionDynamicConsequentScenario where T: Expression<Builtin = stdlib::Stdlib>, TFactory: ExpressionFactory<T> {
+impl<T, TFactory> WasmTestScenario<T, TFactory>
+    for StdlibAndDynamicTruthyConditionDynamicConsequentScenario
+where
+    T: Expression<Builtin = stdlib::Stdlib>,
+    TFactory: ExpressionFactory<T>,
+{
     fn input(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> T {
         factory.create_application_term(
             factory.create_builtin_term(stdlib::And),
@@ -249,7 +284,12 @@ impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibAndDynamicTruthyCondit
 
 struct StdlibAndDynamicFalsyConditionDynamicConsequentScenario;
 
-impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibAndDynamicFalsyConditionDynamicConsequentScenario where T: Expression<Builtin = stdlib::Stdlib>, TFactory: ExpressionFactory<T> {
+impl<T, TFactory> WasmTestScenario<T, TFactory>
+    for StdlibAndDynamicFalsyConditionDynamicConsequentScenario
+where
+    T: Expression<Builtin = stdlib::Stdlib>,
+    TFactory: ExpressionFactory<T>,
+{
     fn input(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> T {
         factory.create_application_term(
             factory.create_builtin_term(stdlib::And),
@@ -279,25 +319,26 @@ impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibAndDynamicFalsyConditi
 
 struct StdlibAndUnresolvedStatefulConditionUnresolvedStatefulConsequentScenario;
 
-impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibAndUnresolvedStatefulConditionUnresolvedStatefulConsequentScenario where T: Expression<Builtin = stdlib::Stdlib>, TFactory: ExpressionFactory<T> {
+impl<T, TFactory> WasmTestScenario<T, TFactory>
+    for StdlibAndUnresolvedStatefulConditionUnresolvedStatefulConsequentScenario
+where
+    T: Expression<Builtin = stdlib::Stdlib>,
+    TFactory: ExpressionFactory<T>,
+{
     fn input(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> T {
         factory.create_application_term(
             factory.create_builtin_term(stdlib::And),
             allocator.create_pair(
-                factory.create_effect_term(allocator.create_signal(
-                    SignalType::Custom(
-                        factory.create_string_term(allocator.create_static_string("foo")),
-                    ),
-                    factory.create_int_term(3),
-                    factory.create_nil_term(),
-                )),
-                factory.create_effect_term(allocator.create_signal(
-                    SignalType::Custom(
-                        factory.create_string_term(allocator.create_static_string("bar")),
-                    ),
-                    factory.create_boolean_term(false),
-                    factory.create_nil_term(),
-                )),
+                factory.create_effect_term(allocator.create_signal(SignalType::Custom {
+                    effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+                    payload: factory.create_int_term(3),
+                    token: factory.create_nil_term(),
+                })),
+                factory.create_effect_term(allocator.create_signal(SignalType::Custom {
+                    effect_type: factory.create_string_term(allocator.create_static_string("bar")),
+                    payload: factory.create_boolean_term(false),
+                    token: factory.create_nil_term(),
+                })),
             ),
         )
     }
@@ -309,33 +350,36 @@ impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibAndUnresolvedStatefulC
     ) -> (T, Vec<T::Signal>) {
         let result =
             factory.create_signal_term(allocator.create_signal_list([allocator.create_signal(
-                SignalType::Custom(
-                    factory.create_string_term(allocator.create_static_string("foo")),
-                ),
-                factory.create_int_term(3),
-                factory.create_nil_term(),
+                SignalType::Custom {
+                    effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+                    payload: factory.create_int_term(3),
+                    token: factory.create_nil_term(),
+                },
             )]));
-        let dependencies = vec![allocator.create_signal(
-            SignalType::Custom(factory.create_string_term(allocator.create_static_string("foo"))),
-            factory.create_int_term(3),
-            factory.create_nil_term(),
-        )];
+        let dependencies = vec![allocator.create_signal(SignalType::Custom {
+            effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+            payload: factory.create_int_term(3),
+            token: factory.create_nil_term(),
+        })];
         (result, dependencies)
     }
 }
 
 struct StdlibAndResolvedTruthyStatefulConditionUnresolvedStatefulConsequentScenario;
 
-impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibAndResolvedTruthyStatefulConditionUnresolvedStatefulConsequentScenario where T: Expression<Builtin = stdlib::Stdlib>, TFactory: ExpressionFactory<T> {
+impl<T, TFactory> WasmTestScenario<T, TFactory>
+    for StdlibAndResolvedTruthyStatefulConditionUnresolvedStatefulConsequentScenario
+where
+    T: Expression<Builtin = stdlib::Stdlib>,
+    TFactory: ExpressionFactory<T>,
+{
     fn state(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> Vec<(T::Signal, T)> {
         vec![(
-            allocator.create_signal(
-                SignalType::Custom(
-                    factory.create_string_term(allocator.create_static_string("foo")),
-                ),
-                factory.create_int_term(3),
-                factory.create_nil_term(),
-            ),
+            allocator.create_signal(SignalType::Custom {
+                effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+                payload: factory.create_int_term(3),
+                token: factory.create_nil_term(),
+            }),
             factory.create_boolean_term(true),
         )]
     }
@@ -344,20 +388,16 @@ impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibAndResolvedTruthyState
         factory.create_application_term(
             factory.create_builtin_term(stdlib::And),
             allocator.create_pair(
-                factory.create_effect_term(allocator.create_signal(
-                    SignalType::Custom(
-                        factory.create_string_term(allocator.create_static_string("foo")),
-                    ),
-                    factory.create_int_term(3),
-                    factory.create_nil_term(),
-                )),
-                factory.create_effect_term(allocator.create_signal(
-                    SignalType::Custom(
-                        factory.create_string_term(allocator.create_static_string("bar")),
-                    ),
-                    factory.create_boolean_term(false),
-                    factory.create_nil_term(),
-                )),
+                factory.create_effect_term(allocator.create_signal(SignalType::Custom {
+                    effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+                    payload: factory.create_int_term(3),
+                    token: factory.create_nil_term(),
+                })),
+                factory.create_effect_term(allocator.create_signal(SignalType::Custom {
+                    effect_type: factory.create_string_term(allocator.create_static_string("bar")),
+                    payload: factory.create_boolean_term(false),
+                    token: factory.create_nil_term(),
+                })),
             ),
         )
     }
@@ -369,27 +409,23 @@ impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibAndResolvedTruthyState
     ) -> (T, Vec<T::Signal>) {
         let result =
             factory.create_signal_term(allocator.create_signal_list([allocator.create_signal(
-                SignalType::Custom(
-                    factory.create_string_term(allocator.create_static_string("bar")),
-                ),
-                factory.create_boolean_term(false),
-                factory.create_nil_term(),
+                SignalType::Custom {
+                    effect_type: factory.create_string_term(allocator.create_static_string("bar")),
+                    payload: factory.create_boolean_term(false),
+                    token: factory.create_nil_term(),
+                },
             )]));
         let dependencies = vec![
-            allocator.create_signal(
-                SignalType::Custom(
-                    factory.create_string_term(allocator.create_static_string("foo")),
-                ),
-                factory.create_int_term(3),
-                factory.create_nil_term(),
-            ),
-            allocator.create_signal(
-                SignalType::Custom(
-                    factory.create_string_term(allocator.create_static_string("bar")),
-                ),
-                factory.create_boolean_term(false),
-                factory.create_nil_term(),
-            ),
+            allocator.create_signal(SignalType::Custom {
+                effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+                payload: factory.create_int_term(3),
+                token: factory.create_nil_term(),
+            }),
+            allocator.create_signal(SignalType::Custom {
+                effect_type: factory.create_string_term(allocator.create_static_string("bar")),
+                payload: factory.create_boolean_term(false),
+                token: factory.create_nil_term(),
+            }),
         ];
         (result, dependencies)
     }
@@ -397,27 +433,28 @@ impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibAndResolvedTruthyState
 
 struct StdlibAndResolvedTruthyStatefulConditionResolvedStatefulConsequentScenario;
 
-impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibAndResolvedTruthyStatefulConditionResolvedStatefulConsequentScenario where T: Expression<Builtin = stdlib::Stdlib>, TFactory: ExpressionFactory<T> {
+impl<T, TFactory> WasmTestScenario<T, TFactory>
+    for StdlibAndResolvedTruthyStatefulConditionResolvedStatefulConsequentScenario
+where
+    T: Expression<Builtin = stdlib::Stdlib>,
+    TFactory: ExpressionFactory<T>,
+{
     fn state(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> Vec<(T::Signal, T)> {
         vec![
             (
-                allocator.create_signal(
-                    SignalType::Custom(
-                        factory.create_string_term(allocator.create_static_string("foo")),
-                    ),
-                    factory.create_int_term(3),
-                    factory.create_nil_term(),
-                ),
+                allocator.create_signal(SignalType::Custom {
+                    effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+                    payload: factory.create_int_term(3),
+                    token: factory.create_nil_term(),
+                }),
                 factory.create_boolean_term(true),
             ),
             (
-                allocator.create_signal(
-                    SignalType::Custom(
-                        factory.create_string_term(allocator.create_static_string("bar")),
-                    ),
-                    factory.create_boolean_term(false),
-                    factory.create_nil_term(),
-                ),
+                allocator.create_signal(SignalType::Custom {
+                    effect_type: factory.create_string_term(allocator.create_static_string("bar")),
+                    payload: factory.create_boolean_term(false),
+                    token: factory.create_nil_term(),
+                }),
                 factory.create_int_term(3),
             ),
         ]
@@ -427,20 +464,16 @@ impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibAndResolvedTruthyState
         factory.create_application_term(
             factory.create_builtin_term(stdlib::And),
             allocator.create_pair(
-                factory.create_effect_term(allocator.create_signal(
-                    SignalType::Custom(
-                        factory.create_string_term(allocator.create_static_string("foo")),
-                    ),
-                    factory.create_int_term(3),
-                    factory.create_nil_term(),
-                )),
-                factory.create_effect_term(allocator.create_signal(
-                    SignalType::Custom(
-                        factory.create_string_term(allocator.create_static_string("bar")),
-                    ),
-                    factory.create_boolean_term(false),
-                    factory.create_nil_term(),
-                )),
+                factory.create_effect_term(allocator.create_signal(SignalType::Custom {
+                    effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+                    payload: factory.create_int_term(3),
+                    token: factory.create_nil_term(),
+                })),
+                factory.create_effect_term(allocator.create_signal(SignalType::Custom {
+                    effect_type: factory.create_string_term(allocator.create_static_string("bar")),
+                    payload: factory.create_boolean_term(false),
+                    token: factory.create_nil_term(),
+                })),
             ),
         )
     }
@@ -452,20 +485,16 @@ impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibAndResolvedTruthyState
     ) -> (T, Vec<T::Signal>) {
         let result = factory.create_int_term(3);
         let dependencies = vec![
-            allocator.create_signal(
-                SignalType::Custom(
-                    factory.create_string_term(allocator.create_static_string("foo")),
-                ),
-                factory.create_int_term(3),
-                factory.create_nil_term(),
-            ),
-            allocator.create_signal(
-                SignalType::Custom(
-                    factory.create_string_term(allocator.create_static_string("bar")),
-                ),
-                factory.create_boolean_term(false),
-                factory.create_nil_term(),
-            ),
+            allocator.create_signal(SignalType::Custom {
+                effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+                payload: factory.create_int_term(3),
+                token: factory.create_nil_term(),
+            }),
+            allocator.create_signal(SignalType::Custom {
+                effect_type: factory.create_string_term(allocator.create_static_string("bar")),
+                payload: factory.create_boolean_term(false),
+                token: factory.create_nil_term(),
+            }),
         ];
         (result, dependencies)
     }
@@ -473,16 +502,19 @@ impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibAndResolvedTruthyState
 
 struct StdlibAndResolvedFalsyStatefulConditionUnresolvedStatefulConsequentScenario;
 
-impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibAndResolvedFalsyStatefulConditionUnresolvedStatefulConsequentScenario where T: Expression<Builtin = stdlib::Stdlib>, TFactory: ExpressionFactory<T> {
+impl<T, TFactory> WasmTestScenario<T, TFactory>
+    for StdlibAndResolvedFalsyStatefulConditionUnresolvedStatefulConsequentScenario
+where
+    T: Expression<Builtin = stdlib::Stdlib>,
+    TFactory: ExpressionFactory<T>,
+{
     fn state(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> Vec<(T::Signal, T)> {
         vec![(
-            allocator.create_signal(
-                SignalType::Custom(
-                    factory.create_string_term(allocator.create_static_string("foo")),
-                ),
-                factory.create_int_term(3),
-                factory.create_nil_term(),
-            ),
+            allocator.create_signal(SignalType::Custom {
+                effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+                payload: factory.create_int_term(3),
+                token: factory.create_nil_term(),
+            }),
             factory.create_boolean_term(false),
         )]
     }
@@ -491,20 +523,16 @@ impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibAndResolvedFalsyStatef
         factory.create_application_term(
             factory.create_builtin_term(stdlib::And),
             allocator.create_pair(
-                factory.create_effect_term(allocator.create_signal(
-                    SignalType::Custom(
-                        factory.create_string_term(allocator.create_static_string("foo")),
-                    ),
-                    factory.create_int_term(3),
-                    factory.create_nil_term(),
-                )),
-                factory.create_effect_term(allocator.create_signal(
-                    SignalType::Custom(
-                        factory.create_string_term(allocator.create_static_string("bar")),
-                    ),
-                    factory.create_boolean_term(false),
-                    factory.create_nil_term(),
-                )),
+                factory.create_effect_term(allocator.create_signal(SignalType::Custom {
+                    effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+                    payload: factory.create_int_term(3),
+                    token: factory.create_nil_term(),
+                })),
+                factory.create_effect_term(allocator.create_signal(SignalType::Custom {
+                    effect_type: factory.create_string_term(allocator.create_static_string("bar")),
+                    payload: factory.create_boolean_term(false),
+                    token: factory.create_nil_term(),
+                })),
             ),
         )
     }
@@ -515,38 +543,39 @@ impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibAndResolvedFalsyStatef
         allocator: &impl HeapAllocator<T>,
     ) -> (T, Vec<T::Signal>) {
         let result = factory.create_boolean_term(false);
-        let dependencies = vec![allocator.create_signal(
-            SignalType::Custom(factory.create_string_term(allocator.create_static_string("foo"))),
-            factory.create_int_term(3),
-            factory.create_nil_term(),
-        )];
+        let dependencies = vec![allocator.create_signal(SignalType::Custom {
+            effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+            payload: factory.create_int_term(3),
+            token: factory.create_nil_term(),
+        })];
         (result, dependencies)
     }
 }
 
 struct StdlibAndResolvedFalsyStatefulConditionResolvedStatefulConsequentScenario;
 
-impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibAndResolvedFalsyStatefulConditionResolvedStatefulConsequentScenario where T: Expression<Builtin = stdlib::Stdlib>, TFactory: ExpressionFactory<T> {
+impl<T, TFactory> WasmTestScenario<T, TFactory>
+    for StdlibAndResolvedFalsyStatefulConditionResolvedStatefulConsequentScenario
+where
+    T: Expression<Builtin = stdlib::Stdlib>,
+    TFactory: ExpressionFactory<T>,
+{
     fn state(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> Vec<(T::Signal, T)> {
         vec![
             (
-                allocator.create_signal(
-                    SignalType::Custom(
-                        factory.create_string_term(allocator.create_static_string("foo")),
-                    ),
-                    factory.create_int_term(3),
-                    factory.create_nil_term(),
-                ),
+                allocator.create_signal(SignalType::Custom {
+                    effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+                    payload: factory.create_int_term(3),
+                    token: factory.create_nil_term(),
+                }),
                 factory.create_boolean_term(false),
             ),
             (
-                allocator.create_signal(
-                    SignalType::Custom(
-                        factory.create_string_term(allocator.create_static_string("bar")),
-                    ),
-                    factory.create_boolean_term(false),
-                    factory.create_nil_term(),
-                ),
+                allocator.create_signal(SignalType::Custom {
+                    effect_type: factory.create_string_term(allocator.create_static_string("bar")),
+                    payload: factory.create_boolean_term(false),
+                    token: factory.create_nil_term(),
+                }),
                 factory.create_int_term(3),
             ),
         ]
@@ -556,20 +585,16 @@ impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibAndResolvedFalsyStatef
         factory.create_application_term(
             factory.create_builtin_term(stdlib::And),
             allocator.create_pair(
-                factory.create_effect_term(allocator.create_signal(
-                    SignalType::Custom(
-                        factory.create_string_term(allocator.create_static_string("foo")),
-                    ),
-                    factory.create_int_term(3),
-                    factory.create_nil_term(),
-                )),
-                factory.create_effect_term(allocator.create_signal(
-                    SignalType::Custom(
-                        factory.create_string_term(allocator.create_static_string("bar")),
-                    ),
-                    factory.create_boolean_term(false),
-                    factory.create_nil_term(),
-                )),
+                factory.create_effect_term(allocator.create_signal(SignalType::Custom {
+                    effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+                    payload: factory.create_int_term(3),
+                    token: factory.create_nil_term(),
+                })),
+                factory.create_effect_term(allocator.create_signal(SignalType::Custom {
+                    effect_type: factory.create_string_term(allocator.create_static_string("bar")),
+                    payload: factory.create_boolean_term(false),
+                    token: factory.create_nil_term(),
+                })),
             ),
         )
     }
@@ -580,11 +605,11 @@ impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibAndResolvedFalsyStatef
         allocator: &impl HeapAllocator<T>,
     ) -> (T, Vec<T::Signal>) {
         let result = factory.create_boolean_term(false);
-        let dependencies = vec![allocator.create_signal(
-            SignalType::Custom(factory.create_string_term(allocator.create_static_string("foo"))),
-            factory.create_int_term(3),
-            factory.create_nil_term(),
-        )];
+        let dependencies = vec![allocator.create_signal(SignalType::Custom {
+            effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+            payload: factory.create_int_term(3),
+            token: factory.create_nil_term(),
+        })];
         (result, dependencies)
     }
 }

@@ -10,7 +10,7 @@ use std::{
 use debug_ignore::DebugIgnore;
 use derivative::Derivative;
 use reflex::{
-    core::{ConditionType, Expression, ExpressionFactory, HeapAllocator, RefType, SignalType},
+    core::{ConditionType, Expression, ExpressionFactory, HeapAllocator, SignalType},
     hash::{HashId, IntMap},
 };
 use reflex_lang::{allocator::DefaultAllocator, CachedSharedTerm, SharedTermFactory};
@@ -107,18 +107,29 @@ pub(crate) fn run_scenario(
                     .map(|dependency| {
                         let condition = {
                             let dependency = dependency;
-                            let effect_type = match dependency.signal_type() {
-                                SignalType::Custom(effect_type) => wasm_factory
-                                    .import(&effect_type, &factory)
-                                    .map(SignalType::Custom),
-                                SignalType::Pending => Ok(SignalType::Pending),
-                                SignalType::Error => Ok(SignalType::Error),
-                            }?;
-                            let payload =
-                                wasm_factory.import(dependency.payload().as_deref(), &factory)?;
-                            let token =
-                                wasm_factory.import(dependency.token().as_deref(), &factory)?;
-                            wasm_factory.create_signal(effect_type, payload, token)
+                            let signal_type = match dependency.signal_type() {
+                                SignalType::Custom {
+                                    effect_type,
+                                    payload,
+                                    token,
+                                } => {
+                                    let effect_type =
+                                        wasm_factory.import(&effect_type, &factory)?;
+                                    let payload = wasm_factory.import(&payload, &factory)?;
+                                    let token = wasm_factory.import(&token, &factory)?;
+                                    SignalType::Custom {
+                                        effect_type,
+                                        payload,
+                                        token,
+                                    }
+                                }
+                                SignalType::Pending => SignalType::Pending,
+                                SignalType::Error { payload } => {
+                                    let payload = wasm_factory.import(&payload, &factory)?;
+                                    SignalType::Error { payload }
+                                }
+                            };
+                            wasm_factory.create_signal(signal_type)
                         };
                         Ok(WasmExpression::new(
                             Rc::clone(arena),
