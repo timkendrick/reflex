@@ -877,14 +877,19 @@ impl Builtin for Stdlib {
     }
     fn apply<T: Expression<Builtin = Self> + Applicable<T>>(
         &self,
-        _args: impl ExactSizeIterator<Item = T>,
-        _factory: &impl ExpressionFactory<T>,
-        _allocator: &impl HeapAllocator<T>,
+        args: impl ExactSizeIterator<Item = T>,
+        factory: &impl ExpressionFactory<T>,
+        allocator: &impl HeapAllocator<T>,
         _cache: &mut impl EvaluationCache<T>,
     ) -> Result<T, String> {
-        Err(format!(
-            "Unable to apply native WebAssembly function: {:?}",
-            self
+        // Native WebAssembly functions cannot currently be evaluated outside a WebAssembly VM, but the `Builtin`  trait
+        // interface does not provide a WebAssembly execution context to allow this.
+        // We therefore need to ensure that WASM stdlib functions do not interfere with normalization of other nodes.
+        // Note that this method should only be invoked during the pre-compile AST normalization phase,
+        // which includes an explicit check that bails out if a builtin function returns an identical application term.
+        Ok(factory.create_application_term(
+            factory.create_builtin_term(*self),
+            allocator.create_list(args),
         ))
     }
     fn should_parallelize<T: Expression<Builtin = Self> + Applicable<T>>(
