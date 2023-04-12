@@ -430,11 +430,23 @@ fn normalize_builtin_application<
                 None
             } else {
                 let result = apply_function(target, resolved_args, factory, allocator, cache);
-                Some(
-                    result
-                        .normalize(factory, allocator, cache)
-                        .unwrap_or(result),
-                )
+                // If applying the function returned an identical application term, we cannot normalize any further
+                let is_already_fully_normalized = factory
+                    .match_application_term(&result)
+                    .filter(|term| {
+                        term.target().as_deref().id() == target.id()
+                            && term.args().as_deref().id() == args.id()
+                    })
+                    .is_some();
+                if is_already_fully_normalized {
+                    None
+                } else {
+                    Some(
+                        result
+                            .normalize(factory, allocator, cache)
+                            .unwrap_or(result),
+                    )
+                }
             }
         }
     }
