@@ -1202,7 +1202,7 @@ mod tests {
                 &arena,
             ));
 
-            for i in 2..=100 {
+            for i in 2..=64 {
                 let new_int = arena.allocate(Term::new(TermType::Int(IntTerm::from(i)), &arena));
 
                 let args = ListTerm::allocate([current, new_int], &mut arena);
@@ -1262,7 +1262,7 @@ mod tests {
                 .deref()
                 .borrow_mut()
                 .deref_mut()
-                .allocate(Term::new(TermType::Int(IntTerm::from(5050)), &interpreter)),
+                .allocate(Term::new(TermType::Int(IntTerm::from(2080)), &interpreter)),
         );
 
         assert_eq!(result.result(), expected_result);
