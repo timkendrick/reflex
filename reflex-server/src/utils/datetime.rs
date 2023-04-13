@@ -5,7 +5,7 @@ use std::time::SystemTime;
 
 use chrono::{DateTime, Utc};
 
-pub fn format_datetime(timestamp: SystemTime, format: &'static str) -> impl std::fmt::Display {
+pub fn format_datetime_utc(timestamp: SystemTime, format: &'_ str) -> impl std::fmt::Display + '_ {
     let datetime: DateTime<Utc> = timestamp.into();
     datetime.format(format)
 }

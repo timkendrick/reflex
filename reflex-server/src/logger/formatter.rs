@@ -3,7 +3,7 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 use std::{marker::PhantomData, time::SystemTime};
 
-use crate::utils::datetime::format_datetime;
+use crate::utils::datetime::format_datetime_utc;
 
 pub trait LogFormatter {
     type Message;
@@ -317,7 +317,7 @@ where
     T: LogWriter,
 {
     fn write(&self, f: &mut impl std::io::Write) -> std::io::Result<()> {
-        let label = format_datetime(SystemTime::now(), self.format);
+        let label = format_datetime_utc(SystemTime::now(), self.format);
         write!(f, "{}", label)?;
         self.inner.write(f)?;
         Ok(())

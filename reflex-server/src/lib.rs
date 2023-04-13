@@ -18,7 +18,7 @@ use server::{
     GraphQlServerOperationMetricLabels, GraphQlServerQueryLabel,
     HttpGraphQlServerQueryMetricLabels, WebSocketGraphQlServerConnectionMetricLabels,
 };
-use utils::datetime::format_datetime;
+use utils::datetime::format_datetime_utc;
 
 use crate::server::{
     action::opentelemetry::OpenTelemetryMiddlewareErrorAction,
@@ -258,7 +258,7 @@ where
 pub fn generate_session_recording_filename(suffix: Option<&str>) -> String {
     format!(
         "{}{}.session",
-        format_datetime(SystemTime::now(), "%Y-%m-%d-%s"),
+        format_datetime_utc(SystemTime::now(), "%Y-%m-%d-%s"),
         suffix.unwrap_or("")
     )
 }
