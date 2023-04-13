@@ -45,9 +45,9 @@ use reflex_server::{
         task::{ServerCliTaskActor, ServerCliTaskFactory},
     },
     logger::{
-        formatted::FormattedActionLogger, formatter::PrefixedLogFormatter, json::JsonActionLogger,
-        messages::DefaultActionFormatter, prometheus::PrometheusLogger, ActionLogger, ChainLogger,
-        EitherLogger,
+        formatted::FormattedActionLogger, formatter::TimestampedLogFormatter,
+        json::JsonActionLogger, messages::DefaultActionFormatter, prometheus::PrometheusLogger,
+        ActionLogger, ChainLogger, EitherLogger,
     },
     scheduler_metrics::{
         NoopServerMetricsSchedulerQueueInstrumentation, ServerMetricsInstrumentation,
@@ -161,7 +161,7 @@ pub async fn main() -> Result<()> {
             EitherLogger::Left(JsonActionLogger::<_, TAction, TTask>::stderr())
         }
         _ => EitherLogger::Right(FormattedActionLogger::<_, _, TAction, TTask>::stderr(
-            PrefixedLogFormatter::new("server", DefaultActionFormatter::new(factory.clone())),
+            TimestampedLogFormatter::rfc_3339(DefaultActionFormatter::new(factory.clone())),
         )),
     });
     if let Some(port) = args.metrics_port {
