@@ -29,6 +29,49 @@ pub trait Arena {
         Self: 'a;
 }
 
+impl<'slice> Arena for &'slice [u8] {
+    type Slice<'a> = &'a [u8]
+        where
+            Self: 'a;
+    fn read_value<T, V>(&self, offset: ArenaPointer, selector: impl FnOnce(&T) -> V) -> V {
+        selector(get_slice_ref::<T>(self, offset))
+    }
+    fn inner_pointer<T, V>(
+        &self,
+        offset: ArenaPointer,
+        selector: impl FnOnce(&T) -> &V,
+    ) -> ArenaPointer {
+        let target = get_slice_ref::<T>(self, offset);
+        let outer_pointer = target as *const T as usize;
+        let inner_pointer = selector(target) as *const V as usize;
+        offset.offset((inner_pointer - outer_pointer) as u32)
+    }
+    fn as_slice<'a>(&'a self, offset: ArenaPointer, length: usize) -> Self::Slice<'a>
+    where
+        Self::Slice<'a>: 'a,
+    {
+        let offset = u32::from(offset) as usize;
+        &self[offset..(offset + length)]
+    }
+}
+
+fn get_slice_ref<T: Sized>(slice: &[u8], offset: ArenaPointer) -> &T {
+    let index = u32::from(offset) as usize;
+    let is_zero_sized_value = std::mem::size_of::<T>() == 0;
+    let is_invalid_offset = match is_zero_sized_value {
+        true => index > slice.len(),
+        false => index >= slice.len(),
+    };
+    if is_invalid_offset {
+        panic!(
+            "Invalid allocator offset: {} (length: {})",
+            index,
+            slice.len()
+        );
+    }
+    unsafe { std::mem::transmute::<&u8, &T>(slice.get_unchecked(index)) }
+}
+
 pub trait ArenaAllocator: Arena {
     fn allocate<T: TermSize>(&mut self, value: T) -> ArenaPointer;
     fn extend(&mut self, offset: ArenaPointer, size: usize);
