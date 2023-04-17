@@ -31,3 +31,7 @@ wasmtime-wasi = "4.0.0"
 wasm-opt = "0.111.0"
 debug-ignore = "1.0.5"
 derivative = "2.2.0"
+
+[[bin]]
+name = "snapshot"
+path = "src/bin/snapshot.rs"
