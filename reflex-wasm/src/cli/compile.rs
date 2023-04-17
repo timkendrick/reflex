@@ -3,7 +3,7 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 use std::{
     cell::RefCell,
-    collections::{hash_map::Entry, HashMap},
+    collections::{hash_map::Entry, HashMap, HashSet, VecDeque},
     env::temp_dir,
     ops::{Deref, DerefMut},
     path::PathBuf,
@@ -21,7 +21,7 @@ use walrus::{
 };
 
 use crate::{
-    allocator::{Arena, ArenaAllocator, VecAllocator},
+    allocator::{Arena, ArenaAllocator, ArenaIterator, VecAllocator},
     compiler::{
         error::TypedStackError,
         instruction::{self, CompiledInstruction},
@@ -36,9 +36,10 @@ use crate::{
         ParamsSignature, PureThunk, TypeSignature, ValueType,
     },
     factory::WasmTermFactory,
+    hash::TermHasher,
     stdlib::{self, Stdlib},
-    term_type::{LambdaTerm, TermType, TypedTerm},
-    ArenaPointer, ArenaRef, FunctionIndex, Term, WASM_PAGE_SIZE,
+    term_type::{BuiltinTerm, LambdaTerm, TermType, TypedTerm},
+    ArenaPointer, ArenaRef, FunctionIndex, IntoArenaRefIterator, PointerIter, Term, WASM_PAGE_SIZE,
 };
 
 #[derive(Debug)]
@@ -309,18 +310,19 @@ pub fn compile_module(
                 }
                 Entry::Vacant(entry) => Ok(entry),
             }?;
-            let (thunk_function_body, target_uid_pointer, free_variables) = match compiled_thunk {
+            let (thunk_function_body, compiled_function_term, free_variables) = match compiled_thunk
+            {
                 CompiledThunk::Pure(PureThunk {
                     thunk_function_body,
-                    target_uid_pointer,
+                    compiled_function_term,
                     ..
-                }) => (thunk_function_body, target_uid_pointer, Vec::new()),
+                }) => (thunk_function_body, compiled_function_term, Vec::new()),
                 CompiledThunk::Capturing(CapturingThunk {
                     thunk_function_body,
-                    target_uid_pointer,
+                    compiled_function_term,
                     free_variables,
                     ..
-                }) => (thunk_function_body, target_uid_pointer, free_variables),
+                }) => (thunk_function_body, compiled_function_term, free_variables),
             };
             entry.insert(CompiledLambda {
                 params: ParamsSignature::from_iter(
@@ -328,7 +330,7 @@ pub fn compile_module(
                 ),
                 body: thunk_function_body,
             });
-            Ok((term_hash, (compiled_function_id, target_uid_pointer)))
+            Ok((term_hash, (compiled_function_id, compiled_function_term)))
         })
         .collect::<Result<HashMap<_, _>, _>>()?;
 
@@ -380,16 +382,26 @@ pub fn compile_module(
         },
     )?;
 
-    // Now that we know the final linked WASM function IDs for all the compiled thunk wrapper functions, we can patch
-    // the real function addresses into the cached thunk heap term wrappers (overriding the placeholder value)
-    for (compiled_function_id, target_uid_pointer) in compiled_thunk_targets.into_values() {
-        let function_index = function_ids
-            .get_indirect_call_function_index(compiled_function_id)
-            .ok_or_else(|| WasmCompilerError::InvalidFunctionId(compiled_function_id))?;
-        patch_heap_snapshot_builtin_target_uid(
+    if !compiled_thunk_targets.is_empty() {
+        // Now that we know the final linked WASM function IDs for all the compiled thunk wrapper functions, we can
+        // patch the real function addresses into the cached thunk heap term wrappers (overriding the placeholder value)
+        for (compiled_function_id, compiled_function_term) in compiled_thunk_targets.values() {
+            let function_index = function_ids
+                .get_indirect_call_function_index(*compiled_function_id)
+                .ok_or_else(|| WasmCompilerError::InvalidFunctionId(*compiled_function_id))?;
+            patch_heap_snapshot_builtin_target_uid(
+                &mut heap_snapshot,
+                *compiled_function_term,
+                function_index,
+            );
+        }
+        // Patching the thunk wrappers will have caused hashes to become invalid, so we need to recompute the hashes of
+        // any affected terms
+        recompute_invalidated_term_hashes(
             &mut heap_snapshot,
-            target_uid_pointer,
-            function_index,
+            compiled_thunk_targets
+                .into_values()
+                .map(|(_, compiled_function_term)| compiled_function_term),
         );
     }
 
@@ -459,6 +471,95 @@ pub fn compile_module(
     }
 }
 
+fn recompute_invalidated_term_hashes(
+    heap_snapshot: &mut [u8],
+    invalidated_terms: impl IntoIterator<Item = ArenaPointer>,
+) {
+    let invalidated_terms = invalidated_terms.into_iter().collect::<HashSet<_>>();
+    // Construct a topologically-sorted iterator of invalidated term pointers
+    let updated_terms = {
+        let mut updated_hashes = HashMap::<ArenaPointer, Option<usize>>::default();
+        let arena = &*heap_snapshot;
+        let start_offset = ArenaPointer::from(std::mem::size_of::<u32>() as u32);
+        let end_offset = ArenaPointer::from(arena.len() as u32);
+        let mut queue = VecDeque::from_iter(
+            ArenaIterator::<Term, _>::new(&arena, start_offset, end_offset)
+                .as_arena_refs::<Term>(&arena),
+        );
+        while let Some(term) = queue.pop_front() {
+            let term_pointer = term.as_pointer();
+            if updated_hashes.contains_key(&term_pointer) {
+                continue;
+            }
+            let children = PointerIter::iter(&term)
+                .map(|pointer| arena.read_value::<ArenaPointer, _>(pointer, |target| *target))
+                .as_arena_refs::<Term>(&arena);
+            let unprocessed_children = children
+                .clone()
+                .filter(|child| !updated_hashes.contains_key(&child.as_pointer()));
+            let has_unprocessed_children = unprocessed_children.clone().next().is_some();
+            if has_unprocessed_children {
+                queue.push_front(term);
+                for unprocessed_child in unprocessed_children {
+                    queue.push_front(unprocessed_child)
+                }
+                continue;
+            }
+            let invalidated_child_depth = children
+                .clone()
+                .filter_map(|child| updated_hashes.get(&child.as_pointer()).copied())
+                .max()
+                .and_then(|depth| depth);
+            let invalidated_depth = match invalidated_child_depth {
+                Some(depth) => Some(depth + 1),
+                None => {
+                    if invalidated_terms.contains(&term_pointer) {
+                        Some(0)
+                    } else {
+                        None
+                    }
+                }
+            };
+            updated_hashes.insert(term_pointer, invalidated_depth);
+        }
+        let mut updated_hashes = updated_hashes
+            .into_iter()
+            .filter_map(|(term_pointer, updated_hash)| {
+                updated_hash.map(|depth| (term_pointer, depth))
+            })
+            .collect::<Vec<_>>();
+        // Sort the list of invalidated terms topologically to ensure child terms are hashed before their parents
+        updated_hashes.sort_by_key(|(_, depth)| *depth);
+        updated_hashes
+            .into_iter()
+            .map(|(term_pointer, _)| term_pointer)
+    };
+    for term_pointer in updated_terms {
+        let (hash_pointer, updated_hash) = {
+            let arena = &*heap_snapshot;
+            let term = ArenaRef::<Term, _>::new(arena, term_pointer);
+            let hash_pointer = Term::get_hash_pointer(term_pointer);
+            let updated_hash =
+                term.read_value(|term| TermHasher::default().hash(term, &arena).finish());
+            (hash_pointer, updated_hash)
+        };
+        let heap_offset = u32::from(hash_pointer) as usize;
+        // Get the bytes to write at the given insertion offset
+        // (WASM specifies that integers are encoded in little-endian format)
+        let patch_bytes = u64::from(updated_hash).to_le_bytes();
+        // Overwrite the bytes at the insertion offset
+        // (note that this will require term hashes to be recomputed for any terms that reference this term)
+        heap_snapshot[heap_offset + 0] = patch_bytes[0];
+        heap_snapshot[heap_offset + 1] = patch_bytes[1];
+        heap_snapshot[heap_offset + 2] = patch_bytes[2];
+        heap_snapshot[heap_offset + 3] = patch_bytes[3];
+        heap_snapshot[heap_offset + 4] = patch_bytes[4];
+        heap_snapshot[heap_offset + 5] = patch_bytes[5];
+        heap_snapshot[heap_offset + 6] = patch_bytes[6];
+        heap_snapshot[heap_offset + 7] = patch_bytes[7];
+    }
+}
+
 pub fn parse_inline_memory_snapshot(wasm_bytes: &[u8]) -> Result<Vec<u8>, WasmCompilerError> {
     // Create a new WASM module based on the input bytes
     let ast = parse_wasm_ast(wasm_bytes)?;
@@ -470,15 +571,21 @@ pub fn parse_inline_memory_snapshot(wasm_bytes: &[u8]) -> Result<Vec<u8>, WasmCo
 
 fn patch_heap_snapshot_builtin_target_uid(
     heap_snapshot: &mut [u8],
-    target_uid_pointer: ArenaPointer,
+    compiled_function_term: ArenaPointer,
     function_index: FunctionIndex,
 ) {
-    // Get the insertion offset
+    // Get the insertion offset of the placeholder target function ID to overwrite with the final value
+    let target_uid_pointer = {
+        let arena = &*heap_snapshot;
+        let term = ArenaRef::<TypedTerm<BuiltinTerm>, _>::new(arena, compiled_function_term);
+        term.as_inner().inner_pointer(|term| &term.uid)
+    };
     let heap_offset = u32::from(target_uid_pointer) as usize;
     // Get the bytes to write at the given insertion offset
     // (WASM specifies that integers are encoded in little-endian format)
     let patch_bytes = u32::from(function_index).to_le_bytes();
     // Overwrite the bytes at the insertion offset
+    // (note that this will require term hashes to be recomputed for any terms that reference this term)
     heap_snapshot[heap_offset + 0] = patch_bytes[0];
     heap_snapshot[heap_offset + 1] = patch_bytes[1];
     heap_snapshot[heap_offset + 2] = patch_bytes[2];

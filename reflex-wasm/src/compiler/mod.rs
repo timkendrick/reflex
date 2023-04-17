@@ -26,7 +26,7 @@ use crate::{
     serialize::{Serialize, SerializerState},
     stdlib::Stdlib,
     term_type::*,
-    term_type::{list::compile_list, TermType, TermTypeDiscriminants, TypedTerm, WasmExpression},
+    term_type::{list::compile_list, TermType, TermTypeDiscriminants, WasmExpression},
     ArenaPointer, ArenaRef, Array, IntoArenaRefIterator, PointerIter, Term,
 };
 
@@ -1216,24 +1216,14 @@ impl<A: Arena + Clone> CompileWasm<A> for LazyExpression<A> {
                     })
                     .map_err(CompilerError::StackError)?;
                     let thunk_function_body = self.inner.compile(inner_stack, state, options)?;
-                    // Create a placeholder term to represent the compiled function
-                    let (compiled_function_term, target_uid_pointer) = {
-                        let term_pointer = state.heap.allocate(Term::new(
-                            TermType::Builtin(BuiltinTerm {
-                                // The compiled function ID will be filled in with the actual value by the linker
-                                uid: u32::from(ArenaPointer::null()),
-                            }),
-                            &state.heap,
-                        ));
-                        let uid_pointer = {
-                            let term = ArenaRef::<TypedTerm<BuiltinTerm>, _>::new(
-                                &state.heap,
-                                term_pointer,
-                            );
-                            term.as_inner().inner_pointer(|term| &term.uid)
-                        };
-                        (term_pointer, uid_pointer)
-                    };
+                    // Create a placeholder builtin term to represent the compiled function
+                    let compiled_function_term = state.heap.allocate(Term::new(
+                        TermType::Builtin(BuiltinTerm {
+                            // The compiled function ID will be filled in with the actual value by the linker
+                            uid: u32::from(ArenaPointer::null()),
+                        }),
+                        &state.heap,
+                    ));
                     let thunk = match free_variables {
                         None => {
                             let empty_list = {
@@ -1273,14 +1263,13 @@ impl<A: Arena + Clone> CompileWasm<A> for LazyExpression<A> {
                             CompiledThunk::Pure(PureThunk {
                                 application_term: application_pointer,
                                 thunk_function_body,
-                                target_uid_pointer,
+                                compiled_function_term,
                             })
                         }
                         Some(bindings) => CompiledThunk::Capturing(CapturingThunk {
                             free_variables: bindings.into_iter().collect(),
                             thunk_function_body,
                             compiled_function_term,
-                            target_uid_pointer,
                         }),
                     };
                     state.compiled_thunks.entry(thunk_id).or_insert(thunk)
@@ -1365,8 +1354,11 @@ pub struct PureThunk {
     /// Pointer to the heap-allocated application term instance
     /// (pure thunks contain no free variables and therefore the same application term instance can be shared across all usages)
     pub application_term: ArenaPointer,
-    /// Placeholder pointer to where the compiled lambda ID should be written once known
-    pub target_uid_pointer: ArenaPointer,
+    /// Pointer to the heap-allocated term instance corresponding to the compiled thunk function.
+    ///
+    /// Note that the compiled function index cannot be known until the code generation phase, so the allocated term
+    /// contains a placeholder value that will need to be patched with the correct value once known
+    pub compiled_function_term: ArenaPointer,
 }
 
 #[derive(Clone, Debug)]
@@ -1377,9 +1369,10 @@ pub struct CapturingThunk {
     pub thunk_function_body: CompiledBlock,
     /// Pointer to the heap-allocated term instance corresponding to the compiled thunk function
     /// (this can be used as a function application target, passing the free variable values as arguments)
+    ///
+    /// Note that the compiled function index cannot be known until the code generation phase, so the allocated term
+    /// contains a placeholder value that will need to be patched with the correct value once known
     pub compiled_function_term: ArenaPointer,
-    /// Placeholder pointer to where the compiled lambda ID should be written once known
-    pub target_uid_pointer: ArenaPointer,
 }
 
 #[derive(Debug, Clone, Copy)]
