@@ -9,7 +9,7 @@ import createWasmTestRunner from './node.runner.mjs';
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 
 const module_path = process.env.WASM_MODULE || path.join(__dirname, `../build/runtime.wasm`);
-const ENTRY_POINT = getRequiredEnvVar('ENTRY_POINT');
+const ENTRY_POINT = getRequiredPointerEnvVar('ENTRY_POINT');
 const STATE = getOptionalPointerEnvVar('STATE');
 const runner = createWasmTestRunner(module_path);
 
@@ -18,7 +18,7 @@ runner((describe) => {
     test('Evaluate expression', (assert, runtime) => {
       debugger;
       let state = STATE === null ? runtime.NULL : STATE;
-      const [result, dependencies] = runtime.exports[ENTRY_POINT](state);
+      const [result, dependencies] = runtime.exports.evaluate(ENTRY_POINT, state);
       console.log(runtime.format(result));
       debugger;
     });
@@ -41,6 +41,11 @@ function getRequiredEnvVar(key) {
     throw new Error(`Missing ${key} environment variable`);
   }
   return value;
+}
+
+function getRequiredPointerEnvVar(key) {
+  const value = getRequiredEnvVar(key);
+  return parsePointer(value);
 }
 
 function getOptionalEnvVar(key) {

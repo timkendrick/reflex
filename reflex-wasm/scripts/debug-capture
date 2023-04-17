@@ -1,0 +1,43 @@
+#/usr/bin/env bash
+set -euo pipefail
+
+# Read module path and heap snapshot path from arguments
+module_path="$(realpath $1)"
+heap_snapshot_path="$(realpath $2)"
+
+echo "Loading session"
+echo " WASM module: $1"
+echo " Heap snapshot: $2"
+
+# Extract variables from heap snapshot filename
+filename="$(basename "$heap_snapshot_path")"
+filename_segments="${filename%.*}"
+# Split underscore-delimited filename into constituent parts
+IFS='_' read -r cache_key state_index entry_point state <<< "$(echo "$filename_segments")"
+
+echo "  Cache key: $cache_key"
+echo "  State index: $state_index"
+echo "  Entry point: $entry_point"
+echo "  State: $state"
+
+scripts_path="$(dirname $0)"
+package_path="$scripts_path/.."
+workspace_path="$package_path/.."
+
+output_module_path="${module_path%.wasm}.${cache_key}_${state_index}_${entry_point}_${state}.wasm"
+
+# Inline the heap snapshot into the runtime module
+echo "Inlining heap snapshot..."
+(cd "$workspace_path" && \
+  cargo run --bin snapshot -- \
+    --input "$module_path" \
+    --memory-name "memory" \
+    --snapshot "$heap_snapshot_path" \
+    --output "$output_module_path")
+
+# Debug the generated WASM module
+echo "Debugging..."
+WASM_MODULE="$output_module_path" \
+ENTRY_POINT="$entry_point" \
+STATE="$state" \
+  "$scripts_path/debug" src/node.debug.mjs
