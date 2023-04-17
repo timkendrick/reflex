@@ -28,13 +28,13 @@ use reflex_runtime::{
     AsyncExpression, AsyncExpressionFactory, AsyncHeapAllocator, QueryEvaluationMode,
 };
 use reflex_wasm::{
-    allocator::ArenaAllocator,
+    allocator::{ArenaAllocator, ArenaIterator},
     cli::compile::WasmProgram,
     factory::WasmTermFactory,
     interpreter::{InterpreterError, UnboundEvaluationResult, WasmInterpreter},
     term_type::{
-        symbol::SymbolTerm, ApplicationTerm, ConditionTerm, HashmapTerm, ListTerm, TermType,
-        TreeTerm, TypedTerm, WasmExpression,
+        symbol::SymbolTerm, ApplicationCache, ApplicationTerm, ConditionTerm, HashmapTerm,
+        ListTerm, TermType, TreeTerm, TypedTerm, WasmExpression,
     },
     ArenaPointer, ArenaRef, Term,
 };
@@ -449,8 +449,6 @@ where
                         let wasm_factory =
                             WasmTermFactory::from(Rc::new(RefCell::new(&mut state.instance)));
                         let state_token = key.id();
-                        let key_pointer = import_wasm_condition(key, &self.factory, &wasm_factory)
-                            .map_err(WasmWorkerError::SerializationError)?;
                         let value_pointer =
                             import_wasm_expression(value, &self.factory, &wasm_factory)
                                 .map_err(WasmWorkerError::SerializationError)?;
@@ -460,6 +458,9 @@ where
                                 *state_value = value_pointer;
                             }
                             Entry::Vacant(entry) => {
+                                let key_pointer =
+                                    import_wasm_condition(key, &self.factory, &wasm_factory)
+                                        .map_err(WasmWorkerError::SerializationError)?;
                                 entry.insert((key_pointer, value_pointer));
                             }
                         }
@@ -479,11 +480,8 @@ where
                                 &mut state.instance,
                             )
                         };
-                        let initial_heap_snapshot = match self.dump_query_errors {
-                            true => Some(state.instance.dump_heap()),
-                            false => None,
-                        }
-                        .unwrap_or_default();
+                        // Keep track of the bump allocator offset before evaluation
+                        let existing_heap_size = state.instance.end_offset();
                         let start_time = Instant::now();
                         let result = state.instance.evaluate(state.entry_point, runtime_state);
                         let elapsed_time = start_time.elapsed();
@@ -495,98 +493,31 @@ where
                                 histogram!(metric_name.clone(), elapsed_time.as_secs_f64())
                             }
                         }
-                        match result {
+                        let result = match result {
                             Ok(UnboundEvaluationResult {
                                 result_pointer,
                                 dependencies_pointer,
                             }) => {
                                 let result = {
                                     let arena = Rc::new(RefCell::new(&mut state.instance));
-                                    let result = {
-                                        let value = ArenaRef::<Term, _>::new(
-                                            Rc::clone(&arena),
-                                            result_pointer,
-                                        );
-                                        let dependencies = match dependencies_pointer {
-                                            None => None,
-                                            Some(pointer) => {
-                                                Some(ArenaRef::<TypedTerm<TreeTerm>, _>::new(
-                                                    Rc::clone(&arena),
-                                                    pointer,
-                                                ))
-                                            }
-                                        };
-                                        parse_wasm_interpreter_result(
-                                            &value,
-                                            dependencies.as_ref(),
-                                            &self.factory,
-                                            &self.allocator,
-                                            &arena,
-                                        )
-                                    };
-                                    if self.dump_query_errors {
-                                        if let Some(signal) = self
-                                            .factory
-                                            .match_signal_term(result.result())
-                                            .filter(|signal| {
-                                                signal.signals().as_deref().iter().any(|effect| {
-                                                    matches!(
-                                                        effect.as_deref().signal_type(),
-                                                        SignalType::Error { .. }
-                                                    )
-                                                })
-                                            })
-                                        {
-                                            println!("Query error: {cache_key}");
-                                            println!(" Result: {result_pointer:?}");
-                                            for err in
-                                                signal.signals().as_deref().iter().filter_map(
-                                                    |effect| {
-                                                        let effect = effect.as_deref();
-                                                        match effect.signal_type() {
-                                                            SignalType::Error { payload } => {
-                                                                Some(payload)
-                                                            }
-                                                            _ => None,
-                                                        }
-                                                    },
-                                                )
-                                            {
-                                                println!(" {err}");
-                                            }
-                                            if let Some(pointer) = dependencies_pointer {
-                                                println!(" Dependencies: {dependencies_pointer:?}");
-                                                let dependencies =
-                                                    ArenaRef::<TypedTerm<TreeTerm>, _>::new(
-                                                        Rc::clone(&arena),
-                                                        pointer,
-                                                    );
-                                                for condition in dependencies.as_inner().nodes() {
-                                                    let condition_pointer = condition.as_pointer();
-                                                    println!(
-                                                        "  {condition_pointer:?}: {condition}"
-                                                    );
-                                                }
-                                            }
-                                            let output_filename = format!(
-                                                "{}_{}_{}_{}.bin",
-                                                cache_key.id(),
-                                                state_index.map(usize::from).unwrap_or(0),
-                                                u32::from(state.entry_point),
-                                                u32::from(runtime_state)
-                                            );
-                                            println!("Dumping heap to {output_filename}...");
-                                            std::fs::write(output_filename, initial_heap_snapshot)
-                                                .expect("Failed to dump heap");
-                                            println!("Heap dump complete");
-                                            println!(
-                                                "Invoking function evaluate({}, {})",
-                                                u32::from(state.entry_point),
-                                                u32::from(runtime_state)
-                                            );
+                                    let value =
+                                        ArenaRef::<Term, _>::new(Rc::clone(&arena), result_pointer);
+                                    let dependencies = match dependencies_pointer {
+                                        None => None,
+                                        Some(pointer) => {
+                                            Some(ArenaRef::<TypedTerm<TreeTerm>, _>::new(
+                                                Rc::clone(&arena),
+                                                pointer,
+                                            ))
                                         }
-                                    }
-                                    result
+                                    };
+                                    parse_wasm_interpreter_result(
+                                        &value,
+                                        dependencies.as_ref(),
+                                        &self.factory,
+                                        &self.allocator,
+                                        &arena,
+                                    )
                                 };
                                 state.latest_result = Some(result.clone());
                                 Ok((result, state.get_statistics()))
@@ -594,7 +525,60 @@ where
                             Err(err) => {
                                 Err(MaybeOwned::Owned(WasmWorkerError::InterpreterError(err)))
                             }
+                        };
+                        let dump_heap_snapshot = if self.dump_query_errors {
+                            match result.as_ref() {
+                                Err(_) => true,
+                                Ok((result, _)) => {
+                                    let error_signal = self
+                                        .factory
+                                        .match_signal_term(result.result())
+                                        .filter(|signal| {
+                                            signal.signals().as_deref().iter().any(|effect| {
+                                                matches!(
+                                                    effect.as_deref().signal_type(),
+                                                    SignalType::Error { .. }
+                                                )
+                                            })
+                                        });
+                                    error_signal.is_some()
+                                }
+                            }
+                        } else {
+                            false
+                        };
+                        if dump_heap_snapshot {
+                            let heap_snapshot = {
+                                let mut bytes = state.instance.dump_heap();
+                                // Ignore any heap values allocated during this evaluation
+                                bytes.truncate(u32::from(existing_heap_size) as usize);
+                                // Purge internal caches for any heap-allocated application nodes
+                                // (this is necessary because application term caches can be retrospectively updated
+                                // to reference terms that were created during the current evaluation pass)
+                                clear_snapshot_cached_application_results(&mut bytes);
+                                bytes
+                            };
+                            let output_filename = format!(
+                                "{}_{}_{}_{}.bin",
+                                cache_key.id(),
+                                state_index.map(usize::from).unwrap_or(0),
+                                u32::from(state.entry_point),
+                                u32::from(runtime_state)
+                            );
+                            println!(
+                                "Dumping {} bytes to {output_filename}...",
+                                u32::from(existing_heap_size)
+                            );
+                            std::fs::write(output_filename, heap_snapshot)
+                                .expect("Failed to dump heap");
+                            println!("Heap dump complete");
+                            println!(
+                                "Invoking function evaluate({}, {})",
+                                u32::from(state.entry_point),
+                                u32::from(runtime_state)
+                            );
                         }
+                        result
                     }
                 }
             }
@@ -853,4 +837,52 @@ fn export_wasm_condition<'heap, T: Expression>(
 ) -> Result<T::Signal, WasmExpression<Rc<RefCell<&'heap mut WasmInterpreter>>>> {
     let wasm_factory = WasmTermFactory::from(Rc::clone(arena));
     wasm_factory.export_condition(condition, factory, allocator)
+}
+
+fn clear_snapshot_cached_application_results(heap_snapshot: &mut [u8]) {
+    let arena = &*heap_snapshot;
+    let application_cache_offsets = ArenaIterator::<Term, _>::new(
+        &arena,
+        ArenaPointer::from(std::mem::size_of::<u32>() as u32),
+        ArenaPointer::from(heap_snapshot.len() as u32),
+    )
+    .filter_map(
+        |term| match ArenaRef::<Term, _>::new(arena, term).as_application_term() {
+            None => None,
+            Some(term) => {
+                let cache = term.as_inner().cache();
+                let is_empty_cache = match (
+                    cache.value(),
+                    cache.dependencies(),
+                    cache.overall_state_hash(),
+                    cache.minimal_state_hash(),
+                ) {
+                    (None, None, None, None) => true,
+                    _ => false,
+                };
+                if is_empty_cache {
+                    None
+                } else {
+                    Some(cache.as_pointer())
+                }
+            }
+        },
+    )
+    .collect::<Vec<_>>();
+    for application_cache_offset in application_cache_offsets {
+        let offset = u32::from(application_cache_offset) as usize;
+        for (index, value) in as_bytes(&ApplicationCache::default())
+            .iter()
+            .copied()
+            .enumerate()
+            .map(|(index, value)| (offset + index, value))
+        {
+            heap_snapshot[index] = value;
+        }
+    }
+}
+
+fn as_bytes<T: Sized>(value: &T) -> &[u8] {
+    let num_bytes = std::mem::size_of::<T>() as usize;
+    unsafe { std::slice::from_raw_parts(value as *const T as *const u8, num_bytes) }
 }
