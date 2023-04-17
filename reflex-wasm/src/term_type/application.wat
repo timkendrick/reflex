@@ -22,7 +22,6 @@
 
       (@derive $size (@get $Application))
       (@derive $equals (@get $Application))
-      (@derive $hash (@get $Application))
 
       (@export $Application (@get $Application))))
 
@@ -36,6 +35,19 @@
   (export "getApplicationCacheDependencies" (func $ApplicationCache::get::dependencies))
   (export "getApplicationCacheOverallStateId" (func $ApplicationCache::get::overall_state_hash))
   (export "getApplicationCacheMinimalStateId" (func $ApplicationCache::get::minimal_state_hash))
+
+  (func $Application::traits::hash (param $self i32) (param $state i64) (result i64)
+    (call $Application::pointer::args (local.get $self))
+    (call $Application::pointer::target (local.get $self))
+    (local.get $state)
+    (call $Application::hash::target)
+    (call $Application::hash::args))
+
+  (func $Application::hash::target (param $self i32) (param $state i64) (result i64)
+    (call $Hash::write_i64 (local.get $state) (call $Term::get_hash (i32.load (local.get $self)))))
+
+  (func $Application::hash::args (param $self i32) (param $state i64) (result i64)
+    (call $Hash::write_i64 (local.get $state) (call $Term::get_hash (i32.load (local.get $self)))))
 
   (func $Term::Application::new (export "createApplication") (param $target i32) (param $args i32) (result i32)
     (local $instance i32)
