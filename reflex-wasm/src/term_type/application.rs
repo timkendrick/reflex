@@ -35,7 +35,7 @@ pub struct ApplicationTerm {
     pub cache: ApplicationCache,
 }
 
-#[derive(Clone, Copy, Debug, reflex_macros::PointerIter)]
+#[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct ApplicationCache {
     pub value: ArenaPointer,
@@ -59,9 +59,34 @@ impl<A: Arena + Clone> PointerIter for ArenaRef<ApplicationTerm, A> {
             self.inner_pointer(|term| &term.target),
             self.inner_pointer(|term| &term.args),
         ];
-        let cache = self.inner_ref::<ApplicationCache>(|term| &term.cache);
+        let cache = self.cache();
         let cache_pointers: ApplicationCachePointerIter = PointerIter::iter(&cache);
         pointers.into_iter().chain(cache_pointers)
+    }
+}
+
+pub type ApplicationCachePointerIter =
+    std::iter::Chain<std::option::IntoIter<ArenaPointer>, std::option::IntoIter<ArenaPointer>>;
+
+impl<A: Arena + Clone> PointerIter for ArenaRef<ApplicationCache, A> {
+    type Iter<'a> = ApplicationCachePointerIter
+    where
+        Self: 'a;
+    fn iter<'a>(&self) -> Self::Iter<'a>
+    where
+        Self: 'a,
+    {
+        let value = self.read_value(|term| {
+            term.value
+                .as_non_null()
+                .map(|_| self.inner_pointer(|term| &term.value))
+        });
+        let dependencies = self.read_value(|term| {
+            term.dependencies
+                .as_non_null()
+                .map(|_| self.inner_pointer(|term| &term.dependencies))
+        });
+        value.into_iter().chain(dependencies)
     }
 }
 

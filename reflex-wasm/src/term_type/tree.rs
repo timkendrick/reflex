@@ -11,7 +11,6 @@ use reflex::{
     },
     hash::HashId,
 };
-use reflex_macros::PointerIter;
 use reflex_utils::{MapIntoIterator, WithExactSizeIterator};
 use serde_json::Value as JsonValue;
 
@@ -23,10 +22,10 @@ use crate::{
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{ConditionTerm, TermTypeDiscriminants, TypedTerm, WasmExpression},
-    ArenaPointer, ArenaRef, IntoArenaRefIter, Term,
+    ArenaPointer, ArenaRef, IntoArenaRefIter, PointerIter, Term,
 };
 
-#[derive(Clone, Copy, Debug, PointerIter)]
+#[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct TreeTerm {
     pub left: ArenaPointer,
@@ -81,6 +80,32 @@ impl<A: Arena + Clone> ArenaRef<TreeTerm, A> {
     }
     pub fn len(&self) -> u32 {
         self.read_value(|term| term.length)
+    }
+}
+
+pub type TreeTermPointerIter =
+    std::iter::Chain<std::option::IntoIter<ArenaPointer>, std::option::IntoIter<ArenaPointer>>;
+
+impl<A: Arena> PointerIter for ArenaRef<TreeTerm, A> {
+    type Iter<'a> = TreeTermPointerIter
+    where
+        Self: 'a;
+
+    fn iter<'a>(&'a self) -> Self::Iter<'a>
+    where
+        Self: 'a,
+    {
+        let left = self.read_value(|term| {
+            term.left
+                .as_non_null()
+                .map(|_| self.inner_pointer(|term| &term.left))
+        });
+        let right = self.read_value(|term| {
+            term.right
+                .as_non_null()
+                .map(|_| self.inner_pointer(|term| &term.right))
+        });
+        left.into_iter().chain(right)
     }
 }
 

@@ -8,7 +8,6 @@ use reflex::core::{
     DependencyList, Eagerness, Expression, GraphNode, Internable, NodeId, RecordTermType,
     SerializeJson, StackOffset,
 };
-use reflex_macros::PointerIter;
 use reflex_utils::json::is_empty_json_object;
 use serde_json::{Map as JsonMap, Value as JsonValue};
 
@@ -20,10 +19,10 @@ use crate::{
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{list::compile_list, ListTerm, TypedTerm, WasmExpression},
-    ArenaPointer, ArenaRef, Term,
+    ArenaPointer, ArenaRef, PointerIter, Term,
 };
 
-#[derive(Clone, Copy, Debug, PointerIter)]
+#[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct RecordTerm {
     pub keys: ArenaPointer,
@@ -69,6 +68,22 @@ impl<A: Arena + Clone> ArenaRef<RecordTerm, A> {
                     .get(index)
                     .map(|pointer| ArenaRef::<Term, _>::new(self.arena.clone(), pointer))
             })
+    }
+}
+
+pub type RecordTermPointerIter = std::array::IntoIter<ArenaPointer, 2>;
+
+impl<A: Arena + Clone> PointerIter for ArenaRef<RecordTerm, A> {
+    type Iter<'a> = RecordTermPointerIter
+    where
+        Self: 'a;
+    fn iter<'a>(&self) -> Self::Iter<'a>
+    where
+        Self: 'a,
+    {
+        let keys = self.inner_pointer(|term| &term.keys);
+        let values = self.inner_pointer(|term| &term.values);
+        [keys, values].into_iter()
     }
 }
 
