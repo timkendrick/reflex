@@ -923,11 +923,11 @@
     ;; Divide hashes evenly across the total bucket capacity via the modulo operation
     (i32.wrap_i64 (i64.rem_u (local.get $hash) (i64.extend_i32_u (local.get $capacity)))))
 
-  (func $Term::Hashmap::get_bucket_key (param $self i32) (param $index i32) (result i32)
+  (func $Term::Hashmap::get_bucket_key (export "getHashmapBucketKey") (param $self i32) (param $index i32) (result i32)
     (call $HashmapBucket::get::key
       (call $Term::Hashmap::get::buckets::pointer (local.get $self) (local.get $index))))
 
-  (func $Term::Hashmap::get_bucket_value (param $self i32) (param $index i32) (result i32)
+  (func $Term::Hashmap::get_bucket_value (export "getHashmapBucketValue") (param $self i32) (param $index i32) (result i32)
     (call $HashmapBucket::get::value
       (call $Term::Hashmap::get::buckets::pointer (local.get $self) (local.get $index))))
 

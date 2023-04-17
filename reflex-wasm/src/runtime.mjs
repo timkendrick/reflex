@@ -482,8 +482,8 @@ export function createRuntime(runtime) {
     getRecordValues(value) {
       return runtime.getRecordValues(value);
     },
-    getRecordField(value, key) {
-      return runtime.getRecordField(value, key);
+    getRecordValue(value, key) {
+      return runtime.getRecordValue(value, key);
     },
     createConstructor(keys) {
       return runtime.createConstructor(keys);
@@ -515,6 +515,14 @@ export function createRuntime(runtime) {
     },
     hasHashmapKey(value, key) {
       return Boolean(runtime.hasHashmapKey(value, key));
+    },
+    getHashmapEntries(hashmap) {
+      return Array.from({ length: runtime.getHashmapCapacity(hashmap) }, (_, index) => {
+        const key = runtime.getHashmapBucketKey(hashmap, index);
+        if (key === 0) return null;
+        const value = runtime.getHashmapBucketValue(hashmap, index);
+        return [key, value];
+      }).filter(Boolean);
     },
     createHashset(values) {
       const entries = runtime.allocateHashmap(runtime.defaultHashmapCapacity(values.length));
