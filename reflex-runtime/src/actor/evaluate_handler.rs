@@ -1173,12 +1173,12 @@ where
         worker.status = WorkerStatus::Idle {
             latest_result: (*state_index, result.clone()),
             active_effects: {
-                let mut updated_worker_effects = previous_worker_effects;
+                let mut active_effects = previous_worker_effects;
                 for removed_effect_id in removed_worker_effects.into_keys() {
-                    updated_worker_effects.remove(&removed_effect_id);
+                    active_effects.remove(&removed_effect_id);
                 }
-                updated_worker_effects.extend(added_worker_effects);
-                updated_worker_effects
+                active_effects.extend(added_worker_effects);
+                active_effects
             },
         };
         let reevaluate_action = {
