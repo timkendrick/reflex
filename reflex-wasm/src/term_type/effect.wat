@@ -55,5 +55,5 @@
         (call $Term::Signal::of (local.get $condition))
         (local.get $dependencies))
       (else
-        (local.get $value)
-        (local.get $dependencies)))))
+        (call $Term::traits::evaluate (local.get $value) (local.get $state))
+        (call $Dependencies::traits::union (local.get $dependencies))))))

@@ -147,6 +147,26 @@ export default (describe) => {
           '(<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)',
         );
       })();
+      (() => {
+        const expression = createEffect(
+          createCustomCondition(createSymbol(123), createInt(3), createSymbol(0)),
+        );
+        const [result, dependencies] = evaluate(
+          expression,
+          createHashmap([
+            [
+              createCustomCondition(createSymbol(123), createInt(3), createSymbol(0)),
+              createEffect(createCustomCondition(createSymbol(456), createInt(4), createSymbol(0))),
+            ],
+            [createCustomCondition(createSymbol(456), createInt(4), createSymbol(0)), createInt(5)],
+          ]),
+        );
+        assert.strictEqual(format(result), '5');
+        assert.strictEqual(
+          format(dependencies),
+          '((<CustomCondition:Symbol(456):4:Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):3:Symbol(0)> . NULL))',
+        );
+      })();
     });
   });
 };
