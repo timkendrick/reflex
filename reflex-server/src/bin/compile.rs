@@ -9,7 +9,10 @@ use clap::Parser;
 use reflex_lang::{allocator::DefaultAllocator, SharedTermFactory};
 use reflex_parser::Syntax;
 use reflex_server::cli::compile::{create_loader, parse_and_compile_module};
-use reflex_wasm::cli::compile::{WasmCompilerMode, WasmCompilerOptions};
+use reflex_wasm::{
+    cli::compile::{WasmCompilerMode, WasmCompilerOptions},
+    compiler::CompilerOptions,
+};
 
 // Reflex WebAssembly compiler
 #[derive(Parser, Debug)]
@@ -35,6 +38,15 @@ struct Args {
     /// Whether to skip compile-time evaluation where applicable
     #[arg(long)]
     unoptimized: bool,
+    #[arg(long)]
+    /// Compile array items as lazily-evaluated expressions
+    lazy_list_items: bool,
+    /// Compile record field values as lazily-evaluated expressions
+    #[arg(long)]
+    lazy_record_values: bool,
+    /// Compile variable initializer values as lazily-evaluated expressions
+    #[arg(long)]
+    lazy_variable_initializers: bool,
 }
 
 fn main() -> Result<()> {
@@ -61,7 +73,14 @@ fn main() -> Result<()> {
     let source =
         std::fs::read_to_string(&input_path).with_context(|| "Failed to read input file")?;
 
-    let mut compiler_options = WasmCompilerOptions::default();
+    let mut compiler_options = WasmCompilerOptions {
+        compiler: CompilerOptions {
+            lazy_record_values: args.lazy_record_values,
+            lazy_list_items: args.lazy_list_items,
+            lazy_variable_initializers: args.lazy_variable_initializers,
+        },
+        ..Default::default()
+    };
     if !unoptimized {
         // wasm-opt doesn't currently support block params
         compiler_options.generator.disable_block_params = true;
