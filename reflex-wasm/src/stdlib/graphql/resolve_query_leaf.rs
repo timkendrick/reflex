@@ -3,7 +3,7 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 use reflex::core::{uuid, ArgType, Arity, FunctionArity, Uid, Uuid};
 
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+#[derive(Default, PartialEq, Eq, Clone, Copy, Debug)]
 pub struct ResolveQueryLeaf;
 impl ResolveQueryLeaf {
     pub const UUID: Uuid = uuid!("52299fbb-a84b-488e-81ef-98c439869f74");

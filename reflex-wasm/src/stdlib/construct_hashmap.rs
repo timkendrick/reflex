@@ -3,7 +3,7 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 use reflex::core::{uuid, ArgType, Arity, FunctionArity, Uid, Uuid};
 
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+#[derive(Default, PartialEq, Eq, Clone, Copy, Debug)]
 pub struct ConstructHashmap;
 impl ConstructHashmap {
     pub const UUID: Uuid = uuid!("e9d74f69-3722-47f0-810b-76730129d6d3");

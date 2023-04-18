@@ -12,7 +12,7 @@ use crate::{
     },
 };
 
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+#[derive(Default, PartialEq, Eq, Clone, Copy, Debug)]
 pub struct And;
 impl And {
     pub const UUID: Uuid = uuid!("223539c0-3858-4257-a53d-55fa93e2e7ba");

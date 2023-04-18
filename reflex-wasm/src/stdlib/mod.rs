@@ -6,7 +6,7 @@ use reflex::core::{
     Uuid,
 };
 use reflex_macros::Matcher;
-use strum_macros::EnumDiscriminants;
+use strum_macros::{EnumDiscriminants, EnumIter};
 
 pub mod abs;
 pub mod add;
@@ -169,7 +169,7 @@ pub use unzip::*;
 pub use values::*;
 pub use zip::*;
 
-#[derive(Matcher, PartialEq, Eq, Clone, Copy, Debug, EnumDiscriminants)]
+#[derive(Matcher, PartialEq, Eq, Clone, Copy, Debug, EnumDiscriminants, EnumIter)]
 pub enum Stdlib {
     Abs(Abs),
     Accessor(Accessor),

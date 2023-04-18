@@ -3,7 +3,7 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 use reflex::core::{uuid, ArgType, Arity, FunctionArity, Uid, Uuid};
 
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+#[derive(Default, PartialEq, Eq, Clone, Copy, Debug)]
 pub struct GetVariable;
 impl GetVariable {
     pub const UUID: Uuid = uuid!("fb7bbe51-fa38-4c79-a361-c90607db2736");
@@ -22,7 +22,7 @@ impl Uid for GetVariable {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+#[derive(Default, PartialEq, Eq, Clone, Copy, Debug)]
 pub struct SetVariable;
 impl SetVariable {
     pub const UUID: Uuid = uuid!("c7a1b8e5-1045-4ce7-bd1a-4125bdb8d647");
@@ -41,7 +41,7 @@ impl Uid for SetVariable {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+#[derive(Default, PartialEq, Eq, Clone, Copy, Debug)]
 pub struct IncrementVariable;
 impl IncrementVariable {
     pub const UUID: Uuid = uuid!("c73a5dfa-61fb-4a19-956e-752f34526718");
@@ -60,7 +60,7 @@ impl Uid for IncrementVariable {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+#[derive(Default, PartialEq, Eq, Clone, Copy, Debug)]
 pub struct DecrementVariable;
 impl DecrementVariable {
     pub const UUID: Uuid = uuid!("75b1d997-91ff-43e6-bbb6-b3f9d6c47a34");
