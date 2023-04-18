@@ -121,12 +121,14 @@ impl<TBuiltin: Builtin> ExpressionFactory<CachedSharedTerm<TBuiltin>>
         hash: HashId,
         required_args: StackOffset,
         optional_args: StackOffset,
+        variadic_args: bool,
     ) -> CachedSharedTerm<TBuiltin> {
         self.create_expression(Term::CompiledFunction(CompiledFunctionTerm::new(
             address,
             hash,
             required_args,
             optional_args,
+            variadic_args,
         )))
     }
     fn create_record_term(

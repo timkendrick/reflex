@@ -627,6 +627,7 @@ fn evaluate_instruction<'a, T: Expression + Rewritable<T> + Reducible<T> + Appli
                         hash,
                         *required_args,
                         *optional_args,
+                        false,
                     ));
                     Ok((ExecutionResult::Advance, DependencyList::empty()))
                 }
@@ -1696,7 +1697,8 @@ mod tests {
     fn match_compiled_functions() {
         let factory = SharedTermFactory::<Stdlib>::default();
         let allocator = DefaultAllocator::default();
-        let compiled_function = CompiledFunctionTerm::new(InstructionPointer::default(), 0, 0, 0);
+        let compiled_function =
+            CompiledFunctionTerm::new(InstructionPointer::default(), 0, 0, 0, false);
         let expression = factory.create_partial_application_term(
             factory.create_partial_application_term(
                 factory.create_partial_application_term(
@@ -1705,6 +1707,7 @@ mod tests {
                         compiled_function.hash(),
                         compiled_function.required_args(),
                         compiled_function.optional_args(),
+                        compiled_function.variadic_args(),
                     ),
                     allocator.create_unit_list(factory.create_int_term(5)),
                 ),
