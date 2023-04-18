@@ -296,6 +296,24 @@ impl WasmContext {
                     .map(|value| (export_name.as_str(), value))
             })
     }
+
+    pub fn get_table_item(&mut self, export_name: &str, index: u32) -> Option<Val> {
+        self.instance
+            .get_table(&mut self.store, export_name)
+            .and_then(|table| table.get(&mut self.store, index))
+    }
+
+    pub fn get_table_size(&mut self, export_name: &str) -> Option<u32> {
+        self.instance
+            .get_table(&mut self.store, export_name)
+            .map(|table| table.size(&self.store))
+    }
+
+    pub fn exports(&self) -> impl Iterator<Item = (&str, &ExternType)> + '_ {
+        self.exports
+            .iter()
+            .map(|(export_name, definition)| (export_name.as_str(), definition))
+    }
 }
 
 impl WasmInterpreter {
@@ -390,6 +408,15 @@ impl WasmInterpreter {
     }
     pub fn get_globals(&mut self) -> impl Iterator<Item = (&str, Val)> {
         self.0.get_globals()
+    }
+    pub fn get_table_item(&mut self, export_name: &str, index: u32) -> Option<Val> {
+        self.0.get_table_item(export_name, index)
+    }
+    pub fn get_table_size(&mut self, export_name: &str) -> Option<u32> {
+        self.0.get_table_size(export_name)
+    }
+    pub fn exports(&self) -> impl Iterator<Item = (&str, &ExternType)> + '_ {
+        self.0.exports()
     }
     pub fn dump_heap(&self) -> Vec<u8> {
         let Self(context) = self;

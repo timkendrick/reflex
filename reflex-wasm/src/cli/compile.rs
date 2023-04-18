@@ -12,12 +12,15 @@ use std::{
 
 use reflex::{
     cache::SubstitutionCache,
-    core::{Expression, ExpressionFactory, HeapAllocator, LambdaTermType, Rewritable, Uuid},
+    core::{Arity, Expression, ExpressionFactory, HeapAllocator, LambdaTermType, Rewritable, Uuid},
 };
 use serde::{Deserialize, Serialize};
+use strum::IntoEnumIterator;
 use walrus::{
-    self, ir::Value, ActiveData, ActiveDataLocation, DataKind, ElementId, ElementKind, ExportItem,
-    FunctionId, GlobalId, InitExpr, MemoryId, Module, TableId,
+    self,
+    ir::{InstrSeqId, Value},
+    ActiveData, ActiveDataLocation, DataKind, ElementId, ElementKind, ExportItem, FunctionId,
+    GlobalId, InitExpr, InstrSeqBuilder, LocalId, MemoryId, Module, TableId, ValType,
 };
 
 use crate::{
@@ -54,6 +57,8 @@ pub enum WasmCompilerError {
     MultipleMemories,
     ParseError(PathBuf, String),
     InvalidFunctionTable,
+    IndirectFunctionCallArityLookupNotFound,
+    InvalidIndirectFunctionCallArityLookup,
     InvalidFunctionId(CompiledFunctionId),
     StackError(TypedStackError),
     CompilerError(anyhow::Error),
@@ -75,6 +80,12 @@ impl std::fmt::Display for WasmCompilerError {
             Self::MultipleTables => write!(f, "Multiple indirect function call table definitions"),
             Self::InvalidFunctionTable => {
                 write!(f, "Invalid indirect function call table initializer")
+            }
+            Self::IndirectFunctionCallArityLookupNotFound => {
+                write!(f, "Indirect function call arity lookup function not found")
+            }
+            Self::InvalidIndirectFunctionCallArityLookup => {
+                write!(f, "Invalid indirect function call arity lookup function")
             }
             Self::DataSectionNotFound => write!(f, "Data section definition not found"),
             Self::MultipleDataSections => write!(f, "Multiple data section definitions"),
@@ -377,7 +388,13 @@ pub fn compile_module(
                 );
                 register_dynamic_function(&mut ast, function_table_initializer_id, wrapper_id)
             }?;
-            function_ids.insert(compiled_function_id, function_id, function_index);
+            function_ids.insert(
+                compiled_function_id,
+                function_id,
+                function_index,
+                // TODO: Differentiate between eager/strict/lazy lambda arguments
+                Arity::eager(num_args, 0, false),
+            );
             Ok(function_ids)
         },
     )?;
@@ -418,6 +435,20 @@ pub fn compile_module(
             ast.exports.add(&export_name, function_id);
         }
     }
+
+    // Rewrite the implementation of the function that exposes the arity of the stdlib indirect call wrappers
+    // to additionally expose the arity of the compiled function wrappers
+    let stdlib_indirect_call_arities =
+        Stdlib::iter().map(|builtin| (FunctionIndex::from(u32::from(builtin)), builtin.arity()));
+    let compiled_function_indirect_call_arities = function_ids
+        .iter()
+        .map(|(_, (_, function_index, arity))| (*function_index, *arity));
+    update_indirect_call_arity_lookup_function(
+        &mut ast,
+        "__indirect_function_arity",
+        main_function_table_id,
+        stdlib_indirect_call_arities.chain(compiled_function_indirect_call_arities),
+    )?;
 
     // Update the module's initial memory allocation
     let linear_memory_size = heap_snapshot.len();
@@ -558,6 +589,191 @@ fn recompute_invalidated_term_hashes(
         heap_snapshot[heap_offset + 6] = patch_bytes[6];
         heap_snapshot[heap_offset + 7] = patch_bytes[7];
     }
+}
+
+#[must_use]
+fn update_indirect_call_arity_lookup_function(
+    ast: &mut Module,
+    export_name: &str,
+    indirect_call_table_id: TableId,
+    function_arities: impl IntoIterator<Item = (FunctionIndex, Arity)>,
+) -> Result<(), WasmCompilerError> {
+    // Collect a lookup table that maps indirect function call indices to their respective arities
+    let function_arities = function_arities.into_iter().collect::<HashMap<_, _>>();
+    // Locate the exported arity lookup function within the WASM module AST
+    let indirect_call_arity_function_id = get_exported_function_id(ast, export_name)
+        .ok_or_else(|| WasmCompilerError::IndirectFunctionCallArityLookupNotFound)?;
+    // Introspect the WASM module AST to get the corresponding arity for each entry in the indirect call table
+    let indirect_call_table_arities = {
+        // Retrieve the indices of all prepopulated elements of the indirect call table
+        let indirect_function_indices = ast
+            .elements
+            .iter()
+            .filter_map(|elem| match &elem.kind {
+                ElementKind::Active { table, offset } if *table == indirect_call_table_id => {
+                    match offset {
+                        InitExpr::Value(Value::I32(offset)) => Some(
+                            elem.members
+                                .iter()
+                                .enumerate()
+                                .map({
+                                    let offset = *offset as u32;
+                                    move |(index, value)| {
+                                        (FunctionIndex::from(offset + (index as u32)), value)
+                                    }
+                                })
+                                .filter_map(|(function_index, value)| match value {
+                                    Some(_function_id) => Some(function_index),
+                                    None => None,
+                                }),
+                        ),
+                        _ => None,
+                    }
+                }
+                _ => None,
+            })
+            .flatten();
+        // Determine the number of indirect call table entries based on the largest function index
+        let indirect_call_table_size = indirect_function_indices
+            .map(u32::from)
+            .max()
+            .map(|index| index + 1)
+            .unwrap_or(0);
+        // Determine the arity for each of the entries in the indirect call table, filling any gaps with a default value
+        (0..indirect_call_table_size)
+            .map(FunctionIndex::from)
+            .map(|function_index| {
+                function_arities
+                    .get(&function_index)
+                    .copied()
+                    .unwrap_or(Arity::eager(0, 0, false))
+            })
+            .collect::<Vec<_>>()
+    };
+    // Rewrite the existing arity lookup function with the updated function arities
+    patch_indirect_call_arity_lookup_function(
+        ast,
+        indirect_call_arity_function_id,
+        &indirect_call_table_arities,
+    )
+}
+
+#[must_use]
+fn patch_indirect_call_arity_lookup_function(
+    ast: &mut Module,
+    function_id: FunctionId,
+    indirect_call_table_arities: &[Arity],
+) -> Result<(), WasmCompilerError> {
+    // Retrieve the arity lookup function for editing
+    let (func_arg, mut func_body) = match &mut ast.funcs.get_mut(function_id).kind {
+        walrus::FunctionKind::Local(function) => {
+            let function_index_type = ValType::I32;
+            let arity_value_type = [ValType::I32, ValType::I32];
+            let function_type = ast.types.get(function.ty()).clone();
+            let expected_function_params = &[function_index_type];
+            let expected_function_results = &arity_value_type;
+            if (function_type.params(), function_type.results())
+                == (expected_function_params, expected_function_results)
+            {
+                function
+                    .args
+                    .get(0)
+                    .copied()
+                    .map(|arg| (arg, function.builder_mut().func_body()))
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+    .ok_or_else(|| WasmCompilerError::InvalidIndirectFunctionCallArityLookup)?;
+
+    // Clear the existing function body implementation
+    func_body.instrs_mut().clear();
+
+    // Helper function for creating a branch of the arity lookup branch table
+    fn build_arity_lookup_block(
+        builder: &mut InstrSeqBuilder,
+        arity: Arity,
+        remaining: &[Arity],
+        local_id: LocalId,
+        mut parent_blocks: Vec<InstrSeqId>,
+        default_block: InstrSeqId,
+    ) {
+        if remaining.is_empty() {
+            // If all branches have been processed, embed the branch statement that selects the correct branch based on
+            // the provided function index
+            builder.block(None, |builder| {
+                parent_blocks.push(builder.id());
+                builder
+                    // Get the function index from the provided local variable
+                    .local_get(local_id)
+                    // Break out of the block that corresponds to the function index,
+                    // or the default block if an unknown function index was provided
+                    .br_table(parent_blocks.into(), default_block);
+            })
+        } else {
+            // There are still more branches to process, so create a control flow block (for the current entry to break
+            // out of) and recurse within that block to process the remaining branches
+            builder.block(None, |builder| {
+                parent_blocks.push(builder.id());
+                build_arity_lookup_block(
+                    builder,
+                    remaining[0],
+                    &remaining[1..],
+                    local_id,
+                    parent_blocks,
+                    default_block,
+                );
+            })
+        }
+        // Breaking out of this entry's block will cause the following instructions to be executed
+        // Push the positional argument count onto the stack
+        .i32_const({
+            let num_positional_args = (arity.required().len() + arity.optional().len()) as u32;
+            num_positional_args as i32
+        })
+        // Push the 'has variadic args' boolean onto the stack
+        .i32_const({
+            let has_variadic_args = if arity.variadic().is_some() {
+                1u32
+            } else {
+                0u32
+            };
+            has_variadic_args as i32
+        })
+        // Now that the correct return values are on the stack,
+        // the return statement will bail out of the arity lookup function regardless of which block we are currenly in
+        .return_();
+    }
+
+    match indirect_call_table_arities.get(0).copied() {
+        // If there were no provided function arities, no need to create a branch table
+        None => &mut func_body,
+        // Otherwise create a branch table that maps the provided function index to the corresponding arity
+        Some(arity) => func_body.block(None, |builder| {
+            build_arity_lookup_block(
+                builder,
+                arity,
+                &indirect_call_table_arities[1..],
+                func_arg,
+                Vec::with_capacity(indirect_call_table_arities.len()),
+                builder.id(),
+            );
+        }),
+    }
+    // Default arity return type (this will only be encountered if an unknown function index was provided)
+    // Push the positional argument count onto the stack
+    .i32_const({
+        let num_positional_args = 0u32;
+        num_positional_args as i32
+    })
+    // Push the 'has variadic args' boolean onto the stack
+    .i32_const({
+        let has_variadic_args = 0u32;
+        has_variadic_args as i32
+    });
+    Ok(())
 }
 
 pub fn parse_inline_memory_snapshot(wasm_bytes: &[u8]) -> Result<Vec<u8>, WasmCompilerError> {
@@ -1167,6 +1383,12 @@ fn parse_exported_functions(
             ExportItem::Function(id) => Some((export.name.as_str(), id)),
             _ => None,
         })
+}
+
+fn get_exported_function_id(module: &walrus::Module, export_name: &str) -> Option<FunctionId> {
+    parse_exported_functions(module)
+        .find(|(exported_name, _)| *exported_name == export_name)
+        .map(|(_, function_id)| function_id)
 }
 
 fn update_initial_heap_size(

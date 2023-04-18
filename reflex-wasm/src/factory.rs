@@ -3,6 +3,7 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 use std::{
     cell::RefCell,
+    collections::HashMap,
     iter::{empty, once},
     ops::{Deref, DerefMut},
     rc::Rc,
@@ -10,7 +11,7 @@ use std::{
 
 use reflex::{
     core::{
-        ApplicationTermType, BooleanTermType, BuiltinTermType, CompiledFunctionTermType,
+        ApplicationTermType, Arity, BooleanTermType, BuiltinTermType, CompiledFunctionTermType,
         ConditionListType, ConditionType, ConstructorTermType, EffectTermType, Expression,
         ExpressionFactory, ExpressionListType, FloatTermType, FloatValue, HashmapTermType,
         HashsetTermType, HeapAllocator, InstructionPointer, IntTermType, IntValue, LambdaTermType,
@@ -205,6 +206,7 @@ where
         expression: &WasmExpression<Rc<RefCell<A>>>,
         factory: &impl ExpressionFactory<T>,
         allocator: &impl HeapAllocator<T>,
+        indirect_call_arity: &HashMap<FunctionIndex, Arity>,
     ) -> Result<T, WasmExpression<Rc<RefCell<A>>>> {
         if let Some(term) = expression.as_nil_term() {
             let _term = term.as_inner();
@@ -228,50 +230,93 @@ where
             Ok(factory.create_variable_term(term.offset()))
         } else if let Some(term) = expression.as_effect_term() {
             let term = term.as_inner();
-            let condition =
-                self.export_condition(term.condition().as_deref(), factory, allocator)?;
+            let condition = self.export_condition(
+                term.condition().as_deref(),
+                factory,
+                allocator,
+                indirect_call_arity,
+            )?;
             Ok(factory.create_effect_term(condition))
         } else if let Some(term) = expression.as_let_term() {
             let term = term.as_inner();
-            let initializer = self.export(term.initializer().as_deref(), factory, allocator)?;
-            let body = self.export(term.body().as_deref(), factory, allocator)?;
+            let initializer = self.export(
+                term.initializer().as_deref(),
+                factory,
+                allocator,
+                indirect_call_arity,
+            )?;
+            let body = self.export(
+                term.body().as_deref(),
+                factory,
+                allocator,
+                indirect_call_arity,
+            )?;
             Ok(factory.create_let_term(initializer, body))
         } else if let Some(term) = expression.as_lambda_term() {
             let num_args = term.num_args();
-            let body = self.export(term.body().as_deref(), factory, allocator)?;
+            let body = self.export(
+                term.body().as_deref(),
+                factory,
+                allocator,
+                indirect_call_arity,
+            )?;
             Ok(factory.create_lambda_term(num_args, body))
         } else if let Some(term) = expression.as_application_term() {
             let term = term.as_inner();
-            let target = self.export(term.target().as_deref(), factory, allocator)?;
+            let target = self.export(
+                term.target().as_deref(),
+                factory,
+                allocator,
+                indirect_call_arity,
+            )?;
             let args = term
                 .args()
                 .as_deref()
                 .iter()
-                .map(|arg| self.export(arg.as_deref(), factory, allocator))
+                .map(|arg| self.export(arg.as_deref(), factory, allocator, indirect_call_arity))
                 .collect::<Result<Vec<_>, _>>()?;
             let args = allocator.create_list(args);
             Ok(factory.create_application_term(target, args))
         } else if let Some(term) = expression.as_partial_term() {
             let term = term.as_inner();
-            let target = self.export(term.target().as_deref(), factory, allocator)?;
+            let target = self.export(
+                term.target().as_deref(),
+                factory,
+                allocator,
+                indirect_call_arity,
+            )?;
             let args = term
                 .args()
                 .as_deref()
                 .iter()
-                .map(|arg| self.export(arg.as_deref(), factory, allocator))
+                .map(|arg| self.export(arg.as_deref(), factory, allocator, indirect_call_arity))
                 .collect::<Result<Vec<_>, _>>()?;
             let args = allocator.create_list(args);
             Ok(factory.create_partial_application_term(target, args))
         } else if let Some(builtin) = expression.as_builtin_term() {
             let index = FunctionIndex::from(builtin.as_inner().read_value(|term| term.uid));
-            // FIXME: Determine arity of compiled WASM functions when translating to shared expressions
-            Ok(factory.create_compiled_function_term(
-                InstructionPointer::new(u32::from(index) as usize),
-                HashId::default(),
-                0,
-                0,
-                false,
-            ))
+            match indirect_call_arity.get(&index).copied() {
+                None => Err(expression.clone()),
+                Some(arity) => {
+                    let builtin_term_hash = {
+                        let arena = expression.arena();
+                        Term::new(
+                            TermType::Builtin(BuiltinTerm {
+                                uid: u32::from(index),
+                            }),
+                            arena,
+                        )
+                        .id()
+                    };
+                    Ok(factory.create_compiled_function_term(
+                        InstructionPointer::new(u32::from(index) as usize),
+                        builtin_term_hash,
+                        arity.required().len(),
+                        arity.optional().len(),
+                        arity.variadic().is_some(),
+                    ))
+                }
+            }
         } else if let Some(term) = expression.as_record_term() {
             let term = term.as_inner();
             let keys = term
@@ -280,7 +325,7 @@ where
                 .keys()
                 .as_deref()
                 .iter()
-                .map(|key| self.export(key.as_deref(), factory, allocator))
+                .map(|key| self.export(key.as_deref(), factory, allocator, indirect_call_arity))
                 .collect::<Result<Vec<_>, _>>()?;
             let keys = allocator.create_list(keys);
             let prototype = allocator.create_struct_prototype(keys);
@@ -288,7 +333,7 @@ where
                 .values()
                 .as_deref()
                 .iter()
-                .map(|key| self.export(key.as_deref(), factory, allocator))
+                .map(|key| self.export(key.as_deref(), factory, allocator, indirect_call_arity))
                 .collect::<Result<Vec<_>, _>>()?;
             let values = allocator.create_list(values);
             Ok(factory.create_record_term(prototype, values))
@@ -300,7 +345,7 @@ where
                 .keys()
                 .as_deref()
                 .iter()
-                .map(|key| self.export(key.as_deref(), factory, allocator))
+                .map(|key| self.export(key.as_deref(), factory, allocator, indirect_call_arity))
                 .collect::<Result<Vec<_>, _>>()?;
             let keys = allocator.create_list(keys);
             let prototype = allocator.create_struct_prototype(keys);
@@ -310,7 +355,7 @@ where
                 .items()
                 .as_deref()
                 .iter()
-                .map(|key| self.export(key.as_deref(), factory, allocator))
+                .map(|key| self.export(key.as_deref(), factory, allocator, indirect_call_arity))
                 .collect::<Result<Vec<_>, _>>()?;
             let items = allocator.create_list(items);
             Ok(factory.create_list_term(items))
@@ -318,10 +363,10 @@ where
             let term = term.as_inner();
             let keys = term
                 .keys()
-                .map(|term| self.export(term.as_deref(), factory, allocator));
+                .map(|term| self.export(term.as_deref(), factory, allocator, indirect_call_arity));
             let values = term
                 .values()
-                .map(|term| self.export(term.as_deref(), factory, allocator));
+                .map(|term| self.export(term.as_deref(), factory, allocator, indirect_call_arity));
             let entries = keys
                 .zip(values)
                 .map(|(key, value)| {
@@ -335,7 +380,7 @@ where
             let term = term.as_inner();
             let values = term
                 .values()
-                .map(|term| self.export(term.as_deref(), factory, allocator))
+                .map(|term| self.export(term.as_deref(), factory, allocator, indirect_call_arity))
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(factory.create_hashset_term(values))
         } else if let Some(term) = expression.as_signal_term() {
@@ -344,7 +389,14 @@ where
                 .signals()
                 .as_deref()
                 .iter()
-                .map(|condition| self.export_condition(condition.as_deref(), factory, allocator))
+                .map(|condition| {
+                    self.export_condition(
+                        condition.as_deref(),
+                        factory,
+                        allocator,
+                        indirect_call_arity,
+                    )
+                })
                 .collect::<Result<Vec<_>, WasmExpression<Rc<RefCell<A>>>>>()?;
             let conditions = allocator.create_signal_list(conditions);
             Ok(factory.create_signal_term(conditions))
@@ -388,6 +440,7 @@ where
         condition: &ArenaRef<TypedTerm<ConditionTerm>, Rc<RefCell<A>>>,
         factory: &impl ExpressionFactory<T>,
         allocator: &impl HeapAllocator<T>,
+        indirect_call_arity: &HashMap<FunctionIndex, Arity>,
     ) -> Result<T::Signal, WasmExpression<Rc<RefCell<A>>>> {
         let signal_type = match condition.signal_type() {
             SignalType::Custom {
@@ -395,9 +448,10 @@ where
                 payload,
                 token,
             } => {
-                let effect_type = self.export(&effect_type, factory, allocator)?;
-                let payload = self.export(&payload, factory, allocator)?;
-                let token = self.export(&token, factory, allocator)?;
+                let effect_type =
+                    self.export(&effect_type, factory, allocator, indirect_call_arity)?;
+                let payload = self.export(&payload, factory, allocator, indirect_call_arity)?;
+                let token = self.export(&token, factory, allocator, indirect_call_arity)?;
                 SignalType::Custom {
                     effect_type,
                     payload,
@@ -414,7 +468,7 @@ where
                             .create_string_term(allocator.create_string(format!("{condition}"))),
                     }
                 } else {
-                    let payload = self.export(&payload, factory, allocator)?;
+                    let payload = self.export(&payload, factory, allocator, indirect_call_arity)?;
                     SignalType::Error { payload }
                 }
             }

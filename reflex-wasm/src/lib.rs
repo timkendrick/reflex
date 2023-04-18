@@ -37,7 +37,7 @@ pub mod utils;
 // Memory is allocated in 64KiB pages according to WASM spec
 pub const WASM_PAGE_SIZE: usize = 64 * 1024;
 
-#[derive(PartialEq, Eq, Clone, Copy, Debug, PointerIter)]
+#[derive(PartialEq, Eq, Clone, Copy, PointerIter, Hash, Debug)]
 #[repr(C)]
 pub struct FunctionIndex(u32);
 impl FunctionIndex {

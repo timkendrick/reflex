@@ -3,7 +3,7 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 use reflex::core::{uuid, ArgType, Arity, FunctionArity, Uid, Uuid};
 
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+#[derive(Default, PartialEq, Eq, Clone, Copy, Debug)]
 pub struct Raise;
 impl Raise {
     pub const UUID: Uuid = uuid!("880b89f5-8783-4cde-93c9-bdd2b3c79038");

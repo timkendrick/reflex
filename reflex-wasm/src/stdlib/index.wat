@@ -205,7 +205,7 @@
         (local.get $state)
         (local.get $target)))
 
-    (func $Builtin::arity (param $target i32) (result i32 i32)
+    (func $Builtin::arity (export "__indirect_function_arity") (param $target i32) (result i32 i32)
       (@branch
         (local.get $target)
         (@list

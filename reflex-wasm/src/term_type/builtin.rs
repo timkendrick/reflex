@@ -97,11 +97,7 @@ impl<A: Arena + Clone> CompiledFunctionTermType for ArenaRef<BuiltinTerm, A> {
     fn hash(&self) -> HashId {
         self.read_value(|term| {
             let arena = self.arena();
-            HashId::from(
-                TermHasher::default()
-                    .hash(&Term::new(TermType::Builtin(*term), arena), arena)
-                    .finish(),
-            )
+            Term::new(TermType::Builtin(*term), arena).id()
         })
     }
     fn required_args(&self) -> StackOffset {

@@ -2,14 +2,21 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 use std::{
-    borrow::Cow, cell::RefCell, collections::hash_map::Entry, iter::once, marker::PhantomData,
-    ops::Deref, rc::Rc, sync::Arc, time::Instant,
+    borrow::Cow,
+    cell::RefCell,
+    collections::{hash_map::Entry, HashMap},
+    iter::once,
+    marker::PhantomData,
+    ops::Deref,
+    rc::Rc,
+    sync::Arc,
+    time::Instant,
 };
 
 use metrics::histogram;
 use reflex::{
     core::{
-        ConditionListType, ConditionType, DependencyList, EvaluationResult, Expression,
+        Arity, ConditionListType, ConditionType, DependencyList, EvaluationResult, Expression,
         ExpressionFactory, HeapAllocator, RefType, SignalTermType, SignalType, StateToken,
     },
     hash::IntMap,
@@ -36,7 +43,7 @@ use reflex_wasm::{
         symbol::SymbolTerm, ApplicationCache, ApplicationTerm, ConditionTerm, HashmapTerm,
         ListTerm, TermType, TreeTerm, TypedTerm, WasmExpression,
     },
-    ArenaPointer, ArenaRef, Term,
+    ArenaPointer, ArenaRef, FunctionIndex, Term,
 };
 use serde::{Deserialize, Serialize};
 
@@ -168,6 +175,7 @@ impl<T: Expression> Default for WasmWorkerState<T> {
 
 pub struct WasmWorkerInitializedState<T: Expression> {
     instance: WasmInterpreter,
+    indirect_call_arity: HashMap<FunctionIndex, Arity>,
     entry_point: ArenaPointer,
     state_index: Option<MessageOffset>,
     state_values: IntMap<StateToken, (ArenaPointer, ArenaPointer)>,
@@ -288,6 +296,8 @@ dispatcher!({
 pub enum WasmWorkerError<T: Expression> {
     Unititialized,
     InvalidGraphDefinition,
+    InvalidFunctionTable,
+    InvalidFunctionTableArityLookup,
     InterpreterError(InterpreterError),
     SerializationError(T),
 }
@@ -297,6 +307,10 @@ impl<T: Expression + std::fmt::Display> std::fmt::Display for WasmWorkerError<T>
         match self {
             Self::Unititialized => write!(f, "WebAssembly module not initialized"),
             Self::InvalidGraphDefinition => write!(f, "Invalid graph definition"),
+            Self::InvalidFunctionTable => write!(f, "Invalid function table definition"),
+            Self::InvalidFunctionTableArityLookup => {
+                write!(f, "Invalid function table arity lookup function")
+            }
             Self::InterpreterError(err) => {
                 write!(f, "WebAssembly interpreter error: {}", err)
             }
@@ -354,6 +368,51 @@ where
                     WasmInterpreter::instantiate(&self.wasm_module, "memory")
                         .map_err(WasmWorkerError::InterpreterError)
                         .and_then(|mut instance| {
+                            // TODO: Move WASM indirect call arity lookup generation and graph root retrieval to startup phase
+                            let indirect_call_table_size = instance
+                                .get_table_size("__indirect_function_table")
+                                .ok_or_else(|| WasmWorkerError::InvalidFunctionTable)?;
+                            let indirect_call_arity = (0..indirect_call_table_size)
+                                .map(FunctionIndex::from)
+                                .map(|function_index| {
+                                    let (num_positional_args, has_variadic_args) = instance
+                                        .call::<u32, (u32, u32)>(
+                                            "__indirect_function_arity",
+                                            u32::from(function_index),
+                                        )
+                                        .map_err(WasmWorkerError::InterpreterError)?;
+                                    let num_positional_args = num_positional_args as usize;
+                                    let has_variadic_args = match has_variadic_args {
+                                        1 => true,
+                                        _ => false,
+                                    };
+                                    if let Some(builtin) =
+                                        reflex_wasm::stdlib::Stdlib::try_from(function_index).ok()
+                                    {
+                                        let arity = builtin.arity();
+                                        if num_positional_args
+                                            == arity.required().len() + arity.optional().len()
+                                            && has_variadic_args == arity.variadic().is_some()
+                                        {
+                                            Ok((function_index, arity))
+                                        } else {
+                                            Err(WasmWorkerError::InvalidFunctionTableArityLookup)
+                                        }
+                                    } else {
+                                        let required_args = num_positional_args;
+                                        let optional_args = 0;
+                                        Ok((
+                                            function_index,
+                                            // TODO: Differentiate between eager/strict/lazy lambda arguments
+                                            Arity::eager(
+                                                required_args,
+                                                optional_args,
+                                                has_variadic_args,
+                                            ),
+                                        ))
+                                    }
+                                })
+                                .collect::<Result<HashMap<_, _>, _>>()?;
                             let graph_root = instance
                                 .call::<u32, (u32, u32)>(
                                     &self.graph_root_factory_export_name,
@@ -395,12 +454,13 @@ where
                             }
                             query
                                 .map_err(WasmWorkerError::SerializationError)
-                                .map(|query| (instance, query))
+                                .map(|query| (instance, indirect_call_arity, query))
                         })
                 } {
-                    Ok((instance, entry_point)) => {
+                    Ok((instance, indirect_call_arity, entry_point)) => {
                         WasmWorkerState::Initialized(WasmWorkerInitializedState {
                             instance,
+                            indirect_call_arity,
                             entry_point,
                             state_index: Default::default(),
                             state_values: Default::default(),
@@ -517,6 +577,7 @@ where
                                         &self.factory,
                                         &self.allocator,
                                         &arena,
+                                        &state.indirect_call_arity,
                                     )
                                 };
                                 state.latest_result = Some(result.clone());
@@ -679,35 +740,38 @@ fn parse_wasm_interpreter_result<'heap, T: Expression>(
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
     arena: &Rc<RefCell<&'heap mut WasmInterpreter>>,
+    indirect_call_arity: &HashMap<FunctionIndex, Arity>,
 ) -> EvaluationResult<T> {
-    let (result, dependencies) = export_wasm_expression(result, factory, allocator, arena)
-        .and_then(|result| {
-            let dependencies = dependencies
-                .map(|dependencies| {
-                    parse_wasm_interpreter_result_dependencies(
-                        dependencies,
+    let (result, dependencies) =
+        export_wasm_expression(result, factory, allocator, arena, indirect_call_arity)
+            .and_then(|result| {
+                let dependencies = dependencies
+                    .map(|dependencies| {
+                        parse_wasm_interpreter_result_dependencies(
+                            dependencies,
+                            factory,
+                            allocator,
+                            arena,
+                            indirect_call_arity,
+                        )
+                    })
+                    .transpose()?;
+                Ok((result, dependencies))
+            })
+            .unwrap_or_else(|term| {
+                (
+                    create_error_expression(
+                        if let Some(condition) = term.as_condition_term() {
+                            format!("{}", condition)
+                        } else {
+                            format!("Unable to translate evaluation result: {}", term)
+                        },
                         factory,
                         allocator,
-                        arena,
-                    )
-                })
-                .transpose()?;
-            Ok((result, dependencies))
-        })
-        .unwrap_or_else(|term| {
-            (
-                create_error_expression(
-                    if let Some(condition) = term.as_condition_term() {
-                        format!("{}", condition)
-                    } else {
-                        format!("Unable to translate evaluation result: {}", term)
-                    },
-                    factory,
-                    allocator,
-                ),
-                None,
-            )
-        });
+                    ),
+                    None,
+                )
+            });
     EvaluationResult::new(result, dependencies.unwrap_or_default())
 }
 
@@ -716,14 +780,17 @@ fn parse_wasm_interpreter_result_dependencies<'heap, T: Expression>(
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
     arena: &Rc<RefCell<&'heap mut WasmInterpreter>>,
+    indirect_call_arity: &HashMap<FunctionIndex, Arity>,
 ) -> Result<DependencyList, WasmExpression<Rc<RefCell<&'heap mut WasmInterpreter>>>> {
     dependencies
         .as_inner()
         .nodes()
         .map(|dependency| match dependency.as_condition_term() {
             None => Err(dependency),
-            Some(condition) => export_wasm_condition(condition, factory, allocator, arena)
-                .map(|effect| effect.id()),
+            Some(condition) => {
+                export_wasm_condition(condition, factory, allocator, arena, indirect_call_arity)
+                    .map(|effect| effect.id())
+            }
         })
         .collect::<Result<DependencyList, _>>()
 }
@@ -824,9 +891,10 @@ fn export_wasm_expression<'heap, T: Expression>(
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
     arena: &Rc<RefCell<&'heap mut WasmInterpreter>>,
+    indirect_call_arity: &HashMap<FunctionIndex, Arity>,
 ) -> Result<T, WasmExpression<Rc<RefCell<&'heap mut WasmInterpreter>>>> {
     let wasm_factory = WasmTermFactory::from(Rc::clone(arena));
-    wasm_factory.export(expression, factory, allocator)
+    wasm_factory.export(expression, factory, allocator, indirect_call_arity)
 }
 
 fn export_wasm_condition<'heap, T: Expression>(
@@ -834,9 +902,10 @@ fn export_wasm_condition<'heap, T: Expression>(
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
     arena: &Rc<RefCell<&'heap mut WasmInterpreter>>,
+    indirect_call_arity: &HashMap<FunctionIndex, Arity>,
 ) -> Result<T::Signal, WasmExpression<Rc<RefCell<&'heap mut WasmInterpreter>>>> {
     let wasm_factory = WasmTermFactory::from(Rc::clone(arena));
-    wasm_factory.export_condition(condition, factory, allocator)
+    wasm_factory.export_condition(condition, factory, allocator, indirect_call_arity)
 }
 
 fn clear_snapshot_cached_application_results(heap_snapshot: &mut [u8]) {

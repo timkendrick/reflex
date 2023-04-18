@@ -13,7 +13,7 @@ use crate::{
     FunctionIndex,
 };
 
-use reflex::core::StackOffset;
+use reflex::core::{Arity, StackOffset};
 use reflex_utils::Stack;
 use walrus::{
     ir::{self, BinaryOp, Instr, InstrSeqId, InstrSeqType},
@@ -591,7 +591,7 @@ impl std::fmt::Display for WasmGeneratorError {
 
 #[derive(Default, Debug, Clone)]
 pub struct WasmCompiledFunctionMappings {
-    mappings: HashMap<CompiledFunctionId, (FunctionId, FunctionIndex)>,
+    mappings: HashMap<CompiledFunctionId, (FunctionId, FunctionIndex, Arity)>,
 }
 impl WasmCompiledFunctionMappings {
     pub fn insert(
@@ -599,13 +599,15 @@ impl WasmCompiledFunctionMappings {
         target: CompiledFunctionId,
         function_id: FunctionId,
         function_index: FunctionIndex,
+        arity: Arity,
     ) {
-        self.mappings.insert(target, (function_id, function_index));
+        self.mappings
+            .insert(target, (function_id, function_index, arity));
     }
     pub fn get_function_id(&self, target: CompiledFunctionId) -> Option<FunctionId> {
         self.mappings
             .get(&target)
-            .map(|(function_id, _)| *function_id)
+            .map(|(function_id, _, _)| *function_id)
     }
     pub fn get_indirect_call_function_index(
         &self,
@@ -613,7 +615,16 @@ impl WasmCompiledFunctionMappings {
     ) -> Option<FunctionIndex> {
         self.mappings
             .get(&target)
-            .map(|(_, function_index)| *function_index)
+            .map(|(_, function_index, _)| *function_index)
+    }
+    pub fn get_function_arity(&self, target: CompiledFunctionId) -> Option<Arity> {
+        self.mappings.get(&target).map(|(_, _, num_args)| *num_args)
+    }
+    pub fn iter(
+        &self,
+    ) -> std::collections::hash_map::Iter<CompiledFunctionId, (FunctionId, FunctionIndex, Arity)>
+    {
+        self.mappings.iter()
     }
 }
 
