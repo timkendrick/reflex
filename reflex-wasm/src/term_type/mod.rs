@@ -1433,7 +1433,7 @@ impl<A: Arena + Clone> Expression for ArenaRef<Term, A> {
     type RecursiveTerm = ArenaRef<TypedTerm<NilTerm>, A>;
     type BuiltinTerm = ArenaRef<TypedTerm<BuiltinTerm>, A>;
     // FIXME: remove compiled function term
-    type CompiledFunctionTerm = ArenaRef<TypedTerm<NilTerm>, A>;
+    type CompiledFunctionTerm = ArenaRef<TypedTerm<BuiltinTerm>, A>;
     type RecordTerm = ArenaRef<TypedTerm<RecordTerm>, A>;
     type ConstructorTerm = ArenaRef<TypedTerm<ConstructorTerm>, A>;
     type ListTerm = ArenaRef<TypedTerm<ListTerm>, A>;

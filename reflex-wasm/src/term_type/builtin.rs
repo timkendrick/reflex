@@ -4,9 +4,12 @@
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use std::collections::HashSet;
 
-use reflex::core::{
-    Arity, BuiltinTermType, DependencyList, Eagerness, Expression, GraphNode, Internable,
-    SerializeJson, StackOffset,
+use reflex::{
+    core::{
+        Arity, BuiltinTermType, CompiledFunctionTermType, DependencyList, Eagerness, Expression,
+        GraphNode, Internable, SerializeJson, StackOffset,
+    },
+    hash::HashId,
 };
 use reflex_macros::PointerIter;
 use serde_json::Value as JsonValue;
@@ -21,7 +24,7 @@ use crate::{
     hash::{TermHash, TermHasher, TermSize},
     stdlib::Stdlib,
     term_type::TypedTerm,
-    ArenaRef, FunctionIndex,
+    ArenaRef, FunctionIndex, Term, TermType,
 };
 
 #[derive(Clone, Copy, Debug, PointerIter)]
@@ -84,6 +87,58 @@ where
         T::Builtin: 'a,
     {
         <ArenaRef<BuiltinTerm, A> as BuiltinTermType<T>>::target(&self.as_inner())
+    }
+}
+
+impl<A: Arena + Clone> CompiledFunctionTermType for ArenaRef<BuiltinTerm, A> {
+    fn address(&self) -> reflex::core::InstructionPointer {
+        self.read_value(|term| reflex::core::InstructionPointer::new(term.uid as usize))
+    }
+    fn hash(&self) -> HashId {
+        self.read_value(|term| {
+            let arena = self.arena();
+            HashId::from(
+                TermHasher::default()
+                    .hash(&Term::new(TermType::Builtin(*term), arena), arena)
+                    .finish(),
+            )
+        })
+    }
+    fn required_args(&self) -> StackOffset {
+        match self.arity() {
+            Some(arity) => arity.required().len(),
+            None => panic!("Unable to retrieve arity of compiled function term"),
+        }
+    }
+    fn optional_args(&self) -> StackOffset {
+        match self.arity() {
+            Some(arity) => arity.optional().len(),
+            None => panic!("Unable to retrieve arity of compiled function term"),
+        }
+    }
+    fn variadic_args(&self) -> bool {
+        match self.arity() {
+            Some(arity) => arity.variadic().is_some(),
+            None => panic!("Unable to retrieve arity of compiled function term"),
+        }
+    }
+}
+
+impl<A: Arena + Clone> CompiledFunctionTermType for ArenaRef<TypedTerm<BuiltinTerm>, A> {
+    fn address(&self) -> reflex::core::InstructionPointer {
+        <ArenaRef<BuiltinTerm, A> as CompiledFunctionTermType>::address(&self.as_inner())
+    }
+    fn hash(&self) -> HashId {
+        <ArenaRef<BuiltinTerm, A> as CompiledFunctionTermType>::hash(&self.as_inner())
+    }
+    fn required_args(&self) -> StackOffset {
+        <ArenaRef<BuiltinTerm, A> as CompiledFunctionTermType>::required_args(&self.as_inner())
+    }
+    fn optional_args(&self) -> StackOffset {
+        <ArenaRef<BuiltinTerm, A> as CompiledFunctionTermType>::optional_args(&self.as_inner())
+    }
+    fn variadic_args(&self) -> bool {
+        <ArenaRef<BuiltinTerm, A> as CompiledFunctionTermType>::variadic_args(&self.as_inner())
     }
 }
 

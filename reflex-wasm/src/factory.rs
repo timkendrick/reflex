@@ -117,7 +117,14 @@ where
             let hash = term.hash();
             let required_args = term.required_args();
             let optional_args = term.optional_args();
-            Ok(self.create_compiled_function_term(address, hash, required_args, optional_args))
+            let variadic_args = term.variadic_args();
+            Ok(self.create_compiled_function_term(
+                address,
+                hash,
+                required_args,
+                optional_args,
+                variadic_args,
+            ))
         } else if let Some(term) = factory.match_record_term(expression) {
             let keys = term
                 .prototype()
@@ -263,6 +270,7 @@ where
                 HashId::default(),
                 0,
                 0,
+                false,
             ))
         } else if let Some(term) = expression.as_record_term() {
             let term = term.as_inner();
@@ -911,6 +919,7 @@ where
         _hash: HashId,
         _required_args: StackOffset,
         _optional_args: StackOffset,
+        _variadic_args: bool,
     ) -> ArenaRef<Term, Self> {
         let index = address.get();
         if index < 0x000000000000FFFF {
