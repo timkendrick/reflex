@@ -1411,7 +1411,18 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<Term, A> {
         options: &CompilerOptions,
     ) -> CompilerResult<A> {
         if self.should_intern(Eagerness::Eager) {
-            return intern_static_value(self, state);
+            let compiled_heap_pointer = intern_static_value(self, state)?;
+            let result = if self.is_static() {
+                Ok(compiled_heap_pointer)
+            } else {
+                let block = CompiledBlockBuilder::new(CompilerStack::default());
+                let block = block.append_block(compiled_heap_pointer);
+                let block = block.push(CompiledInstruction::Evaluate(
+                    instruction::runtime::Evaluate,
+                ));
+                block.finish()
+            };
+            return result;
         }
         match self.read_value(|term| term.type_id()) {
             TermTypeDiscriminants::Application => self
