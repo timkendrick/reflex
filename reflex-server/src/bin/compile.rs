@@ -62,8 +62,7 @@ fn main() -> Result<()> {
         WasmCompilerMode::Wasm
     };
     let unoptimized = args.unoptimized;
-    // FIXME: Use rust stdlib implementations in WASM compiler to allow pre-compile normalization
-    let factory = SharedTermFactory::<reflex_wasm::stdlib::Stdlib>::default();
+    let factory = SharedTermFactory::<reflex_server::builtins::ServerBuiltins>::default();
     let allocator = DefaultAllocator::default();
 
     // Load the runtime library module
