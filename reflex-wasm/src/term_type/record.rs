@@ -305,12 +305,13 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<RecordTerm, A> {
             } else {
                 compile_list(
                     values.map(|item| {
-                        let eagerness = if item.is_static() && item.as_signal_term().is_none() {
+                        // Skip signal-testing for record field values that are already fully evaluated to a non-signal value
+                        let strictness = if item.is_static() && item.as_signal_term().is_none() {
                             Strictness::NonStrict
                         } else {
                             Strictness::Strict
                         };
-                        (item, eagerness)
+                        (item, strictness)
                     }),
                     stack,
                     state,

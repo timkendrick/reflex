@@ -131,7 +131,7 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<VariableTerm, A> {
         &self,
         stack: CompilerStack,
         _state: &mut CompilerState,
-        options: &CompilerOptions,
+        _options: &CompilerOptions,
     ) -> CompilerResult<A> {
         let stack_offset = self.stack_offset();
         if let Some(scope_offset) = stack.lookup_variable(stack_offset) {
@@ -142,14 +142,10 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<VariableTerm, A> {
                 value_type: ValueType::HeapPointer,
                 scope_offset,
             });
-            let block = if options.lazy_variable_initializers {
-                // If the variable was initialized lazily, evaluate the result now that we're using it
-                // => [Term]
-                block.push(instruction::runtime::Evaluate)
-            } else {
-                // Otherwise the variable will already have been evaluated at initialization time, so no need to evaluate again
-                block
-            };
+            // If the variable was initialized lazily, evaluate the result now that we're using it
+            // TODO: Prevent unnecessary re-evaluation of already-evaluated scope values by tracking evaluation status in stack type
+            // => [Term]
+            let block = block.push(instruction::runtime::Evaluate);
             block.finish()
         } else {
             Err(CompilerError::UnboundVariable(stack_offset))
