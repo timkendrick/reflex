@@ -154,7 +154,7 @@
                   (return (global.get $FALSE)))
                 (else)))
             (else))
-          ;; If this was not the last bucket, continue with the next bucket
+          ;; If this was not the final bucket, continue with the next bucket
           (br_if $LOOP (i32.lt_u (local.tee $bucket_index (i32.add (local.get $bucket_index) (i32.const 1))) (local.get $capacity))))
         ;; If the entire hashmap was iterated without finding a non-atomic key, return true
         (global.get $TRUE))))
@@ -354,7 +354,7 @@
                     (local.get $existing_key)
                     (call $Term::Hashmap::get_bucket_value (local.get $self) (local.get $bucket_index))))
                 (else))
-              ;; If this was not the last bucket, continue with the next bucket
+              ;; If this was not the final bucket, continue with the next bucket
               (br_if $LOOP (i32.lt_u (local.tee $bucket_index (i32.add (local.get $bucket_index) (i32.const 1))) (local.get $existing_capacity))))))
         ;; Insert the provided key and value into the new hashmap
         (call $Term::Hashmap::insert (local.get $instance) (local.get $key) (local.get $value))
@@ -497,7 +497,7 @@
               (call $Term::Hashmap::set::num_entries (local.get $instance) (local.get $num_entries))
               ;; Reallocate the hashmap to a new location with double the capacity
               (local.set $instance
-                (call $Term::Hashmap::reallocate
+                (call $Term::Hashmap::clone_with_capacity
                   (local.get $instance)
                   (local.tee $capacity
                     (select
@@ -777,7 +777,7 @@
               (call $Term::Hashmap::set::num_entries (local.get $instance) (local.get $num_entries))
               ;; Reallocate the hashmap to a new location with double the capacity
               (local.set $instance
-                (call $Term::Hashmap::reallocate
+                (call $Term::Hashmap::clone_with_capacity
                   (local.get $instance)
                   (local.tee $capacity
                     (select
@@ -824,52 +824,43 @@
       (local.get $key)
       (local.get $value)))
 
-  (func $Term::Hashmap::reallocate (param $self i32) (param $capacity i32) (result i32)
+  (func $Term::Hashmap::clone_with_capacity (param $self i32) (param $capacity i32) (result i32)
+    ;; Return a newly-allocated hashmap with the same contents and the requested capacity.
+    ;; The requested capacity MUST be sufficient to hold the existing hashmap contents.
     (local $instance i32)
     (local $source_capacity i32)
     (local $bucket_index i32)
     (local $key i32)
     (local $num_entries i32)
-    (if (result i32)
-      ;; If the hashmap already has sufficient capacity, return it as-is
-      (i32.ge_u (local.tee $source_capacity (call $Term::Hashmap::get_capacity (local.get $self))) (local.get $capacity))
+    ;; Allocate a new hashmap with the given capacity, and copy the contents of the source hashmap
+    (local.tee $instance (call $Term::Hashmap::allocate (local.get $capacity)))
+    ;; If the source hashmap contains any entries, copy them across to the new hashmap
+    (if
+      (i32.ne (i32.const 0) (call $Term::Hashmap::get::num_entries (local.get $self)))
       (then
-        (local.get $self))
-      (else
-        ;; Otherwise allocate a new hashmap with the given capacity, and copy the contents of the source hashmap
-        (local.tee $instance (call $Term::Hashmap::allocate (local.get $capacity)))
-        ;; If the source hashmap contains any entries, copy them across to the new hashmap
-        (if
-          (i32.eqz (call $Term::Hashmap::get::num_entries (local.get $self)))
-          (then
-            ;; If this is not the global empty hashmap instance, rewrite the source hashmap as a redirect pointer term
-            ;; (this is to avoid breaking any existing pointers to the original hashmap address)
-            (if
-              (i32.ne (call $Term::Hashmap::empty) (local.get $self))
-              (then
-                (call $Term::redirect (local.get $self) (local.get $instance)))))
-          (else
-            ;; Iterate through each bucket in turn, inserting the existing entries into the new hashmap
-            (loop $LOOP
-              (if
-                ;; If the current bucket is not empty, copy it into the new hashmap
-                (local.tee $key (call $Term::Hashmap::get_bucket_key (local.get $self) (local.get $bucket_index)))
-                (then
-                  (call $Term::Hashmap::insert
-                    (local.get $instance)
-                    (local.get $key)
-                    (call $Term::Hashmap::get_bucket_value (local.get $self) (local.get $bucket_index)))
-                  ;; Keep track of how many entries have been added to the hashmap
-                  (local.set $num_entries (i32.add (local.get $num_entries) (i32.const 1))))
-                (else))
-              ;; If this was not the last bucket, continue with the next bucket
-              (br_if $LOOP (i32.lt_u (local.tee $bucket_index (i32.add (local.get $bucket_index) (i32.const 1))) (local.get $source_capacity))))
-              ;; Rewrite the source hashmap as a redirect pointer term
-              ;; (this is to avoid breaking any existing pointers to the original hashmap address)
-              (call $Term::redirect (local.get $self) (local.get $instance))))
-        ;; Initialize the hashmap term
-        ;; TODO: investigate whether reallocated hashmap initialization can be moved to the parent function
-        (call $Term::Hashmap::init (local.get $num_entries)))))
+        ;; Determine the capacity of the source hashmap for use in the iterator termination condition
+        (local.set $source_capacity (call $Term::Hashmap::get_capacity (local.get $self)))
+        ;; Iterate through each bucket in turn, inserting the existing entries into the new hashmap
+        (loop $LOOP
+          (if
+            ;; If the current bucket is not empty, copy it into the new hashmap
+            (local.tee $key (call $Term::Hashmap::get_bucket_key (local.get $self) (local.get $bucket_index)))
+            (then
+              (call $Term::Hashmap::insert
+                (local.get $instance)
+                (local.get $key)
+                (call $Term::Hashmap::get_bucket_value (local.get $self) (local.get $bucket_index)))
+              ;; Keep track of how many entries have been added to the hashmap
+              (local.set $num_entries (i32.add (local.get $num_entries) (i32.const 1))))
+            (else))
+          ;; If this was not the final bucket, continue with the next bucket
+          (br_if $LOOP
+            (i32.lt_u
+              (local.tee $bucket_index (i32.add (local.get $bucket_index) (i32.const 1)))
+              (local.get $source_capacity))))))
+    ;; Initialize the hashmap term
+    ;; TODO: investigate whether reallocated hashmap initialization can be moved to the parent function
+    (call $Term::Hashmap::init (local.get $num_entries)))
 
   (func $Term::Hashmap::has_dynamic_entries (param $self i32) (result i32)
     (local $bucket_index i32)
@@ -896,7 +887,7 @@
                   (return (global.get $TRUE)))
                 (else)))
             (else))
-          ;; If this was not the last bucket, continue with the next bucket
+          ;; If this was not the final bucket, continue with the next bucket
           (br_if $LOOP (i32.lt_u (local.tee $bucket_index (i32.add (local.get $bucket_index) (i32.const 1))) (local.get $capacity))))
         ;; If the entire hashmap was iterated without finding a dynamic entry, return false
         (global.get $FALSE))))

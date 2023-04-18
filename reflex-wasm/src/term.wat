@@ -141,7 +141,8 @@
     (local $end_offset i32)
     (local $foo i32)
     ;; If this was the most recently allocated object, nothing can ever have referenced it, so it can be safely wiped.
-    ;; Otherwise there may theoretically still be dangling references to the disposed term, so we point it to an error.
+    ;; Otherwise there may theoretically still be dangling references to the disposed term, so we leave it in place
+    ;; to be garbage-collected as necessary.
     (if
       ;; Consult the current allocator offset to check whether this was the most recently allocated object
       (i32.eq
@@ -154,21 +155,8 @@
         ;; If this was the most recently allocated object, wipe the memory
         (call $Allocator::shrink (local.get $end_offset) (local.get $size)))
       (else
-        ;; TODO: Implement type-specific drop implementations
-        ;; Otherwise create a redirect from the old address to an 'invalid pointer' error
-        (call $Term::redirect (local.get $self) (call $Term::Signal::invalid_pointer)))))
-
-  (func $Term::redirect (param $self i32) (param $target i32)
-    ;; This function overwrites an existing term with new contents, so take care not to call it on shared global objects
-    ;; The existing term must have at least one field (singleton instances should be created for zero-field terms)
-    ;; Zero out the bytes of the existing term
-    (memory.fill (local.get $self) (i32.const 0) (call $Term::traits::size (local.get $self)))
-    ;; Rewrite a redirect pointer term at the same address where the term used to exist
-    (call $TermType::Pointer::construct (call $Term::pointer::value (local.get $self)) (local.get $target))
-    ;; Initialize the pointer term
-    (call $Term::init (local.get $self))
-    ;; Ignore the result
-    (drop))
+        ;; Otherwise leave the term in place to be garbage-collected
+        (return))))
 
   (func $Term::traits::clone (param $self i32) (result i32)
     (local $instance i32)

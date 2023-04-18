@@ -137,7 +137,7 @@
             (local.get $capacity))
           (then
             ;; Reallocate the list with double the capacity
-            (local.set $self (call $Term::List::reallocate (local.get $self) (i32.mul (local.get $length) (i32.const 2)))))
+            (local.set $self (call $Term::List::clone_with_capacity (local.get $self) (i32.mul (local.get $length) (i32.const 2)))))
           (else))
         ;; Push the item onto the list and update the list length
         (call $Term::List::set::items::length (local.get $self) (i32.add (local.get $length) (i32.const 1)))
@@ -585,7 +585,7 @@
               (call $Term::List::set::items::length (local.get $instance) (local.get $index))
               ;; Reallocate the list to a new location with double the capacity
               (local.set $instance
-                (call $Term::List::reallocate
+                (call $Term::List::clone_with_capacity
                   (local.get $instance)
                   (local.tee $capacity
                     (select
@@ -756,7 +756,7 @@
                   (call $Term::List::set::items::length (local.get $instance) (local.get $index))
                   ;; Reallocate the list to a new location with double the capacity
                   (local.set $instance
-                    (call $Term::List::reallocate
+                    (call $Term::List::clone_with_capacity
                       (local.get $instance)
                       (local.tee $capacity
                         (select
@@ -789,34 +789,20 @@
             (call $Term::List::init (local.get $instance) (local.get $index))
             (local.get $dependencies))))))
 
-  (func $Term::List::reallocate (param $self i32) (param $capacity i32) (result i32)
+  (func $Term::List::clone_with_capacity (param $self i32) (param $capacity i32) (result i32)
+    ;; Return a newly-allocated list with the same contents and the requested capacity.
+    ;; The requested capacity MUST be sufficient to hold the existing list contents.
     (local $instance i32)
-    (if (result i32)
-      ;; If the list already has sufficient capacity, return it as-is
-      (i32.ge_u (call $Term::List::get::items::capacity (local.get $self)) (local.get $capacity))
+    ;; Allocate a new list with the given capacity
+    (local.tee $instance (call $Term::List::allocate (local.get $capacity)))
+    ;; If the source list contains any items, copy them across to the new list
+    (if
+      (i32.ne (i32.const 0) (call $Term::List::get::items::length (local.get $self)))
       (then
-        (local.get $self))
-      (else
-        ;; Otherwise allocate a new list with the given capacity
-        (local.tee $instance (call $Term::List::allocate (local.get $capacity)))
-        ;; If the source list contains any items, copy them across to the new list
-        (if
-          (i32.eqz (call $Term::List::get::items::length (local.get $self)))
-          (then
-            ;; If this is not the global empty list instance, rewrite the source list as a redirect pointer term
-            ;; (this is to avoid breaking any existing pointers to the original list address)
-            (if
-              (i32.ne (call $Term::List::empty) (local.get $self))
-              (then
-                (call $Term::redirect (local.get $self) (local.get $instance)))))
-          (else
-            (memory.copy
-              (call $Term::List::get::items::pointer (local.get $instance) (i32.const 0))
-              (call $Term::List::get::items::pointer (local.get $self) (i32.const 0))
-              (i32.mul (call $Term::List::get::items::length (local.get $self)) (i32.const 4)))
-            ;; Rewrite the source list as a redirect pointer term
-            ;; (this is to avoid breaking any existing pointers to the original list address)
-            (call $Term::redirect (local.get $self) (local.get $instance)))))))
+        (memory.copy
+          (call $Term::List::get::items::pointer (local.get $instance) (i32.const 0))
+          (call $Term::List::get::items::pointer (local.get $self) (i32.const 0))
+          (i32.mul (call $Term::List::get::items::length (local.get $self)) (i32.const 4))))))
 
   (func $Term::List::has_dynamic_items (param $self i32) (result i32)
     (local $length i32)
