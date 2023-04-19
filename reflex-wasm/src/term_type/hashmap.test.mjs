@@ -108,6 +108,67 @@ export default (describe) => {
       assert.strictEqual(format(dependencies), 'NULL');
     });
 
+    test('substitution', (assert, {
+      createApplication,
+      createInt,
+      createHashmap,
+      createLambda,
+      createString,
+      createTriple,
+      createVariable,
+      evaluate,
+      format,
+      getHashmapEntries,
+      NULL,
+    }) => {
+      (() => {
+        const expression = createApplication(
+          createLambda(
+            3,
+            createHashmap([
+              [createString('foo'), createInt(3)],
+              [createString('bar'), createInt(4)],
+              [createString('baz'), createInt(5)],
+            ]),
+          ),
+          createTriple(createInt(3), createInt(4), createInt(5)),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.deepEqual(
+          new Map(getHashmapEntries(result).map(([key, value]) => [format(key), format(value)])),
+          new Map([
+            ['"foo"', '3'],
+            ['"bar"', '4'],
+            ['"baz"', '5'],
+          ]),
+        );
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createLambda(
+            3,
+            createHashmap([
+              [createString('foo'), createVariable(2)],
+              [createString('bar'), createVariable(1)],
+              [createString('baz'), createVariable(0)],
+            ]),
+          ),
+          createTriple(createInt(3), createInt(4), createInt(5)),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.deepEqual(
+          new Map(getHashmapEntries(result).map(([key, value]) => [format(key), format(value)])),
+          new Map([
+            ['"foo"', '3'],
+            ['"bar"', '4'],
+            ['"baz"', '5'],
+          ]),
+        );
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+    });
+
     test('iteration', (assert, {
       createApplication,
       createBuiltin,

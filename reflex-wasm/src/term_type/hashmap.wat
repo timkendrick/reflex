@@ -192,8 +192,15 @@
         (local.set $capacity (call $Term::Hashmap::get_capacity (local.get $self)))
         (local.set $results (global.get $NULL))
         (loop $LOOP
-          ;; If this bucket is empty, continue with the next bucket
-          (br_if $LOOP (i32.eqz (local.tee $key (call $Term::Hashmap::get_bucket_key (local.get $self) (local.get $index)))))
+          ;; Retrieve the bucket key at the given index
+          (local.set $key (call $Term::Hashmap::get_bucket_key (local.get $self) (local.get $index)))
+          ;; If this bucket is empty, we skip over this bucket and continue with the next one
+          ;; Increment the iterator index in anticipation of continuing with the next item
+          (local.set $index (i32.add (local.get $index) (i32.const 1)))
+          ;; If the bucket key is uninitialized, continue with the next iteration
+          (br_if $LOOP (i32.eqz (local.get $key)))
+          ;;; Otherwise decrement the iterator index to revert it to the correct value for the current iteration
+          (local.set $index (i32.sub (local.get $index) (i32.const 1)))
           ;; Get the substituted key and value
           (local.set $substituted_key
             (call $Term::traits::substitute
