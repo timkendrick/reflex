@@ -8,8 +8,8 @@ use std::{
 };
 
 use reflex::core::{
-    ConditionListType, ConditionType, DependencyList, EvaluationResult, Expression,
-    ExpressionFactory, RefType, SignalTermType, SignalType, StateToken,
+    ConditionListType, ConditionType, EvaluationResult, Expression, ExpressionFactory, RefType,
+    SignalTermType, SignalType, StateToken,
 };
 use reflex_dispatcher::{
     Action, ActorEvents, HandlerContext, MessageData, NoopDisposeCallback, SchedulerMode,
@@ -52,109 +52,74 @@ impl<T: Expression> Default for QueryInspectorState<T> {
 }
 impl<T: Expression> QueryInspectorState<T> {
     pub fn to_json(&self, factory: &impl ExpressionFactory<T>) -> JsonValue {
-        let queries = self.active_workers.iter().map(|(worker_id, worker_state)| {
-            worker_state.to_json(*worker_id, &self.active_effects, factory)
+        let serialized_queries = self.active_workers.iter().map(|(worker_id, worker_state)| {
+            json!({
+                "id": *worker_id,
+                "label": &worker_state.label,
+                "result": match worker_state.latest_result.as_ref() {
+                    None => JsonValue::Null,
+                    Some(result) => json!({
+                        "value": serialize_value(result.result(), factory),
+                        "dependencies": JsonValue::Array(result.dependencies().iter().map(JsonValue::from).collect()),
+                    }),
+                },
+            })
         });
-        let effects = self
-            .active_effects
-            .values()
-            .filter(|effect_state| is_unresolved_effect_state(effect_state, factory))
-            .map(|effect_state| {
-                json!({
-                    "effect": serialize_effect(&effect_state.effect),
-                    "value": serialize_effect_result(effect_state.value.as_ref(), factory),
-                })
-            });
+        let serialized_effects = self.active_effects.values().map(|effect_state| {
+            json!({
+                "effect": serialize_effect(&effect_state.effect, factory),
+                "value": match effect_state.value.as_ref() {
+                    None => JsonValue::Null,
+                    Some(value) => serialize_value(value, factory),
+                },
+            })
+        });
         json!({
-            "numEffects": &self.active_effects.len(),
-            "queries": queries.collect::<Vec<_>>(),
-            "effects": effects.collect::<Vec<_>>()
+            "queries": serialized_queries.collect::<Vec<_>>(),
+            "effects": serialized_effects.collect::<Vec<_>>()
         })
     }
 }
 
-fn serialize_query_result<T: Expression>(
-    result: Option<&EvaluationResult<T>>,
-    active_effects: &HashMap<StateToken, QueryInspectorEffectState<T>>,
-    factory: &impl ExpressionFactory<T>,
-) -> JsonValue {
-    match result {
-        None => JsonValue::Null,
-        Some(result) => json!({
-            "value": serialize_value(result.result(), factory),
-            "dependencies": JsonValue::Array(get_unresolved_dependencies(result.dependencies(), active_effects, factory).map(JsonValue::from).collect()),
-        }),
-    }
-}
-
-fn get_unresolved_dependencies<'a, T: Expression>(
-    dependencies: &'a DependencyList,
-    active_effects: &'a HashMap<StateToken, QueryInspectorEffectState<T>>,
-    factory: &'a impl ExpressionFactory<T>,
-) -> impl Iterator<Item = StateToken> + 'a {
-    dependencies
-        .iter()
-        .filter(|state_token| is_unresolved_dependency(state_token, active_effects, factory))
-}
-
-fn is_unresolved_dependency<T: Expression>(
-    state_token: &StateToken,
-    active_effects: &HashMap<StateToken, QueryInspectorEffectState<T>>,
-    factory: &impl ExpressionFactory<T>,
-) -> bool {
-    match active_effects.get(state_token) {
-        None => true,
-        Some(effect_state) => is_unresolved_effect_state(effect_state, factory),
-    }
-}
-
-fn is_unresolved_effect_state<T: Expression>(
-    effect_state: &QueryInspectorEffectState<T>,
-    factory: &impl ExpressionFactory<T>,
-) -> bool {
-    match effect_state.value.as_ref() {
-        None => true,
-        Some(value) => factory
-            .match_signal_term(value)
-            .map(|term| {
-                term.signals()
-                    .as_deref()
-                    .iter()
-                    .any(|effect| is_unresolved_effect(effect.as_deref()))
-            })
-            .unwrap_or(false),
-    }
-}
-
-fn is_unresolved_effect<T: Expression>(effect: &impl ConditionType<T>) -> bool {
-    match effect.signal_type() {
-        SignalType::Error { .. } => false,
-        SignalType::Pending | SignalType::Custom { .. } => true,
-    }
-}
-
-fn serialize_effect_result<T: Expression>(
-    result: Option<&T>,
-    factory: &impl ExpressionFactory<T>,
-) -> JsonValue {
-    match result {
-        None => JsonValue::Null,
-        Some(value) => serialize_value(value, factory),
-    }
-}
-
 fn serialize_value<T: Expression>(value: &T, factory: &impl ExpressionFactory<T>) -> JsonValue {
-    if let Some(value) = factory.match_signal_term(value) {
+    if let Ok(serialized_value) = reflex_json::sanitize(value) {
+        serialized_value
+    } else if let Some(value) = factory.match_signal_term(value) {
         JsonValue::Array(
             value
                 .signals()
                 .as_deref()
                 .iter()
-                .map(|effect| serialize_effect(effect.as_deref()))
+                .map(|effect| serialize_effect(effect.as_deref(), factory))
                 .collect(),
         )
     } else {
-        JsonValue::Number(value.id().into())
+        JsonValue::String(format!("{value}"))
+    }
+}
+
+fn serialize_effect<T: Expression>(
+    effect: &impl ConditionType<T>,
+    factory: &impl ExpressionFactory<T>,
+) -> JsonValue {
+    match effect.signal_type() {
+        SignalType::Custom {
+            effect_type,
+            payload,
+            token,
+        } => json!({
+            "id": JsonValue::Number(effect.id().into()),
+            "type": serialize_value(&effect_type, factory),
+            "payload": serialize_value(&payload, factory),
+            "token": serialize_value(&token, factory),
+        }),
+        SignalType::Error { payload } => json!({
+            "type": "error",
+            "payload": serialize_value(&payload, factory),
+        }),
+        SignalType::Pending => json!({
+            "type": "pending",
+        }),
     }
 }
 
@@ -172,47 +137,6 @@ struct QueryInspectorWorkerState<T: Expression> {
     #[allow(dead_code)]
     invalidation_strategy: QueryInvalidationStrategy,
     latest_result: Option<EvaluationResult<T>>,
-}
-impl<T: Expression> QueryInspectorWorkerState<T> {
-    fn to_json(
-        &self,
-        worker_id: StateToken,
-        active_effects: &HashMap<StateToken, QueryInspectorEffectState<T>>,
-        factory: &impl ExpressionFactory<T>,
-    ) -> JsonValue {
-        json!({
-            "id": worker_id,
-            "label": &self.label,
-            "result": serialize_query_result(self.latest_result.as_ref(), active_effects, factory),
-        })
-    }
-}
-
-fn serialize_effect<T: Expression>(effect: &impl ConditionType<T>) -> JsonValue {
-    match effect.signal_type() {
-        SignalType::Custom {
-            effect_type,
-            payload,
-            token,
-        } => json!({
-            "id": JsonValue::Number(effect.id().into()),
-            "type": reflex_json::sanitize(&effect_type).unwrap_or_else(|_| json!({})),
-            "payload": reflex_json::sanitize(&payload).unwrap_or_else(|_| json!({})),
-            "token": reflex_json::sanitize(&token).unwrap_or_else(|_| json!({})),
-        }),
-        SignalType::Error { payload } => json!({
-            "id": JsonValue::Number(effect.id().into()),
-            "type": "error",
-            "payload": reflex_json::sanitize(&payload).unwrap_or_else(|_| json!({})),
-            "token": JsonValue::Null,
-        }),
-        SignalType::Pending => json!({
-            "id": JsonValue::Number(effect.id().into()),
-            "type": "pending",
-            "payload": JsonValue::Null,
-            "token": JsonValue::Null,
-        }),
-    }
 }
 
 dispatcher!({
