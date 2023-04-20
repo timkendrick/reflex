@@ -5,7 +5,10 @@
 use std::collections::HashSet;
 
 use chrono::{DateTime, NaiveDateTime, SecondsFormat, Utc};
-use reflex::core::{DependencyList, Eagerness, GraphNode, Internable, SerializeJson, StackOffset};
+use reflex::core::{
+    DependencyList, Eagerness, GraphNode, Internable, SerializeJson, StackOffset,
+    TimestampTermType, TimestampValue,
+};
 use reflex_macros::PointerIter;
 use serde_json::Value as JsonValue;
 
@@ -16,6 +19,7 @@ use crate::{
         CompilerOptions, CompilerResult, CompilerStack, CompilerState, ConstValue,
     },
     hash::{TermHash, TermHasher, TermSize},
+    term_type::TypedTerm,
     utils::{chunks_to_i64, i64_to_chunks},
     ArenaRef,
 };
@@ -52,6 +56,18 @@ impl From<DateTerm> for i64 {
 impl<A: Arena + Clone> ArenaRef<DateTerm, A> {
     pub fn timestamp(&self) -> i64 {
         self.read_value(|term| i64::from(*term))
+    }
+}
+
+impl<A: Arena + Clone> TimestampTermType for ArenaRef<DateTerm, A> {
+    fn millis(&self) -> TimestampValue {
+        self.timestamp() as TimestampValue
+    }
+}
+
+impl<A: Arena + Clone> TimestampTermType for ArenaRef<TypedTerm<DateTerm>, A> {
+    fn millis(&self) -> TimestampValue {
+        <ArenaRef<DateTerm, A> as TimestampTermType>::millis(&self.as_inner())
     }
 }
 

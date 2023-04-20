@@ -1423,6 +1423,7 @@ impl<A: Arena + Clone> Expression for ArenaRef<Term, A> {
     type FloatTerm = ArenaRef<TypedTerm<FloatTerm>, A>;
     type StringTerm = ArenaRef<TypedTerm<StringTerm>, A>;
     type SymbolTerm = ArenaRef<TypedTerm<SymbolTerm>, A>;
+    type TimestampTerm = ArenaRef<TypedTerm<DateTerm>, A>;
     type VariableTerm = ArenaRef<TypedTerm<VariableTerm>, A>;
     type EffectTerm = ArenaRef<TypedTerm<EffectTerm>, A>;
     type LetTerm = ArenaRef<TypedTerm<LetTerm>, A>;

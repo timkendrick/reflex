@@ -17,7 +17,8 @@ use reflex::{
         HashsetTermType, HeapAllocator, InstructionPointer, IntTermType, IntValue, LambdaTermType,
         LetTermType, ListTermType, PartialApplicationTermType, RecordTermType, RecursiveTermType,
         RefType, SignalTermType, SignalType, StackOffset, StringTermType, StringValue,
-        StructPrototypeType, SymbolId, SymbolTermType, VariableTermType,
+        StructPrototypeType, SymbolId, SymbolTermType, TimestampTermType, TimestampValue,
+        VariableTermType,
     },
     hash::HashId,
 };
@@ -29,10 +30,10 @@ use crate::{
     hash::TermSize,
     term_type::{
         ApplicationTerm, BooleanTerm, BuiltinTerm, ConditionTerm, ConstructorTerm, CustomCondition,
-        EffectTerm, ErrorCondition, FloatTerm, HashmapTerm, HashsetTerm, IntTerm, LambdaTerm,
-        LetTerm, ListTerm, NilTerm, PartialTerm, PendingCondition, RecordTerm, SignalTerm,
-        StringTerm, SymbolTerm, TermType, TermTypeDiscriminants, TreeTerm, TypedTerm, VariableTerm,
-        WasmExpression,
+        DateTerm, EffectTerm, ErrorCondition, FloatTerm, HashmapTerm, HashsetTerm, IntTerm,
+        LambdaTerm, LetTerm, ListTerm, NilTerm, PartialTerm, PendingCondition, RecordTerm,
+        SignalTerm, StringTerm, SymbolTerm, TermType, TermTypeDiscriminants, TreeTerm, TypedTerm,
+        VariableTerm, WasmExpression,
     },
     ArenaPointer, ArenaRef, FunctionIndex, Term,
 };
@@ -74,6 +75,8 @@ where
             Ok(self.create_string_term(value))
         } else if let Some(term) = factory.match_symbol_term(expression) {
             Ok(self.create_symbol_term(term.id()))
+        } else if let Some(term) = factory.match_timestamp_term(expression) {
+            Ok(self.create_timestamp_term(term.millis()))
         } else if let Some(term) = factory.match_variable_term(expression) {
             Ok(self.create_variable_term(term.offset()))
         } else if let Some(term) = factory.match_effect_term(expression) {
@@ -225,6 +228,8 @@ where
             Ok(factory.create_string_term(value))
         } else if let Some(term) = expression.as_symbol_term() {
             Ok(factory.create_symbol_term(term.id()))
+        } else if let Some(term) = expression.as_date_term() {
+            Ok(factory.create_timestamp_term(term.millis()))
         } else if let Some(term) = expression.as_variable_term() {
             let term = term.as_inner();
             Ok(factory.create_variable_term(term.offset()))
@@ -808,6 +813,15 @@ where
         ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
+    fn create_timestamp_term(&self, millis: TimestampValue) -> ArenaRef<Term, Self> {
+        let term = Term::new(
+            TermType::Date(DateTerm::from(millis)),
+            &*self.arena.borrow(),
+        );
+        let pointer = self.arena.borrow_mut().deref_mut().allocate(term);
+        ArenaRef::<Term, Self>::new(self.clone(), pointer)
+    }
+
     fn create_variable_term(&self, offset: StackOffset) -> ArenaRef<Term, Self> {
         let term = Term::new(
             TermType::Variable(VariableTerm {
@@ -1171,6 +1185,16 @@ where
     ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::SymbolTerm> {
         match expression.read_value(|term| term.type_id()) {
             TermTypeDiscriminants::Symbol => Some(expression.as_typed_term::<SymbolTerm>()),
+            _ => None,
+        }
+    }
+
+    fn match_timestamp_term<'a>(
+        &self,
+        expression: &'a ArenaRef<Term, Self>,
+    ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::TimestampTerm> {
+        match expression.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Date => Some(expression.as_typed_term::<DateTerm>()),
             _ => None,
         }
     }
