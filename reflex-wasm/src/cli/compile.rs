@@ -1057,6 +1057,7 @@ fn parse_runtime_exports(module: &Module) -> Result<RuntimeExportMappings, WasmC
             )?,
             create_record: get_builtin_function(&exported_functions, RuntimeBuiltin::CreateRecord)?,
             create_signal: get_builtin_function(&exported_functions, RuntimeBuiltin::CreateSignal)?,
+            create_symbol: get_builtin_function(&exported_functions, RuntimeBuiltin::CreateSymbol)?,
             create_timestamp: get_builtin_function(
                 &exported_functions,
                 RuntimeBuiltin::CreateTimestamp,

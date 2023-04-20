@@ -40,6 +40,7 @@ pub enum RuntimeBuiltin {
     CreateRecord,
     CreateTimestamp,
     CreateSignal,
+    CreateSymbol,
     CreateTree,
     CreateEmptyIterator,
     CreateEvaluateIterator,
@@ -171,6 +172,9 @@ impl RuntimeBuiltin {
             ),
             RuntimeBuiltin::CreateSignal => {
                 TypeSignature::new(ValueType::HeapPointer, ValueType::HeapPointer)
+            }
+            RuntimeBuiltin::CreateSymbol => {
+                TypeSignature::new(ValueType::I64, ValueType::HeapPointer)
             }
             RuntimeBuiltin::CreateTimestamp => {
                 TypeSignature::new(ValueType::I64, ValueType::HeapPointer)
@@ -322,6 +326,7 @@ impl RuntimeBuiltin {
             RuntimeBuiltin::CreatePointer => "createPointer",
             RuntimeBuiltin::CreateRecord => "createRecord",
             RuntimeBuiltin::CreateSignal => "createSignal",
+            RuntimeBuiltin::CreateSymbol => "createSymbol",
             RuntimeBuiltin::CreateTimestamp => "createTimestamp",
             RuntimeBuiltin::CreateTree => "createTree",
             RuntimeBuiltin::CreateEmptyIterator => "createEmptyIterator",
