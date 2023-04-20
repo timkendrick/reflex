@@ -1163,13 +1163,13 @@ export default (describe) => {
       })();
     });
 
-    test('(Date, String)', (assert, {
+    test('(Timestamp, String)', (assert, {
       createApplication,
       createBuiltin,
-      createDate,
       createEmptyList,
       createPair,
       createString,
+      createTimestamp,
       evaluate,
       format,
       NULL,
@@ -1180,7 +1180,7 @@ export default (describe) => {
         const expression = createApplication(
           createApplication(
             createBuiltin(Stdlib.Accessor),
-            createPair(createDate(timestamp), createString('getTime')),
+            createPair(createTimestamp(timestamp), createString('getTime')),
           ),
           createEmptyList(),
         );

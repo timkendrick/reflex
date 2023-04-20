@@ -1038,7 +1038,6 @@ fn parse_runtime_exports(module: &Module) -> Result<RuntimeExportMappings, WasmC
                 &exported_functions,
                 RuntimeBuiltin::CreateConstructor,
             )?,
-            create_date: get_builtin_function(&exported_functions, RuntimeBuiltin::CreateDate)?,
             create_effect: get_builtin_function(&exported_functions, RuntimeBuiltin::CreateEffect)?,
             create_float: get_builtin_function(&exported_functions, RuntimeBuiltin::CreateFloat)?,
             create_hashset: get_builtin_function(
@@ -1058,6 +1057,10 @@ fn parse_runtime_exports(module: &Module) -> Result<RuntimeExportMappings, WasmC
             )?,
             create_record: get_builtin_function(&exported_functions, RuntimeBuiltin::CreateRecord)?,
             create_signal: get_builtin_function(&exported_functions, RuntimeBuiltin::CreateSignal)?,
+            create_timestamp: get_builtin_function(
+                &exported_functions,
+                RuntimeBuiltin::CreateTimestamp,
+            )?,
             create_tree: get_builtin_function(&exported_functions, RuntimeBuiltin::CreateTree)?,
             create_empty_iterator: get_builtin_function(
                 &exported_functions,

@@ -7,7 +7,7 @@ use wasmtime::{AsContext, AsContextMut, Caller, Extern, Memory, StoreContext};
 
 use crate::{
     interpreter::{InterpreterError, WasmContextBuilder},
-    term_type::date::DateTimestamp,
+    term_type::timestamp::UtcTimestamp,
     ArenaPointer, WASM_PAGE_SIZE,
 };
 
@@ -45,7 +45,7 @@ pub fn add_wasm_runtime_imports(
             "Date",
             "toISOString",
             |mut caller: Caller<'_, WasiCtx>, timestamp: i64, dest_pointer: u32| -> u32 {
-                let formatted = format!("{}", DateTimestamp(timestamp));
+                let formatted = format!("{}", UtcTimestamp(timestamp));
                 let formatted_bytes = formatted.as_bytes();
                 match get_linear_memory(&mut caller, memory_name).and_then(|mut memory| {
                     write_linear_memory_bytes(

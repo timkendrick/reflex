@@ -8,18 +8,18 @@
     (@impl
       (i32.eq (global.get $TermType::Int))
       (func $Stdlib_ParseDate::impl::Int (param $self i32) (param $state i32) (result i32 i32)
-        (call $Term::Date::new (call $Term::Int::get_value (local.get $self)))
+        (call $Term::Timestamp::new (call $Term::Int::get_value (local.get $self)))
         (global.get $NULL)))
 
     (@impl
       (i32.eq (global.get $TermType::Float))
       (func $Stdlib_ParseDate::impl::Float (param $self i32) (param $state i32) (result i32 i32)
-        (call $Term::Date::new (i64.trunc_f64_s (call $Term::Float::get_value (local.get $self))))
+        (call $Term::Timestamp::new (i64.trunc_f64_s (call $Term::Float::get_value (local.get $self))))
         (global.get $NULL)))
 
     (@impl
-      (i32.eq (global.get $TermType::Date))
-      (func $Stdlib_ParseDate::impl::Date (param $self i32) (param $state i32) (result i32 i32)
+      (i32.eq (global.get $TermType::Timestamp))
+      (func $Stdlib_ParseDate::impl::Timestamp (param $self i32) (param $state i32) (result i32 i32)
         (local.get $self)
         (global.get $NULL)))
 
@@ -35,7 +35,7 @@
                 (call $Term::String::get_length (local.get $self))))
             (i64.const 0xFFFFFFFFFFFFFFFF))
           (then
-            (call $Term::Date::new (local.get $timestamp))
+            (call $Term::Timestamp::new (local.get $timestamp))
             (global.get $NULL))
           (else
             (call $Stdlib_ParseDate::impl::default (local.get $self) (local.get $state))))))

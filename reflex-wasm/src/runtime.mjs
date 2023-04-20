@@ -26,7 +26,6 @@ function createTermTypes(runtime) {
     List: runtime.TermType_List.value,
     Condition: runtime.TermType_Condition.value,
     Constructor: runtime.TermType_Constructor.value,
-    Date: runtime.TermType_Date.value,
     Effect: runtime.TermType_Effect.value,
     Float: runtime.TermType_Float.value,
     Int: runtime.TermType_Int.value,
@@ -37,6 +36,7 @@ function createTermTypes(runtime) {
     Signal: runtime.TermType_Signal.value,
     String: runtime.TermType_String.value,
     Symbol: runtime.TermType_Symbol.value,
+    Timestamp: runtime.TermType_Timestamp.value,
     Tree: runtime.TermType_Tree.value,
     Lambda: runtime.TermType_Lambda.value,
     Variable: runtime.TermType_Variable.value,
@@ -253,13 +253,13 @@ export function createRuntime(runtime) {
       const length = runtime.getStringLength(value);
       return new TextDecoder('utf-8').decode(new Uint8Array(runtime.memory.buffer, offset, length));
     },
-    createDate(timestamp) {
-      return runtime.createDate(BigInt(timestamp));
+    createTimestamp(millis) {
+      return runtime.createTimestamp(BigInt(millis));
     },
-    isDate(value) {
-      return runtime.isDate(value);
+    isTimestamp(value) {
+      return runtime.isTimestamp(value);
     },
-    getDateTimestamp(value) {
+    getTimestampMillis(value) {
       return Number(runtime.getDateTimestamp(value));
     },
     createSignal(condition) {

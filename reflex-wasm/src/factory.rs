@@ -30,10 +30,10 @@ use crate::{
     hash::TermSize,
     term_type::{
         ApplicationTerm, BooleanTerm, BuiltinTerm, ConditionTerm, ConstructorTerm, CustomCondition,
-        DateTerm, EffectTerm, ErrorCondition, FloatTerm, HashmapTerm, HashsetTerm, IntTerm,
-        LambdaTerm, LetTerm, ListTerm, NilTerm, PartialTerm, PendingCondition, RecordTerm,
-        SignalTerm, StringTerm, SymbolTerm, TermType, TermTypeDiscriminants, TreeTerm, TypedTerm,
-        VariableTerm, WasmExpression,
+        EffectTerm, ErrorCondition, FloatTerm, HashmapTerm, HashsetTerm, IntTerm, LambdaTerm,
+        LetTerm, ListTerm, NilTerm, PartialTerm, PendingCondition, RecordTerm, SignalTerm,
+        StringTerm, SymbolTerm, TermType, TermTypeDiscriminants, TimestampTerm, TreeTerm,
+        TypedTerm, VariableTerm, WasmExpression,
     },
     ArenaPointer, ArenaRef, FunctionIndex, Term,
 };
@@ -228,7 +228,7 @@ where
             Ok(factory.create_string_term(value))
         } else if let Some(term) = expression.as_symbol_term() {
             Ok(factory.create_symbol_term(term.id()))
-        } else if let Some(term) = expression.as_date_term() {
+        } else if let Some(term) = expression.as_timestamp_term() {
             Ok(factory.create_timestamp_term(term.millis()))
         } else if let Some(term) = expression.as_variable_term() {
             let term = term.as_inner();
@@ -815,7 +815,7 @@ where
 
     fn create_timestamp_term(&self, millis: TimestampValue) -> ArenaRef<Term, Self> {
         let term = Term::new(
-            TermType::Date(DateTerm::from(millis)),
+            TermType::Timestamp(TimestampTerm::from(millis)),
             &*self.arena.borrow(),
         );
         let pointer = self.arena.borrow_mut().deref_mut().allocate(term);
@@ -1194,7 +1194,7 @@ where
         expression: &'a ArenaRef<Term, Self>,
     ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::TimestampTerm> {
         match expression.read_value(|term| term.type_id()) {
-            TermTypeDiscriminants::Date => Some(expression.as_typed_term::<DateTerm>()),
+            TermTypeDiscriminants::Timestamp => Some(expression.as_typed_term::<TimestampTerm>()),
             _ => None,
         }
     }

@@ -28,7 +28,6 @@ pub mod builtin;
 pub mod cell;
 pub mod condition;
 pub mod constructor;
-pub mod date;
 pub mod effect;
 pub mod float;
 pub mod hashmap;
@@ -45,6 +44,7 @@ pub mod record;
 pub mod signal;
 pub mod string;
 pub mod symbol;
+pub mod timestamp;
 pub mod tree;
 pub mod variable;
 
@@ -54,7 +54,6 @@ pub use builtin::*;
 pub use cell::*;
 pub use condition::*;
 pub use constructor::*;
-pub use date::*;
 pub use effect::*;
 pub use float::*;
 pub use hashmap::*;
@@ -71,6 +70,7 @@ pub use record::*;
 pub use signal::*;
 pub use string::*;
 pub use symbol::*;
+pub use timestamp::*;
 pub use tree::*;
 pub use variable::*;
 
@@ -85,7 +85,6 @@ pub enum TermType {
     Cell(CellTerm),
     Condition(ConditionTerm),
     Constructor(ConstructorTerm),
-    Date(DateTerm),
     Effect(EffectTerm),
     Float(FloatTerm),
     Hashmap(HashmapTerm),
@@ -101,6 +100,7 @@ pub enum TermType {
     Signal(SignalTerm),
     String(StringTerm),
     Symbol(SymbolTerm),
+    Timestamp(TimestampTerm),
     Tree(TreeTerm),
     Variable(VariableTerm),
     EmptyIterator(EmptyIteratorTerm),
@@ -131,7 +131,6 @@ impl TryFrom<u32> for TermTypeDiscriminants {
             value if value == Self::Cell as u32 => Ok(Self::Cell),
             value if value == Self::Condition as u32 => Ok(Self::Condition),
             value if value == Self::Constructor as u32 => Ok(Self::Constructor),
-            value if value == Self::Date as u32 => Ok(Self::Date),
             value if value == Self::Effect as u32 => Ok(Self::Effect),
             value if value == Self::Float as u32 => Ok(Self::Float),
             value if value == Self::Hashmap as u32 => Ok(Self::Hashmap),
@@ -147,6 +146,7 @@ impl TryFrom<u32> for TermTypeDiscriminants {
             value if value == Self::Signal as u32 => Ok(Self::Signal),
             value if value == Self::String as u32 => Ok(Self::String),
             value if value == Self::Symbol as u32 => Ok(Self::Symbol),
+            value if value == Self::Timestamp as u32 => Ok(Self::Timestamp),
             value if value == Self::Tree as u32 => Ok(Self::Tree),
             value if value == Self::Variable as u32 => Ok(Self::Variable),
             value if value == Self::EmptyIterator as u32 => Ok(Self::EmptyIterator),
@@ -182,7 +182,6 @@ impl TermSize for TermType {
             Self::Cell(term) => term.size_of(),
             Self::Condition(term) => term.size_of(),
             Self::Constructor(term) => term.size_of(),
-            Self::Date(term) => term.size_of(),
             Self::Effect(term) => term.size_of(),
             Self::Float(term) => term.size_of(),
             Self::Hashmap(term) => term.size_of(),
@@ -198,6 +197,7 @@ impl TermSize for TermType {
             Self::Signal(term) => term.size_of(),
             Self::String(term) => term.size_of(),
             Self::Symbol(term) => term.size_of(),
+            Self::Timestamp(term) => term.size_of(),
             Self::Tree(term) => term.size_of(),
             Self::Variable(term) => term.size_of(),
             Self::EmptyIterator(term) => term.size_of(),
@@ -241,9 +241,6 @@ impl TermHash for TermType {
                 .hash(term, arena),
             Self::Constructor(term) => hasher
                 .write_u8(TermTypeDiscriminants::Constructor as u8)
-                .hash(term, arena),
-            Self::Date(term) => hasher
-                .write_u8(TermTypeDiscriminants::Date as u8)
                 .hash(term, arena),
             Self::Effect(term) => hasher
                 .write_u8(TermTypeDiscriminants::Effect as u8)
@@ -289,6 +286,9 @@ impl TermHash for TermType {
                 .hash(term, arena),
             Self::Symbol(term) => hasher
                 .write_u8(TermTypeDiscriminants::Symbol as u8)
+                .hash(term, arena),
+            Self::Timestamp(term) => hasher
+                .write_u8(TermTypeDiscriminants::Timestamp as u8)
                 .hash(term, arena),
             Self::Tree(term) => hasher
                 .write_u8(TermTypeDiscriminants::Tree as u8)
@@ -356,7 +356,6 @@ pub enum TermPointerIterator {
     Cell(CellTermPointerIter),
     Condition(ConditionTermPointerIter),
     Constructor(ConstructorTermPointerIter),
-    Date(DateTermPointerIter),
     Effect(EffectTermPointerIter),
     Float(FloatTermPointerIter),
     Hashmap(HashmapTermPointerIter),
@@ -372,6 +371,7 @@ pub enum TermPointerIterator {
     Signal(SignalTermPointerIter),
     String(StringTermPointerIter),
     Symbol(SymbolTermPointerIter),
+    Timestamp(TimestampTermPointerIter),
     Tree(TreeTermPointerIter),
     Variable(VariableTermPointerIter),
     EmptyIterator(EmptyIteratorTermPointerIter),
@@ -402,7 +402,6 @@ impl Iterator for TermPointerIterator {
             TermPointerIterator::Cell(inner) => inner.next(),
             TermPointerIterator::Condition(inner) => inner.next(),
             TermPointerIterator::Constructor(inner) => inner.next(),
-            TermPointerIterator::Date(inner) => inner.next(),
             TermPointerIterator::Effect(inner) => inner.next(),
             TermPointerIterator::Float(inner) => inner.next(),
             TermPointerIterator::Hashmap(inner) => inner.next(),
@@ -418,6 +417,7 @@ impl Iterator for TermPointerIterator {
             TermPointerIterator::Signal(inner) => inner.next(),
             TermPointerIterator::String(inner) => inner.next(),
             TermPointerIterator::Symbol(inner) => inner.next(),
+            TermPointerIterator::Timestamp(inner) => inner.next(),
             TermPointerIterator::Tree(inner) => inner.next(),
             TermPointerIterator::Variable(inner) => inner.next(),
             TermPointerIterator::EmptyIterator(inner) => inner.next(),
@@ -468,9 +468,6 @@ impl<A: Arena + Clone> PointerIter for ArenaRef<Term, A> {
             TermTypeDiscriminants::Constructor => TermPointerIterator::Constructor(
                 self.as_typed_term::<ConstructorTerm>().as_inner().iter(),
             ),
-            TermTypeDiscriminants::Date => {
-                TermPointerIterator::Date(self.as_typed_term::<DateTerm>().as_inner().iter())
-            }
             TermTypeDiscriminants::Effect => {
                 TermPointerIterator::Effect(self.as_typed_term::<EffectTerm>().as_inner().iter())
             }
@@ -516,6 +513,9 @@ impl<A: Arena + Clone> PointerIter for ArenaRef<Term, A> {
             TermTypeDiscriminants::Symbol => {
                 TermPointerIterator::Symbol(self.as_typed_term::<SymbolTerm>().as_inner().iter())
             }
+            TermTypeDiscriminants::Timestamp => TermPointerIterator::Timestamp(
+                self.as_typed_term::<TimestampTerm>().as_inner().iter(),
+            ),
             TermTypeDiscriminants::Tree => TermPointerIterator::Tree(PointerIter::iter(
                 &self.as_typed_term::<TreeTerm>().as_inner(),
             )),
@@ -619,10 +619,6 @@ impl<A: Arena + Clone> Internable for ArenaRef<Term, A> {
                 .as_typed_term::<ConstructorTerm>()
                 .as_inner()
                 .should_intern(eager),
-            TermTypeDiscriminants::Date => self
-                .as_typed_term::<DateTerm>()
-                .as_inner()
-                .should_intern(eager),
             TermTypeDiscriminants::Effect => self
                 .as_typed_term::<EffectTerm>()
                 .as_inner()
@@ -681,6 +677,10 @@ impl<A: Arena + Clone> Internable for ArenaRef<Term, A> {
                 .should_intern(eager),
             TermTypeDiscriminants::Symbol => self
                 .as_typed_term::<SymbolTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::Timestamp => self
+                .as_typed_term::<TimestampTerm>()
                 .as_inner()
                 .should_intern(eager),
             TermTypeDiscriminants::Tree => self
@@ -922,14 +922,6 @@ impl<'a> Into<Option<&'a ConstructorTerm>> for &'a TermType {
         }
     }
 }
-impl<'a> Into<Option<&'a DateTerm>> for &'a TermType {
-    fn into(self) -> Option<&'a DateTerm> {
-        match self {
-            TermType::Date(term) => Some(term),
-            _ => None,
-        }
-    }
-}
 impl<'a> Into<Option<&'a EffectTerm>> for &'a TermType {
     fn into(self) -> Option<&'a EffectTerm> {
         match self {
@@ -1046,6 +1038,14 @@ impl<'a> Into<Option<&'a SymbolTerm>> for &'a TermType {
     fn into(self) -> Option<&'a SymbolTerm> {
         match self {
             TermType::Symbol(term) => Some(term),
+            _ => None,
+        }
+    }
+}
+impl<'a> Into<Option<&'a TimestampTerm>> for &'a TermType {
+    fn into(self) -> Option<&'a TimestampTerm> {
+        match self {
+            TermType::Timestamp(term) => Some(term),
             _ => None,
         }
     }
@@ -1248,10 +1248,6 @@ impl<A: Arena + Clone> PartialEq for ArenaRef<Term, A> {
                 self.as_typed_term::<ConstructorTerm>().as_inner()
                     == other.as_typed_term::<ConstructorTerm>().as_inner()
             }
-            (TermTypeDiscriminants::Date, TermTypeDiscriminants::Date) => {
-                self.as_typed_term::<DateTerm>().as_inner()
-                    == other.as_typed_term::<DateTerm>().as_inner()
-            }
             (TermTypeDiscriminants::Effect, TermTypeDiscriminants::Effect) => {
                 self.as_typed_term::<EffectTerm>().as_inner()
                     == other.as_typed_term::<EffectTerm>().as_inner()
@@ -1311,6 +1307,10 @@ impl<A: Arena + Clone> PartialEq for ArenaRef<Term, A> {
             (TermTypeDiscriminants::Symbol, TermTypeDiscriminants::Symbol) => {
                 self.as_typed_term::<SymbolTerm>().as_inner()
                     == other.as_typed_term::<SymbolTerm>().as_inner()
+            }
+            (TermTypeDiscriminants::Timestamp, TermTypeDiscriminants::Timestamp) => {
+                self.as_typed_term::<TimestampTerm>().as_inner()
+                    == other.as_typed_term::<TimestampTerm>().as_inner()
             }
             (TermTypeDiscriminants::Tree, TermTypeDiscriminants::Tree) => {
                 self.as_typed_term::<TreeTerm>().as_inner()
@@ -1423,7 +1423,7 @@ impl<A: Arena + Clone> Expression for ArenaRef<Term, A> {
     type FloatTerm = ArenaRef<TypedTerm<FloatTerm>, A>;
     type StringTerm = ArenaRef<TypedTerm<StringTerm>, A>;
     type SymbolTerm = ArenaRef<TypedTerm<SymbolTerm>, A>;
-    type TimestampTerm = ArenaRef<TypedTerm<DateTerm>, A>;
+    type TimestampTerm = ArenaRef<TypedTerm<TimestampTerm>, A>;
     type VariableTerm = ArenaRef<TypedTerm<VariableTerm>, A>;
     type EffectTerm = ArenaRef<TypedTerm<EffectTerm>, A>;
     type LetTerm = ArenaRef<TypedTerm<LetTerm>, A>;
@@ -1471,9 +1471,6 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             TermTypeDiscriminants::Constructor => {
                 GraphNode::size(&self.as_typed_term::<ConstructorTerm>().as_inner())
             }
-            TermTypeDiscriminants::Date => {
-                GraphNode::size(&self.as_typed_term::<DateTerm>().as_inner())
-            }
             TermTypeDiscriminants::Effect => {
                 GraphNode::size(&self.as_typed_term::<EffectTerm>().as_inner())
             }
@@ -1518,6 +1515,9 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             }
             TermTypeDiscriminants::Symbol => {
                 GraphNode::size(&self.as_typed_term::<SymbolTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Timestamp => {
+                GraphNode::size(&self.as_typed_term::<TimestampTerm>().as_inner())
             }
             TermTypeDiscriminants::Tree => {
                 GraphNode::size(&self.as_typed_term::<TreeTerm>().as_inner())
@@ -1597,9 +1597,6 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             TermTypeDiscriminants::Constructor => {
                 GraphNode::capture_depth(&self.as_typed_term::<ConstructorTerm>().as_inner())
             }
-            TermTypeDiscriminants::Date => {
-                GraphNode::capture_depth(&self.as_typed_term::<DateTerm>().as_inner())
-            }
             TermTypeDiscriminants::Effect => {
                 GraphNode::capture_depth(&self.as_typed_term::<EffectTerm>().as_inner())
             }
@@ -1644,6 +1641,9 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             }
             TermTypeDiscriminants::Symbol => {
                 GraphNode::capture_depth(&self.as_typed_term::<SymbolTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Timestamp => {
+                GraphNode::capture_depth(&self.as_typed_term::<TimestampTerm>().as_inner())
             }
             TermTypeDiscriminants::Tree => {
                 GraphNode::capture_depth(&self.as_typed_term::<TreeTerm>().as_inner())
@@ -1723,9 +1723,6 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             TermTypeDiscriminants::Constructor => {
                 GraphNode::free_variables(&self.as_typed_term::<ConstructorTerm>().as_inner())
             }
-            TermTypeDiscriminants::Date => {
-                GraphNode::free_variables(&self.as_typed_term::<DateTerm>().as_inner())
-            }
             TermTypeDiscriminants::Effect => {
                 GraphNode::free_variables(&self.as_typed_term::<EffectTerm>().as_inner())
             }
@@ -1770,6 +1767,9 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             }
             TermTypeDiscriminants::Symbol => {
                 GraphNode::free_variables(&self.as_typed_term::<SymbolTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Timestamp => {
+                GraphNode::free_variables(&self.as_typed_term::<TimestampTerm>().as_inner())
             }
             TermTypeDiscriminants::Tree => {
                 GraphNode::free_variables(&self.as_typed_term::<TreeTerm>().as_inner())
@@ -1855,10 +1855,6 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
                 &self.as_typed_term::<ConstructorTerm>().as_inner(),
                 offset,
             ),
-            TermTypeDiscriminants::Date => GraphNode::count_variable_usages(
-                &self.as_typed_term::<DateTerm>().as_inner(),
-                offset,
-            ),
             TermTypeDiscriminants::Effect => GraphNode::count_variable_usages(
                 &self.as_typed_term::<EffectTerm>().as_inner(),
                 offset,
@@ -1917,6 +1913,10 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             ),
             TermTypeDiscriminants::Symbol => GraphNode::count_variable_usages(
                 &self.as_typed_term::<SymbolTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::Timestamp => GraphNode::count_variable_usages(
+                &self.as_typed_term::<TimestampTerm>().as_inner(),
                 offset,
             ),
             TermTypeDiscriminants::Tree => GraphNode::count_variable_usages(
@@ -2020,9 +2020,6 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
                 &self.as_typed_term::<ConstructorTerm>().as_inner(),
                 deep,
             ),
-            TermTypeDiscriminants::Date => {
-                GraphNode::dynamic_dependencies(&self.as_typed_term::<DateTerm>().as_inner(), deep)
-            }
             TermTypeDiscriminants::Effect => GraphNode::dynamic_dependencies(
                 &self.as_typed_term::<EffectTerm>().as_inner(),
                 deep,
@@ -2076,6 +2073,10 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             ),
             TermTypeDiscriminants::Symbol => GraphNode::dynamic_dependencies(
                 &self.as_typed_term::<SymbolTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Timestamp => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<TimestampTerm>().as_inner(),
                 deep,
             ),
             TermTypeDiscriminants::Tree => {
@@ -2179,10 +2180,6 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
                 &self.as_typed_term::<ConstructorTerm>().as_inner(),
                 deep,
             ),
-            TermTypeDiscriminants::Date => GraphNode::has_dynamic_dependencies(
-                &self.as_typed_term::<DateTerm>().as_inner(),
-                deep,
-            ),
             TermTypeDiscriminants::Effect => GraphNode::has_dynamic_dependencies(
                 &self.as_typed_term::<EffectTerm>().as_inner(),
                 deep,
@@ -2241,6 +2238,10 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             ),
             TermTypeDiscriminants::Symbol => GraphNode::has_dynamic_dependencies(
                 &self.as_typed_term::<SymbolTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Timestamp => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<TimestampTerm>().as_inner(),
                 deep,
             ),
             TermTypeDiscriminants::Tree => GraphNode::has_dynamic_dependencies(
@@ -2339,9 +2340,6 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             TermTypeDiscriminants::Constructor => {
                 GraphNode::is_static(&self.as_typed_term::<ConstructorTerm>().as_inner())
             }
-            TermTypeDiscriminants::Date => {
-                GraphNode::is_static(&self.as_typed_term::<DateTerm>().as_inner())
-            }
             TermTypeDiscriminants::Effect => {
                 GraphNode::is_static(&self.as_typed_term::<EffectTerm>().as_inner())
             }
@@ -2386,6 +2384,9 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             }
             TermTypeDiscriminants::Symbol => {
                 GraphNode::is_static(&self.as_typed_term::<SymbolTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Timestamp => {
+                GraphNode::is_static(&self.as_typed_term::<TimestampTerm>().as_inner())
             }
             TermTypeDiscriminants::Tree => {
                 GraphNode::is_static(&self.as_typed_term::<TreeTerm>().as_inner())
@@ -2465,9 +2466,6 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             TermTypeDiscriminants::Constructor => {
                 GraphNode::is_atomic(&self.as_typed_term::<ConstructorTerm>().as_inner())
             }
-            TermTypeDiscriminants::Date => {
-                GraphNode::is_atomic(&self.as_typed_term::<DateTerm>().as_inner())
-            }
             TermTypeDiscriminants::Effect => {
                 GraphNode::is_atomic(&self.as_typed_term::<EffectTerm>().as_inner())
             }
@@ -2512,6 +2510,9 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             }
             TermTypeDiscriminants::Symbol => {
                 GraphNode::is_atomic(&self.as_typed_term::<SymbolTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Timestamp => {
+                GraphNode::is_atomic(&self.as_typed_term::<TimestampTerm>().as_inner())
             }
             TermTypeDiscriminants::Tree => {
                 GraphNode::is_atomic(&self.as_typed_term::<TreeTerm>().as_inner())
@@ -2591,9 +2592,6 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             TermTypeDiscriminants::Constructor => {
                 GraphNode::is_complex(&self.as_typed_term::<ConstructorTerm>().as_inner())
             }
-            TermTypeDiscriminants::Date => {
-                GraphNode::is_complex(&self.as_typed_term::<DateTerm>().as_inner())
-            }
             TermTypeDiscriminants::Effect => {
                 GraphNode::is_complex(&self.as_typed_term::<EffectTerm>().as_inner())
             }
@@ -2638,6 +2636,9 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             }
             TermTypeDiscriminants::Symbol => {
                 GraphNode::is_complex(&self.as_typed_term::<SymbolTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Timestamp => {
+                GraphNode::is_complex(&self.as_typed_term::<TimestampTerm>().as_inner())
             }
             TermTypeDiscriminants::Tree => {
                 GraphNode::is_complex(&self.as_typed_term::<TreeTerm>().as_inner())
@@ -2720,9 +2721,6 @@ impl<A: Arena + Clone> SerializeJson for ArenaRef<Term, A> {
             TermTypeDiscriminants::Constructor => {
                 SerializeJson::to_json(&self.as_typed_term::<ConstructorTerm>().as_inner())
             }
-            TermTypeDiscriminants::Date => {
-                SerializeJson::to_json(&self.as_typed_term::<DateTerm>().as_inner())
-            }
             TermTypeDiscriminants::Effect => {
                 SerializeJson::to_json(&self.as_typed_term::<EffectTerm>().as_inner())
             }
@@ -2767,6 +2765,9 @@ impl<A: Arena + Clone> SerializeJson for ArenaRef<Term, A> {
             }
             TermTypeDiscriminants::Symbol => {
                 SerializeJson::to_json(&self.as_typed_term::<SymbolTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Timestamp => {
+                SerializeJson::to_json(&self.as_typed_term::<TimestampTerm>().as_inner())
             }
             TermTypeDiscriminants::Tree => {
                 SerializeJson::to_json(&self.as_typed_term::<TreeTerm>().as_inner())
@@ -2868,10 +2869,6 @@ impl<A: Arena + Clone> SerializeJson for ArenaRef<Term, A> {
                     &target.as_typed_term::<ConstructorTerm>().as_inner(),
                 )
             }
-            (TermTypeDiscriminants::Date, TermTypeDiscriminants::Date) => SerializeJson::patch(
-                &self.as_typed_term::<DateTerm>().as_inner(),
-                &target.as_typed_term::<DateTerm>().as_inner(),
-            ),
             (TermTypeDiscriminants::Effect, TermTypeDiscriminants::Effect) => SerializeJson::patch(
                 &self.as_typed_term::<EffectTerm>().as_inner(),
                 &target.as_typed_term::<EffectTerm>().as_inner(),
@@ -2940,6 +2937,12 @@ impl<A: Arena + Clone> SerializeJson for ArenaRef<Term, A> {
                 &self.as_typed_term::<SymbolTerm>().as_inner(),
                 &target.as_typed_term::<SymbolTerm>().as_inner(),
             ),
+            (TermTypeDiscriminants::Timestamp, TermTypeDiscriminants::Timestamp) => {
+                SerializeJson::patch(
+                    &self.as_typed_term::<TimestampTerm>().as_inner(),
+                    &target.as_typed_term::<TimestampTerm>().as_inner(),
+                )
+            }
             (TermTypeDiscriminants::Tree, TermTypeDiscriminants::Tree) => SerializeJson::patch(
                 &self.as_typed_term::<TreeTerm>().as_inner(),
                 &target.as_typed_term::<TreeTerm>().as_inner(),
@@ -3079,9 +3082,6 @@ impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<Term, A> {
             TermTypeDiscriminants::Constructor => {
                 std::fmt::Debug::fmt(&self.as_typed_term::<ConstructorTerm>().as_inner(), f)
             }
-            TermTypeDiscriminants::Date => {
-                std::fmt::Debug::fmt(&self.as_typed_term::<DateTerm>().as_inner(), f)
-            }
             TermTypeDiscriminants::Effect => {
                 std::fmt::Debug::fmt(&self.as_typed_term::<EffectTerm>().as_inner(), f)
             }
@@ -3126,6 +3126,9 @@ impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<Term, A> {
             }
             TermTypeDiscriminants::Symbol => {
                 std::fmt::Debug::fmt(&self.as_typed_term::<SymbolTerm>().as_inner(), f)
+            }
+            TermTypeDiscriminants::Timestamp => {
+                std::fmt::Debug::fmt(&self.as_typed_term::<TimestampTerm>().as_inner(), f)
             }
             TermTypeDiscriminants::Tree => {
                 std::fmt::Debug::fmt(&self.as_typed_term::<TreeTerm>().as_inner(), f)
@@ -3212,9 +3215,6 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<Term, A> {
             TermTypeDiscriminants::Constructor => {
                 std::fmt::Display::fmt(&self.as_typed_term::<ConstructorTerm>().as_inner(), f)
             }
-            TermTypeDiscriminants::Date => {
-                std::fmt::Display::fmt(&self.as_typed_term::<DateTerm>().as_inner(), f)
-            }
             TermTypeDiscriminants::Effect => {
                 std::fmt::Display::fmt(&self.as_typed_term::<EffectTerm>().as_inner(), f)
             }
@@ -3259,6 +3259,9 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<Term, A> {
             }
             TermTypeDiscriminants::Symbol => {
                 std::fmt::Display::fmt(&self.as_typed_term::<SymbolTerm>().as_inner(), f)
+            }
+            TermTypeDiscriminants::Timestamp => {
+                std::fmt::Display::fmt(&self.as_typed_term::<TimestampTerm>().as_inner(), f)
             }
             TermTypeDiscriminants::Tree => {
                 std::fmt::Display::fmt(&self.as_typed_term::<TreeTerm>().as_inner(), f)
@@ -3344,9 +3347,6 @@ impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<TermType, A> {
             TermTypeDiscriminants::Constructor => {
                 std::fmt::Debug::fmt(&self.read_value(|value| *value), f)
             }
-            TermTypeDiscriminants::Date => {
-                std::fmt::Debug::fmt(&self.read_value(|value| *value), f)
-            }
             TermTypeDiscriminants::Effect => {
                 std::fmt::Debug::fmt(&self.read_value(|value| *value), f)
             }
@@ -3384,6 +3384,9 @@ impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<TermType, A> {
                 std::fmt::Debug::fmt(&self.read_value(|value| *value), f)
             }
             TermTypeDiscriminants::Symbol => {
+                std::fmt::Debug::fmt(&self.read_value(|value| *value), f)
+            }
+            TermTypeDiscriminants::Timestamp => {
                 std::fmt::Debug::fmt(&self.read_value(|value| *value), f)
             }
             TermTypeDiscriminants::Tree => {
@@ -3470,7 +3473,6 @@ impl<V> TypedTerm<V> {
                 TermType::Cell(inner) => std::mem::transmute::<&CellTerm, &V>(inner),
                 TermType::Condition(inner) => std::mem::transmute::<&ConditionTerm, &V>(inner),
                 TermType::Constructor(inner) => std::mem::transmute::<&ConstructorTerm, &V>(inner),
-                TermType::Date(inner) => std::mem::transmute::<&DateTerm, &V>(inner),
                 TermType::Effect(inner) => std::mem::transmute::<&EffectTerm, &V>(inner),
                 TermType::Float(inner) => std::mem::transmute::<&FloatTerm, &V>(inner),
                 TermType::Hashmap(inner) => std::mem::transmute::<&HashmapTerm, &V>(inner),
@@ -3486,6 +3488,7 @@ impl<V> TypedTerm<V> {
                 TermType::Signal(inner) => std::mem::transmute::<&SignalTerm, &V>(inner),
                 TermType::String(inner) => std::mem::transmute::<&StringTerm, &V>(inner),
                 TermType::Symbol(inner) => std::mem::transmute::<&SymbolTerm, &V>(inner),
+                TermType::Timestamp(inner) => std::mem::transmute::<&TimestampTerm, &V>(inner),
                 TermType::Tree(inner) => std::mem::transmute::<&TreeTerm, &V>(inner),
                 TermType::Variable(inner) => std::mem::transmute::<&VariableTerm, &V>(inner),
                 TermType::EmptyIterator(inner) => {
@@ -3636,18 +3639,6 @@ impl<A: Arena + Clone> ArenaRef<Term, A> {
     pub fn into_constructor_term(self) -> Option<ArenaRef<TypedTerm<ConstructorTerm>, A>> {
         match self.read_value(|term| term.type_id()) {
             TermTypeDiscriminants::Constructor => Some(self.into_typed_term::<ConstructorTerm>()),
-            _ => None,
-        }
-    }
-    pub fn as_date_term(&self) -> Option<&ArenaRef<TypedTerm<DateTerm>, A>> {
-        match self.read_value(|term| term.type_id()) {
-            TermTypeDiscriminants::Date => Some(self.as_typed_term::<DateTerm>()),
-            _ => None,
-        }
-    }
-    pub fn into_date_term(self) -> Option<ArenaRef<TypedTerm<DateTerm>, A>> {
-        match self.read_value(|term| term.type_id()) {
-            TermTypeDiscriminants::Date => Some(self.into_typed_term::<DateTerm>()),
             _ => None,
         }
     }
@@ -3828,6 +3819,18 @@ impl<A: Arena + Clone> ArenaRef<Term, A> {
     pub fn into_symbol_term(self) -> Option<ArenaRef<TypedTerm<SymbolTerm>, A>> {
         match self.read_value(|term| term.type_id()) {
             TermTypeDiscriminants::Symbol => Some(self.into_typed_term::<SymbolTerm>()),
+            _ => None,
+        }
+    }
+    pub fn as_timestamp_term(&self) -> Option<&ArenaRef<TypedTerm<TimestampTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Timestamp => Some(self.as_typed_term::<TimestampTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_timestamp_term(self) -> Option<ArenaRef<TypedTerm<TimestampTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Timestamp => Some(self.into_typed_term::<TimestampTerm>()),
             _ => None,
         }
     }
@@ -4196,22 +4199,22 @@ mod tests {
         assert_eq!(TermTypeDiscriminants::Cell as u32, 3);
         assert_eq!(TermTypeDiscriminants::Condition as u32, 4);
         assert_eq!(TermTypeDiscriminants::Constructor as u32, 5);
-        assert_eq!(TermTypeDiscriminants::Date as u32, 6);
-        assert_eq!(TermTypeDiscriminants::Effect as u32, 7);
-        assert_eq!(TermTypeDiscriminants::Float as u32, 8);
-        assert_eq!(TermTypeDiscriminants::Hashmap as u32, 9);
-        assert_eq!(TermTypeDiscriminants::Hashset as u32, 10);
-        assert_eq!(TermTypeDiscriminants::Int as u32, 11);
-        assert_eq!(TermTypeDiscriminants::Lambda as u32, 12);
-        assert_eq!(TermTypeDiscriminants::Let as u32, 13);
-        assert_eq!(TermTypeDiscriminants::List as u32, 14);
-        assert_eq!(TermTypeDiscriminants::Nil as u32, 15);
-        assert_eq!(TermTypeDiscriminants::Partial as u32, 16);
-        assert_eq!(TermTypeDiscriminants::Pointer as u32, 17);
-        assert_eq!(TermTypeDiscriminants::Record as u32, 18);
-        assert_eq!(TermTypeDiscriminants::Signal as u32, 19);
-        assert_eq!(TermTypeDiscriminants::String as u32, 20);
-        assert_eq!(TermTypeDiscriminants::Symbol as u32, 21);
+        assert_eq!(TermTypeDiscriminants::Effect as u32, 6);
+        assert_eq!(TermTypeDiscriminants::Float as u32, 7);
+        assert_eq!(TermTypeDiscriminants::Hashmap as u32, 8);
+        assert_eq!(TermTypeDiscriminants::Hashset as u32, 9);
+        assert_eq!(TermTypeDiscriminants::Int as u32, 10);
+        assert_eq!(TermTypeDiscriminants::Lambda as u32, 11);
+        assert_eq!(TermTypeDiscriminants::Let as u32, 12);
+        assert_eq!(TermTypeDiscriminants::List as u32, 13);
+        assert_eq!(TermTypeDiscriminants::Nil as u32, 14);
+        assert_eq!(TermTypeDiscriminants::Partial as u32, 15);
+        assert_eq!(TermTypeDiscriminants::Pointer as u32, 16);
+        assert_eq!(TermTypeDiscriminants::Record as u32, 17);
+        assert_eq!(TermTypeDiscriminants::Signal as u32, 18);
+        assert_eq!(TermTypeDiscriminants::String as u32, 19);
+        assert_eq!(TermTypeDiscriminants::Symbol as u32, 20);
+        assert_eq!(TermTypeDiscriminants::Timestamp as u32, 21);
         assert_eq!(TermTypeDiscriminants::Tree as u32, 22);
         assert_eq!(TermTypeDiscriminants::Variable as u32, 23);
         assert_eq!(TermTypeDiscriminants::EmptyIterator as u32, 24);

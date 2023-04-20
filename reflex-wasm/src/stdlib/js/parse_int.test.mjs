@@ -195,10 +195,10 @@ export default (describe) => {
       })();
     });
 
-    test('(Date)', (assert, {
+    test('(Timestamp)', (assert, {
       createApplication,
       createBuiltin,
-      createDate,
+      createTimestamp,
       createUnitList,
       evaluate,
       format,
@@ -209,7 +209,7 @@ export default (describe) => {
         const timestamp = new Date('2000-01-01T00:00:00Z').getTime();
         const expression = createApplication(
           createBuiltin(Stdlib.ParseInt),
-          createUnitList(createDate(timestamp)),
+          createUnitList(createTimestamp(timestamp)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), `${timestamp}`);

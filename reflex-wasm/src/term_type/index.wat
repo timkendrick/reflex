@@ -8,7 +8,6 @@
   (@include "./cell.wat")
   (@include "./condition.wat")
   (@include "./constructor.wat")
-  (@include "./date.wat")
   (@include "./effect.wat")
   (@include "./float.wat")
   (@include "./hashmap.wat")
@@ -40,6 +39,7 @@
   (@include "./signal.wat")
   (@include "./string.wat")
   (@include "./symbol.wat")
+  (@include "./timestamp.wat")
   (@include "./tree.wat")
   (@include "./variable.wat")
 
@@ -51,7 +51,6 @@
       (@import $Cell "./cell.wat")
       (@import $Condition "./condition.wat")
       (@import $Constructor "./constructor.wat")
-      (@import $Date "./date.wat")
       (@import $Effect "./effect.wat")
       (@import $Float "./float.wat")
       (@import $Hashmap "./hashmap.wat")
@@ -67,6 +66,7 @@
       (@import $Signal "./signal.wat")
       (@import $String "./string.wat")
       (@import $Symbol "./symbol.wat")
+      (@import $Timestamp "./timestamp.wat")
       (@import $Tree "./tree.wat")
       (@import $Variable "./variable.wat")
       (@import $EmptyIterator "./iterator/empty.wat")
@@ -357,7 +357,7 @@
         $String
         $List
         $Record
-        $Date)
+        $Timestamp)
 
       (func $TermType::implements::to_json (param $type i32) (result i32)
         (@fold $result $typename

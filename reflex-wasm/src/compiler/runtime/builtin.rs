@@ -29,7 +29,6 @@ pub enum RuntimeBuiltin {
     CreateInvalidFunctionArgsCondition,
     CreateInvalidPointerCondition,
     CreateConstructor,
-    CreateDate,
     CreateEffect,
     CreateFloat,
     CreateHashset,
@@ -39,6 +38,7 @@ pub enum RuntimeBuiltin {
     CreatePartial,
     CreatePointer,
     CreateRecord,
+    CreateTimestamp,
     CreateSignal,
     CreateTree,
     CreateEmptyIterator,
@@ -143,9 +143,6 @@ impl RuntimeBuiltin {
             RuntimeBuiltin::CreateConstructor => {
                 TypeSignature::new(ValueType::HeapPointer, ValueType::HeapPointer)
             }
-            RuntimeBuiltin::CreateDate => {
-                TypeSignature::new(ValueType::I64, ValueType::HeapPointer)
-            }
             RuntimeBuiltin::CreateEffect => {
                 TypeSignature::new(ValueType::HeapPointer, ValueType::HeapPointer)
             }
@@ -174,6 +171,9 @@ impl RuntimeBuiltin {
             ),
             RuntimeBuiltin::CreateSignal => {
                 TypeSignature::new(ValueType::HeapPointer, ValueType::HeapPointer)
+            }
+            RuntimeBuiltin::CreateTimestamp => {
+                TypeSignature::new(ValueType::I64, ValueType::HeapPointer)
             }
             RuntimeBuiltin::CreateTree => TypeSignature::new(
                 (ValueType::HeapPointer, ValueType::HeapPointer),
@@ -312,7 +312,6 @@ impl RuntimeBuiltin {
             }
             RuntimeBuiltin::CreateInvalidPointerCondition => "createInvalidPointerCondition",
             RuntimeBuiltin::CreateConstructor => "createConstructor",
-            RuntimeBuiltin::CreateDate => "createDate",
             RuntimeBuiltin::CreateEffect => "createEffect",
             RuntimeBuiltin::CreateFloat => "createFloat",
             RuntimeBuiltin::CreateHashset => "createHashset",
@@ -323,6 +322,7 @@ impl RuntimeBuiltin {
             RuntimeBuiltin::CreatePointer => "createPointer",
             RuntimeBuiltin::CreateRecord => "createRecord",
             RuntimeBuiltin::CreateSignal => "createSignal",
+            RuntimeBuiltin::CreateTimestamp => "createTimestamp",
             RuntimeBuiltin::CreateTree => "createTree",
             RuntimeBuiltin::CreateEmptyIterator => "createEmptyIterator",
             RuntimeBuiltin::CreateEvaluateIterator => "createEvaluateIterator",

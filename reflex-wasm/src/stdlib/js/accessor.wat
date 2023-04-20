@@ -380,9 +380,9 @@
           (call $Stdlib_Accessor::impl::<iterate>::String (local.get $self) (local.get $key) (local.get $state)))))
 
     (@impl
-      (i32.eq (global.get $TermType::Date))
+      (i32.eq (global.get $TermType::Timestamp))
       (i32.eq (global.get $TermType::String))
-      (func $Stdlib_Accessor::impl::Date::String (param $self i32) (param $key i32) (param $state i32) (result i32 i32)
+      (func $Stdlib_Accessor::impl::Timestamp::String (param $self i32) (param $key i32) (param $state i32) (result i32 i32)
         (@switch
           ;; Determine the return value based on the provided member name
           (@list

@@ -28,9 +28,9 @@
             (call $Stdlib_ParseInt::impl::default (local.get $self) (local.get $state))))))
 
     (@impl
-      (i32.eq (global.get $TermType::Date))
-      (func $Stdlib_ParseInt::impl::Date (param $self i32) (param $state i32) (result i32 i32)
-        (call $Term::Int::new (call $Term::Date::get::timestamp (local.get $self)))
+      (i32.eq (global.get $TermType::Timestamp))
+      (func $Stdlib_ParseInt::impl::Timestamp (param $self i32) (param $state i32) (result i32 i32)
+        (call $Term::Int::new (call $Term::Timestamp::get::millis (local.get $self)))
         (global.get $NULL)))
 
     (@default

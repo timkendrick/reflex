@@ -7,7 +7,6 @@ import builtin from './builtin.test.mjs';
 import cell from './cell.test.mjs';
 import condition from './condition.test.mjs';
 import constructor from './constructor.test.mjs';
-import date from './date.test.mjs';
 import effect from './effect.test.mjs';
 import float from './float.test.mjs';
 import hashmap from './hashmap.test.mjs';
@@ -24,6 +23,7 @@ import record from './record.test.mjs';
 import signal from './signal.test.mjs';
 import string from './string.test.mjs';
 import symbol from './symbol.test.mjs';
+import timestamp from './timestamp.test.mjs';
 import tree from './tree.test.mjs';
 import variable from './variable.test.mjs';
 
@@ -34,7 +34,6 @@ export default (describe) => {
   cell(describe);
   condition(describe);
   constructor(describe);
-  date(describe);
   effect(describe);
   float(describe);
   hashmap(describe);
@@ -50,6 +49,7 @@ export default (describe) => {
   signal(describe);
   string(describe);
   symbol(describe);
+  timestamp(describe);
   tree(describe);
   variable(describe);
   iterator(describe);

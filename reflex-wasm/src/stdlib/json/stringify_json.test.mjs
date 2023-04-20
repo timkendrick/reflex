@@ -586,10 +586,10 @@ export default (describe) => {
       })();
     });
 
-    test('(Date)', (assert, {
+    test('(Timestamp)', (assert, {
       createApplication,
       createBuiltin,
-      createDate,
+      createTimestamp,
       createUnitList,
       evaluate,
       format,
@@ -599,7 +599,7 @@ export default (describe) => {
       const timestamp = Date.now();
       const expression = createApplication(
         createBuiltin(Stdlib.StringifyJson),
-        createUnitList(createDate(timestamp)),
+        createUnitList(createTimestamp(timestamp)),
       );
       const [result, dependencies] = evaluate(expression, NULL);
       assert.strictEqual(

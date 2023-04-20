@@ -1449,10 +1449,6 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<Term, A> {
                 .as_typed_term::<ConstructorTerm>()
                 .as_inner()
                 .compile(stack, state, options),
-            TermTypeDiscriminants::Date => self
-                .as_typed_term::<DateTerm>()
-                .as_inner()
-                .compile(stack, state, options),
             TermTypeDiscriminants::Effect => self
                 .as_typed_term::<EffectTerm>()
                 .as_inner()
@@ -1511,6 +1507,10 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<Term, A> {
                 .compile(stack, state, options),
             TermTypeDiscriminants::Symbol => self
                 .as_typed_term::<SymbolTerm>()
+                .as_inner()
+                .compile(stack, state, options),
+            TermTypeDiscriminants::Timestamp => self
+                .as_typed_term::<TimestampTerm>()
                 .as_inner()
                 .compile(stack, state, options),
             TermTypeDiscriminants::Tree => self

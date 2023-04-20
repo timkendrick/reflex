@@ -3,6 +3,28 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 export default (describe) => {
   describe('Stdlib_ParseDate', (test) => {
+    test('(Timestamp)', (assert, {
+      createApplication,
+      createBuiltin,
+      createTimestamp,
+      createUnitList,
+      evaluate,
+      format,
+      isTimestamp,
+      NULL,
+      Stdlib,
+    }) => {
+      const timestamp = Date.now();
+      const expression = createApplication(
+        createBuiltin(Stdlib.ParseDate),
+        createUnitList(createTimestamp(timestamp)),
+      );
+      const [result, dependencies] = evaluate(expression, NULL);
+      assert.ok(isTimestamp(result));
+      assert.strictEqual(format(result), `Timestamp(${new Date(timestamp).toISOString()})`);
+      assert.strictEqual(format(dependencies), 'NULL');
+    });
+
     test('(Int)', (assert, {
       createApplication,
       createBuiltin,
@@ -10,7 +32,7 @@ export default (describe) => {
       createUnitList,
       evaluate,
       format,
-      isDate,
+      isTimestamp,
       NULL,
       Stdlib,
     }) => {
@@ -21,8 +43,8 @@ export default (describe) => {
         createUnitList(createInt(timestamp)),
       );
       const [result, dependencies] = evaluate(expression, NULL);
-      assert.ok(isDate(result));
-      assert.strictEqual(format(result), `Date(${new Date(timestamp).toISOString()})`);
+      assert.ok(isTimestamp(result));
+      assert.strictEqual(format(result), `Timestamp(${new Date(timestamp).toISOString()})`);
       assert.strictEqual(format(dependencies), 'NULL');
     });
 
@@ -33,7 +55,7 @@ export default (describe) => {
       createUnitList,
       evaluate,
       format,
-      isDate,
+      isTimestamp,
       NULL,
       Stdlib,
     }) => {
@@ -43,8 +65,8 @@ export default (describe) => {
         createUnitList(createFloat(timestamp)),
       );
       const [result, dependencies] = evaluate(expression, NULL);
-      assert.ok(isDate(result));
-      assert.strictEqual(format(result), `Date(${new Date(timestamp).toISOString()})`);
+      assert.ok(isTimestamp(result));
+      assert.strictEqual(format(result), `Timestamp(${new Date(timestamp).toISOString()})`);
       assert.strictEqual(format(dependencies), 'NULL');
     });
 
@@ -55,7 +77,7 @@ export default (describe) => {
       createUnitList,
       evaluate,
       format,
-      isDate,
+      isTimestamp,
       NULL,
       Stdlib,
     }) => {
@@ -65,8 +87,8 @@ export default (describe) => {
         createUnitList(createString(new Date(timestamp).toISOString())),
       );
       const [result, dependencies] = evaluate(expression, NULL);
-      assert.ok(isDate(result));
-      assert.strictEqual(format(result), `Date(${new Date(timestamp).toISOString()})`);
+      assert.ok(isTimestamp(result));
+      assert.strictEqual(format(result), `Timestamp(${new Date(timestamp).toISOString()})`);
       assert.strictEqual(format(dependencies), 'NULL');
     });
   });
