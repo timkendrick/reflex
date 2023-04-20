@@ -1563,7 +1563,7 @@ impl From<reflex_js::stdlib::Stdlib> for reflex_wasm::stdlib::Stdlib {
             reflex_js::stdlib::Stdlib::Construct => {
                 reflex_wasm::stdlib::Stdlib::Construct(reflex_wasm::stdlib::Construct)
             }
-            reflex_js::stdlib::Stdlib::DateConstructor => {
+            reflex_js::stdlib::Stdlib::ParseDate => {
                 reflex_wasm::stdlib::Stdlib::ParseDate(reflex_wasm::stdlib::ParseDate)
             }
             reflex_js::stdlib::Stdlib::EncodeUriComponent => {
@@ -2016,11 +2016,6 @@ impl From<reflex_js::stdlib::Construct> for reflex_wasm::stdlib::Stdlib {
         Self::from(reflex_js::stdlib::Stdlib::from(value))
     }
 }
-impl From<reflex_js::stdlib::DateConstructor> for reflex_wasm::stdlib::Stdlib {
-    fn from(value: reflex_js::stdlib::DateConstructor) -> Self {
-        Self::from(reflex_js::stdlib::Stdlib::from(value))
-    }
-}
 impl From<reflex_js::stdlib::EncodeUriComponent> for reflex_wasm::stdlib::Stdlib {
     fn from(value: reflex_js::stdlib::EncodeUriComponent) -> Self {
         Self::from(reflex_js::stdlib::Stdlib::from(value))
@@ -2043,6 +2038,11 @@ impl From<reflex_js::stdlib::Log> for reflex_wasm::stdlib::Stdlib {
 }
 impl From<reflex_js::stdlib::LogArgs> for reflex_wasm::stdlib::Stdlib {
     fn from(value: reflex_js::stdlib::LogArgs) -> Self {
+        Self::from(reflex_js::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_js::stdlib::ParseDate> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_js::stdlib::ParseDate) -> Self {
         Self::from(reflex_js::stdlib::Stdlib::from(value))
     }
 }
