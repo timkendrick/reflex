@@ -23,6 +23,8 @@ use crate::hash::{hash_object, FnvHasher, HashId, IntMap, IntSet};
 pub type IntValue = i64;
 pub type FloatValue = f64;
 pub type SymbolId = u32;
+/// Timestamp expressed as milliseconds since UNIX epoch
+pub type TimestampValue = i64;
 
 pub fn is_integer(value: FloatValue) -> bool {
     as_integer(value).is_some()
@@ -92,6 +94,10 @@ pub trait StringTermType<T: Expression>: Clone {
 
 pub trait SymbolTermType: Clone {
     fn id(&self) -> SymbolId;
+}
+
+pub trait TimestampTermType: Clone {
+    fn millis(&self) -> TimestampValue;
 }
 
 pub trait VariableTermType: Clone {
@@ -445,6 +451,7 @@ where
     type FloatTerm: FloatTermType;
     type StringTerm: StringTermType<Self>;
     type SymbolTerm: SymbolTermType;
+    type TimestampTerm: TimestampTermType;
     type VariableTerm: VariableTermType;
     type EffectTerm: EffectTermType<Self>;
     type LetTerm: LetTermType<Self>;
@@ -1093,6 +1100,7 @@ pub trait ExpressionFactory<T: Expression> {
     fn create_float_term(&self, value: FloatValue) -> T;
     fn create_string_term(&self, value: T::String) -> T;
     fn create_symbol_term(&self, value: SymbolId) -> T;
+    fn create_timestamp_term(&self, millis: TimestampValue) -> T;
     fn create_variable_term(&self, offset: StackOffset) -> T;
     fn create_effect_term(&self, condition: T::Signal) -> T;
     fn create_let_term(&self, initializer: T, body: T) -> T;
@@ -1128,6 +1136,7 @@ pub trait ExpressionFactory<T: Expression> {
     fn match_float_term<'a>(&self, expression: &'a T) -> Option<&'a T::FloatTerm>;
     fn match_string_term<'a>(&self, expression: &'a T) -> Option<&'a T::StringTerm>;
     fn match_symbol_term<'a>(&self, expression: &'a T) -> Option<&'a T::SymbolTerm>;
+    fn match_timestamp_term<'a>(&self, expression: &'a T) -> Option<&'a T::TimestampTerm>;
     fn match_variable_term<'a>(&self, expression: &'a T) -> Option<&'a T::VariableTerm>;
     fn match_effect_term<'a>(&self, expression: &'a T) -> Option<&'a T::EffectTerm>;
     fn match_let_term<'a>(&self, expression: &'a T) -> Option<&'a T::LetTerm>;

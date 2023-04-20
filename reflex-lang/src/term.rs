@@ -31,6 +31,7 @@ mod recursive;
 mod signal;
 mod string;
 mod symbol;
+mod timestamp;
 mod variable;
 
 pub use application::*;
@@ -53,6 +54,7 @@ pub use recursive::*;
 pub use signal::*;
 pub use string::*;
 pub use symbol::*;
+pub use timestamp::*;
 pub use variable::*;
 
 use reflex::{
@@ -80,6 +82,7 @@ where
     Float(FloatTerm),
     String(StringTerm<T>),
     Symbol(SymbolTerm),
+    Timestamp(TimestampTerm),
     Variable(VariableTerm),
     Effect(EffectTerm<T>),
     Let(LetTerm<T>),
@@ -114,6 +117,7 @@ where
     type FloatTerm = FloatTerm;
     type StringTerm = StringTerm<Self>;
     type SymbolTerm = SymbolTerm;
+    type TimestampTerm = TimestampTerm;
     type VariableTerm = VariableTerm;
     type EffectTerm = EffectTerm<Self>;
     type LetTerm = LetTerm<Self>;
@@ -180,6 +184,7 @@ where
             Self::Float(term) => term.size(),
             Self::String(term) => term.size(),
             Self::Symbol(term) => term.size(),
+            Self::Timestamp(term) => term.size(),
             Self::Variable(term) => term.size(),
             Self::Effect(term) => term.size(),
             Self::Let(term) => term.size(),
@@ -205,6 +210,7 @@ where
             Self::Float(term) => term.capture_depth(),
             Self::String(term) => term.capture_depth(),
             Self::Symbol(term) => term.capture_depth(),
+            Self::Timestamp(term) => term.capture_depth(),
             Self::Variable(term) => term.capture_depth(),
             Self::Effect(term) => term.capture_depth(),
             Self::Let(term) => term.capture_depth(),
@@ -230,6 +236,7 @@ where
             Self::Float(term) => term.free_variables(),
             Self::String(term) => term.free_variables(),
             Self::Symbol(term) => term.free_variables(),
+            Self::Timestamp(term) => term.free_variables(),
             Self::Variable(term) => term.free_variables(),
             Self::Effect(term) => term.free_variables(),
             Self::Let(term) => term.free_variables(),
@@ -255,6 +262,7 @@ where
             Self::Float(term) => term.count_variable_usages(offset),
             Self::String(term) => term.count_variable_usages(offset),
             Self::Symbol(term) => term.count_variable_usages(offset),
+            Self::Timestamp(term) => term.count_variable_usages(offset),
             Self::Variable(term) => term.count_variable_usages(offset),
             Self::Effect(term) => term.count_variable_usages(offset),
             Self::Let(term) => term.count_variable_usages(offset),
@@ -280,6 +288,7 @@ where
             Self::Float(term) => term.dynamic_dependencies(deep),
             Self::String(term) => term.dynamic_dependencies(deep),
             Self::Symbol(term) => term.dynamic_dependencies(deep),
+            Self::Timestamp(term) => term.dynamic_dependencies(deep),
             Self::Variable(term) => term.dynamic_dependencies(deep),
             Self::Effect(term) => term.dynamic_dependencies(deep),
             Self::Let(term) => term.dynamic_dependencies(deep),
@@ -305,6 +314,7 @@ where
             Self::Float(term) => term.has_dynamic_dependencies(deep),
             Self::String(term) => term.has_dynamic_dependencies(deep),
             Self::Symbol(term) => term.has_dynamic_dependencies(deep),
+            Self::Timestamp(term) => term.has_dynamic_dependencies(deep),
             Self::Variable(term) => term.has_dynamic_dependencies(deep),
             Self::Effect(term) => term.has_dynamic_dependencies(deep),
             Self::Let(term) => term.has_dynamic_dependencies(deep),
@@ -330,6 +340,7 @@ where
             Self::Float(term) => term.is_static(),
             Self::String(term) => term.is_static(),
             Self::Symbol(term) => term.is_static(),
+            Self::Timestamp(term) => term.is_static(),
             Self::Variable(term) => term.is_static(),
             Self::Effect(term) => term.is_static(),
             Self::Let(term) => term.is_static(),
@@ -355,6 +366,7 @@ where
             Self::Float(term) => term.is_atomic(),
             Self::String(term) => term.is_atomic(),
             Self::Symbol(term) => term.is_atomic(),
+            Self::Timestamp(term) => term.is_atomic(),
             Self::Variable(term) => term.is_atomic(),
             Self::Effect(term) => term.is_atomic(),
             Self::Let(term) => term.is_atomic(),
@@ -380,6 +392,7 @@ where
             Self::Float(term) => term.is_complex(),
             Self::String(term) => term.is_complex(),
             Self::Symbol(term) => term.is_complex(),
+            Self::Timestamp(term) => term.is_complex(),
             Self::Variable(term) => term.is_complex(),
             Self::Effect(term) => term.is_complex(),
             Self::Let(term) => term.is_complex(),
@@ -673,6 +686,7 @@ where
             Self::Float(term) => term.should_intern(eager),
             Self::String(term) => term.should_intern(eager),
             Self::Symbol(term) => term.should_intern(eager),
+            Self::Timestamp(term) => term.should_intern(eager),
             Self::Variable(term) => term.should_intern(eager),
             Self::Effect(term) => term.should_intern(eager),
             Self::Let(term) => term.should_intern(eager),
@@ -703,6 +717,7 @@ where
             Self::Float(term) => std::fmt::Display::fmt(term, f),
             Self::String(term) => std::fmt::Display::fmt(term, f),
             Self::Symbol(term) => std::fmt::Display::fmt(term, f),
+            Self::Timestamp(term) => std::fmt::Display::fmt(term, f),
             Self::Variable(term) => std::fmt::Display::fmt(term, f),
             Self::Effect(term) => std::fmt::Display::fmt(term, f),
             Self::Let(term) => std::fmt::Display::fmt(term, f),
@@ -734,6 +749,7 @@ where
             Self::Float(term) => term.to_json(),
             Self::String(term) => term.to_json(),
             Self::Symbol(term) => term.to_json(),
+            Self::Timestamp(term) => term.to_json(),
             Self::Variable(term) => term.to_json(),
             Self::Effect(term) => term.to_json(),
             Self::Let(term) => term.to_json(),
@@ -760,6 +776,7 @@ where
             (Self::Float(term), Self::Float(other)) => term.patch(other),
             (Self::String(term), Self::String(other)) => term.patch(other),
             (Self::Symbol(term), Self::Symbol(other)) => term.patch(other),
+            (Self::Timestamp(term), Self::Timestamp(other)) => term.patch(other),
             (Self::Variable(term), Self::Variable(other)) => term.patch(other),
             (Self::Effect(term), Self::Effect(other)) => term.patch(other),
             (Self::Let(term), Self::Let(other)) => term.patch(other),

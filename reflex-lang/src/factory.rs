@@ -10,7 +10,7 @@ use reflex::{
         Applicable, Arity, Builtin, CompoundNode, DependencyList, DynamicState, Eagerness,
         Evaluate, EvaluationCache, EvaluationResult, Expression, ExpressionFactory, FloatValue,
         GraphNode, HeapAllocator, InstructionPointer, IntValue, Internable, NodeId, Reducible,
-        Rewritable, SerializeJson, StackOffset, Substitutions, SymbolId,
+        Rewritable, SerializeJson, StackOffset, Substitutions, SymbolId, TimestampValue,
     },
     hash::HashId,
 };
@@ -66,6 +66,9 @@ impl<TBuiltin: Builtin> ExpressionFactory<CachedSharedTerm<TBuiltin>>
     }
     fn create_symbol_term(&self, id: SymbolId) -> CachedSharedTerm<TBuiltin> {
         self.create_expression(Term::Symbol(SymbolTerm::new(id)))
+    }
+    fn create_timestamp_term(&self, millis: TimestampValue) -> CachedSharedTerm<TBuiltin> {
+        self.create_expression(Term::Timestamp(TimestampTerm::new(millis)))
     }
     fn create_variable_term(&self, offset: StackOffset) -> CachedSharedTerm<TBuiltin> {
         self.create_expression(Term::Variable(VariableTerm::new(offset)))
@@ -222,6 +225,15 @@ impl<TBuiltin: Builtin> ExpressionFactory<CachedSharedTerm<TBuiltin>>
     ) -> Option<&'a StringTerm<CachedSharedTerm<TBuiltin>>> {
         match expression.inner_term() {
             Term::String(term) => Some(term),
+            _ => None,
+        }
+    }
+    fn match_timestamp_term<'a>(
+        &self,
+        expression: &'a CachedSharedTerm<TBuiltin>,
+    ) -> Option<&'a TimestampTerm> {
+        match expression.inner_term() {
+            Term::Timestamp(term) => Some(term),
             _ => None,
         }
     }
@@ -403,6 +415,7 @@ impl<TBuiltin: Builtin> Expression for CachedSharedTerm<TBuiltin> {
     type FloatTerm = FloatTerm;
     type StringTerm = StringTerm<Self>;
     type SymbolTerm = SymbolTerm;
+    type TimestampTerm = TimestampTerm;
     type VariableTerm = VariableTerm;
     type EffectTerm = EffectTerm<Self>;
     type LetTerm = LetTerm<Self>;

@@ -1996,6 +1996,7 @@ dependencies = [
 name = "reflex-lang"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "reflex",
  "reflex-stdlib",
  "reflex-utils",

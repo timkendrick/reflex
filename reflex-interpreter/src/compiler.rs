@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-// SPDX-FileContributor: Chris Campbell <c.campbell@mwam.com> https://github.com/c-campbell-mwam
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use std::{
     collections::{
@@ -16,7 +15,7 @@ use reflex::{
     cache::SubstitutionCache,
     core::{
         Applicable, Eagerness, Expression, ExpressionFactory, HeapAllocator, InstructionPointer,
-        IntValue, Internable, Reducible, Rewritable, StackOffset, SymbolId, Uuid,
+        IntValue, Internable, Reducible, Rewritable, StackOffset, SymbolId, TimestampValue, Uuid,
     },
     hash::{hash_object, FnvHashMap, FnvHasher, HashId, IntMap},
 };
@@ -134,6 +133,9 @@ pub enum Instruction {
     },
     PushSymbol {
         id: SymbolId,
+    },
+    PushTimestamp {
+        millis: TimestampValue,
     },
     PushFunction {
         target: InstructionPointer,
