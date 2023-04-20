@@ -16,7 +16,7 @@
         (local.set $dependencies (global.get $NULL))
         (local.set $iterator_state (global.get $NULL))
         ;; Iterate through the arguments and combine into a single combined signal
-        (@iterate $arg_list $item $iterator_state $state $dependencies
+        (@iterate $LOOP $arg_list $item $iterator_state $state $dependencies
           ;; Determine whether the argument is a signal
           (if
             (call $Term::Signal::is (local.get $item))

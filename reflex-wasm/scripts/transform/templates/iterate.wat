@@ -4,7 +4,7 @@
 ;; Initialize the iterator state
 (local.set (@get $iterator_state) (global.get $NULL))
 ;; Iterate through each of the source iterator items
-(loop $LOOP
+(loop (@get $label)
   ;; Consume the next iterator item
   (call $Term::traits::next (local.get (@get $source)) (local.get (@get $iterator_state)) (local.get (@get $state)))
   ;; Update the accumulated dependencies
@@ -19,4 +19,4 @@
       ;; Otherwise evaluate the provided iteratee body
       (@get $body)
       ;; Continue with the next item
-      (br $LOOP))))
+      (br (@get $label)))))

@@ -166,7 +166,7 @@
     (local $dependencies i32)
     (local.set $dependencies (global.get $NULL))
     ;; Consume the iterator, counting the number of iterations
-    (@iterate $iterator $item $iterator_state $state $dependencies
+    (@iterate $LOOP $iterator $item $iterator_state $state $dependencies
       (local.set $num_items (i32.add (i32.const 1) (local.get $num_items))))
     (local.get $num_items)
     (local.get $dependencies))

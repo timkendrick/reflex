@@ -58,7 +58,7 @@
           (else
             (local.set $size_hint (i32.const 0))
             (local.set $dependencies (global.get $NULL))
-            (@iterate $self $item $iterator_state $state $dependencies
+            (@iterate $LOOP $self $item $iterator_state $state $dependencies
               (local.set $size_hint (i32.add (i32.const 1) (local.get $size_hint))))
             (call $Term::Int::new (i64.extend_i32_u (local.get $size_hint)))
             (local.get $dependencies)))))

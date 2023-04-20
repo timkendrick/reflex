@@ -17,6 +17,7 @@ export const ITERATE_DIRECTIVE = '@iterate';
 export default function iterateDirective(node, context) {
   const [
     instruction,
+    labelIdentifier,
     sourceIdentifier,
     itemIdentifier,
     iteratorStateIdentifier,
@@ -26,11 +27,13 @@ export default function iterateDirective(node, context) {
   ] = node.elements
     .flatMap((node) => (context.transform ? context.transform(node, context) : [node]))
     .reduce((results, node) => {
-      results.push(...(results.length < 6 && isNonFunctionalNode(node) ? [] : [node]));
+      results.push(...(results.length < 7 && isNonFunctionalNode(node) ? [] : [node]));
       return results;
     }, []);
   if (
     !isNamedTermNode(ITERATE_DIRECTIVE, instruction) ||
+    !labelIdentifier ||
+    !isIdentifierNode(labelIdentifier) ||
     !sourceIdentifier ||
     !isIdentifierNode(sourceIdentifier) ||
     !itemIdentifier ||
@@ -51,6 +54,7 @@ export default function iterateDirective(node, context) {
   }
   return getTemplateElements(
     context.import(TEMPLATE, {
+      $label: labelIdentifier,
       $source: sourceIdentifier,
       $item: itemIdentifier,
       $iterator_state: iteratorStateIdentifier,

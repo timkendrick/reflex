@@ -50,7 +50,7 @@
         ;; If the state is empty or the dependency list is empty, return -1
         (i64.const -1))
       (else
-        (@iterate $self $item $iterator_state $state $dependencies
+        (@iterate $LOOP $self $item $iterator_state $state $dependencies
           ;; Get the state value corresponding to the current dependency state token
           ;; (this will be the null pointer if no state value exists for this state token)
           (local.set $item (call $Term::Hashmap::traits::get (local.get $state) (local.get $item)))
