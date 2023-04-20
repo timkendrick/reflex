@@ -27,6 +27,12 @@
           (else
             (call $Stdlib_ParseInt::impl::default (local.get $self) (local.get $state))))))
 
+    (@impl
+      (i32.eq (global.get $TermType::Date))
+      (func $Stdlib_ParseInt::impl::Date (param $self i32) (param $state i32) (result i32 i32)
+        (call $Term::Int::new (call $Term::Date::get::timestamp (local.get $self)))
+        (global.get $NULL)))
+
     (@default
       (func $Stdlib_ParseInt::impl::default (param $self i32) (param $state i32) (result i32 i32)
         (call $Term::Signal::of

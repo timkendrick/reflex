@@ -194,5 +194,27 @@ export default (describe) => {
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });
+
+    test('(Date)', (assert, {
+      createApplication,
+      createBuiltin,
+      createDate,
+      createUnitList,
+      evaluate,
+      format,
+      NULL,
+      Stdlib,
+    }) => {
+      (() => {
+        const timestamp = new Date('2000-01-01T00:00:00Z').getTime();
+        const expression = createApplication(
+          createBuiltin(Stdlib.ParseInt),
+          createUnitList(createDate(timestamp)),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), `${timestamp}`);
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+    });
   });
 };

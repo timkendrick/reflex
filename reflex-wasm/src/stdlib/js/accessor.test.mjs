@@ -1163,6 +1163,33 @@ export default (describe) => {
       })();
     });
 
+    test('(Date, String)', (assert, {
+      createApplication,
+      createBuiltin,
+      createDate,
+      createEmptyList,
+      createPair,
+      createString,
+      evaluate,
+      format,
+      NULL,
+      Stdlib,
+    }) => {
+      (() => {
+        const timestamp = new Date('2000-01-01T00:00:00Z').getTime();
+        const expression = createApplication(
+          createApplication(
+            createBuiltin(Stdlib.Accessor),
+            createPair(createDate(timestamp), createString('getTime')),
+          ),
+          createEmptyList(),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), `${timestamp}`);
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+    });
+
     test('(Iterator, String)', (assert, {
       createApplication,
       createBuiltin,

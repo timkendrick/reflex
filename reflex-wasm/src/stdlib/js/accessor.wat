@@ -6,6 +6,7 @@
   (@const-string $Stdlib_Accessor::ENTRIES "entries")
   (@const-string $Stdlib_Accessor::FILTER "filter")
   (@const-string $Stdlib_Accessor::GET "get")
+  (@const-string $Stdlib_Accessor::GET_TIME "getTime")
   (@const-string $Stdlib_Accessor::HAS "has")
   (@const-string $Stdlib_Accessor::KEYS "keys")
   (@const-string $Stdlib_Accessor::LENGTH "length")
@@ -377,6 +378,23 @@
                 (global.get $NULL))))
           ;; Default to the generic iterator implementation
           (call $Stdlib_Accessor::impl::<iterate>::String (local.get $self) (local.get $key) (local.get $state)))))
+
+    (@impl
+      (i32.eq (global.get $TermType::Date))
+      (i32.eq (global.get $TermType::String))
+      (func $Stdlib_Accessor::impl::Date::String (param $self i32) (param $key i32) (param $state i32) (result i32 i32)
+        (@switch
+          ;; Determine the return value based on the provided member name
+          (@list
+            (@list
+              (call $Term::traits::equals (local.get $key) (global.get $Stdlib_Accessor::GET_TIME))
+              (return
+                (call $Term::Partial::new
+                  (call $Term::Builtin::new (global.get $Stdlib_ParseInt))
+                  (call $Term::List::of (local.get $self)))
+                (global.get $NULL))))
+          ;; Default to returning an error for unrecognized member names
+          (call $Stdlib_Accessor::impl::default (local.get $self) (local.get $key) (local.get $state)))))
 
     (@impl
       (call $TermType::implements::iterate)
