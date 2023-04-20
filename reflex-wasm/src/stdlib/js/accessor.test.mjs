@@ -1262,6 +1262,40 @@ export default (describe) => {
             createApplication(
               createApplication(
                 createBuiltin(Stdlib.Accessor),
+                createPair(createRangeIterator(3, 3), createString('flatMap')),
+              ),
+              createUnitList(
+                createLambda(
+                  1,
+                  createPair(
+                    createApplication(
+                      createBuiltin(Stdlib.Multiply),
+                      createPair(createVariable(0), createInt(2)),
+                    ),
+                    createApplication(
+                      createBuiltin(Stdlib.Multiply),
+                      createPair(createVariable(0), createInt(3)),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(
+          format(result),
+          `[${3 * 2}, ${3 * 3}, ${4 * 2}, ${4 * 3}, ${5 * 2}, ${5 * 3}]`,
+        );
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.ResolveList),
+          createUnitList(
+            createApplication(
+              createApplication(
+                createBuiltin(Stdlib.Accessor),
                 createPair(createRangeIterator(3, 3), createString('keys')),
               ),
               createEmptyList(),

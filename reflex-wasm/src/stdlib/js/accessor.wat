@@ -5,6 +5,7 @@
   (@const-string $Stdlib_Accessor::ADD "add")
   (@const-string $Stdlib_Accessor::ENTRIES "entries")
   (@const-string $Stdlib_Accessor::FILTER "filter")
+  (@const-string $Stdlib_Accessor::FLAT_MAP "flatMap")
   (@const-string $Stdlib_Accessor::GET "get")
   (@const-string $Stdlib_Accessor::GET_TIME "getTime")
   (@const-string $Stdlib_Accessor::HAS "has")
@@ -418,6 +419,16 @@
                   (call $Term::FilterIterator::new
                     (local.get $self)
                     (call $Term::Variable::new (i32.const 0))))
+                (global.get $NULL)))
+            (@list
+              (call $Term::traits::equals (local.get $key) (global.get $Stdlib_Accessor::FLAT_MAP))
+              (return
+                (call $Term::Lambda::new
+                  (i32.const 1)
+                  (call $Term::FlattenIterator::new
+                    (call $Term::MapIterator::new
+                      (local.get $self)
+                      (call $Term::Variable::new (i32.const 0)))))
                 (global.get $NULL)))
             (@list
               (call $Term::traits::equals (local.get $key) (global.get $Stdlib_Accessor::KEYS))
