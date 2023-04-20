@@ -7,7 +7,7 @@ use chrono::{DateTime, NaiveDateTime};
 use reflex::core::{
     uuid, Applicable, ArgType, Arity, EvaluationCache, Expression, ExpressionFactory,
     FloatTermType, FunctionArity, HeapAllocator, IntTermType, RefType, StringTermType, StringValue,
-    Uid, Uuid,
+    TimestampValue, Uid, Uuid,
 };
 
 pub struct ParseDate;
@@ -67,7 +67,7 @@ impl<T: Expression> Applicable<T> for ParseDate {
     }
 }
 
-fn parse_string_timestamp(timestamp: &str) -> Option<i64> {
+fn parse_string_timestamp(timestamp: &str) -> Option<TimestampValue> {
     None.or_else(|| {
         DateTime::parse_from_rfc3339(timestamp)
             .ok()
