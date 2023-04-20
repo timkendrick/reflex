@@ -486,11 +486,6 @@ impl From<reflex_js::stdlib::Construct> for CliBuiltins {
         Self::from(reflex_js::stdlib::Stdlib::from(value))
     }
 }
-impl From<reflex_js::stdlib::DateConstructor> for CliBuiltins {
-    fn from(value: reflex_js::stdlib::DateConstructor) -> Self {
-        Self::from(reflex_js::stdlib::Stdlib::from(value))
-    }
-}
 impl From<reflex_js::stdlib::EncodeUriComponent> for CliBuiltins {
     fn from(value: reflex_js::stdlib::EncodeUriComponent) -> Self {
         Self::from(reflex_js::stdlib::Stdlib::from(value))
@@ -513,6 +508,11 @@ impl From<reflex_js::stdlib::Log> for CliBuiltins {
 }
 impl From<reflex_js::stdlib::LogArgs> for CliBuiltins {
     fn from(value: reflex_js::stdlib::LogArgs) -> Self {
+        Self::from(reflex_js::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_js::stdlib::ParseDate> for CliBuiltins {
+    fn from(value: reflex_js::stdlib::ParseDate) -> Self {
         Self::from(reflex_js::stdlib::Stdlib::from(value))
     }
 }

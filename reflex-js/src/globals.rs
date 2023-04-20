@@ -3,8 +3,8 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 // SPDX-FileContributor: Chris Campbell <c.campbell@mwam.com> https://github.com/c-campbell-mwam
 use crate::stdlib::{
-    Accessor, DateConstructor, EncodeUriComponent, FormatErrorMessage, IsFinite, ParseFloat,
-    ParseInt, ToString,
+    Accessor, EncodeUriComponent, FormatErrorMessage, IsFinite, ParseDate, ParseFloat, ParseInt,
+    ToString,
 };
 use reflex::core::{Builtin, Expression, ExpressionFactory, HeapAllocator};
 use reflex_json::stdlib::{JsonDeserialize, JsonSerialize};
@@ -44,7 +44,7 @@ pub trait JsGlobalsBuiltin:
     + From<CollectHashMap>
     + From<CollectHashSet>
     + From<ConstructRecord>
-    + From<DateConstructor>
+    + From<ParseDate>
     + From<EncodeUriComponent>
     + From<Floor>
     + From<FormatErrorMessage>
@@ -78,7 +78,7 @@ impl<T> JsGlobalsBuiltin for T where
         + From<CollectHashMap>
         + From<CollectHashSet>
         + From<ConstructRecord>
-        + From<DateConstructor>
+        + From<ParseDate>
         + From<EncodeUriComponent>
         + From<Floor>
         + From<FormatErrorMessage>

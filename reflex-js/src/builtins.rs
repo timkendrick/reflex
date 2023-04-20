@@ -469,8 +469,8 @@ impl From<reflex_js::stdlib::Construct> for JsBuiltins {
         Self::from(reflex_js::stdlib::Stdlib::from(value))
     }
 }
-impl From<reflex_js::stdlib::DateConstructor> for JsBuiltins {
-    fn from(value: reflex_js::stdlib::DateConstructor) -> Self {
+impl From<reflex_js::stdlib::ParseDate> for JsBuiltins {
+    fn from(value: reflex_js::stdlib::ParseDate) -> Self {
         Self::from(reflex_js::stdlib::Stdlib::from(value))
     }
 }
