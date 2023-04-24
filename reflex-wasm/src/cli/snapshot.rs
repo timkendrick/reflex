@@ -230,12 +230,12 @@ fn clear_function_body(
     module: &mut walrus::Module,
     function_id: FunctionId,
 ) -> Result<(), WasmSnapshotError> {
-    let init_function = match &mut module.funcs.get_mut(function_id).kind {
+    let function = match &mut module.funcs.get_mut(function_id).kind {
         walrus::FunctionKind::Local(func) => Some(func),
         _ => None,
     }
     .ok_or_else(|| WasmSnapshotError::InvalidAstTransformation)?;
-    init_function.builder_mut().func_body().instrs_mut().clear();
+    function.builder_mut().func_body().instrs_mut().clear();
     Ok(())
 }
 

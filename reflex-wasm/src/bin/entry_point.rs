@@ -5,9 +5,9 @@ use std::{io::Write, path::PathBuf};
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use reflex_wasm::cli::snapshot::{capture_heap_snapshot, inline_heap_snapshot, MemorySnapshot};
+use reflex_wasm::cli::entry_point::add_module_entry_point;
 
-// Reflex WebAssembly memory snapshot tool
+// Reflex WebAssembly entry point function generator tool
 #[derive(Parser, Debug)]
 #[command(about)]
 struct Args {
@@ -15,13 +15,17 @@ struct Args {
     #[arg(short, long)]
     input: PathBuf,
 
-    /// Name of exported WASM memory
+    /// Heap pointer to expression to evaluate
     #[arg(short, long)]
-    memory_name: String,
+    entry_point: u32,
 
-    /// Heap snapshot to inline into the WASM module (defaults to initial VM memory snapshot)
+    /// Heap pointer to state object to use for evaluation
     #[arg(short, long)]
-    snapshot: Option<PathBuf>,
+    state: Option<u32>,
+
+    /// Name of exported entry point function
+    #[arg(short = 'n', long)]
+    export_name: String,
 
     /// Path to output file (defaults to stdout)
     #[arg(short, long)]
@@ -33,25 +37,18 @@ fn main() -> Result<()> {
     let args = Args::parse();
     let Args {
         input: input_path,
-        memory_name,
         output: output_path,
-        snapshot,
+        entry_point: expression_pointer,
+        state: state_pointer,
+        export_name,
     } = args;
 
     // Load the WASM module
     let wasm_bytes = std::fs::read(&input_path).with_context(|| "Failed to load input module")?;
 
-    // Capture the heap snapshot if one was not provided
-    let snapshot = match snapshot {
-        Some(snapshot_path) => std::fs::read(&snapshot_path)
-            .map(MemorySnapshot::from_bytes)
-            .with_context(|| "Failed to load heap snapshot"),
-        None => capture_heap_snapshot(&wasm_bytes, &memory_name)
-            .with_context(|| "Failed to capture initial heap snapshot"),
-    }?;
-
     // Inline the heap snapshot into the WASM module source
-    let output_bytes = inline_heap_snapshot(&wasm_bytes, &memory_name, snapshot)?;
+    let output_bytes =
+        add_module_entry_point(&wasm_bytes, &export_name, expression_pointer, state_pointer)?;
 
     // Output .wasm file contents
     match output_path {

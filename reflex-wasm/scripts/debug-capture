@@ -35,9 +35,18 @@ echo "Inlining heap snapshot..."
     --snapshot "$heap_snapshot_path" \
     --output "$output_module_path")
 
+# Inline the heap snapshot into the runtime module
+echo "Creating entry point function..."
+(cd "$workspace_path" && \
+  cargo run --bin entry-point -- \
+    --input "$output_module_path" \
+    --entry-point "$entry_point" \
+    --state "$state" \
+    --output "$output_module_path" \
+    --export-name "_run")
+
 # Debug the generated WASM module
 echo "Debugging..."
 WASM_MODULE="$output_module_path" \
-ENTRY_POINT="$entry_point" \
-STATE="$state" \
+ENTRY_POINT="_run" \
   "$scripts_path/debug" src/node.debug.mjs

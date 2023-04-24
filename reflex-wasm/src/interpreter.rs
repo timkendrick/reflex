@@ -391,7 +391,7 @@ impl WasmInterpreter {
     pub fn instantiate(
         module: &WasmProgram,
         memory_name: &'static str,
-    ) -> Result<crate::interpreter::WasmInterpreter, InterpreterError> {
+    ) -> Result<Self, InterpreterError> {
         match module.compiler_mode {
             WasmCompilerMode::Wasm => WasmContextBuilder::from_wasm(module.as_bytes(), memory_name),
             WasmCompilerMode::Cranelift => {
