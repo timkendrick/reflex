@@ -29,7 +29,7 @@ use reflex_engine::{
         bytecode_interpreter::{BytecodeInterpreterAction, BytecodeInterpreterMetricLabels},
         wasm_interpreter::{WasmInterpreter, WasmInterpreterMetricNames},
     },
-    task::wasm_worker::WasmWorkerTask,
+    task::wasm_worker::{WasmHeapDumpMode, WasmWorkerTask},
 };
 use reflex_graphql::{
     create_json_error_object,
@@ -488,7 +488,7 @@ where
         async_tasks: TAsyncTasks,
         blocking_tasks: TBlockingTasks,
         effect_throttle: Option<Duration>,
-        dump_query_errors: bool,
+        dump_heap_snapshot: Option<WasmHeapDumpMode>,
     ) -> Result<Self, String>
     where
         T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T>,
@@ -594,7 +594,7 @@ where
                     metric_names.interpreter,
                     get_worker_metric_labels,
                     main_pid,
-                    dump_query_errors,
+                    dump_heap_snapshot,
                 ))
                 .map(TTask::Actor::from),
             )

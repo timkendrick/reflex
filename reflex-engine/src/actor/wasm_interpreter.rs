@@ -41,7 +41,9 @@ use reflex_wasm::cli::compile::WasmProgram;
 
 use crate::{
     actor::bytecode_interpreter::BytecodeInterpreterMetricLabels,
-    task::wasm_worker::{WasmWorkerMetricNames, WasmWorkerTask, WasmWorkerTaskFactory},
+    task::wasm_worker::{
+        WasmHeapDumpMode, WasmWorkerMetricNames, WasmWorkerTask, WasmWorkerTaskFactory,
+    },
 };
 
 // TODO: Allow tweaking bytecode interpreter GC trigger
@@ -119,7 +121,7 @@ where
     metric_names: WasmInterpreterMetricNames,
     get_worker_metric_labels: TMetricLabels,
     main_pid: ProcessId,
-    dump_query_errors: bool,
+    dump_heap_snapshot: Option<WasmHeapDumpMode>,
     _expression: PhantomData<T>,
 }
 impl<T, TFactory, TAllocator, TMetricLabels> WasmInterpreter<T, TFactory, TAllocator, TMetricLabels>
@@ -137,7 +139,7 @@ where
         metric_names: WasmInterpreterMetricNames,
         get_worker_metric_labels: TMetricLabels,
         main_pid: ProcessId,
-        dump_query_errors: bool,
+        dump_heap_snapshot: Option<WasmHeapDumpMode>,
     ) -> Self {
         Self {
             program: Arc::new(program),
@@ -147,7 +149,7 @@ where
             metric_names: metric_names.init(),
             get_worker_metric_labels,
             main_pid,
-            dump_query_errors,
+            dump_heap_snapshot,
             _expression: Default::default(),
         }
     }
@@ -540,7 +542,7 @@ where
                                     .into(),
                             },
                             caller_pid: current_pid,
-                            dump_query_errors: self.dump_query_errors,
+                            dump_heap_snapshot: self.dump_heap_snapshot,
                             _expression: PhantomData,
                             _factory: PhantomData,
                             _allocator: PhantomData,

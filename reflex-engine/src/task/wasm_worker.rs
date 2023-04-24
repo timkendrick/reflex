@@ -9,6 +9,7 @@ use std::{
     marker::PhantomData,
     ops::Deref,
     rc::Rc,
+    str::FromStr,
     sync::Arc,
     time::Instant,
 };
@@ -48,6 +49,102 @@ use reflex_wasm::{
 use serde::{Deserialize, Serialize};
 
 use crate::task::bytecode_worker::BytecodeWorkerAction;
+
+/// Criteria governing whether to dump the state of the heap at the point of evaluation
+#[derive(PartialEq, Eq, Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct WasmHeapDumpMode {
+    evaluation_type: WasmHeapDumpEvaluationType,
+    result_type: WasmHeapDumpResultType,
+}
+
+impl WasmHeapDumpMode {
+    pub fn new(
+        evaluation_type: WasmHeapDumpEvaluationType,
+        result_type: WasmHeapDumpResultType,
+    ) -> Self {
+        Self {
+            evaluation_type,
+            result_type,
+        }
+    }
+    fn should_dump_heap<T: Expression, E>(
+        &self,
+        query_type: QueryEvaluationMode,
+        result: Result<&T, E>,
+        factory: &impl ExpressionFactory<T>,
+    ) -> bool {
+        let query_type_match = match (self.evaluation_type, query_type) {
+            (WasmHeapDumpEvaluationType::All, _) => true,
+            (WasmHeapDumpEvaluationType::Query, QueryEvaluationMode::Query) => true,
+            _ => false,
+        };
+        if !query_type_match {
+            return false;
+        }
+        match self.result_type {
+            WasmHeapDumpResultType::All => true,
+            WasmHeapDumpResultType::Error => match result {
+                Err(_) => true,
+                Ok(result) => is_error_result(result, factory),
+            },
+            WasmHeapDumpResultType::Result => match result {
+                Err(_) => true,
+                Ok(result) => !is_unresolved_result(result, factory),
+            },
+        }
+    }
+}
+
+impl FromStr for WasmHeapDumpMode {
+    type Err = String;
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        match input.to_lowercase().as_str() {
+            "all" => Ok(WasmHeapDumpMode::new(
+                WasmHeapDumpEvaluationType::All,
+                WasmHeapDumpResultType::All,
+            )),
+            "error" => Ok(WasmHeapDumpMode::new(
+                WasmHeapDumpEvaluationType::All,
+                WasmHeapDumpResultType::Error,
+            )),
+            "result" => Ok(WasmHeapDumpMode::new(
+                WasmHeapDumpEvaluationType::All,
+                WasmHeapDumpResultType::Result,
+            )),
+            "query-all" => Ok(WasmHeapDumpMode::new(
+                WasmHeapDumpEvaluationType::Query,
+                WasmHeapDumpResultType::All,
+            )),
+            "query-error" => Ok(WasmHeapDumpMode::new(
+                WasmHeapDumpEvaluationType::Query,
+                WasmHeapDumpResultType::Error,
+            )),
+            "query-result" => Ok(WasmHeapDumpMode::new(
+                WasmHeapDumpEvaluationType::Query,
+                WasmHeapDumpResultType::Result,
+            )),
+            _ => Err(format!("Unrecognized heap dump mode: {}", input)),
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Clone, Copy, Debug, Serialize, Deserialize)]
+pub enum WasmHeapDumpEvaluationType {
+    /// Dump heap only for top-level queries
+    Query,
+    /// Dump heap for all queries and sub-queries
+    All,
+}
+
+#[derive(PartialEq, Eq, Clone, Copy, Debug, Serialize, Deserialize)]
+pub enum WasmHeapDumpResultType {
+    /// Dump heap on error results
+    Error,
+    /// Dump heap on all results
+    Result,
+    /// Dump heap on intermediate evaluations
+    All,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct WasmWorkerMetricNames {
@@ -94,7 +191,7 @@ pub struct WasmWorkerTaskFactory<
     pub wasm_module: Arc<WasmProgram>,
     pub metric_names: WasmWorkerMetricNames,
     pub caller_pid: ProcessId,
-    pub dump_query_errors: bool,
+    pub dump_heap_snapshot: Option<WasmHeapDumpMode>,
     pub _expression: PhantomData<T>,
     pub _factory: PhantomData<TFactory>,
     pub _allocator: PhantomData<TAllocator>,
@@ -120,7 +217,7 @@ where
             wasm_module,
             metric_names,
             caller_pid,
-            dump_query_errors,
+            dump_heap_snapshot,
             _expression,
             _factory,
             _allocator,
@@ -137,7 +234,7 @@ where
             allocator,
             metric_names,
             caller_pid,
-            dump_query_errors,
+            dump_heap_snapshot,
         }
     }
 }
@@ -158,7 +255,7 @@ where
     allocator: TAllocator,
     metric_names: WasmWorkerMetricNames,
     caller_pid: ProcessId,
-    dump_query_errors: bool,
+    dump_heap_snapshot: Option<WasmHeapDumpMode>,
 }
 
 pub enum WasmWorkerState<T: Expression> {
@@ -587,28 +684,18 @@ where
                                 Err(MaybeOwned::Owned(WasmWorkerError::InterpreterError(err)))
                             }
                         };
-                        let dump_heap_snapshot = if self.dump_query_errors {
-                            match result.as_ref() {
-                                Err(_) => true,
-                                Ok((result, _)) => {
-                                    let error_signal = self
-                                        .factory
-                                        .match_signal_term(result.result())
-                                        .filter(|signal| {
-                                            signal.signals().as_deref().iter().any(|effect| {
-                                                matches!(
-                                                    effect.as_deref().signal_type(),
-                                                    SignalType::Error { .. }
-                                                )
-                                            })
-                                        });
-                                    error_signal.is_some()
-                                }
-                            }
-                        } else {
-                            false
-                        };
-                        if dump_heap_snapshot {
+                        if self
+                            .dump_heap_snapshot
+                            .as_ref()
+                            .map(|criteria| {
+                                criteria.should_dump_heap(
+                                    self.evaluation_mode,
+                                    result.as_ref().map(|(result, _)| result.result()),
+                                    &self.factory,
+                                )
+                            })
+                            .unwrap_or(false)
+                        {
                             let heap_snapshot = {
                                 let mut bytes = state.instance.dump_heap();
                                 // Ignore any heap values allocated during this evaluation
@@ -949,6 +1036,31 @@ fn clear_snapshot_cached_application_results(heap_snapshot: &mut [u8]) {
             heap_snapshot[index] = value;
         }
     }
+}
+
+fn is_error_result<T: Expression>(result: &T, factory: &impl ExpressionFactory<T>) -> bool {
+    factory
+        .match_signal_term(result)
+        .filter(|result| {
+            result.signals().as_deref().iter().any(|condition| {
+                matches!(condition.as_deref().signal_type(), SignalType::Error { .. })
+            })
+        })
+        .is_some()
+}
+
+fn is_unresolved_result<T: Expression>(result: &T, factory: &impl ExpressionFactory<T>) -> bool {
+    factory
+        .match_signal_term(result)
+        .filter(|result| {
+            result.signals().as_deref().iter().all(|condition| {
+                matches!(
+                    condition.as_deref().signal_type(),
+                    SignalType::Pending | SignalType::Custom { .. }
+                )
+            })
+        })
+        .is_some()
 }
 
 fn as_bytes<T: Sized>(value: &T) -> &[u8] {

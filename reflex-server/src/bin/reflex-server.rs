@@ -17,6 +17,7 @@ use clap::Parser;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use opentelemetry::trace::noop::NoopTracer;
 use reflex_dispatcher::{Action, HandlerContext};
+use reflex_engine::task::wasm_worker::WasmHeapDumpMode;
 use reflex_graphql::{parse_graphql_schema, GraphQlSchema, NoopGraphQlQueryTransform};
 use reflex_grpc::{
     actor::{GrpcHandler, GrpcHandlerMetricNames},
@@ -92,7 +93,7 @@ struct Args {
     log: Option<Option<LogFormat>>,
     /// Dump heap snapshots for any queries that return error results
     #[clap(long)]
-    dump_query_errors: bool,
+    dump_heap_snapshot: Option<WasmHeapDumpMode>,
 }
 impl Into<ReflexServerCliOptions> for Args {
     fn into(self) -> ReflexServerCliOptions {
@@ -189,7 +190,7 @@ pub async fn main() -> Result<()> {
                 .map(Some),
             _ => Ok(None),
         }?;
-    let dump_query_errors = args.dump_query_errors;
+    let dump_heap_snapshot = args.dump_heap_snapshot;
     let schema = if let Some(schema_path) = &args.schema {
         Some(load_graphql_schema(schema_path.as_path())?)
     } else {
@@ -289,7 +290,7 @@ pub async fn main() -> Result<()> {
             TokioRuntimeThreadPoolFactory::new(tokio::runtime::Handle::current()),
             TokioRuntimeThreadPoolFactory::new(tokio::runtime::Handle::current()),
             effect_throttle,
-            dump_query_errors,
+            dump_heap_snapshot,
         )
         .with_context(|| anyhow!("Server startup failed"))?;
     server.await.with_context(|| anyhow!("Server error"))

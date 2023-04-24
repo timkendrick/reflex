@@ -38,7 +38,8 @@ use nom::{
 };
 use reflex::core::{Applicable, Expression, Reducible, Rewritable};
 use reflex_engine::{
-    actor::bytecode_interpreter::BytecodeInterpreterMetricLabels, task::wasm_worker::WasmWorkerTask,
+    actor::bytecode_interpreter::BytecodeInterpreterMetricLabels,
+    task::wasm_worker::{WasmHeapDumpMode, WasmWorkerTask},
 };
 use reflex_graphql::{GraphQlOperation, GraphQlParserBuiltin, GraphQlSchema};
 use reflex_handlers::utils::tls::{parse_ca_certs, rustls};
@@ -438,7 +439,7 @@ pub fn cli<
     async_tasks: TAsyncTasks,
     blocking_tasks: TBlockingTasks,
     effect_throttle: Option<Duration>,
-    dump_query_errors: bool,
+    dump_heap_snapshot: Option<WasmHeapDumpMode>,
 ) -> Result<impl Future<Output = Result<(), hyper::Error>>>
 where
     T: AsyncExpression + Expression<String = String> + Rewritable<T> + Reducible<T> + Applicable<T>,
@@ -535,7 +536,7 @@ where
         async_tasks,
         blocking_tasks,
         effect_throttle,
-        dump_query_errors,
+        dump_heap_snapshot,
     )
     .map_err(|err| anyhow!(err))
     .context("Failed to initialize server")?;

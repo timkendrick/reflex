@@ -15,6 +15,7 @@ use reflex_dispatcher::{
     Action, Actor, Handler, ProcessId, SchedulerTransition, SerializableAction, TaskFactory,
 };
 use reflex_engine::actor::bytecode_interpreter::BytecodeInterpreterMetricLabels;
+use reflex_engine::task::wasm_worker::WasmHeapDumpMode;
 use reflex_graphql::{GraphQlOperation, GraphQlParserBuiltin, GraphQlSchema};
 use reflex_json::{json, JsonValue};
 use reflex_runtime::{
@@ -104,7 +105,7 @@ pub async fn cli<
     tokio_runtime_metric_names: TokioRuntimeMonitorMetricNames,
     async_tasks: TAsyncTasks,
     blocking_tasks: TBlockingTasks,
-    dump_query_errors: bool,
+    dump_heap_snapshot: Option<WasmHeapDumpMode>,
 ) -> Result<String>
 where
     T: AsyncExpression
@@ -235,7 +236,7 @@ where
         async_tasks,
         blocking_tasks,
         effect_throttle,
-        dump_query_errors,
+        dump_heap_snapshot,
     )
     .map_err(|err| anyhow!(err))
     .context("Failed to initialize server")?;

@@ -34,6 +34,10 @@ pub use ::metrics;
 pub use ::metrics_exporter_prometheus;
 pub use ::opentelemetry;
 
+pub use reflex_engine::task::wasm_worker::{
+    WasmHeapDumpEvaluationType, WasmHeapDumpMode, WasmHeapDumpResultType,
+};
+
 pub mod action;
 pub mod actor;
 pub mod logger;

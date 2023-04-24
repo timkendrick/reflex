@@ -50,7 +50,8 @@ use reflex_server::{
     scheduler_metrics::{
         NoopServerMetricsSchedulerQueueInstrumentation, ServerMetricsInstrumentation,
     },
-    GraphQlWebServerActorFactory,
+    GraphQlWebServerActorFactory, WasmHeapDumpEvaluationType, WasmHeapDumpMode,
+    WasmHeapDumpResultType,
 };
 use reflex_utils::reconnect::NoopReconnectTimeout;
 use reflex_wasm::{
@@ -137,7 +138,10 @@ pub fn serve_graphql(
     );
     let async_tasks = TokioRuntimeThreadPoolFactory::new(tokio::runtime::Handle::current());
     let blocking_tasks = TokioRuntimeThreadPoolFactory::new(tokio::runtime::Handle::current());
-    let dump_query_errors = true;
+    let dump_heap_snapshot = Some(WasmHeapDumpMode::new(
+        WasmHeapDumpEvaluationType::Query,
+        WasmHeapDumpResultType::Error,
+    ));
     let app = GraphQlWebServer::<TAction, TTask>::new(
         wasm_module,
         entry_point_export_name,
@@ -175,7 +179,7 @@ pub fn serve_graphql(
         async_tasks,
         blocking_tasks,
         None,
-        dump_query_errors,
+        dump_heap_snapshot,
     )
     .map_err(WasmTestError::Server)?;
     let service = make_service_fn({
