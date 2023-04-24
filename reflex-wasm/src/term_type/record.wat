@@ -444,6 +444,8 @@
         (local.get $hashmap)
         (call $Term::List::get_item (local.get $keys) (local.get $field_index))
         (call $Term::List::get_item (local.get $values) (local.get $field_index)))
+      ;; Discard the result of whether the key already existed
+      (drop)
       (br_if $LOOP
         (i32.lt_u (local.tee $field_index (i32.add (local.get $field_index) (i32.const 1))) (local.get $num_fields))))
     ;; Instantiate the hashmap

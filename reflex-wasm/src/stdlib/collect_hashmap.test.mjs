@@ -76,6 +76,36 @@ export default (describe) => {
       })();
     });
 
+    test('Duplicate keys', (assert, {
+      createApplication,
+      createBuiltin,
+      createInt,
+      createPair,
+      createString,
+      createTriple,
+      evaluate,
+      format,
+      getHashmapValue,
+      NULL,
+      Stdlib,
+    }) => {
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.CollectHashmap),
+          createTriple(
+            createPair(createString('foo'), createInt(3)),
+            createPair(createString('bar'), createInt(4)),
+            createPair(createString('foo'), createInt(5)),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), 'Map(2)');
+        assert.strictEqual(format(getHashmapValue(result, createString('foo'))), '5');
+        assert.strictEqual(format(getHashmapValue(result, createString('bar'))), '4');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+    });
+
     test('Invalid entries', (assert, {
       createApplication,
       createBuiltin,

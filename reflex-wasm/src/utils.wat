@@ -2,6 +2,9 @@
 ;; SPDX-License-Identifier: Apache-2.0
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 (module
+  (func $Utils::bool::not (param $self i32) (result i32)
+    (i32.eqz (local.get $self)))
+
   (func $Utils::i32::abs (param $self i32) (result i32)
     (i32.xor
       (i32.add (local.get $self) (local.tee $self (i32.shr_s (local.get $self) (i32.const 31))))
