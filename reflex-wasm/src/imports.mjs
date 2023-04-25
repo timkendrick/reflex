@@ -4,6 +4,11 @@
 export default function imports(wasi, getModule) {
   const I64_MAX_VALUE = BigInt('0xFFFFFFFFFFFFFFFF');
   return {
+    Debugger: {
+      debug: (value) => {
+        debugger;
+      },
+    },
     Math: {
       remainder: (x, y) => x % y,
       acos: Math.acos,

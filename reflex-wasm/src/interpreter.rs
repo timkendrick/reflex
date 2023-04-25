@@ -699,6 +699,7 @@ pub mod mocks {
         builder: WasmContextBuilder,
     ) -> Result<WasmContextBuilder, InterpreterError> {
         builder
+            .add_import("Debugger", "debug", |_: u32| {})?
             .add_import("Date", "parse", |_: u32, _: u32| 0u64)?
             .add_import("Date", "toISOString", |_: i64, _: u32| 0u32)?
             .add_import("Number", "toString", |_: f64, _: u32| 0u32)?

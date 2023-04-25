@@ -17,6 +17,14 @@ pub fn add_wasm_runtime_imports(
 ) -> Result<WasmContextBuilder, InterpreterError> {
     // FIXME: Provide correct implementations for WASM runtime imports
     builder
+        .add_import("Debugger", "debug", |value_pointer: u32| {
+            let value = ArenaPointer::from(value_pointer).as_non_null();
+            if let Some(value) = value {
+                eprintln!("[DEBUG] {value:?}")
+            } else {
+                eprintln!("[DEBUG] NULL")
+            }
+        })?
         .add_import(
             "Date",
             "parse",
@@ -28,12 +36,8 @@ pub fn add_wasm_runtime_imports(
                         _ => None,
                     })
                     .and_then(|memory| {
-                        let slice = read_linear_memory_slice(
-                            &memory,
-                            caller.as_context(),
-                            offset as usize,
-                            length as usize,
-                        );
+                        let slice =
+                            read_linear_memory_slice(&memory, caller.as_context(), offset, length);
                         std::str::from_utf8(slice)
                             .ok()
                             .and_then(|timestamp| parse_string_timestamp(timestamp))
@@ -51,9 +55,16 @@ pub fn add_wasm_runtime_imports(
                     write_linear_memory_bytes(
                         &mut memory,
                         &mut caller,
-                        dest_pointer as usize,
+                        dest_pointer,
                         formatted_bytes,
                     )
+                    .and_then(|_| {
+                        update_linear_memory_allocator_offset(
+                            &mut memory,
+                            &mut caller,
+                            dest_pointer + formatted_bytes.len() as u32,
+                        )
+                    })
                     .ok()
                 }) {
                     Some(_) => formatted_bytes.len() as u32,
@@ -71,9 +82,16 @@ pub fn add_wasm_runtime_imports(
                     write_linear_memory_bytes(
                         &mut memory,
                         &mut caller,
-                        dest_pointer as usize,
+                        dest_pointer,
                         formatted_bytes,
                     )
+                    .and_then(|_| {
+                        update_linear_memory_allocator_offset(
+                            &mut memory,
+                            &mut caller,
+                            dest_pointer + formatted_bytes.len() as u32,
+                        )
+                    })
                     .ok()
                 }) {
                     Some(_) => formatted_bytes.len() as u32,
@@ -127,40 +145,47 @@ fn get_linear_memory(caller: &mut Caller<WasiCtx>, memory_name: &str) -> Option<
 fn write_linear_memory_bytes(
     memory: &mut Memory,
     caller: &mut Caller<WasiCtx>,
-    dest_pointer: usize,
-    formatted_bytes: &[u8],
+    dest_pointer: u32,
+    bytes: &[u8],
 ) -> Result<(), ()> {
-    match ensure_linear_memory_size(
-        memory,
-        caller,
-        dest_pointer as usize + formatted_bytes.len(),
-    ) {
-        Ok(_) => Some(memory),
-        Err(_) => None,
+    if bytes.len() > (u32::MAX as usize) {
+        return Err(());
     }
-    .and_then(|memory| {
-        memory
-            .write(
-                caller.as_context_mut(),
-                dest_pointer as usize,
-                formatted_bytes,
-            )
-            .ok()
-    })
-    .ok_or(())
+    // Ensure enough pages of linear memory have been allocated to contain the output bytes
+    let end_offset = dest_pointer + (bytes.len() as u32);
+    let _ = ensure_linear_memory_size(memory, caller, end_offset).map_err(|_| ())?;
+    // Write the bytes into linear memory
+    let _ = memory
+        .write(caller.as_context_mut(), dest_pointer as usize, bytes)
+        .map_err(|_| ())?;
+    Ok(())
 }
 
+fn update_linear_memory_allocator_offset(
+    memory: &mut Memory,
+    caller: &mut Caller<WasiCtx>,
+    offset: u32,
+) -> Result<(), ()> {
+    // Update the bump allocator offset at heap pointer address 0 to reflect the updated heap size
+    let _ = memory
+        .write(caller.as_context_mut(), 0, &offset.to_le_bytes())
+        .map_err(|_| ())?;
+    Ok(())
+}
+
+#[must_use]
 fn ensure_linear_memory_size<'a, T>(
     memory: &mut Memory,
     caller: &mut Caller<'a, T>,
-    len: usize,
+    len: u32,
 ) -> Result<(), anyhow::Error> {
+    let required_size = len as usize;
     let existing_size = memory.data_size(caller.as_context());
-    if existing_size >= len {
+    if existing_size >= required_size {
         return Ok(());
     }
     let num_existing_pages = existing_size / WASM_PAGE_SIZE;
-    let num_required_pages = pad_to_next(len, WASM_PAGE_SIZE);
+    let num_required_pages = pad_to_next(required_size, WASM_PAGE_SIZE);
     let _ = memory.grow(
         caller.as_context_mut(),
         (num_required_pages - num_existing_pages) as u64,
@@ -171,9 +196,11 @@ fn ensure_linear_memory_size<'a, T>(
 fn read_linear_memory_slice<'a, T: 'a>(
     memory: &'a Memory,
     store: impl Into<StoreContext<'a, T>>,
-    offset: usize,
-    length: usize,
+    offset: u32,
+    length: u32,
 ) -> &'a [u8] {
+    let offset = offset as usize;
+    let length = length as usize;
     let heap = memory.data(store);
     &heap[offset..offset + length]
 }

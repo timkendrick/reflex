@@ -2,6 +2,7 @@
 ;; SPDX-License-Identifier: Apache-2.0
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 (module
+  (@include "./debugger.wat")
   (@include "./date.wat")
   (@include "./math.wat")
   (@include "./number.wat")
