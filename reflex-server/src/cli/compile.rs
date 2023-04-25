@@ -12,9 +12,7 @@ use reflex_handlers::{
 };
 use reflex_js::{builtin_imports, imports::JsImportsBuiltin, static_module_loader};
 use reflex_parser::{create_parser, ParserBuiltin, Syntax, SyntaxParser};
-use reflex_wasm::cli::compile::{
-    compile_wasm_module, WasmCompilerError, WasmCompilerMode, WasmCompilerOptions, WasmProgram,
-};
+use reflex_wasm::cli::compile::{compile_wasm_module, WasmCompilerError, WasmCompilerOptions};
 
 #[derive(Debug)]
 pub enum ServerCompilerError {
@@ -47,10 +45,9 @@ pub fn parse_and_compile_module<T: Expression + 'static>(
     runtime: &[u8],
     factory: &(impl ExpressionFactory<T> + Clone + 'static),
     allocator: &(impl HeapAllocator<T> + Clone + 'static),
-    compiler_mode: WasmCompilerMode,
     compiler_options: &WasmCompilerOptions,
     unoptimized: bool,
-) -> Result<WasmProgram, ServerCompilerError>
+) -> Result<Vec<u8>, ServerCompilerError>
 where
     T::Builtin: ParserBuiltin + Into<reflex_wasm::stdlib::Stdlib>,
     // TODO: Remove unnecessary trait bounds
@@ -74,7 +71,6 @@ where
         runtime,
         factory,
         allocator,
-        compiler_mode,
         compiler_options,
         unoptimized,
     )

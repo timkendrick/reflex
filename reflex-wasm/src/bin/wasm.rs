@@ -6,7 +6,9 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use clap::Parser;
 use reflex_wasm::{
-    allocator::Arena, cli::compile::WasmProgram, interpreter::WasmInterpreter, ArenaPointer,
+    allocator::Arena,
+    interpreter::{WasmInterpreter, WasmProgram},
+    ArenaPointer,
 };
 
 // Reflex WebAssembly standalone WASM module interpretr

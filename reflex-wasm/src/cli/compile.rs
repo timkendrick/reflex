@@ -14,7 +14,6 @@ use reflex::{
     cache::SubstitutionCache,
     core::{Arity, Expression, ExpressionFactory, HeapAllocator, LambdaTermType, Rewritable, Uuid},
 };
-use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use walrus::{
     self,
@@ -118,51 +117,15 @@ impl std::fmt::Display for WasmCompilerError {
     }
 }
 
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
-pub enum WasmCompilerMode {
-    /// Standard WASM module
-    Wasm,
-    /// Cranelift-precompiled module
-    Cranelift,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct WasmProgram {
-    pub(crate) compiler_mode: WasmCompilerMode,
-    bytes: Vec<u8>,
-}
-
-impl WasmProgram {
-    pub fn from_wasm(bytes: Vec<u8>) -> Self {
-        Self {
-            compiler_mode: WasmCompilerMode::Wasm,
-            bytes,
-        }
-    }
-    pub fn from_cwasm(bytes: Vec<u8>) -> Self {
-        Self {
-            compiler_mode: WasmCompilerMode::Cranelift,
-            bytes,
-        }
-    }
-    pub fn as_bytes(&self) -> &[u8] {
-        &self.bytes
-    }
-    pub fn into_bytes(self) -> Vec<u8> {
-        self.bytes
-    }
-}
-
 pub fn compile_wasm_module<T: Expression + 'static>(
     expression: &T,
     export_name: &str,
     runtime: &[u8],
     factory: &(impl ExpressionFactory<T> + Clone + 'static),
     allocator: &(impl HeapAllocator<T> + Clone + 'static),
-    compiler_mode: WasmCompilerMode,
     compiler_options: &WasmCompilerOptions,
     unoptimized: bool,
-) -> Result<WasmProgram, WasmCompilerError>
+) -> Result<Vec<u8>, WasmCompilerError>
 where
     // TODO: Remove unnecessary trait bounds
     T: Rewritable<T>,
@@ -208,7 +171,6 @@ where
     compile_module(
         [(String::from(export_name), factory)],
         runtime,
-        compiler_mode,
         None,
         compiler_options,
         unoptimized,
@@ -226,11 +188,10 @@ pub fn compile_module(
         Item = (String, ArenaRef<TypedTerm<LambdaTerm>, impl Arena + Clone>),
     >,
     runtime_wasm: &[u8],
-    compiler_mode: WasmCompilerMode,
     heap_snapshot: Option<&[u8]>,
     options: &WasmCompilerOptions,
     unoptimized: bool,
-) -> Result<WasmProgram, WasmCompilerError> {
+) -> Result<Vec<u8>, WasmCompilerError> {
     let entry_points = entry_points.into_iter().collect::<Vec<_>>();
 
     // Create a new Wasm module based on the runtime bytes
@@ -489,17 +450,7 @@ pub fn compile_module(
                     })
             })
     }?;
-
-    match compiler_mode {
-        WasmCompilerMode::Wasm => Ok(WasmProgram::from_wasm(wasm_bytes)),
-        WasmCompilerMode::Cranelift => {
-            let engine = wasmtime::Engine::default();
-            engine
-                .precompile_module(&wasm_bytes)
-                .map_err(WasmCompilerError::CompilerError)
-                .map(WasmProgram::from_cwasm)
-        }
-    }
+    Ok(wasm_bytes)
 }
 
 fn recompute_invalidated_term_hashes(
@@ -1454,17 +1405,10 @@ mod tests {
     use super::*;
 
     fn create_mock_wasm_interpreter(
-        wasm_module: &WasmProgram,
+        wasm_module: &[u8],
     ) -> Result<WasmInterpreter, InterpreterError> {
         let memory_name = "memory";
-        let context = match wasm_module.compiler_mode {
-            WasmCompilerMode::Wasm => {
-                WasmContextBuilder::from_wasm(wasm_module.as_bytes(), memory_name)
-            }
-            WasmCompilerMode::Cranelift => {
-                WasmContextBuilder::from_cwasm(wasm_module.as_bytes(), memory_name)
-            }
-        }?;
+        let context = WasmContextBuilder::from_wasm(wasm_module, memory_name)?;
         let mut interpreter: WasmInterpreter = add_import_stubs(context)?.build()?.into();
         interpreter.initialize()?;
         Ok(interpreter)
@@ -1491,7 +1435,6 @@ mod tests {
         let wasm_bytes = compile_module(
             [("foo".into(), entry_point)],
             RUNTIME_BYTES,
-            WasmCompilerMode::Wasm,
             None,
             &WasmCompilerOptions::default(),
             true,
@@ -1568,7 +1511,6 @@ mod tests {
         let wasm_bytes = compile_module(
             [("foo".into(), entry_point)],
             RUNTIME_BYTES,
-            WasmCompilerMode::Wasm,
             None,
             &WasmCompilerOptions::default(),
             true,

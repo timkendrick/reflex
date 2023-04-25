@@ -50,7 +50,7 @@ use reflex_runtime::{
 use reflex_scheduler::tokio::{
     TokioInbox, TokioSchedulerInstrumentation, TokioSchedulerLogger, TokioThreadPoolFactory,
 };
-use reflex_wasm::cli::compile::WasmProgram;
+use reflex_wasm::interpreter::WasmProgram;
 use serde::{Deserialize, Serialize};
 
 use crate::{

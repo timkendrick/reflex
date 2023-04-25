@@ -56,14 +56,13 @@ use reflex_server::{
 use reflex_utils::reconnect::NoopReconnectTimeout;
 use reflex_wasm::{
     allocator::ArenaAllocator,
-    cli::compile::{WasmCompilerOptions, WasmProgram},
+    cli::compile::WasmCompilerOptions,
+    interpreter::WasmProgram,
     term_type::{LambdaTerm, TermType, TypedTerm},
     ArenaRef, Term,
 };
 use reflex_wasm::{
-    allocator::VecAllocator,
-    cli::compile::{compile_module, WasmCompilerMode},
-    factory::WasmTermFactory,
+    allocator::VecAllocator, cli::compile::compile_module, factory::WasmTermFactory,
 };
 use tokio::sync::oneshot;
 
@@ -102,7 +101,6 @@ pub fn serve_graphql(
         graph_definition,
         &factory,
         &allocator,
-        WasmCompilerMode::Wasm,
     )?;
 
     type TBuiltin = ServerBuiltins;
@@ -143,7 +141,7 @@ pub fn serve_graphql(
         WasmHeapDumpResultType::Error,
     ));
     let app = GraphQlWebServer::<TAction, TTask>::new(
-        wasm_module,
+        WasmProgram::from_wasm(wasm_module),
         entry_point_export_name,
         None,
         {
@@ -209,8 +207,7 @@ fn compile_graphql_module<T: Expression + 'static>(
     graph_definition: &str,
     factory: &(impl ExpressionFactory<T> + Clone + 'static),
     allocator: &(impl HeapAllocator<T> + Clone + 'static),
-    compiler_mode: WasmCompilerMode,
-) -> Result<WasmProgram, WasmTestError<T>>
+) -> Result<Vec<u8>, WasmTestError<T>>
 where
     T: Rewritable<T>,
     T::Builtin: JsParserBuiltin
@@ -272,7 +269,6 @@ where
     let wasm_module = compile_module(
         [(String::from(export_name), graph_factory)],
         RUNTIME_BYTES,
-        compiler_mode,
         None,
         &WasmCompilerOptions::default(),
         true,

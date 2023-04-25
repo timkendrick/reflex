@@ -9,10 +9,7 @@ use clap::Parser;
 use reflex_lang::{allocator::DefaultAllocator, SharedTermFactory};
 use reflex_parser::Syntax;
 use reflex_server::cli::compile::{create_loader, parse_and_compile_module};
-use reflex_wasm::{
-    cli::compile::{WasmCompilerMode, WasmCompilerOptions},
-    compiler::CompilerOptions,
-};
+use reflex_wasm::{cli::compile::WasmCompilerOptions, compiler::CompilerOptions};
 
 // Reflex WebAssembly compiler
 #[derive(Parser, Debug)]
@@ -56,11 +53,6 @@ fn main() -> Result<()> {
     let input_path = args.entry_point;
     let syntax = args.syntax;
     let export_name = args.export_name;
-    let compiler_mode = if args.precompile {
-        WasmCompilerMode::Cranelift
-    } else {
-        WasmCompilerMode::Wasm
-    };
     let unoptimized = args.unoptimized;
     let factory = SharedTermFactory::<reflex_server::builtins::ServerBuiltins>::default();
     let allocator = DefaultAllocator::default();
@@ -97,17 +89,15 @@ fn main() -> Result<()> {
         &runtime_bytes,
         &factory,
         &allocator,
-        compiler_mode,
         &compiler_options,
         unoptimized,
     )
     .with_context(|| "Failed to compile WebAssembly module")?;
 
     // Output compiled WASM module bytes
-    let output_bytes = wasm_module.as_bytes();
     match args.output {
-        Some(name) => std::fs::write(&name, output_bytes),
-        None => std::io::stdout().write(&output_bytes).map(|_| ()),
+        Some(name) => std::fs::write(&name, &wasm_module),
+        None => std::io::stdout().write(&wasm_module).map(|_| ()),
     }
     .with_context(|| "Failed to write output file")
 }

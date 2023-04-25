@@ -53,7 +53,7 @@ use reflex_server::{
     tokio_runtime_metrics_export::TokioRuntimeMonitorMetricNames,
 };
 use reflex_utils::reconnect::NoopReconnectTimeout;
-use reflex_wasm::cli::compile::WasmProgram;
+use reflex_wasm::interpreter::WasmProgram;
 
 /// Execute a GraphQL query against the provided graph root
 #[derive(Parser)]

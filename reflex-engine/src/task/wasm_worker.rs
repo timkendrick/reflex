@@ -37,9 +37,8 @@ use reflex_runtime::{
 };
 use reflex_wasm::{
     allocator::{ArenaAllocator, ArenaIterator},
-    cli::compile::WasmProgram,
     factory::WasmTermFactory,
-    interpreter::{InterpreterError, UnboundEvaluationResult, WasmInterpreter},
+    interpreter::{InterpreterError, UnboundEvaluationResult, WasmInterpreter, WasmProgram},
     term_type::{
         symbol::SymbolTerm, ApplicationCache, ApplicationTerm, ConditionTerm, HashmapTerm,
         ListTerm, TermType, TreeTerm, TypedTerm, WasmExpression,

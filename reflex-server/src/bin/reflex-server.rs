@@ -59,7 +59,7 @@ use reflex_server::{
     server::utils::EitherTracer, tokio_runtime_metrics_export::TokioRuntimeMonitorMetricNames,
 };
 use reflex_utils::reconnect::FibonacciReconnectTimeout;
-use reflex_wasm::cli::compile::WasmProgram;
+use reflex_wasm::interpreter::WasmProgram;
 
 /// Launch a GraphQL server for the provided graph root
 #[derive(Parser)]

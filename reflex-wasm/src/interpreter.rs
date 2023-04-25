@@ -9,6 +9,7 @@ use std::{
     rc::Rc,
 };
 
+use serde::{Deserialize, Serialize};
 use wasmtime::{
     Engine, ExternType, Instance, IntoFunc, Linker, Memory, Module, Store, Val, WasmParams,
     WasmResults,
@@ -17,7 +18,6 @@ use wasmtime_wasi::{sync::WasiCtxBuilder, WasiCtx};
 
 use crate::{
     allocator::{Arena, ArenaAllocator, ArenaIterator},
-    cli::compile::{WasmCompilerMode, WasmProgram},
     compiler::runtime::builtin::RuntimeBuiltin,
     exports::add_wasm_runtime_imports,
     hash::TermSize,
@@ -25,6 +25,41 @@ use crate::{
     term_type::{TreeTerm, TypedTerm},
     ArenaPointer, ArenaRef, PointerIter, Term, WASM_PAGE_SIZE,
 };
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
+pub enum WasmCompilerMode {
+    /// Standard WASM module
+    Wasm,
+    /// Cranelift-precompiled module
+    Cranelift,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WasmProgram {
+    pub(crate) compiler_mode: WasmCompilerMode,
+    bytes: Vec<u8>,
+}
+
+impl WasmProgram {
+    pub fn from_wasm(bytes: Vec<u8>) -> Self {
+        Self {
+            compiler_mode: WasmCompilerMode::Wasm,
+            bytes,
+        }
+    }
+    pub fn from_cwasm(bytes: Vec<u8>) -> Self {
+        Self {
+            compiler_mode: WasmCompilerMode::Cranelift,
+            bytes,
+        }
+    }
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.bytes
+    }
+}
 
 pub struct UnboundEvaluationResult {
     pub result_pointer: ArenaPointer,

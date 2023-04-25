@@ -49,7 +49,7 @@ use reflex_scheduler::tokio::{
     TokioInbox, TokioScheduler, TokioSchedulerBuilder, TokioSchedulerInstrumentation,
     TokioSchedulerLogger, TokioThreadPoolFactory,
 };
-use reflex_wasm::cli::compile::WasmProgram;
+use reflex_wasm::interpreter::WasmProgram;
 use uuid::Uuid;
 
 use crate::{

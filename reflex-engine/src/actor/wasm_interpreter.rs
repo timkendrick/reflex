@@ -37,7 +37,7 @@ use reflex_runtime::{
     },
     QueryInvalidationStrategy,
 };
-use reflex_wasm::cli::compile::WasmProgram;
+use reflex_wasm::interpreter::WasmProgram;
 
 use crate::{
     actor::bytecode_interpreter::BytecodeInterpreterMetricLabels,

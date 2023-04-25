@@ -17,15 +17,14 @@ use reflex_lang::{allocator::DefaultAllocator, CachedSharedTerm, SharedTermFacto
 use reflex_wasm::{
     allocator::{Arena, ArenaAllocator, VecAllocator},
     cli::compile::{
-        compile_module, parse_inline_memory_snapshot, WasmCompilerError, WasmCompilerMode,
-        WasmCompilerOptions, WasmProgram,
+        compile_module, parse_inline_memory_snapshot, WasmCompilerError, WasmCompilerOptions,
     },
     compiler::{
         error::TypedStackError, CompileWasm, CompilerOptions, CompilerStack, CompilerState,
         ParamsSignature, TypeSignature, TypedCompilerBlock, ValueType,
     },
     factory::WasmTermFactory,
-    interpreter::{InterpreterError, WasmInterpreter},
+    interpreter::{InterpreterError, WasmInterpreter, WasmProgram},
     stdlib::Stdlib,
     term_type::{
         condition::ConditionTerm, hashmap::HashmapTerm, lambda::LambdaTerm, signal::SignalTerm,
@@ -380,20 +379,20 @@ where
     let wasm_module = compile_module(
         [(String::from(export_name), entry_point)],
         &RUNTIME_BYTES,
-        WasmCompilerMode::Wasm,
         Some(&linear_memory),
         compiler_options,
         true,
     )
     .map_err(CompilerTestError::Compiler)?;
+    let wasm_program = WasmProgram::from_wasm(wasm_module);
 
-    let (interpreter, result, dependencies) = WasmInterpreter::instantiate(&wasm_module, "memory")
+    let (interpreter, result, dependencies) = WasmInterpreter::instantiate(&wasm_program, "memory")
         .and_then(|mut interpreter| {
             interpreter
                 .call::<u32, (u32, u32)>(export_name, u32::from(state))
                 .map(|(result, dependencies)| (interpreter, result, dependencies))
         })
-        .map_err(|err| CompilerTestError::Interpreter(err, wasm_module.into()))?;
+        .map_err(|err| CompilerTestError::Interpreter(err, wasm_program.into()))?;
     let allocator = VecAllocator::from_bytes(&interpreter.dump_heap());
     let arena = Rc::new(RefCell::new(allocator));
     let dependencies = ArenaPointer::from(dependencies)
