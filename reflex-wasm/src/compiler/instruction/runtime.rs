@@ -11,8 +11,11 @@ use crate::{
         instruction,
         runtime::builtin::RuntimeBuiltin,
         wasm::{
-            parse_function_type_signature, parse_value_type, GenerateWasm, WasmGeneratorBindings,
-            WasmGeneratorError, WasmGeneratorOptions, WasmGeneratorOutput, WasmGeneratorResult,
+            generate::{
+                GenerateWasm, WasmGeneratorBindings, WasmGeneratorError, WasmGeneratorOptions,
+                WasmGeneratorOutput, WasmGeneratorResult,
+            },
+            types::{parse_function_type_signature, parse_value_type},
         },
         CompiledBlock, CompiledFunctionId, CompilerStack, ParamsSignature, TypeSignature,
         TypedCompilerBlock, ValueType,

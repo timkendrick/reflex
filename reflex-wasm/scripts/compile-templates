@@ -1,0 +1,12 @@
+#/usr/bin/env bash
+cd $(dirname $0)/..
+set -euo pipefail
+
+TEMPLATES_DIR=./templates
+OUTPUT_DIR=./templates
+
+for input_path in "$TEMPLATES_DIR"/*.wat; do
+  echo "Compiling ${input_path}..."
+  filename=$(basename "$input_path" ".wat")
+  wat2wasm "$input_path" --debug-names --output "$OUTPUT_DIR/$filename.wasm"
+done

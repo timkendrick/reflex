@@ -133,7 +133,6 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.ok(isHashmap(result));
         assert.strictEqual(getHashmapNumEntries(result), 3);
-        // FIXME: unresolved
         assert.strictEqual(
           format(getHashmapValue(result, createString('foo'))),
           '[(0) => 1(), (0) => 2(), (0) => 3()]',

@@ -10,6 +10,7 @@ use std::{
     rc::Rc,
 };
 
+use anyhow::Context;
 use reflex::{
     cache::SubstitutionCache,
     core::{Arity, Expression, ExpressionFactory, HeapAllocator, LambdaTermType, Rewritable, Uuid},
@@ -28,10 +29,11 @@ use crate::{
         error::TypedStackError,
         instruction::{self, CompiledInstruction},
         runtime::{builtin::RuntimeBuiltin, globals::RuntimeGlobal},
-        wasm::{
-            generate_indirect_function_wrapper, generate_stateful_function, RuntimeBuiltinMappings,
-            RuntimeExportMappings, RuntimeGlobalMappings, RuntimeStdlibMappings,
-            WasmCompiledFunctionMappings, WasmGeneratorError, WasmGeneratorOptions,
+        wasm::generate::{
+            generate_cached_function_wrapper, generate_indirect_function_wrapper,
+            generate_stateful_function, RuntimeBuiltinMappings, RuntimeExportMappings,
+            RuntimeGlobalMappings, RuntimeStdlibMappings, WasmCompiledFunctionMappings,
+            WasmGeneratorError, WasmGeneratorOptions,
         },
         CapturingThunk, CompileWasm, CompiledBlock, CompiledFunctionId, CompiledLambda,
         CompiledThunk, CompilerOptions, CompilerStack, CompilerState, ConstValue, FunctionPointer,
@@ -39,10 +41,13 @@ use crate::{
     },
     factory::WasmTermFactory,
     hash::TermHasher,
-    stdlib::{self, Stdlib},
+    stdlib,
     term_type::{BuiltinTerm, LambdaTerm, TermType, TypedTerm},
     ArenaPointer, ArenaRef, FunctionIndex, IntoArenaRefIterator, PointerIter, Term, WASM_PAGE_SIZE,
 };
+
+const CACHED_FUNCTION_TEMPLATE: &'static [u8] =
+    include_bytes!("../../templates/cached_function.wasm");
 
 #[derive(Debug)]
 pub enum WasmCompilerError {
@@ -61,11 +66,12 @@ pub enum WasmCompilerError {
     InvalidFunctionId(CompiledFunctionId),
     StackError(TypedStackError),
     CompilerError(anyhow::Error),
+    TemplateError(anyhow::Error),
     OptimizationError(wasm_opt::OptimizationError),
     OptimizationFileSystemError(std::io::Error),
     RuntimeGlobalNotFound(RuntimeGlobal),
     RuntimeBuiltinNotFound(RuntimeBuiltin),
-    StdlibBuiltinNotFound(Stdlib),
+    StdlibBuiltinNotFound(stdlib::Stdlib),
     GeneratorError(WasmGeneratorError),
 }
 
@@ -74,7 +80,7 @@ impl std::error::Error for WasmCompilerError {}
 impl std::fmt::Display for WasmCompilerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::ModuleLoadError(err) => write!(f, "Failed to load WASM module: {err}"),
+            Self::ModuleLoadError(err) => write!(f, "Failed to load WASM module: {err:?}"),
             Self::TableNotFound => write!(f, "Indirect function call table definition not found"),
             Self::MultipleTables => write!(f, "Multiple indirect function call table definitions"),
             Self::InvalidFunctionTable => {
@@ -97,7 +103,8 @@ impl std::fmt::Display for WasmCompilerError {
                 input_path.display()
             ),
             Self::StackError(err) => write!(f, "Stack error: {err}"),
-            Self::CompilerError(err) => write!(f, "Failed to compile WASM output: {err}"),
+            Self::CompilerError(err) => write!(f, "Failed to compile WASM output: {err:?}"),
+            Self::TemplateError(err) => write!(f, "Failed to generate WASM template: {err:?}"),
             Self::OptimizationError(err) => write!(f, "Failed to optimize WASM output: {err}"),
             Self::OptimizationFileSystemError(err) => {
                 write!(f, "Failed to generate optimized WASM output: {err}")
@@ -129,7 +136,7 @@ pub fn compile_wasm_module<T: Expression + 'static>(
 where
     // TODO: Remove unnecessary trait bounds
     T: Rewritable<T>,
-    T::Builtin: Into<crate::stdlib::Stdlib>,
+    T::Builtin: Into<stdlib::Stdlib>,
 {
     // Abstract any free variables from any internal lambda functions within the expression
     let expression = expression
@@ -181,6 +188,12 @@ where
 pub struct WasmCompilerOptions {
     pub compiler: CompilerOptions,
     pub generator: WasmGeneratorOptions,
+    pub runtime: WasmCompilerRuntimeOptions,
+}
+
+#[derive(Default, Clone, Copy, Debug)]
+pub struct WasmCompilerRuntimeOptions {
+    pub memoize_lambdas: bool,
 }
 
 pub fn compile_module(
@@ -192,7 +205,35 @@ pub fn compile_module(
     options: &WasmCompilerOptions,
     unoptimized: bool,
 ) -> Result<Vec<u8>, WasmCompilerError> {
+    // wasm-opt doesn't currently support block params
+    let overridden_options = if !unoptimized && !options.generator.disable_block_params {
+        Some(WasmCompilerOptions {
+            generator: WasmGeneratorOptions {
+                disable_block_params: true,
+                ..options.generator
+            },
+            compiler: options.compiler,
+            runtime: options.runtime,
+        })
+    } else {
+        None
+    };
+    let options = overridden_options.as_ref().unwrap_or(options);
+
     let entry_points = entry_points.into_iter().collect::<Vec<_>>();
+
+    let mut cached_function_template_module = parse_wasm_ast(CACHED_FUNCTION_TEMPLATE)?;
+    let cached_function_template_id = cached_function_template_module
+        .exports
+        .iter()
+        .find_map(|export| match &export.item {
+            ExportItem::Function(function_id) if export.name.as_str() == "main" => {
+                Some(*function_id)
+            }
+            _ => None,
+        })
+        .ok_or_else(|| anyhow::anyhow!("Missing template main function"))
+        .map_err(WasmCompilerError::TemplateError)?;
 
     // Create a new Wasm module based on the runtime bytes
     let mut ast = parse_wasm_ast(runtime_wasm)?;
@@ -273,12 +314,12 @@ pub fn compile_module(
         .into_iter()
         .map(|(term_hash, compiled_thunk)| {
             // Store the generated thunk alongside the compiled lambdas
-            let compiled_function_id = CompiledFunctionId::from(term_hash);
-            let entry = match compiled_lambdas.entry(compiled_function_id) {
+            let function_identifier = CompiledFunctionId::from(term_hash);
+            let entry = match compiled_lambdas.entry(function_identifier) {
                 Entry::Occupied(_) => {
                     // If a mapping already exists for this ID, we have somehow generated a wrapper for a thunk that has
                     // the same hash as a compiled lambda function (which should be impossible)
-                    Err(WasmCompilerError::InvalidFunctionId(compiled_function_id))
+                    Err(WasmCompilerError::InvalidFunctionId(function_identifier))
                 }
                 Entry::Vacant(entry) => Ok(entry),
             }?;
@@ -302,16 +343,16 @@ pub fn compile_module(
                 ),
                 body: thunk_function_body,
             });
-            Ok((term_hash, (compiled_function_id, compiled_function_term)))
+            Ok((term_hash, (function_identifier, compiled_function_term)))
         })
         .collect::<Result<HashMap<_, _>, _>>()?;
 
     // Sort all the compiled functions topologically to ensure they are linked in a valid order when generating WASM bytecode
     let compiled_functions = {
         // Register all internal lambdas as top-level evaluation roots, to ensure that all lambdas are reached
-        for compiled_function_id in compiled_lambdas.keys().copied() {
+        for function_identifier in compiled_lambdas.keys().copied() {
             compiled_entry_points
-                .entry(compiled_function_id)
+                .entry(function_identifier)
                 .or_insert(Vec::new());
         }
         // Sort the functions topologically (deepest first)
@@ -325,11 +366,12 @@ pub fn compile_module(
     // (this relies on the functions having been topologically sorted so that later functions can reference prior ones)
     let function_ids = compiled_functions.fold(
         Ok(WasmCompiledFunctionMappings::default()),
-        |results, (compiled_function_id, compiled_lambda)| {
+        |results, (function_identifier, compiled_lambda)| {
             let mut function_ids = results?;
             let CompiledLambda { params, body } = compiled_lambda;
             let num_args = params.len();
-            let function_id = generate_stateful_function(
+            // Compile the function into a WASM function
+            let compiled_function_id = generate_stateful_function(
                 &mut ast,
                 params.iter(),
                 body,
@@ -340,18 +382,40 @@ pub fn compile_module(
                 &options.generator,
             )
             .map_err(WasmCompilerError::GeneratorError)?;
+            // Generate a cache wrapper for the compiled function that memoizes previous results for specific combinations of arguments
+            let cached_function_id = if options.runtime.memoize_lambdas {
+                generate_cached_function_wrapper(
+                    &mut ast,
+                    FunctionPointer::Lambda(function_identifier),
+                    params,
+                    compiled_function_id,
+                    (
+                        &mut cached_function_template_module,
+                        cached_function_template_id,
+                    ),
+                )
+                .with_context(|| "Failed to generate cached function wrapper template")
+                .map_err(WasmCompilerError::TemplateError)?
+            } else {
+                compiled_function_id
+            };
+            // Generate an 'indirect call' wrapper that can be used to dynamically call the function at runtime via its
+            // index within the WASM call_indirect table.
+            // The indirect call wrapper takes an argument list term (pointer which allows dynamic arguments to be
+            // passed to the function) and a pointer to the current state, and invokes the cached function wrapper
             let function_index = {
                 let wrapper_id = generate_indirect_function_wrapper(
                     &mut ast,
-                    function_id,
+                    cached_function_id,
                     num_args,
                     &export_mappings,
                 );
                 register_dynamic_function(&mut ast, function_table_initializer_id, wrapper_id)
             }?;
+            // Store the cached function wrapper (to be used by later functions) and the indirect call wrapper
             function_ids.insert(
-                compiled_function_id,
-                function_id,
+                function_identifier,
+                cached_function_id,
                 function_index,
                 // TODO: Differentiate between eager/strict/lazy lambda arguments
                 Arity::eager(num_args, 0, false),
@@ -399,8 +463,8 @@ pub fn compile_module(
 
     // Rewrite the implementation of the function that exposes the arity of the stdlib indirect call wrappers
     // to additionally expose the arity of the compiled function wrappers
-    let stdlib_indirect_call_arities =
-        Stdlib::iter().map(|builtin| (FunctionIndex::from(u32::from(builtin)), builtin.arity()));
+    let stdlib_indirect_call_arities = stdlib::Stdlib::iter()
+        .map(|builtin| (FunctionIndex::from(u32::from(builtin)), builtin.arity()));
     let compiled_function_indirect_call_arities = function_ids
         .iter()
         .map(|(_, (_, function_index, arity))| (*function_index, *arity));
@@ -1271,7 +1335,7 @@ fn get_builtin_function(
 
 fn get_stdlib_function(
     builtins: &HashMap<String, FunctionId>,
-    target: Stdlib,
+    target: stdlib::Stdlib,
 ) -> Result<FunctionId, WasmCompilerError> {
     builtins
         .get(target.name())
@@ -1487,7 +1551,6 @@ mod tests {
                     TermType::Application(ApplicationTerm {
                         target: builtin,
                         args,
-                        cache: Default::default(),
                     }),
                     &arena,
                 ));

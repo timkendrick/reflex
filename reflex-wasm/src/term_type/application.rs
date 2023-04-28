@@ -8,6 +8,7 @@ use reflex::core::{
     ApplicationTermType, ArgType, Arity, DependencyList, Eagerness, Expression, GraphNode,
     Internable, SerializeJson, StackOffset,
 };
+use reflex_macros::PointerIter;
 use serde_json::Value as JsonValue;
 
 use crate::{
@@ -18,76 +19,17 @@ use crate::{
         CompilerOptions, CompilerResult, CompilerStack, CompilerState, ConstValue,
         MaybeLazyExpression, ParamsSignature, Strictness, TypeSignature, ValueType,
     },
-    hash::{TermHash, TermHashState, TermHasher, TermSize},
+    hash::{TermHash, TermHasher, TermSize},
     stdlib::Stdlib,
-    term_type::{
-        BuiltinTerm, ConstructorTerm, LambdaTerm, ListTerm, TreeTerm, TypedTerm, WasmExpression,
-    },
-    utils::{chunks_to_u64, u64_to_chunks},
-    ArenaPointer, ArenaRef, PointerIter, Term,
+    term_type::{BuiltinTerm, ConstructorTerm, LambdaTerm, ListTerm, TypedTerm, WasmExpression},
+    ArenaPointer, ArenaRef, Term,
 };
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct ApplicationTerm {
     pub target: ArenaPointer,
     pub args: ArenaPointer,
-    pub cache: ApplicationCache,
-}
-
-#[derive(Clone, Copy, Debug)]
-#[repr(C)]
-pub struct ApplicationCache {
-    pub value: ArenaPointer,
-    pub dependencies: ArenaPointer,
-    pub overall_state_hash: [u32; 2],
-    pub minimal_state_hash: [u32; 2],
-}
-
-pub type ApplicationTermPointerIter =
-    std::iter::Chain<std::array::IntoIter<ArenaPointer, 2>, ApplicationCachePointerIter>;
-
-impl<A: Arena + Clone> PointerIter for ArenaRef<ApplicationTerm, A> {
-    type Iter<'a> = ApplicationTermPointerIter
-    where
-        Self: 'a;
-    fn iter<'a>(&self) -> Self::Iter<'a>
-    where
-        Self: 'a,
-    {
-        let pointers = [
-            self.inner_pointer(|term| &term.target),
-            self.inner_pointer(|term| &term.args),
-        ];
-        let cache = self.cache();
-        let cache_pointers: ApplicationCachePointerIter = PointerIter::iter(&cache);
-        pointers.into_iter().chain(cache_pointers)
-    }
-}
-
-pub type ApplicationCachePointerIter =
-    std::iter::Chain<std::option::IntoIter<ArenaPointer>, std::option::IntoIter<ArenaPointer>>;
-
-impl<A: Arena + Clone> PointerIter for ArenaRef<ApplicationCache, A> {
-    type Iter<'a> = ApplicationCachePointerIter
-    where
-        Self: 'a;
-    fn iter<'a>(&self) -> Self::Iter<'a>
-    where
-        Self: 'a,
-    {
-        let value = self.read_value(|term| {
-            term.value
-                .as_non_null()
-                .map(|_| self.inner_pointer(|term| &term.value))
-        });
-        let dependencies = self.read_value(|term| {
-            term.dependencies
-                .as_non_null()
-                .map(|_| self.inner_pointer(|term| &term.dependencies))
-        });
-        value.into_iter().chain(dependencies)
-    }
 }
 
 impl TermSize for ApplicationTerm {
@@ -103,23 +45,6 @@ impl TermHash for ApplicationTerm {
     }
 }
 
-impl TermSize for ApplicationCache {
-    fn size_of(&self) -> usize {
-        std::mem::size_of::<Self>()
-    }
-}
-
-impl Default for ApplicationCache {
-    fn default() -> Self {
-        Self {
-            value: ArenaPointer::null(),
-            dependencies: ArenaPointer::null(),
-            overall_state_hash: u64_to_chunks(0xFFFFFFFFFFFFFFFF),
-            minimal_state_hash: u64_to_chunks(0xFFFFFFFFFFFFFFFF),
-        }
-    }
-}
-
 impl<A: Arena + Clone> ArenaRef<ApplicationTerm, A> {
     pub fn target(&self) -> ArenaRef<Term, A> {
         ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|value| value.target))
@@ -129,39 +54,6 @@ impl<A: Arena + Clone> ArenaRef<ApplicationTerm, A> {
             self.arena.clone(),
             self.read_value(|value| value.args),
         )
-    }
-    pub fn cache(&self) -> ArenaRef<ApplicationCache, A> {
-        self.inner_ref(|value| &value.cache)
-    }
-}
-
-impl<A: Arena + Clone> ArenaRef<ApplicationCache, A> {
-    pub fn value(&self) -> Option<ArenaRef<Term, A>> {
-        let pointer = self.read_value(|value| value.value).as_non_null()?;
-        Some(ArenaRef::<Term, _>::new(self.arena.clone(), pointer))
-    }
-    pub fn dependencies(&self) -> Option<ArenaRef<TypedTerm<TreeTerm>, A>> {
-        let pointer = self.read_value(|value| value.dependencies).as_non_null()?;
-        Some(ArenaRef::<TypedTerm<TreeTerm>, _>::new(
-            self.arena.clone(),
-            pointer,
-        ))
-    }
-    pub fn overall_state_hash(&self) -> Option<TermHashState> {
-        let value = self.read_value(|value| chunks_to_u64(value.overall_state_hash));
-        if value == 0xFFFFFFFFFFFFFFFF {
-            None
-        } else {
-            Some(TermHashState::from(value))
-        }
-    }
-    pub fn minimal_state_hash(&self) -> Option<TermHashState> {
-        let value = self.read_value(|value| chunks_to_u64(value.minimal_state_hash));
-        if value == 0xFFFFFFFFFFFFFFFF {
-            None
-        } else {
-            Some(TermHashState::from(value))
-        }
     }
 }
 
@@ -882,10 +774,7 @@ impl<'a, A: Arena + Clone> CompileWasm<A> for CompiledFunctionCall<'a, A, Stdlib
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        term_type::{TermType, TermTypeDiscriminants},
-        utils::u64_to_chunks,
-    };
+    use crate::term_type::{TermType, TermTypeDiscriminants};
 
     use super::*;
 
@@ -895,25 +784,9 @@ mod tests {
             TermType::Application(ApplicationTerm {
                 target: ArenaPointer(0x54321),
                 args: ArenaPointer(0x98765),
-                cache: ApplicationCache {
-                    value: ArenaPointer::null(),
-                    dependencies: ArenaPointer::null(),
-                    overall_state_hash: u64_to_chunks(0xFFFFFFFFFFFFFFFF),
-                    minimal_state_hash: u64_to_chunks(0xFFFFFFFFFFFFFFFF),
-                },
             })
             .as_bytes(),
-            [
-                TermTypeDiscriminants::Application as u32,
-                0x54321,
-                0x98765,
-                0xFFFFFFFF,
-                0xFFFFFFFF,
-                0xFFFFFFFF,
-                0xFFFFFFFF,
-                0xFFFFFFFF,
-                0xFFFFFFFF,
-            ],
+            [TermTypeDiscriminants::Application as u32, 0x54321, 0x98765],
         );
     }
 }

@@ -13,6 +13,7 @@
   (@include "./utils.wat")
   (@include "./globals.wat")
   (@include "./hash.wat")
+  (@include "./cache.wat")
   (@include "./stdlib/index.wat")
   (@include "./term.wat")
   (@include "./term_type/index.wat")

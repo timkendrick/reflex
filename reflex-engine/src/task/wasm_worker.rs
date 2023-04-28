@@ -36,13 +36,14 @@ use reflex_runtime::{
     AsyncExpression, AsyncExpressionFactory, AsyncHeapAllocator, QueryEvaluationMode,
 };
 use reflex_wasm::{
-    allocator::{ArenaAllocator, ArenaIterator},
+    allocator::ArenaAllocator,
     factory::WasmTermFactory,
     interpreter::{InterpreterError, UnboundEvaluationResult, WasmInterpreter, WasmProgram},
     term_type::{
-        symbol::SymbolTerm, ApplicationCache, ApplicationTerm, ConditionTerm, HashmapTerm,
-        ListTerm, TermType, TreeTerm, TypedTerm, WasmExpression,
+        symbol::SymbolTerm, ApplicationTerm, ConditionTerm, HashmapTerm, ListTerm, PointerTerm,
+        TermType, TreeTerm, TypedTerm, WasmExpression,
     },
+    wasmtime::Val,
     ArenaPointer, ArenaRef, FunctionIndex, Term,
 };
 use serde::{Deserialize, Serialize};
@@ -272,6 +273,8 @@ impl<T: Expression> Default for WasmWorkerState<T> {
 pub struct WasmWorkerInitializedState<T: Expression> {
     instance: WasmInterpreter,
     indirect_call_arity: HashMap<FunctionIndex, Arity>,
+    evaluation_cache_pointer: ArenaPointer,
+    evaluation_cache_initial_instance: ArenaPointer,
     entry_point: ArenaPointer,
     state_index: Option<MessageOffset>,
     state_values: IntMap<StateToken, (ArenaPointer, ArenaPointer)>,
@@ -393,6 +396,7 @@ pub enum WasmWorkerError<T: Expression> {
     Unititialized,
     InvalidGraphDefinition,
     InvalidFunctionTable,
+    InvalidEvaluationCache,
     InvalidFunctionTableArityLookup,
     InterpreterError(InterpreterError),
     SerializationError(T),
@@ -404,6 +408,7 @@ impl<T: Expression + std::fmt::Display> std::fmt::Display for WasmWorkerError<T>
             Self::Unititialized => write!(f, "WebAssembly module not initialized"),
             Self::InvalidGraphDefinition => write!(f, "Invalid graph definition"),
             Self::InvalidFunctionTable => write!(f, "Invalid function table definition"),
+            Self::InvalidEvaluationCache => write!(f, "Invalid evaluation cache definition"),
             Self::InvalidFunctionTableArityLookup => {
                 write!(f, "Invalid function table arity lookup function")
             }
@@ -509,6 +514,22 @@ where
                                     }
                                 })
                                 .collect::<Result<HashMap<_, _>, _>>()?;
+                            let evaluation_cache_pointer = instance
+                                .get_global("__cache")
+                                .and_then(|value| match value {
+                                    Val::I32(heap_pointer) => {
+                                        Some(ArenaPointer::from(heap_pointer as u32))
+                                    }
+                                    _ => None,
+                                })
+                                .ok_or_else(|| WasmWorkerError::InvalidEvaluationCache)?;
+                            let evaluation_cache_initial_instance =
+                                ArenaRef::<TypedTerm<PointerTerm>, _>::new(
+                                    &instance,
+                                    evaluation_cache_pointer,
+                                )
+                                .as_inner()
+                                .target();
                             let graph_root = instance
                                 .call::<u32, (u32, u32)>(
                                     &self.graph_root_factory_export_name,
@@ -550,19 +571,19 @@ where
                             }
                             query
                                 .map_err(WasmWorkerError::SerializationError)
-                                .map(|query| (instance, indirect_call_arity, query))
+                                .map(|query| WasmWorkerInitializedState {
+                                    instance,
+                                    indirect_call_arity,
+                                    evaluation_cache_pointer,
+                                    evaluation_cache_initial_instance,
+                                    entry_point: query,
+                                    state_index: Default::default(),
+                                    state_values: Default::default(),
+                                    latest_result: Default::default(),
+                                })
                         })
                 } {
-                    Ok((instance, indirect_call_arity, entry_point)) => {
-                        WasmWorkerState::Initialized(WasmWorkerInitializedState {
-                            instance,
-                            indirect_call_arity,
-                            entry_point,
-                            state_index: Default::default(),
-                            state_values: Default::default(),
-                            latest_result: Default::default(),
-                        })
-                    }
+                    Ok(state) => WasmWorkerState::Initialized(state),
                     Err(err) => WasmWorkerState::Error(err),
                 };
                 None
@@ -699,10 +720,15 @@ where
                                 let mut bytes = state.instance.dump_heap();
                                 // Ignore any heap values allocated during this evaluation
                                 bytes.truncate(u32::from(existing_heap_size) as usize);
-                                // Purge internal caches for any heap-allocated application nodes
-                                // (this is necessary because application term caches can be retrospectively updated
-                                // to reference terms that were created during the current evaluation pass)
-                                clear_snapshot_cached_application_results(&mut bytes);
+                                // Purge global evaluation memoization cache
+                                // (this is necessary because the global cache pointer can be mutated within a given
+                                // evaluation, leaving it pointing to a term that was only allocated during the current
+                                // evaluation pass and will therefore not exist in the pre-evaluation heap snapshot)
+                                clear_snapshot_application_cache_results(
+                                    &mut bytes,
+                                    state.evaluation_cache_pointer,
+                                    state.evaluation_cache_initial_instance,
+                                );
                                 bytes
                             };
                             let output_filename = format!(
@@ -916,7 +942,6 @@ where
             TermType::Application(ApplicationTerm {
                 target: graph_root_factory,
                 args: factory_args,
-                cache: Default::default(),
             }),
             arena,
         ));
@@ -928,7 +953,6 @@ where
             TermType::Application(ApplicationTerm {
                 target: compiled_query_function,
                 args: ListTerm::allocate([graph_root], arena),
-                cache: Default::default(),
             }),
             &*arena,
         );
@@ -994,46 +1018,27 @@ fn export_wasm_condition<'heap, T: Expression>(
     wasm_factory.export_condition(condition, factory, allocator, indirect_call_arity)
 }
 
-fn clear_snapshot_cached_application_results(heap_snapshot: &mut [u8]) {
+fn clear_snapshot_application_cache_results(
+    heap_snapshot: &mut [u8],
+    evaluation_cache_pointer: ArenaPointer,
+    evaluation_cache_initial_instance: ArenaPointer,
+) {
+    // Overwrite the existing cache pointer term with a pointer that points to the empty cache instance
     let arena = &*heap_snapshot;
-    let application_cache_offsets = ArenaIterator::<Term, _>::new(
+    let empty_cache_pointer_term = Term::new(
+        TermType::Pointer(PointerTerm {
+            target: evaluation_cache_initial_instance,
+        }),
         &arena,
-        ArenaPointer::from(std::mem::size_of::<u32>() as u32),
-        ArenaPointer::from(heap_snapshot.len() as u32),
-    )
-    .filter_map(
-        |term| match ArenaRef::<Term, _>::new(arena, term).as_application_term() {
-            None => None,
-            Some(term) => {
-                let cache = term.as_inner().cache();
-                let is_empty_cache = match (
-                    cache.value(),
-                    cache.dependencies(),
-                    cache.overall_state_hash(),
-                    cache.minimal_state_hash(),
-                ) {
-                    (None, None, None, None) => true,
-                    _ => false,
-                };
-                if is_empty_cache {
-                    None
-                } else {
-                    Some(cache.as_pointer())
-                }
-            }
-        },
-    )
-    .collect::<Vec<_>>();
-    for application_cache_offset in application_cache_offsets {
-        let offset = u32::from(application_cache_offset) as usize;
-        for (index, value) in as_bytes(&ApplicationCache::default())
-            .iter()
-            .copied()
-            .enumerate()
-            .map(|(index, value)| (offset + index, value))
-        {
-            heap_snapshot[index] = value;
-        }
+    );
+    let offset = u32::from(evaluation_cache_pointer) as usize;
+    for (index, value) in as_bytes(&empty_cache_pointer_term)
+        .iter()
+        .copied()
+        .enumerate()
+        .map(|(index, value)| (offset + index, value))
+    {
+        heap_snapshot[index] = value;
     }
 }
 

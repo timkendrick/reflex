@@ -15,6 +15,6 @@ wat2wasm "$OUTPUT_DIR/$TARGET_NAME.build.wat" --debug-names --output "$OUTPUT_DI
 
 # Inline initial heap snapshot into .wasm module
 echo "Inlining heap snapshot..."
-cargo run --quiet --bin snapshot -- --memory-name "memory" --input "$OUTPUT_DIR/$TARGET_NAME.build.wasm" --output "$OUTPUT_DIR/$TARGET_NAME.wasm"
+cargo run --quiet --bin snapshot -- --memory-name "memory" --inline-globals --input "$OUTPUT_DIR/$TARGET_NAME.build.wasm" --output "$OUTPUT_DIR/$TARGET_NAME.wasm"
 
 echo "Compiled $OUTPUT_DIR/$TARGET_NAME.wasm"

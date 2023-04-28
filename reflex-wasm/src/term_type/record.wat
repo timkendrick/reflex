@@ -433,20 +433,26 @@
 
   (func $Term::Record::create_hashmap_lookup (param $keys i32) (param $values i32) (result i32)
     (local $num_fields i32)
+    (local $num_entries i32)
     (local $hashmap i32)
     (local $field_index i32)
+    ;; Allocate a new hashmap with enough capacity to store the lookup table
     (local.set $num_fields (call $Term::List::traits::length (local.get $keys)))
-    ;; Allocate a new hashmap to store the lookup table
-    (local.set $hashmap (call $Term::Hashmap::allocate (call $Term::Hashmap::default_capacity (call $Term::List::traits::length (local.get $keys)))))
+    (local.tee $hashmap
+      (call $Term::Hashmap::allocate
+        (call $Term::Hashmap::default_capacity
+          (call $Term::List::traits::length (local.get $keys)))))
     ;; Distribute the values into buckets
     (loop $LOOP
-      (call $Term::Hashmap::insert
+      (call $Term::Hashmap::insert_entry
         (local.get $hashmap)
         (call $Term::List::get_item (local.get $keys) (local.get $field_index))
         (call $Term::List::get_item (local.get $values) (local.get $field_index)))
-      ;; Discard the result of whether the key already existed
-      (drop)
+      ;; Keep track of how many unique entries have been added to the hashmap
+      (local.set $num_entries (i32.add (local.get $num_entries)))
       (br_if $LOOP
         (i32.lt_u (local.tee $field_index (i32.add (local.get $field_index) (i32.const 1))) (local.get $num_fields))))
+    ;; Set the hashmap size
+    (call $Term::Hashmap::set::num_entries (local.get $hashmap) (local.get $num_entries))
     ;; Instantiate the hashmap
-    (call $Term::Hashmap::init (local.get $hashmap) (local.get $num_fields))))
+    (call $Term::Hashmap::init)))

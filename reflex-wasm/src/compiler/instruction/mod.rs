@@ -5,7 +5,9 @@ use walrus::Module;
 
 use crate::compiler::{
     error::TypedStackError,
-    wasm::{GenerateWasm, WasmGeneratorBindings, WasmGeneratorOptions, WasmGeneratorResult},
+    wasm::generate::{
+        GenerateWasm, WasmGeneratorBindings, WasmGeneratorOptions, WasmGeneratorResult,
+    },
     CompilerStack, TypedCompilerBlock,
 };
 

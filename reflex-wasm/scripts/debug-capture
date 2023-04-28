@@ -10,7 +10,7 @@ echo " WASM module: $1"
 echo " Heap snapshot: $2"
 
 # Extract variables from heap snapshot filename
-filename="$(basename "$heap_snapshot_path")"
+filename="$(basename "$heap_snapshot_path" ".bin")"
 filename_segments="${filename%.*}"
 # Split underscore-delimited filename into constituent parts
 IFS='_' read -r cache_key state_index entry_point state <<< "$(echo "$filename_segments")"

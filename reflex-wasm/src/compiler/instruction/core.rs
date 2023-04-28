@@ -10,8 +10,11 @@ use crate::{
     compiler::{
         error::TypedStackError,
         wasm::{
-            parse_value_type, GenerateWasm, WasmGeneratorBindings, WasmGeneratorError,
-            WasmGeneratorOptions, WasmGeneratorOutput, WasmGeneratorResult,
+            generate::{
+                GenerateWasm, WasmGeneratorBindings, WasmGeneratorError, WasmGeneratorOptions,
+                WasmGeneratorOutput, WasmGeneratorResult,
+            },
+            types::parse_value_type,
         },
         CompiledBlock, CompiledBlockBuilder, CompilerStack, ConstValue, FunctionPointer,
         ParamsSignature, TypeSignature, TypedCompilerBlock, ValueType,

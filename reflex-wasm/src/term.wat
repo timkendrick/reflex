@@ -136,10 +136,8 @@
     (i32.eqz (call $Term::implements::evaluate (local.get $self))))
 
   (func $Term::drop (param $self i32)
-    ;; This function overwrites an existing term with new contents, so take care not to call it on shared global objects
     (local $size i32)
     (local $end_offset i32)
-    (local $foo i32)
     ;; If this was the most recently allocated object, nothing can ever have referenced it, so it can be safely wiped.
     ;; Otherwise there may theoretically still be dangling references to the disposed term, so we leave it in place
     ;; to be garbage-collected as necessary.

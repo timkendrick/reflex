@@ -188,6 +188,9 @@ export function createRuntime(runtime) {
     ConditionType: constants.ConditionType,
     Stdlib: constants.Stdlib,
     exports: runtime,
+    getTermType(value) {
+      return runtime.getTermType(value);
+    },
     createNil() {
       return runtime.createNil();
     },
@@ -499,7 +502,7 @@ export function createRuntime(runtime) {
       entries.forEach(([key, value]) => {
         runtime.insertHashmapEntry(instance, key, value);
       });
-      return runtime.initHashmap(instance, entries.length);
+      return runtime.initHashmap(instance);
     },
     isHashmap(value) {
       return runtime.isHashmap(value);
@@ -603,6 +606,15 @@ export function createRuntime(runtime) {
     },
     createIndexedAccessorIterator(source, index) {
       return runtime.createIndexedAccessorIterator(source, index);
+    },
+    isPointer(value) {
+      return runtime.isPointer(value);
+    },
+    createPointer(target) {
+      return runtime.createPointer(target);
+    },
+    getPointerTarget(value) {
+      return runtime.getPointerTarget(value);
     },
     hash(value) {
       return u64(runtime.getTermHash(value));

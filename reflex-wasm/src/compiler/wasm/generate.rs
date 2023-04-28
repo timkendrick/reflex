@@ -1,12 +1,15 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use std::collections::HashMap;
+use std::{
+    collections::{hash_map::DefaultHasher, HashMap},
+    hash::{Hash, Hasher},
+};
 
 use crate::{
     compiler::{
         instruction::core::Block, runtime::builtin::RuntimeBuiltin, CompiledBlock,
-        CompiledFunctionId, ParamsSignature, TypeSignature, ValueType,
+        CompiledFunctionId, FunctionPointer, ParamsSignature, TypeSignature, ValueType,
     },
     stdlib::Stdlib,
     utils::from_twos_complement_i32,
@@ -16,9 +19,14 @@ use crate::{
 use reflex::core::{Arity, StackOffset};
 use reflex_utils::Stack;
 use walrus::{
-    ir::{self, BinaryOp, Instr, InstrSeqId, InstrSeqType},
-    FunctionBuilder, FunctionId, GlobalId, InstrSeqBuilder, LocalId, MemoryId, Module, ModuleTypes,
-    TableId, ValType,
+    ir, ExportItem, FunctionBuilder, FunctionId, GlobalId, Import, ImportKind, InstrSeqBuilder,
+    LocalId, MemoryId, Module, TableId, ValType,
+};
+
+use super::{
+    expand_function_args::expand_function_args,
+    import_function::import_function,
+    types::{parse_block_type_signature, parse_value_type},
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -390,7 +398,31 @@ pub struct WasmGeneratorOptions {
 pub enum WasmGeneratorError {
     StackError,
     InvalidCompiledFunction(CompiledFunctionId),
+    InvalidModuleImport {
+        expected: Import,
+        received: Option<ExportItem>,
+    },
     InvalidBlockOffset(usize),
+}
+
+/// Create a function with the given signature within the provided module.
+///
+/// The provided body factory function will be used to build the function body based on the function's argument locals
+pub(crate) fn generate_function(
+    module: &mut Module,
+    params: &[ValType],
+    results: &[ValType],
+    body: impl FnOnce(&[LocalId], &mut InstrSeqBuilder) -> (),
+) -> FunctionId {
+    let mut builder = FunctionBuilder::new(&mut module.types, params, results);
+    let arg_ids = params
+        .iter()
+        .copied()
+        .map(|arg_type| module.locals.add(arg_type))
+        .collect::<Vec<_>>();
+    let mut function_body = builder.func_body();
+    body(&arg_ids, &mut function_body);
+    builder.finish(arg_ids, &mut module.funcs)
 }
 
 /// Create a function from the given pre-compiled function body instructions with the requisite parameters to transparently handle stateful reactivity
@@ -496,6 +528,102 @@ pub(crate) fn generate_stateful_function(
     Ok(function_id)
 }
 
+/// Create a wrapper function that invokes the provided function and memoizes the results for all unique combinations of
+/// input arguments via a a globally-shared runtime cache
+pub(crate) fn generate_cached_function_wrapper(
+    module: &mut Module,
+    function_identifier: FunctionPointer,
+    params: ParamsSignature,
+    compiled_function_id: FunctionId,
+    function_wrapper_template: (&mut Module, FunctionId),
+) -> Result<FunctionId, anyhow::Error> {
+    let (template_module, template_function_id) = function_wrapper_template;
+    let template_args_placeholder_id = template_module
+        .imports
+        .iter()
+        .find_map(
+            |import| match (&import.kind, import.module.as_str(), import.name.as_str()) {
+                (ImportKind::Function(function_id), "$", "__ARGS") => Some(*function_id),
+                _ => None,
+            },
+        )
+        .ok_or_else(|| anyhow::anyhow!("Unable to locate __ARGS import in template source"))?;
+    // Create a new temporary function within the template module that prepends a parameter for each argument,
+    // replacing any calls to the argument placeholder function within the template function body with a sequence of
+    // instructions that pushes all the argument values onto the operand stack
+    let expanded_template_function_id = expand_function_args(
+        template_module,
+        template_function_id,
+        template_args_placeholder_id,
+        params.iter().map(parse_value_type),
+    )
+    .map_err(|err| anyhow::anyhow!("{}", err))?;
+    // Generate a temporary placeholder function in the target module that will be used in the template
+    // to represent pushing each function argument in turn onto the operand stack (this is used as a marker to locate
+    // argument insertion points, and will be removed from the target module once the arguments have been injected)
+    let args_placeholder_id = generate_noop_function(module);
+    // Generate a function in the target module that can be used to hash the provided function arguments
+    // (this is used to obtain a unique invocation hash that represents calling this function with a
+    // specific combination of arguments)
+    let function_hash_id = generate_function_arg_hasher(
+        module,
+        function_identifier,
+        &params,
+        get_exported_hash_functions(module)?,
+    )?;
+    // Get the set of template variables to be injected into the template
+    let substitutions = get_cached_function_template_substitutions(
+        template_module,
+        module,
+        compiled_function_id,
+        function_hash_id,
+        args_placeholder_id,
+    )?;
+    // Import the substituted template into the target module
+    let wrapper_id = import_function(
+        template_module,
+        expanded_template_function_id,
+        module,
+        substitutions,
+        [template_function_id, expanded_template_function_id],
+    )
+    .map_err(|err| anyhow::anyhow!("{}", err))?;
+    // Remove the temporary parameter-expanded function from the template module
+    if expanded_template_function_id != template_function_id {
+        template_module.funcs.delete(expanded_template_function_id);
+    }
+    // Remove the temporary argument placholder function from the target function
+    module.funcs.delete(args_placeholder_id);
+    // Return the function ID of the completed wrapper function
+    Ok(wrapper_id)
+}
+
+fn get_exported_hash_functions(module: &Module) -> Result<HashFunctionIds, anyhow::Error> {
+    fn get_exported_function(
+        export_name: &str,
+        exported_functions: &HashMap<&str, FunctionId>,
+    ) -> Result<FunctionId, anyhow::Error> {
+        exported_functions
+            .get(&export_name)
+            .copied()
+            .ok_or_else(|| anyhow::anyhow!("Invalid module export: {export_name:?}"))
+    }
+    let exported_functions = module
+        .exports
+        .iter()
+        .filter_map(|export| match &export.item {
+            ExportItem::Function(function_id) => Some((export.name.as_str(), *function_id)),
+            _ => None,
+        })
+        .collect::<HashMap<_, _>>();
+    Ok(HashFunctionIds {
+        write_i32: get_exported_function("writeI32Hash", &exported_functions)?,
+        write_i64: get_exported_function("writeI64Hash", &exported_functions)?,
+        write_f32: get_exported_function("writeF32Hash", &exported_functions)?,
+        write_f64: get_exported_function("writeF64Hash", &exported_functions)?,
+    })
+}
+
 /// Create a wrapper function which can be used to make dynamic calls to the provided function
 ///
 /// The resulting function takes two parameters:
@@ -544,9 +672,9 @@ pub(crate) fn generate_indirect_function_wrapper(
             .local_get(arglist_id)
             .call(export_mappings.builtins.get_list_length)
             .i32_const(from_twos_complement_i32(num_args as u32))
-            .binop(BinaryOp::I32LtU)
+            .binop(ir::BinaryOp::I32LtU)
             .if_else(
-                InstrSeqType::new(&mut module.types, &[], &results),
+                ir::InstrSeqType::new(&mut module.types, &[], &results),
                 |builder| {
                     // If insufficient arguments were passed, return an error signal term followed by the null dependencies pointer
                     builder
@@ -579,6 +707,138 @@ pub(crate) fn generate_indirect_function_wrapper(
     function_id
 }
 
+fn generate_noop_function(module: &mut Module) -> FunctionId {
+    generate_function(module, &[], &[], |_args, _builder| {})
+}
+
+struct HashFunctionIds {
+    write_i32: FunctionId,
+    write_i64: FunctionId,
+    write_f32: FunctionId,
+    write_f64: FunctionId,
+}
+impl HashFunctionIds {
+    fn get(&self, value_type: ValType) -> Option<FunctionId> {
+        match value_type {
+            ValType::I32 => Some(self.write_i32),
+            ValType::I64 => Some(self.write_i64),
+            ValType::F32 => Some(self.write_f32),
+            ValType::F64 => Some(self.write_f64),
+            ValType::V128 | ValType::Funcref | ValType::Externref => None,
+        }
+    }
+}
+
+fn generate_function_arg_hasher(
+    module: &mut Module,
+    function_identifier: FunctionPointer,
+    params: &ParamsSignature,
+    hash_function_ids: HashFunctionIds,
+) -> Result<FunctionId, anyhow::Error> {
+    // Generate a unique value to disambiguate calls to this function from calls to other functions called with identical arguments
+    let function_hash = {
+        let mut hasher = DefaultHasher::default();
+        function_identifier.hash(&mut hasher);
+        hasher.finish()
+    };
+    // Parse the function parameter types, for each one getting the corresponding WASM type
+    // and the corresponding WASM function used to hash that type
+    let (arg_types, arg_hashers): (Vec<_>, Vec<_>) = params
+        .iter()
+        .map(parse_value_type)
+        .map(|arg_type| {
+            hash_function_ids
+                .get(arg_type)
+                .ok_or_else(|| anyhow::anyhow!("Unsupported function argument type: {arg_type:?}"))
+                .map(|hasher_id| (arg_type, hasher_id))
+        })
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .unzip();
+    // Generate a function that accepts a hash state and argument values, and returns a corresponding function invocation hash
+    Ok(generate_function(
+        module,
+        &([ValType::I64]
+            .into_iter()
+            .chain(arg_types)
+            .collect::<Vec<_>>()),
+        &[ValType::I64],
+        move |arg_ids, builder| {
+            let args_with_hashers = arg_ids.iter().copied().skip(1).zip(arg_hashers);
+            args_with_hashers.fold(
+                builder
+                    // Start with the provided hash state
+                    .local_get(arg_ids[0])
+                    // Write the unique function hash to the hash state
+                    .i64_const(function_hash as i64)
+                    .call(hash_function_ids.write_i64),
+                // Write the hash for each argument
+                |builder, (arg_id, arg_hasher)| builder.local_get(arg_id).call(arg_hasher),
+            );
+        },
+    ))
+}
+
+fn get_cached_function_template_substitutions<'a>(
+    template_module: &'a Module,
+    target_module: &Module,
+    function_id: FunctionId,
+    function_hash_id: FunctionId,
+    function_args_id: FunctionId,
+) -> Result<impl IntoIterator<Item = (&'a str, ExportItem)>, WasmGeneratorError> {
+    // In addition to certain predefined templated variables, templates can import any of the target module's named
+    // exports (this is indicated within the template by importing from the custom "$" module namespace)
+    // TODO: establish separate namespaces within templates for a) template variables, b) exports, c) private members (identified via debug names)
+    let target_module_exports = target_module
+        .exports
+        .iter()
+        .map(|export| (export.name.as_str(), export))
+        .collect::<HashMap<_, _>>();
+    template_module
+        .imports
+        .iter()
+        .filter(|import| is_template_variable_import(import))
+        .map(|import| {
+            let import_name = import.name.as_str();
+            match (&import.kind, import_name) {
+                // Predefined template variables
+                (ImportKind::Function(_), "__INNER") => Ok(ExportItem::Function(function_id)),
+                (ImportKind::Function(_), "__HASH") => Ok(ExportItem::Function(function_hash_id)),
+                (ImportKind::Function(_), "__ARGS") => Ok(ExportItem::Function(function_args_id)),
+                // Fall back to importing from target module
+                (import_kind, import_name) => match target_module_exports.get(import_name).copied()
+                {
+                    None => Err(None),
+                    Some(export) => match (import_kind, &export.item) {
+                        (ImportKind::Function(_), ExportItem::Function(target_id)) => {
+                            Ok(ExportItem::Function(*target_id))
+                        }
+                        (ImportKind::Table(_), ExportItem::Table(target_id)) => {
+                            Ok(ExportItem::Table(*target_id))
+                        }
+                        (ImportKind::Memory(_), ExportItem::Memory(target_id)) => {
+                            Ok(ExportItem::Memory(*target_id))
+                        }
+                        (ImportKind::Global(_), ExportItem::Global(target_id)) => {
+                            Ok(ExportItem::Global(*target_id))
+                        }
+                        _ => Err(Some(export.item)),
+                    },
+                },
+            }
+            .map(|exported_value| (import_name, exported_value))
+            .map_err(|exported_value| WasmGeneratorError::InvalidModuleImport {
+                expected: import.clone(),
+                received: exported_value,
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()
+}
+
+fn is_template_variable_import(import: &Import) -> bool {
+    import.module.as_str() == "$"
+}
+
 impl std::error::Error for WasmGeneratorError {}
 
 impl std::fmt::Display for WasmGeneratorError {
@@ -586,6 +846,10 @@ impl std::fmt::Display for WasmGeneratorError {
         match self {
             Self::StackError => write!(f, "Invalid stack access"),
             Self::InvalidCompiledFunction(id) => write!(f, "Invalid compiled function ID: {id}"),
+            Self::InvalidModuleImport { expected, received } => write!(
+                f,
+                "Invalid module import: Expected {expected:?}, received {received:?}"
+            ),
             Self::InvalidBlockOffset(target) => write!(f, "Invalid parent block offset: {target}"),
         }
     }
@@ -705,73 +969,13 @@ impl<'a> WasmGeneratorBindings<'a> {
     }
 }
 
-pub fn parse_block_type_signature(
-    signature: &TypeSignature,
-    types: &mut ModuleTypes,
-) -> InstrSeqType {
-    let TypeSignature { params, results } = signature;
-    if let ParamsSignature::Void = params {
-        match results {
-            ParamsSignature::Void => InstrSeqType::Simple(None),
-            ParamsSignature::Single(result1) => {
-                InstrSeqType::Simple(Some(parse_value_type(*result1)))
-            }
-            ParamsSignature::Pair(result1, result2) => InstrSeqType::new(
-                types,
-                &[],
-                &[parse_value_type(*result1), parse_value_type(*result2)],
-            ),
-            ParamsSignature::Triple(result1, result2, result3) => InstrSeqType::new(
-                types,
-                &[],
-                &[
-                    parse_value_type(*result1),
-                    parse_value_type(*result2),
-                    parse_value_type(*result3),
-                ],
-            ),
-            ParamsSignature::Multiple(results) => InstrSeqType::new(
-                types,
-                &[],
-                &results
-                    .iter()
-                    .copied()
-                    .map(parse_value_type)
-                    .collect::<Vec<_>>(),
-            ),
-        }
-    } else {
-        let params = params.iter().map(parse_value_type).collect::<Vec<_>>();
-        let results = results.iter().map(parse_value_type).collect::<Vec<_>>();
-        InstrSeqType::new(types, &params, &results)
-    }
-}
-
-pub fn parse_function_type_signature(signature: &TypeSignature) -> (Vec<ValType>, Vec<ValType>) {
-    let TypeSignature { params, results } = signature;
-    let params = params.iter().map(parse_value_type).collect::<Vec<_>>();
-    let results = results.iter().map(parse_value_type).collect::<Vec<_>>();
-    (params, results)
-}
-
-pub fn parse_value_type(ty: ValueType) -> ValType {
-    match ty {
-        ValueType::I32 | ValueType::U32 | ValueType::HeapPointer | ValueType::FunctionPointer => {
-            ValType::I32
-        }
-        ValueType::I64 | ValueType::U64 => ValType::I64,
-        ValueType::F32 => ValType::F32,
-        ValueType::F64 => ValType::F64,
-    }
-}
-
 #[derive(Default, Clone, Debug)]
 pub struct WasmGeneratorOutput {
     instructions: Vec<WasmInstruction>,
 }
 
 impl WasmGeneratorOutput {
-    pub fn push(&mut self, instruction: impl Into<Instr>) {
+    pub fn push(&mut self, instruction: impl Into<ir::Instr>) {
         self.instructions
             .push(WasmInstruction::Instruction(instruction.into()));
     }
@@ -955,10 +1159,10 @@ impl Extend<WasmInstruction> for WasmGeneratorOutput {
 #[derive(Debug, Clone)]
 pub enum WasmInstruction {
     /// Standard WASM instruction
-    Instruction(Instr),
+    Instruction(ir::Instr),
     /// Control flow block
     Block {
-        block_type: InstrSeqType,
+        block_type: ir::InstrSeqType,
         body: WasmGeneratorOutput,
     },
     /// Unconditional break instruction
@@ -973,7 +1177,7 @@ pub enum WasmInstruction {
     },
     /// If-else conditional branch instruction
     IfElse {
-        block_type: InstrSeqType,
+        block_type: ir::InstrSeqType,
         consequent: WasmGeneratorOutput,
         alternative: WasmGeneratorOutput,
     },
@@ -984,7 +1188,7 @@ pub type WasmGeneratorResult = Result<WasmGeneratorOutput, WasmGeneratorError>;
 #[must_use]
 fn assemble_wasm(
     builder: &mut InstrSeqBuilder,
-    enclosing_blocks: Stack<InstrSeqId>,
+    enclosing_blocks: Stack<ir::InstrSeqId>,
     instructions: impl IntoIterator<Item = WasmInstruction>,
 ) -> Result<(), WasmGeneratorError> {
     instructions

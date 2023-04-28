@@ -5,7 +5,7 @@
   ;; FNV-1a hash function: http://www.isthe.com/chongo/tech/comp/fnv/
   (@let $FNV_SEED (i64.const 0xcbf29ce484222325)
     (@let $FNV_PRIME (i64.const 0x100000001b3)
-      (func $Hash::new (result i64)
+      (func $Hash::new (export "createHash") (result i64)
         (@get $FNV_SEED))
 
       (func $Hash::write_byte (param $self i64) (param $value i32) (result i64)
@@ -27,7 +27,7 @@
                 (else
                   (br $LOOP)))))))
 
-      (func $Hash::write_i32 (param $self i64) (param $value i32) (result i64)
+      (func $Hash::write_i32 (export "writeI32Hash") (param $self i64) (param $value i32) (result i64)
         (local.get $self)
         ;; Hash each byte in turn
         (call $Utils::i32::get_byte (local.get $value) (i32.const 0))
@@ -39,7 +39,7 @@
         (call $Utils::i32::get_byte (local.get $value) (i32.const 3))
         (call $Hash::write_byte))
 
-      (func $Hash::write_i64 (param $self i64) (param $value i64) (result i64)
+      (func $Hash::write_i64 (export "writeI64Hash") (param $self i64) (param $value i64) (result i64)
         (local.get $self)
         ;; Hash each byte in turn
         (call $Utils::i64::get_byte (local.get $value) (i32.const 0))
@@ -59,5 +59,8 @@
         (call $Utils::i64::get_byte (local.get $value) (i32.const 7))
         (call $Hash::write_byte))
 
-      (func $Hash::write_f64 (param $self i64) (param $value f64) (result i64)
+      (func $Hash::write_f32 (export "writeF32Hash") (param $self i64) (param $value f32) (result i64)
+        (call $Hash::write_i32 (local.get $self) (i32.reinterpret_f32 (local.get $value))))
+
+      (func $Hash::write_f64 (export "writeF64Hash") (param $self i64) (param $value f64) (result i64)
         (call $Hash::write_i64 (local.get $self) (i64.reinterpret_f64 (local.get $value)))))))

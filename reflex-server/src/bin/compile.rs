@@ -9,7 +9,10 @@ use clap::Parser;
 use reflex_lang::{allocator::DefaultAllocator, SharedTermFactory};
 use reflex_parser::Syntax;
 use reflex_server::cli::compile::{create_loader, parse_and_compile_module};
-use reflex_wasm::{cli::compile::WasmCompilerOptions, compiler::CompilerOptions};
+use reflex_wasm::{
+    cli::compile::{WasmCompilerOptions, WasmCompilerRuntimeOptions},
+    compiler::CompilerOptions,
+};
 
 // Reflex WebAssembly compiler
 #[derive(Parser, Debug)]
@@ -44,6 +47,9 @@ struct Args {
     /// Compile variable initializer values as lazily-evaluated expressions
     #[arg(long)]
     lazy_variable_initializers: bool,
+    /// Wrap compiled lambdas in argument memoization wrappers
+    #[arg(long)]
+    memoize_lambdas: bool,
 }
 
 fn main() -> Result<()> {
@@ -65,18 +71,17 @@ fn main() -> Result<()> {
     let source =
         std::fs::read_to_string(&input_path).with_context(|| "Failed to read input file")?;
 
-    let mut compiler_options = WasmCompilerOptions {
+    let compiler_options = WasmCompilerOptions {
         compiler: CompilerOptions {
             lazy_record_values: args.lazy_record_values,
             lazy_list_items: args.lazy_list_items,
             lazy_variable_initializers: args.lazy_variable_initializers,
         },
+        runtime: WasmCompilerRuntimeOptions {
+            memoize_lambdas: args.memoize_lambdas,
+        },
         ..Default::default()
     };
-    if !unoptimized {
-        // wasm-opt doesn't currently support block params
-        compiler_options.generator.disable_block_params = true;
-    }
 
     // Parse the input file and compile to WASM
     let wasm_module = parse_and_compile_module(

@@ -904,7 +904,6 @@ where
             TermType::Application(ApplicationTerm {
                 target: target.as_pointer(),
                 args: args.as_pointer(),
-                cache: Default::default(),
             }),
             &*self.arena.borrow(),
         );

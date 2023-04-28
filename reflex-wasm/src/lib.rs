@@ -23,6 +23,7 @@ pub use wasmtime;
 pub use wasmtime_wasi;
 
 pub mod allocator;
+pub mod cache;
 pub mod cli;
 pub mod compiler;
 pub mod exports;

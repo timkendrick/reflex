@@ -488,6 +488,13 @@ impl From<TermHashState> for CompiledFunctionId {
     }
 }
 
+impl From<CompiledFunctionId> for TermHashState {
+    fn from(value: CompiledFunctionId) -> Self {
+        let CompiledFunctionId(value) = value;
+        value
+    }
+}
+
 impl PartialOrd for CompiledFunctionId {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         u64::from(self.0).partial_cmp(&u64::from(other.0))
@@ -1256,7 +1263,6 @@ impl<A: Arena + Clone> CompileWasm<A> for LazyExpression<A> {
                                 TermType::Application(ApplicationTerm {
                                     target: compiled_function_term,
                                     args: empty_list,
-                                    cache: Default::default(),
                                 }),
                                 &state.heap,
                             ));

@@ -53,6 +53,7 @@ pub(crate) fn run_scenario(
     let allocator = DefaultAllocator::<CachedSharedTerm<reflex_wasm::stdlib::Stdlib>>::default();
     let compiler_options = WasmCompilerOptions {
         compiler: scenario.options(),
+        runtime: Default::default(),
         generator: Default::default(),
     };
     let expression = scenario.input(&factory, &allocator);
