@@ -36,7 +36,7 @@
     (i32.add (local.get $offset)))
 
   (func $Term::Pointer::traits::debug (param $self i32) (param $offset i32) (result i32)
-    (call $Term::Pointer::traits::debug (local.get $self) (local.get $offset)))
+    (call $Term::Pointer::traits::display (local.get $self) (local.get $offset)))
 
   (func $Term::Pointer::traits::to_json (param $self i32) (param $offset i32) (result i32 i32)
     ;; Invoke the method on the target term
