@@ -19,6 +19,10 @@ struct Args {
     #[arg(short, long)]
     memory_name: String,
 
+    /// Whether to inline global variables as constants
+    #[arg(short = 'g', long)]
+    inline_globals: bool,
+
     /// Heap snapshot to inline into the WASM module (defaults to initial VM memory snapshot)
     #[arg(short, long)]
     snapshot: Option<PathBuf>,
@@ -34,6 +38,7 @@ fn main() -> Result<()> {
     let Args {
         input: input_path,
         memory_name,
+        inline_globals,
         output: output_path,
         snapshot,
     } = args;
@@ -46,7 +51,7 @@ fn main() -> Result<()> {
         Some(snapshot_path) => std::fs::read(&snapshot_path)
             .map(MemorySnapshot::from_bytes)
             .with_context(|| "Failed to load heap snapshot"),
-        None => capture_heap_snapshot(&wasm_bytes, &memory_name)
+        None => capture_heap_snapshot(&wasm_bytes, &memory_name, inline_globals)
             .with_context(|| "Failed to capture initial heap snapshot"),
     }?;
 

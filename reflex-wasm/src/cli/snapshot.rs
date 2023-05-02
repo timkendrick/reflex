@@ -55,12 +55,50 @@ impl MemorySnapshot {
 pub fn capture_heap_snapshot(
     wasm_bytes: &[u8],
     memory_name: &str,
+    capture_globals: bool,
 ) -> Result<MemorySnapshot, WasmSnapshotError> {
     // Instantiate the runtime WASM module in an interpreter
     let mut interpreter =
         load_wasm_module(wasm_bytes, memory_name).map_err(WasmSnapshotError::InterpreterError)?;
-    // Capture a memory snapshot of the ininitalized WASM module
-    capture_initial_memory_snapshot(&mut interpreter)
+
+    // Snapshot the initial values of the interpreter globals
+    let initial_global_values = if capture_globals {
+        Some(capture_interpreter_globals(&mut interpreter))
+    } else {
+        None
+    };
+
+    // Invoke the _initialize function to pre-fill the linear memory
+    interpreter
+        .initialize()
+        .map_err(WasmSnapshotError::InterpreterError)?;
+
+    // Capture an updated heap snapshot
+    let heap_length = u32::from(interpreter.end_offset()) as usize;
+    let heap_snapshot = Vec::<u8>::from(&interpreter.data()[0..heap_length]);
+
+    // Determine the set of globals whose values have been mutated
+    let modified_global_values = initial_global_values.map(|initial_values| {
+        // Snapshot the updated values of the interpreter globals
+        let updated_global_values = capture_interpreter_globals(&mut interpreter);
+        // Diff with the initial snapshot to determine updated values
+        updated_global_values
+            .into_iter()
+            .filter_map(|(key, value)| {
+                let initial_value = initial_values.get(&key)?;
+                if !runtime_values_are_equal(&value, initial_value) {
+                    Some((key, value))
+                } else {
+                    None
+                }
+            })
+            .collect::<HashMap<_, _>>()
+    });
+
+    Ok(MemorySnapshot {
+        linear_memory: heap_snapshot,
+        updated_globals: modified_global_values.unwrap_or_default(),
+    })
 }
 
 pub fn inline_heap_snapshot(
@@ -75,29 +113,6 @@ pub fn inline_heap_snapshot(
 
     // Create a new WASM module based on the input bytes
     let mut ast = parse_wasm_ast(wasm_bytes)?;
-
-    // Inline the updated global values from the snapshot
-    let global_id_mappings = parse_exported_globals(&ast)
-        .map(|(name, global_id, export_id)| (String::from(name), (global_id, export_id)))
-        .collect::<HashMap<_, _>>();
-    let global_values = updated_globals.into_iter().filter_map(|(key, value)| {
-        let (global_id, export_id) = global_id_mappings.get(&key).copied()?;
-        let value = match value {
-            wasmtime::Val::I32(value) => Some(walrus::ir::Value::I32(value)),
-            wasmtime::Val::I64(value) => Some(walrus::ir::Value::I64(value)),
-            wasmtime::Val::F32(value) => Some(walrus::ir::Value::F32(f32::from_bits(value))),
-            wasmtime::Val::F64(value) => Some(walrus::ir::Value::F64(f64::from_bits(value))),
-            wasmtime::Val::V128(value) => Some(walrus::ir::Value::V128(value)),
-            _ => None,
-        }?;
-        Some((global_id, export_id, value))
-    });
-    for (global_id, export_id, value) in global_values {
-        let global = ast.globals.get_mut(global_id);
-        global.kind = GlobalKind::Local(InitExpr::Value(value));
-        global.mutable = false;
-        ast.exports.delete(export_id);
-    }
 
     // Update the module's initial memory allocation
     let linear_memory_size = linear_memory.len();
@@ -122,6 +137,30 @@ pub fn inline_heap_snapshot(
     let init_function_id = get_named_function_id(&ast, "_initialize")
         .ok_or_else(|| WasmSnapshotError::FunctionNotFound(String::from("_initialize")))?;
     clear_function_body(&mut ast, init_function_id)?;
+
+    // Inline the updated global values from the snapshot
+    if !updated_globals.is_empty() {
+        let global_id_mappings = parse_exported_globals(&ast)
+            .map(|(name, global_id, export_id)| (String::from(name), (global_id, export_id)))
+            .collect::<HashMap<_, _>>();
+        let global_values = updated_globals.into_iter().filter_map(|(key, value)| {
+            let (global_id, _export_id) = global_id_mappings.get(&key).copied()?;
+            let value = match value {
+                wasmtime::Val::I32(value) => Some(walrus::ir::Value::I32(value)),
+                wasmtime::Val::I64(value) => Some(walrus::ir::Value::I64(value)),
+                wasmtime::Val::F32(value) => Some(walrus::ir::Value::F32(f32::from_bits(value))),
+                wasmtime::Val::F64(value) => Some(walrus::ir::Value::F64(f64::from_bits(value))),
+                wasmtime::Val::V128(value) => Some(walrus::ir::Value::V128(value)),
+                _ => None,
+            }?;
+            Some((global_id, value))
+        });
+        for (global_id, value) in global_values {
+            let global = ast.globals.get_mut(global_id);
+            global.kind = GlobalKind::Local(InitExpr::Value(value));
+            global.mutable = false;
+        }
+    }
 
     // Emit the resulting WASM as bytes
     Ok(ast.emit_wasm())
@@ -154,43 +193,6 @@ fn load_wasm_module(
         .and_then(|builder| builder.build())?
         .into();
     Ok(interpreter)
-}
-
-fn capture_initial_memory_snapshot(
-    interpreter: &mut WasmInterpreter,
-) -> Result<MemorySnapshot, WasmSnapshotError> {
-    // Snapshot the initial values of the interpreter globals
-    let initial_global_values = capture_interpreter_globals(interpreter);
-
-    // Invoke the _initialize function to pre-fill the linear memory
-    interpreter
-        .initialize()
-        .map_err(WasmSnapshotError::InterpreterError)?;
-
-    // Snapshot the updated values of the interpreter globals
-    let updated_global_values = capture_interpreter_globals(interpreter);
-
-    // Capture an updated heap snapshot
-    let heap_length = u32::from(interpreter.end_offset()) as usize;
-    let heap_snapshot = Vec::<u8>::from(&interpreter.data()[0..heap_length]);
-
-    // Determine the set of globals whose values have been mutated
-    let modified_global_values = updated_global_values
-        .into_iter()
-        .filter_map(|(key, value)| {
-            let initial_value = initial_global_values.get(&key)?;
-            if !runtime_values_are_equal(&value, initial_value) {
-                Some((key, value))
-            } else {
-                None
-            }
-        })
-        .collect::<HashMap<_, _>>();
-
-    Ok(MemorySnapshot {
-        linear_memory: heap_snapshot,
-        updated_globals: modified_global_values,
-    })
 }
 
 fn capture_interpreter_globals(
