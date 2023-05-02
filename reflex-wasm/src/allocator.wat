@@ -27,17 +27,52 @@
     ;; Reserve the requested amount of heap space and return the allocated address
     (local $before_offset i32)
     (local $after_offset i32)
+    (local $num_existing_pages i32)
+    (local $num_desired_pages i32)
     (local.set $after_offset (i32.add (local.tee $before_offset (call $Allocator::get_offset)) (local.get $size)))
+    ;; Determine whether there is sufficient spare heap capacity to store the entire chunk
     (if
-      ;; If there is insufficient spare heap capacity to store the entire chunk, allocate more pages of linear memory
-      (i32.gt_u (local.get $after_offset) (i32.mul (memory.size) (global.get $Allocator::PAGE_SIZE)))
+      (i32.lt_u
+        (i32.mul (local.tee $num_existing_pages (memory.size)) (global.get $Allocator::PAGE_SIZE))
+        (local.get $after_offset))
       (then
-        ;; Aim to double the current heap capacity, keeping track of how many bytes were successfully allocated
+        ;; If there is insufficient spare heap capacity to store the entire chunk, we need to allocate more pages of linear memory
+        ;; First determine how many extra pages are needed, doubling the current allocation until enough space has been requested
+        (loop $LOOP
+          ;; Loop until the requested size is sufficient to store the entire chunk
+          (br_if $LOOP
+            ;; Determine whether the requested size is sufficient to store the entire chunk
+            (i32.lt_u
+              (i32.mul
+                ;; Start with a request to double the existing number of allocated pages,
+                ;; continuing to double the requested size until enough space has been requested
+                (local.tee $num_desired_pages
+                  (select
+                    ;; If this is the first iteration, start off with a request based on the number of pages already allocated
+                    (select
+                      ;; If there have been no heap pages allocated, start off with a request for a single page
+                      (i32.const 1)
+                      ;; Otherwise start off with a request to double the existing number of pages
+                      (i32.mul (i32.const 2) (local.get $num_existing_pages))
+                      (i32.eqz (local.get $num_existing_pages)))
+                    ;; Otherwise if this is a subsequent iteration, double the requested number of pages
+                    (i32.mul (i32.const 2) (local.get $num_desired_pages))
+                    (i32.eqz (local.get $num_desired_pages))))
+                (global.get $Allocator::PAGE_SIZE))
+              (local.get $after_offset))))
+        ;; Aim to allocate the requested number of pages
         ;; (actual allocated memory can be less than the requested amount if we are approaching linear memory limits)
-        (call $Allocator::increase_linear_memory_size (memory.size))
-        ;; Discard the number of allocated pages
-        (drop))
-      (else))
+        (call $Allocator::increase_linear_memory_size (i32.sub (local.get $num_desired_pages) (local.get $num_existing_pages)))
+        ;; Add the number of allocated pages to the number of existing pages to determine the new heap size
+        (i32.add (local.get $num_existing_pages))
+        ;; Convert the updated heap size from pages into bytes
+        (i32.mul (global.get $Allocator::PAGE_SIZE))
+        ;; Determine whether the newly-allocated heap space is sufficient to perform the requested allocation
+        (if
+          (i32.lt_u (local.get $after_offset))
+          (then
+            ;; If we were unable to allocate enough heap space to perform the requested allocation, panic
+            (unreachable)))))
     ;; Bump the allocator offset to reserve the requested amount of heap
     (call $Allocator::set_offset (local.get $after_offset))
     ;; Return the allocated address
@@ -84,10 +119,10 @@
         (i32.eq (i32.const -1))
         (then
           (if (result i32)
-            ;; If we failed to allocate a single page, panic
+            ;; If we failed to allocate a single page, bail out
             (i32.eq (local.get $pages) (i32.const 1))
             (then
-              (unreachable))
+              (i32.const 0))
             (else
               ;; Otherwise halve the number of pages requested and try again
               (local.set $pages (i32.div_u (local.get $pages) (i32.const 2))
