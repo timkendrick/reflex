@@ -53,6 +53,22 @@
             (call $Stdlib_Accessor::impl::default (local.get $self) (local.get $key) (local.get $state))))))
 
     (@impl
+      (i32.eq (global.get $TermType::LazyRecord))
+      (i32.eq (global.get $TermType::String))
+      (func $Stdlib_Accessor::impl::LazyRecord::String (param $self i32) (param $key i32) (param $state i32) (result i32 i32)
+        (local $value i32)
+        (if (result i32 i32)
+          (i32.ne
+            (local.tee $value (call $Term::LazyRecord::traits::get (local.get $self) (local.get $key)))
+            (global.get $NULL))
+          (then
+            (local.get $value)
+            (global.get $NULL))
+          (else
+            ;; Default to returning an error for unrecognized field names
+            (call $Stdlib_Accessor::impl::default (local.get $self) (local.get $key) (local.get $state))))))
+
+    (@impl
       (i32.eq (global.get $TermType::Record))
       (i32.eq (global.get $TermType::Symbol))
       (func $Stdlib_Accessor::impl::Record::Symbol (param $self i32) (param $key i32) (param $state i32) (result i32 i32)

@@ -53,6 +53,9 @@ impl WasmProgram {
             bytes,
         }
     }
+    pub fn compiler_mode(&self) -> WasmCompilerMode {
+        self.compiler_mode
+    }
     pub fn as_bytes(&self) -> &[u8] {
         &self.bytes
     }

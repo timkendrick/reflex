@@ -30,6 +30,7 @@
   (@include "./iterator/take.wat")
   (@include "./iterator/zip.wat")
   (@include "./lambda.wat")
+  (@include "./lazy_record.wat")
   (@include "./let.wat")
   (@include "./list.wat")
   (@include "./nil.wat")
@@ -57,6 +58,7 @@
       (@import $Hashset "./hashset.wat")
       (@import $Int "./int.wat")
       (@import $Lambda "./lambda.wat")
+      (@import $LazyRecord "./lazy_record.wat")
       (@import $Let "./let.wat")
       (@import $List "./list.wat")
       (@import $Nil "./nil.wat")
@@ -170,7 +172,8 @@
       (@list
         $Application
         $Effect
-        $Let)
+        $Let
+        $LazyRecord)
 
       (func $TermType::implements::evaluate (param $type i32) (result i32)
         (@fold $result $typename
@@ -251,6 +254,7 @@
       (@list
         $List
         $Record
+        $LazyRecord
         $Hashmap
         $Hashset
         $Tree
@@ -357,6 +361,7 @@
         $String
         $List
         $Record
+        $LazyRecord
         $Timestamp)
 
       (func $TermType::implements::to_json (param $type i32) (result i32)

@@ -11,6 +11,7 @@ mod hashmap;
 mod hashset;
 mod int;
 mod lambda;
+mod lazy_record;
 mod r#let;
 mod list;
 mod nil;

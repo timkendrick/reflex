@@ -8,40 +8,40 @@ use crate::{compiler::runner::run_scenario, WasmTestScenario};
 
 #[test]
 fn record_term() {
-    let scenario = RecordTermStaticValuesScenario;
+    let scenario = LazyRecordTermEagerStaticValuesScenario;
     let (actual, expected) = run_scenario(&scenario).unwrap();
     assert_eq!(actual, expected);
 
-    let scenario = RecordTermDynamicValuesScenario;
+    let scenario = LazyRecordTermEagerDynamicValuesScenario;
     let (actual, expected) = run_scenario(&scenario).unwrap();
     assert_eq!(actual, expected);
 
-    let scenario = RecordTermSignalValuesScenario;
+    let scenario = LazyRecordTermEagerSignalValuesScenario;
     let (actual, expected) = run_scenario(&scenario).unwrap();
     assert_eq!(actual, expected);
 
-    let scenario = RecordTermStaticValuesLazyScenario;
+    let scenario = LazyRecordTermLazyStaticValuesScenario;
     let (actual, expected) = run_scenario(&scenario).unwrap();
     assert_eq!(actual, expected);
 
-    let scenario = RecordTermDynamicValuesLazyScenario;
+    let scenario = LazyRecordTermLazyDynamicValuesScenario;
     let (actual, expected) = run_scenario(&scenario).unwrap();
     assert_eq!(actual, expected);
 
-    let scenario = RecordTermSignalValuesLazyScenario;
+    let scenario = LazyRecordTermLazySignalValuesScenario;
     let (actual, expected) = run_scenario(&scenario).unwrap();
     assert_eq!(actual, expected);
 }
 
-struct RecordTermStaticValuesScenario;
+struct LazyRecordTermEagerStaticValuesScenario;
 
-impl<T, TFactory> WasmTestScenario<T, TFactory> for RecordTermStaticValuesScenario
+impl<T, TFactory> WasmTestScenario<T, TFactory> for LazyRecordTermEagerStaticValuesScenario
 where
     T: Expression<Builtin = stdlib::Stdlib>,
     TFactory: ExpressionFactory<T>,
 {
     fn input(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> T {
-        factory.create_record_term(
+        factory.create_lazy_record_term(
             allocator.create_struct_prototype(allocator.create_triple(
                 factory.create_string_term(allocator.create_static_string("foo")),
                 factory.create_string_term(allocator.create_static_string("bar")),
@@ -52,6 +52,7 @@ where
                 factory.create_int_term(4),
                 factory.create_int_term(5),
             ),
+            [ArgType::Strict, ArgType::Strict, ArgType::Strict],
         )
     }
 
@@ -77,15 +78,15 @@ where
     }
 }
 
-struct RecordTermDynamicValuesScenario;
+struct LazyRecordTermEagerDynamicValuesScenario;
 
-impl<T, TFactory> WasmTestScenario<T, TFactory> for RecordTermDynamicValuesScenario
+impl<T, TFactory> WasmTestScenario<T, TFactory> for LazyRecordTermEagerDynamicValuesScenario
 where
     T: Expression<Builtin = stdlib::Stdlib>,
     TFactory: ExpressionFactory<T>,
 {
     fn input(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> T {
-        factory.create_record_term(
+        factory.create_lazy_record_term(
             allocator.create_struct_prototype(allocator.create_triple(
                 factory.create_string_term(allocator.create_static_string("foo")),
                 factory.create_string_term(allocator.create_static_string("bar")),
@@ -105,6 +106,7 @@ where
                     allocator.create_unit_list(factory.create_int_term(-5)),
                 ),
             ),
+            [ArgType::Strict, ArgType::Strict, ArgType::Strict],
         )
     }
 
@@ -130,15 +132,15 @@ where
     }
 }
 
-struct RecordTermSignalValuesScenario;
+struct LazyRecordTermEagerSignalValuesScenario;
 
-impl<T, TFactory> WasmTestScenario<T, TFactory> for RecordTermSignalValuesScenario
+impl<T, TFactory> WasmTestScenario<T, TFactory> for LazyRecordTermEagerSignalValuesScenario
 where
     T: Expression<Builtin = stdlib::Stdlib>,
     TFactory: ExpressionFactory<T>,
 {
     fn input(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> T {
-        factory.create_record_term(
+        factory.create_lazy_record_term(
             allocator.create_struct_prototype(allocator.create_triple(
                 factory.create_string_term(allocator.create_static_string("foo")),
                 factory.create_string_term(allocator.create_static_string("bar")),
@@ -161,6 +163,7 @@ where
                     token: factory.create_nil_term(),
                 })),
             ),
+            [ArgType::Strict, ArgType::Strict, ArgType::Strict],
         )
     }
 
@@ -207,9 +210,9 @@ where
     }
 }
 
-struct RecordTermStaticValuesLazyScenario;
+struct LazyRecordTermLazyStaticValuesScenario;
 
-impl<T, TFactory> WasmTestScenario<T, TFactory> for RecordTermStaticValuesLazyScenario
+impl<T, TFactory> WasmTestScenario<T, TFactory> for LazyRecordTermLazyStaticValuesScenario
 where
     T: Expression<Builtin = stdlib::Stdlib>,
     TFactory: ExpressionFactory<T>,
@@ -252,9 +255,9 @@ where
     }
 }
 
-struct RecordTermDynamicValuesLazyScenario;
+struct LazyRecordTermLazyDynamicValuesScenario;
 
-impl<T, TFactory> WasmTestScenario<T, TFactory> for RecordTermDynamicValuesLazyScenario
+impl<T, TFactory> WasmTestScenario<T, TFactory> for LazyRecordTermLazyDynamicValuesScenario
 where
     T: Expression<Builtin = stdlib::Stdlib>,
     TFactory: ExpressionFactory<T>,
@@ -315,9 +318,9 @@ where
     }
 }
 
-struct RecordTermSignalValuesLazyScenario;
+struct LazyRecordTermLazySignalValuesScenario;
 
-impl<T, TFactory> WasmTestScenario<T, TFactory> for RecordTermSignalValuesLazyScenario
+impl<T, TFactory> WasmTestScenario<T, TFactory> for LazyRecordTermLazySignalValuesScenario
 where
     T: Expression<Builtin = stdlib::Stdlib>,
     TFactory: ExpressionFactory<T>,

@@ -182,6 +182,26 @@ pub trait RecordTermType<T: Expression>: Clone {
         T: 'a;
 }
 
+pub trait LazyRecordTermType<T: Expression>: Clone {
+    type EagernessIterator<'a>: Iterator<Item = ArgType> + ExactSizeIterator + 'a
+    where
+        Self: 'a;
+    fn prototype<'a>(&'a self) -> T::StructPrototypeRef<'a>
+    where
+        T::StructPrototype: 'a,
+        T: 'a;
+    fn values<'a>(&'a self) -> T::ExpressionListRef<'a>
+    where
+        T::ExpressionList: 'a,
+        T: 'a;
+    fn eagerness<'a>(&'a self) -> Self::EagernessIterator<'a>
+    where
+        Self: 'a;
+    fn get<'a>(&'a self, key: &T) -> Option<T::ExpressionRef<'a>>
+    where
+        T: 'a;
+}
+
 pub trait ConstructorTermType<T: Expression>: Clone {
     fn prototype<'a>(&'a self) -> T::StructPrototypeRef<'a>
     where
@@ -462,6 +482,7 @@ where
     type BuiltinTerm: BuiltinTermType<Self>;
     type CompiledFunctionTerm: CompiledFunctionTermType;
     type RecordTerm: RecordTermType<Self>;
+    type LazyRecordTerm: LazyRecordTermType<Self>;
     type ConstructorTerm: ConstructorTermType<Self>;
     type ListTerm: ListTermType<Self>;
     type HashmapTerm: HashmapTermType<Self>;
@@ -628,7 +649,7 @@ pub trait SerializeJson {
     fn patch(&self, target: &Self) -> Result<Option<serde_json::Value>, String>;
 }
 
-#[derive(Hash, Eq, PartialEq, Clone, Copy, Debug)]
+#[derive(Hash, Eq, PartialEq, Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum ArgType {
     /** Evaluate argument before function application, short-circuiting any signals encountered during evaluation */
     Strict,
@@ -1141,6 +1162,12 @@ pub trait ExpressionFactory<T: Expression> {
         variadic_args: bool,
     ) -> T;
     fn create_record_term(&self, prototype: T::StructPrototype, fields: T::ExpressionList) -> T;
+    fn create_lazy_record_term(
+        &self,
+        prototype: T::StructPrototype,
+        fields: T::ExpressionList,
+        eagerness: impl IntoIterator<Item = ArgType, IntoIter = impl ExactSizeIterator<Item = ArgType>>,
+    ) -> T;
     fn create_constructor_term(&self, prototype: T::StructPrototype) -> T;
     fn create_list_term(&self, items: T::ExpressionList) -> T;
     fn create_hashmap_term(
@@ -1176,6 +1203,7 @@ pub trait ExpressionFactory<T: Expression> {
         target: &'a T,
     ) -> Option<&'a T::CompiledFunctionTerm>;
     fn match_record_term<'a>(&self, expression: &'a T) -> Option<&'a T::RecordTerm>;
+    fn match_lazy_record_term<'a>(&self, expression: &'a T) -> Option<&'a T::LazyRecordTerm>;
     fn match_constructor_term<'a>(&self, expression: &'a T) -> Option<&'a T::ConstructorTerm>;
     fn match_list_term<'a>(&self, expression: &'a T) -> Option<&'a T::ListTerm>;
     fn match_hashmap_term<'a>(&self, expression: &'a T) -> Option<&'a T::HashmapTerm>;
@@ -1543,9 +1571,13 @@ pub fn match_typed_expression_list<'a, T: Expression + 'a, V, E>(
 pub fn transform_expression_list<T: Expression>(
     expressions: &T::ExpressionList,
     allocator: &impl HeapAllocator<T>,
-    transform: impl FnMut(&T) -> Option<T>,
+    mut transform: impl FnMut(&T) -> Option<T>,
 ) -> Option<T::ExpressionList> {
-    match transform_expression_list_values(expressions, transform, |item| item.as_deref().clone()) {
+    match transform_expression_list_values(
+        expressions,
+        |_index, item| transform(item),
+        |_index, item| item.as_deref().clone(),
+    ) {
         None => None,
         Some(values) => Some(allocator.create_list(values)),
     }
@@ -1553,22 +1585,21 @@ pub fn transform_expression_list<T: Expression>(
 
 pub fn transform_expression_list_values<T: Expression, V>(
     expressions: &T::ExpressionList,
-    mut transform: impl FnMut(&T) -> Option<V>,
-    mut initialize: impl FnMut(&T) -> V,
+    mut transform: impl FnMut(usize, &T) -> Option<V>,
+    mut initialize: impl FnMut(usize, &T) -> V,
 ) -> Option<Vec<V>> {
     // Create a lazy iterator that collects transformed values along with their indices
     // Note that we don't pre-emptively collect the iterator because there might be no transformed expressions,
     // in which case we don't need to allocate a vector
-    let mut iter = expressions
-        .iter()
-        .map(|item| transform(item.as_deref()))
-        .enumerate()
-        .filter_map(|(index, result)| result.map(|result| (index, result)));
+    let mut iter = expressions.iter().enumerate().filter_map(|(index, item)| {
+        transform(index, item.as_deref()).map(|result| (index, result))
+    });
     // Pull the first value from the iterator, returning if there were no transformed expressions
     let (index, replaced) = iter.next()?;
     let mut results = expressions
         .iter()
-        .map(|item| initialize(item.as_deref()))
+        .enumerate()
+        .map(|(index, item)| initialize(index, item.as_deref()))
         .collect::<Vec<_>>();
     results[index] = replaced;
     // Post-fill with the remaining transformed expressions

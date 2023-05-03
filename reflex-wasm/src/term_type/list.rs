@@ -19,7 +19,7 @@ use crate::{
     compiler::{
         error::CompilerError, instruction, runtime::builtin::RuntimeBuiltin, CompileWasm,
         CompiledBlockBuilder, CompilerOptions, CompilerResult, CompilerStack, CompilerState,
-        ConstValue, LazyExpression, ParamsSignature, Strictness, ValueType,
+        ConstValue, LazyExpression, ParamsSignature, Strictness, TypeSignature, ValueType,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{TermType, TypedTerm, WasmExpression},
@@ -390,12 +390,21 @@ pub(crate) fn compile_list<A: Arena + Clone, T: CompileWasm<A>>(
             let block = block.push(instruction::core::Const {
                 value: ConstValue::U32(index as u32),
             });
-            // Yield the list item onto the stack
-            // => [ListTerm, ListTerm, index, Term]
-            let block = block.append_inner(|stack| item.compile(stack, state, options))?;
             // If this item needs to be tested for signals, combine the item's signal result with the accumulated signal result
             // => [ListTerm, ListTerm, index, Term]
             let (block, num_signal_scopes) = if strictness.is_strict() {
+                // Yield the list item onto the stack (the item is evaluated within its own child block to prevent
+                // nested signals from breaking out of the outer list block and causing preceding signals to be swallowed)
+                // => [ListTerm, ListTerm, index, Term]
+                let block_type = TypeSignature {
+                    params: ParamsSignature::Void,
+                    results: ParamsSignature::Single(ValueType::HeapPointer),
+                };
+                let inner_stack = block.stack().enter_block(&block_type)?;
+                let block = block.push(instruction::core::Block {
+                    block_type,
+                    body: item.compile(inner_stack, state, options)?,
+                });
                 // Pop the list item from the top of the stack and assign to a temporary lexical scope variable
                 // => [ListTerm, ListTerm, index]
                 let block = block.push(instruction::core::ScopeStart {
@@ -472,6 +481,9 @@ pub(crate) fn compile_list<A: Arena + Clone, T: CompileWasm<A>>(
                 });
                 (block, num_signal_scopes + 1)
             } else {
+                // Yield the list item onto the stack
+                // => [ListTerm, ListTerm, index, Term]
+                let block = block.append_inner(|stack| item.compile(stack, state, options))?;
                 (block, num_signal_scopes)
             };
             // Set the list term's value at the given index to the child item

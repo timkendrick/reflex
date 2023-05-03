@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use reflex::core::{Expression, ExpressionFactory, HeapAllocator, SignalType};
+use reflex::core::{ArgType, Expression, ExpressionFactory, HeapAllocator, SignalType};
 use reflex_wasm::{compiler::CompilerOptions, stdlib};
 
 use crate::{compiler::runner::run_scenario, WasmTestScenario};
@@ -42,7 +42,6 @@ where
 {
     fn options(&self) -> CompilerOptions {
         CompilerOptions {
-            lazy_record_values: true,
             lazy_variable_initializers: false,
             ..Default::default()
         }
@@ -50,11 +49,12 @@ where
 
     fn input(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> T {
         factory.create_let_term(
-            factory.create_record_term(
+            factory.create_lazy_record_term(
                 allocator.create_struct_prototype(allocator.create_unit_list(
                     factory.create_string_term(allocator.create_static_string("foo")),
                 )),
                 allocator.create_unit_list(factory.create_int_term(3)),
+                [ArgType::Lazy],
             ),
             factory.create_application_term(
                 factory.create_builtin_term(stdlib::Get),
@@ -86,7 +86,6 @@ where
 {
     fn options(&self) -> CompilerOptions {
         CompilerOptions {
-            lazy_record_values: true,
             lazy_variable_initializers: false,
             ..Default::default()
         }
@@ -94,7 +93,7 @@ where
 
     fn input(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> T {
         factory.create_let_term(
-            factory.create_record_term(
+            factory.create_lazy_record_term(
                 allocator.create_struct_prototype(allocator.create_unit_list(
                     factory.create_string_term(allocator.create_static_string("foo")),
                 )),
@@ -102,6 +101,7 @@ where
                     factory.create_builtin_term(stdlib::Abs),
                     allocator.create_unit_list(factory.create_int_term(-3)),
                 )),
+                [ArgType::Lazy],
             ),
             factory.create_application_term(
                 factory.create_builtin_term(stdlib::Get),
@@ -133,7 +133,6 @@ where
 {
     fn options(&self) -> CompilerOptions {
         CompilerOptions {
-            lazy_record_values: true,
             lazy_variable_initializers: false,
             ..Default::default()
         }
@@ -159,7 +158,7 @@ where
                             factory.create_let_term(
                                 factory.create_nil_term(),
                                 factory.create_let_term(
-                                    factory.create_record_term(
+                                    factory.create_lazy_record_term(
                                         allocator.create_struct_prototype(
                                             allocator.create_unit_list(factory.create_string_term(
                                                 allocator.create_static_string("foo"),
@@ -174,6 +173,7 @@ where
                                                 ),
                                             ),
                                         ),
+                                        [ArgType::Lazy],
                                     ),
                                     factory.create_application_term(
                                         factory.create_builtin_term(stdlib::Get),
@@ -213,7 +213,6 @@ where
 {
     fn options(&self) -> CompilerOptions {
         CompilerOptions {
-            lazy_record_values: true,
             lazy_variable_initializers: false,
             ..Default::default()
         }
@@ -239,7 +238,7 @@ where
                             factory.create_let_term(
                                 factory.create_nil_term(),
                                 factory.create_let_term(
-                                    factory.create_record_term(
+                                    factory.create_lazy_record_term(
                                         allocator.create_struct_prototype(
                                             allocator.create_unit_list(factory.create_string_term(
                                                 allocator.create_static_string("foo"),
@@ -247,7 +246,7 @@ where
                                         ),
                                         allocator.create_unit_list(
                                             factory.create_let_term(
-                                                factory.create_record_term(
+                                                factory.create_lazy_record_term(
                                                     allocator.create_struct_prototype(
                                                         allocator.create_unit_list(
                                                             factory.create_string_term(
@@ -267,6 +266,7 @@ where
                                                             ),
                                                         ),
                                                     ),
+                                                    [ArgType::Lazy],
                                                 ),
                                                 factory.create_application_term(
                                                     factory.create_builtin_term(stdlib::Get),
@@ -279,6 +279,7 @@ where
                                                 ),
                                             ),
                                         ),
+                                        [ArgType::Lazy],
                                     ),
                                     factory.create_application_term(
                                         factory.create_builtin_term(stdlib::Get),
@@ -318,7 +319,6 @@ where
 {
     fn options(&self) -> CompilerOptions {
         CompilerOptions {
-            lazy_record_values: true,
             lazy_variable_initializers: false,
             ..Default::default()
         }
@@ -326,7 +326,7 @@ where
 
     fn input(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> T {
         factory.create_let_term(
-            factory.create_record_term(
+            factory.create_lazy_record_term(
                 allocator.create_struct_prototype(allocator.create_unit_list(
                     factory.create_string_term(allocator.create_static_string("foo")),
                 )),
@@ -338,6 +338,7 @@ where
                         token: factory.create_nil_term(),
                     },
                 ))),
+                [ArgType::Lazy],
             ),
             factory.create_application_term(
                 factory.create_builtin_term(stdlib::Get),
@@ -380,7 +381,6 @@ where
 {
     fn options(&self) -> CompilerOptions {
         CompilerOptions {
-            lazy_record_values: true,
             lazy_variable_initializers: false,
             ..Default::default()
         }
@@ -399,7 +399,7 @@ where
 
     fn input(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> T {
         factory.create_let_term(
-            factory.create_record_term(
+            factory.create_lazy_record_term(
                 allocator.create_struct_prototype(allocator.create_unit_list(
                     factory.create_string_term(allocator.create_static_string("foo")),
                 )),
@@ -411,6 +411,7 @@ where
                         token: factory.create_nil_term(),
                     },
                 ))),
+                [ArgType::Lazy],
             ),
             factory.create_application_term(
                 factory.create_builtin_term(stdlib::Get),
@@ -446,7 +447,6 @@ where
 {
     fn options(&self) -> CompilerOptions {
         CompilerOptions {
-            lazy_record_values: true,
             lazy_variable_initializers: false,
             ..Default::default()
         }
@@ -454,7 +454,7 @@ where
 
     fn input(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> T {
         factory.create_let_term(
-            factory.create_record_term(
+            factory.create_lazy_record_term(
                 allocator.create_struct_prototype(allocator.create_pair(
                     factory.create_string_term(allocator.create_static_string("foo")),
                     factory.create_string_term(allocator.create_static_string("bar")),
@@ -468,6 +468,7 @@ where
                     })),
                     factory.create_int_term(3),
                 ),
+                [ArgType::Lazy, ArgType::Lazy],
             ),
             factory.create_application_term(
                 factory.create_builtin_term(stdlib::Get),

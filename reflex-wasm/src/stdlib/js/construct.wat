@@ -3,7 +3,7 @@
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 (module
   (@builtin $Stdlib_Construct "Construct"
-    (@args (@strict $self) (@variadic (@lazy $arg_list)))
+    (@args (@strict $self) (@variadic (@strict $arg_list)))
 
     (@impl
       (i32.eq (global.get $TermType::Constructor))

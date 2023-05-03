@@ -11,10 +11,10 @@ use reflex::{
         CompiledFunctionTermType, ConditionListType, ConditionType, ConstructorTermType, Eagerness,
         EffectTermType, Expression, ExpressionFactory, ExpressionListType, FloatTermType,
         HashmapTermType, HashsetTermType, HeapAllocator, InstructionPointer, IntTermType,
-        LambdaTermType, LetTermType, ListTermType, PartialApplicationTermType, RecordTermType,
-        RecursiveTermType, Reducible, RefType, Rewritable, SignalTermType, SignalType, StackOffset,
-        StringTermType, StringValue, StructPrototypeType, Substitutions, SymbolTermType,
-        TimestampTermType, Uid, VariableTermType,
+        LambdaTermType, LazyRecordTermType, LetTermType, ListTermType, PartialApplicationTermType,
+        RecordTermType, RecursiveTermType, Reducible, RefType, Rewritable, SignalTermType,
+        SignalType, StackOffset, StringTermType, StringValue, StructPrototypeType, Substitutions,
+        SymbolTermType, TimestampTermType, Uid, VariableTermType,
     },
     hash::{hash_object, HashId},
 };
@@ -22,9 +22,9 @@ use reflex_lang::{
     expression::{CachedExpression, SharedExpression},
     term::{
         ApplicationTerm, BooleanTerm, BuiltinTerm, CompiledFunctionTerm, ConstructorTerm,
-        EffectTerm, FloatTerm, HashMapTerm, HashSetTerm, IntTerm, LambdaTerm, LetTerm, ListTerm,
-        NilTerm, PartialApplicationTerm, RecordTerm, RecursiveTerm, SignalTerm, StringTerm,
-        SymbolTerm, Term, TimestampTerm, VariableTerm,
+        EffectTerm, FloatTerm, HashMapTerm, HashSetTerm, IntTerm, LambdaTerm, LazyRecordTerm,
+        LetTerm, ListTerm, NilTerm, PartialApplicationTerm, RecordTerm, RecursiveTerm, SignalTerm,
+        StringTerm, SymbolTerm, Term, TimestampTerm, VariableTerm,
     },
     CachedSharedTerm,
 };
@@ -122,6 +122,9 @@ where
             }
             Self::Builtin(term) => term.compile(eager, stack_offset, factory, allocator, compiler),
             Self::Record(term) => term.compile(eager, stack_offset, factory, allocator, compiler),
+            Self::LazyRecord(term) => {
+                term.compile(eager, stack_offset, factory, allocator, compiler)
+            }
             Self::Constructor(term) => {
                 term.compile(eager, stack_offset, factory, allocator, compiler)
             }
@@ -634,6 +637,41 @@ impl<T: Expression + Rewritable<T> + Reducible<T> + Compile<T>> Compile<T> for S
     }
 }
 impl<T: Expression + Rewritable<T> + Reducible<T> + Compile<T>> Compile<T> for RecordTerm<T> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        stack_offset: StackOffset,
+        factory: &impl ExpressionFactory<T>,
+        allocator: &impl HeapAllocator<T>,
+        compiler: &mut Compiler,
+    ) -> Result<Program, String> {
+        let values = self.values();
+        let values = values.as_deref();
+        let num_entries = values.len();
+        let compiled_values = compile_expressions(
+            values.iter().map(|item| item.as_deref().clone()),
+            Eagerness::Eager,
+            stack_offset,
+            factory,
+            allocator,
+            compiler,
+        )?;
+        let compiled_constructor = compiler.compile_term(
+            &factory.create_constructor_term(allocator.clone_struct_prototype(self.prototype())),
+            Eagerness::Eager,
+            num_entries,
+            factory,
+            allocator,
+        )?;
+        let mut result = compiled_values;
+        result.extend(compiled_constructor);
+        result.push(Instruction::Apply {
+            num_args: num_entries,
+        });
+        Ok(result)
+    }
+}
+impl<T: Expression + Rewritable<T> + Reducible<T> + Compile<T>> Compile<T> for LazyRecordTerm<T> {
     fn compile(
         &self,
         _eager: Eagerness,

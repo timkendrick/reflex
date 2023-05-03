@@ -46,11 +46,7 @@ export default (describe) => {
           createBuiltin(Stdlib.ResolveRecord),
           createUnitList(
             createRecord(
-              createTriple(
-                createApplication(createLambda(0, createString('foo')), createEmptyList()),
-                createApplication(createLambda(0, createString('bar')), createEmptyList()),
-                createApplication(createLambda(0, createString('baz')), createEmptyList()),
-              ),
+              createTriple(createString('foo'), createString('bar'), createString('baz')),
               createTriple(
                 createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-3))),
                 createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-4))),
@@ -68,11 +64,7 @@ export default (describe) => {
           createBuiltin(Stdlib.ResolveRecord),
           createUnitList(
             createRecord(
-              createTriple(
-                createApplication(createLambda(0, createString('foo')), createEmptyList()),
-                createApplication(createLambda(0, createString('bar')), createEmptyList()),
-                createApplication(createLambda(0, createString('baz')), createEmptyList()),
-              ),
+              createTriple(createString('foo'), createString('bar'), createString('baz')),
               createTriple(
                 createApplication(
                   createLambda(
