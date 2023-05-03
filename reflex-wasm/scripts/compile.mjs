@@ -8,6 +8,7 @@ import { createLoaderContext, loadModule } from './transform/loader.mjs';
 import transformDirectives from './transform/transforms/directives.mjs';
 import { ParseError } from './transform/utils.mjs';
 import addDirective, { ADD_DIRECTIVE } from './transform/directives/add.mjs';
+import applyDirective, { APPLY_DIRECTIVE } from './transform/directives/apply.mjs';
 import blockDirective, { BLOCK_DIRECTIVE } from './transform/directives/block.mjs';
 import branchDirective, { BRANCH_DIRECTIVE } from './transform/directives/branch.mjs';
 import builtinDirective, { BUILTIN_DIRECTIVE } from './transform/directives/builtin.mjs';
@@ -40,6 +41,7 @@ import storeBytesDirective, { STORE_BYTES_DIRECTIVE } from './transform/directiv
 import structDirective, { STRUCT_DIRECTIVE } from './transform/directives/struct.mjs';
 import stringLengthDirective, { STRING_LENGTH_DIRECTIVE } from './transform/directives/string_length.mjs';
 import switchDirective, { SWITCH_DIRECTIVE } from './transform/directives/switch.mjs';
+import templateDirective, { TEMPLATE_DIRECTIVE } from './transform/directives/template.mjs';
 import toStringDirective, { TO_STRING_DIRECTIVE } from './transform/directives/to_string.mjs';
 import unionDirective, { UNION_DIRECTIVE } from './transform/directives/union.mjs';
 import unionVariantDirective, { UNION_VARIANT_DIRECTIVE } from './transform/directives/union_variant.mjs';
@@ -56,6 +58,7 @@ try {
     transform: composeTransforms(
       transformDirectives({
         [ADD_DIRECTIVE]: addDirective,
+        [APPLY_DIRECTIVE]: applyDirective,
         [BLOCK_DIRECTIVE]: blockDirective,
         [BRANCH_DIRECTIVE]: branchDirective,
         [BUILTIN_DIRECTIVE]: builtinDirective,
@@ -88,6 +91,7 @@ try {
         [STRING_LENGTH_DIRECTIVE]: stringLengthDirective,
         [STRUCT_DIRECTIVE]: structDirective,
         [SWITCH_DIRECTIVE]: switchDirective,
+        [TEMPLATE_DIRECTIVE]: templateDirective,
         [TO_STRING_DIRECTIVE]: toStringDirective,
         [UNION_DIRECTIVE]: unionDirective,
         [UNION_VARIANT_DIRECTIVE]: unionVariantDirective,
@@ -101,6 +105,7 @@ try {
   process.stdout.write(output);
   process.exit(0);
 } catch (err) {
+  console.error(err);
   if (err instanceof ParseError) {
     process.stderr.write(`${err.message}\n`);
   } else {
