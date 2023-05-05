@@ -59,35 +59,44 @@
     (global.get $FALSE))
 
   (func $Term::Lambda::traits::apply (param $self i32) (param $args i32) (param $state i32) (result i32 i32)
-    (local $result i32)
+    (local $num_args i32)
+    (local $substituted_body i32)
     (if (result i32 i32)
-      (i32.eq
-        (local.tee $result
-          (if (result i32)
-            ;; TODO: consider alternate substitution method for offseting variable scope rather than overloading
-            (i32.eq (global.get $NULL) (local.get $args))
-            (then
-              (call $Term::traits::substitute
-                (call $Term::Lambda::get::body (local.get $self))
-                (local.get $args)
-                (i32.const 0)))
-            (else
+      ;; Determine whether the correct number of arguments has been provided
+      (i32.ne
+        (local.tee $num_args (call $Term::Lambda::get::num_args (local.get $self)))
+        (call $Term::List::get_length (local.get $args)))
+      (then
+        ;; If an incorrect number of arguments has been provided, return an error
+        (call $Term::Condition::invalid_function_args
+          (local.get $self)
+          (local.get $args))
+        (global.get $NULL))
+      (else
+        ;; Otherwise substitute the provided arguments into the function body
+        (if (result i32 i32)
+          (i32.eq
+            (local.tee $substituted_body
               (if (result i32)
-                (call $Term::List::get_length (local.get $args))
+                ;; If there are no arguments, the function body will be unmodified
+                (i32.eqz (local.get $num_args))
                 (then
+                  (global.get $NULL))
+                (else
+                  ;; Otherwise substitute the arguments into the function body
                   (call $Term::traits::substitute
                     (call $Term::Lambda::get::body (local.get $self))
                     (local.get $args)
-                    (i32.const 0)))
-                (else
-                  (global.get $NULL))))))
-        (global.get $NULL))
-      (then
-        (call $Term::Lambda::get::body (local.get $self))
-        (global.get $NULL))
-      (else
-        (local.get $result)
-        (global.get $NULL))))
+                    (i32.const 0)))))
+            (global.get $NULL))
+          (then
+            ;; If the substitution resulted in no modifications, return the function body as-is
+            (call $Term::Lambda::get::body (local.get $self))
+            (global.get $NULL))
+          (else
+            ;; Otherwise return the substituted body
+            (local.get $substituted_body)
+            (global.get $NULL))))))
 
   (func $Term::Lambda::get_num_args (export "getLambdaNumArgs") (param $self i32) (result i32)
     (call $Term::Lambda::get::num_args (local.get $self)))

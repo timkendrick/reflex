@@ -101,10 +101,11 @@
             (if (result i32)
               (i32.ge_u (local.get $stack_offset) (i32.add (local.get $scope_offset) (local.get $num_variables)))
               (then
-                ;; Reduce the variable stack offset by the number of variables in the substituted scope
-                (call $Term::Variable::new (i32.sub (local.get $scope_offset) (local.get $num_variables))))
+                ;; Reduce the variable stack offset by the number of variables in the scope being instantiated
+                (call $Term::Variable::new (i32.sub (local.get $stack_offset) (local.get $num_variables))))
               (else
-                ;; Otherwise get the replacement value from the instantiated scope values
+                ;; Otherwise the variable stack offset refers to one of the variables in the scope being instantiated,
+                ;; so get the replacement value from the instantiated scope values
                 (local.set $replacement
                   (call $Term::List::get_item
                     (local.get $variables)
@@ -119,11 +120,11 @@
                     (then
                       (global.get $NULL))
                     (else
-                      ;; Note that providing a null variables argument indicates a scope-offsetting substitution
-                      ;; (as opposed to a scope instantiation)
-                      ;; TODO: consider alternatives to overloading the substitution API
                       (call $Term::traits::substitute
                         (local.get $replacement)
+                        ;; Note that providing a null variables argument indicates a scope-offsetting substitution
+                        ;; (as opposed to a scope instantiation)
+                        ;; TODO: consider alternatives to overloading the substitution API
                         (global.get $NULL)
                         (local.get $scope_offset)))))
                 (select
