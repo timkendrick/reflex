@@ -87,6 +87,10 @@ impl WasmHeapDumpMode {
                 Err(_) => true,
                 Ok(result) => is_error_result(result, factory),
             },
+            WasmHeapDumpResultType::Pending => match result {
+                Err(_) => true,
+                Ok(result) => is_pending_result(result, factory),
+            },
             WasmHeapDumpResultType::Result => match result {
                 Err(_) => true,
                 Ok(result) => !is_unresolved_result(result, factory),
@@ -107,6 +111,10 @@ impl FromStr for WasmHeapDumpMode {
                 WasmHeapDumpEvaluationType::All,
                 WasmHeapDumpResultType::Error,
             )),
+            "pending" => Ok(WasmHeapDumpMode::new(
+                WasmHeapDumpEvaluationType::All,
+                WasmHeapDumpResultType::Pending,
+            )),
             "result" => Ok(WasmHeapDumpMode::new(
                 WasmHeapDumpEvaluationType::All,
                 WasmHeapDumpResultType::Result,
@@ -118,6 +126,10 @@ impl FromStr for WasmHeapDumpMode {
             "query-error" => Ok(WasmHeapDumpMode::new(
                 WasmHeapDumpEvaluationType::Query,
                 WasmHeapDumpResultType::Error,
+            )),
+            "query-pending" => Ok(WasmHeapDumpMode::new(
+                WasmHeapDumpEvaluationType::Query,
+                WasmHeapDumpResultType::Pending,
             )),
             "query-result" => Ok(WasmHeapDumpMode::new(
                 WasmHeapDumpEvaluationType::Query,
@@ -140,6 +152,8 @@ pub enum WasmHeapDumpEvaluationType {
 pub enum WasmHeapDumpResultType {
     /// Dump heap on error results
     Error,
+    /// Dump heap on pending results
+    Pending,
     /// Dump heap on all results
     Result,
     /// Dump heap on intermediate evaluations
@@ -1053,18 +1067,37 @@ fn is_error_result<T: Expression>(result: &T, factory: &impl ExpressionFactory<T
         .is_some()
 }
 
-fn is_unresolved_result<T: Expression>(result: &T, factory: &impl ExpressionFactory<T>) -> bool {
-    factory
-        .match_signal_term(result)
-        .filter(|result| {
-            result.signals().as_deref().iter().all(|condition| {
-                matches!(
-                    condition.as_deref().signal_type(),
-                    SignalType::Pending | SignalType::Custom { .. }
-                )
+fn is_blocked_result<T: Expression>(result: &T, factory: &impl ExpressionFactory<T>) -> bool {
+    !is_error_result(result, factory)
+        && factory
+            .match_signal_term(result)
+            .filter(|result| {
+                result.signals().as_deref().iter().any(|condition| {
+                    matches!(
+                        condition.as_deref().signal_type(),
+                        SignalType::Custom { .. }
+                    )
+                })
             })
-        })
-        .is_some()
+            .is_some()
+}
+
+fn is_pending_result<T: Expression>(result: &T, factory: &impl ExpressionFactory<T>) -> bool {
+    !is_error_result(result, factory)
+        && !is_blocked_result(result, factory)
+        && factory
+            .match_signal_term(result)
+            .filter(|result| {
+                result.signals().as_deref().iter().any(|condition| {
+                    matches!(condition.as_deref().signal_type(), SignalType::Pending)
+                })
+            })
+            .is_some()
+}
+
+fn is_unresolved_result<T: Expression>(result: &T, factory: &impl ExpressionFactory<T>) -> bool {
+    !is_error_result(result, factory)
+        && (is_blocked_result(result, factory) || is_pending_result(result, factory))
 }
 
 fn as_bytes<T: Sized>(value: &T) -> &[u8] {
