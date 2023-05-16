@@ -12,7 +12,9 @@ use reflex::core::{
 use reflex_dispatcher::HandlerContext;
 use reflex_grpc::DefaultGrpcConfig;
 use reflex_handlers::{actor::HandlerActor, utils::tls::create_https_client};
-use reflex_parser::{create_parser, DefaultModuleLoader, ParserBuiltin, Syntax, SyntaxParser};
+use reflex_parser::{
+    create_parser, syntax::js::default_js_loaders, ParserBuiltin, Syntax, SyntaxParser,
+};
 use reflex_scheduler::threadpool::TokioRuntimeThreadPoolFactory;
 use reflex_server::{
     cli::{
@@ -163,7 +165,7 @@ where
     let parser = create_parser(
         Syntax::JavaScript,
         Some(PathBuf::from("./index.js").as_path()),
-        Option::<DefaultModuleLoader<T>>::None,
+        default_js_loaders(empty(), factory, allocator),
         env_vars,
         factory,
         allocator,

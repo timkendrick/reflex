@@ -16,6 +16,7 @@ reflex-protobuf = { path = "../reflex-protobuf" }
 reflex-runtime = { path = "../reflex-runtime" }
 reflex-stdlib = { path = "../reflex-stdlib" }
 reflex-utils = { path = "../reflex-utils" }
+derivative = "2.2.0"
 futures = "*"
 metrics = "0.18"
 prost = "0.10"

@@ -5,7 +5,7 @@
 // SPDX-FileContributor: Chris Campbell <c.campbell@mwam.com> https://github.com/c-campbell-mwam
 use std::{
     fs,
-    iter::once,
+    iter::{empty, once},
     net::SocketAddr,
     path::{Path, PathBuf},
     str::FromStr,
@@ -32,7 +32,7 @@ use reflex_interpreter::{
     InterpreterOptions,
 };
 use reflex_lang::{allocator::DefaultAllocator, CachedSharedTerm, SharedTermFactory};
-use reflex_parser::{create_parser, DefaultModuleLoader, Syntax, SyntaxParser};
+use reflex_parser::{create_parser, syntax::js::default_js_loaders, Syntax, SyntaxParser};
 use reflex_protobuf::types::WellKnownTypesTranscoder;
 use reflex_scheduler::threadpool::TokioRuntimeThreadPoolFactory;
 use reflex_server::{
@@ -131,7 +131,6 @@ pub async fn main() -> Result<()> {
     type T = CachedSharedTerm<TBuiltin>;
     type TFactory = SharedTermFactory<TBuiltin>;
     type TAllocator = DefaultAllocator<T>;
-    type TLoader = DefaultModuleLoader<T>;
     type TConnect = hyper_rustls::HttpsConnector<hyper::client::HttpConnector>;
     type TReconnect = FibonacciReconnectTimeout;
     type TGrpcConfig = DefaultGrpcConfig;
@@ -229,7 +228,7 @@ pub async fn main() -> Result<()> {
     let parser = create_parser(
         args.syntax,
         Some(input_path),
-        Option::<TLoader>::None,
+        default_js_loaders(empty(), &factory, &allocator),
         std::env::vars(),
         &factory,
         &allocator,

@@ -4,7 +4,7 @@
 // SPDX-FileContributor: Chris Campbell <c.campbell@mwam.com> https://github.com/c-campbell-mwam
 use std::{
     fs,
-    iter::once,
+    iter::{empty, once},
     path::{Path, PathBuf},
     str::FromStr,
     time::Duration,
@@ -26,7 +26,7 @@ use reflex_handlers::{
 };
 use reflex_interpreter::compiler::{compile_graph_root, CompilerMode, CompilerOptions};
 use reflex_lang::{allocator::DefaultAllocator, CachedSharedTerm, SharedTermFactory};
-use reflex_parser::{create_parser, DefaultModuleLoader, Syntax, SyntaxParser};
+use reflex_parser::{create_parser, syntax::js::default_js_loaders, Syntax, SyntaxParser};
 use reflex_protobuf::types::WellKnownTypesTranscoder;
 use reflex_scheduler::threadpool::TokioRuntimeThreadPoolFactory;
 use reflex_server::{
@@ -125,7 +125,6 @@ async fn main() -> Result<()> {
     type T = CachedSharedTerm<TBuiltin>;
     type TFactory = SharedTermFactory<TBuiltin>;
     type TAllocator = DefaultAllocator<T>;
-    type TLoader = DefaultModuleLoader<T>;
     type TConnect = hyper_rustls::HttpsConnector<hyper::client::HttpConnector>;
     type TReconnect = NoopReconnectTimeout;
     type TGrpcConfig = DefaultGrpcConfig;
@@ -191,7 +190,7 @@ async fn main() -> Result<()> {
     let parser = create_parser(
         args.syntax,
         Some(input_path),
-        Option::<TLoader>::None,
+        default_js_loaders(empty(), &factory, &allocator),
         std::env::vars(),
         &factory,
         &allocator,

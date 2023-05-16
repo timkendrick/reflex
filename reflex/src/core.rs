@@ -10,6 +10,7 @@ use std::{
     iter::{once, repeat, FromIterator},
     marker::PhantomData,
     ops::Deref,
+    path::Path,
     rc::Rc,
     sync::Arc,
 };
@@ -1508,7 +1509,14 @@ pub fn transform_expression_list<T: Expression>(
     allocator: &impl HeapAllocator<T>,
     transform: impl FnMut(&T) -> Option<T>,
 ) -> Option<T::ExpressionList> {
-    match transform_expression_list_values(expressions, transform, |item| item.as_deref().clone()) {
+    match transform_expression_list_values(
+        expressions,
+        {
+            let mut transform = transform;
+            move |_index, item| transform(item)
+        },
+        |item| item.as_deref().clone(),
+    ) {
         None => None,
         Some(values) => Some(allocator.create_list(values)),
     }
@@ -1516,7 +1524,7 @@ pub fn transform_expression_list<T: Expression>(
 
 pub fn transform_expression_list_values<T: Expression, V>(
     expressions: &T::ExpressionList,
-    mut transform: impl FnMut(&T) -> Option<V>,
+    mut transform: impl FnMut(usize, &T) -> Option<V>,
     mut initialize: impl FnMut(&T) -> V,
 ) -> Option<Vec<V>> {
     // Create a lazy iterator that collects transformed values along with their indices
@@ -1524,7 +1532,8 @@ pub fn transform_expression_list_values<T: Expression, V>(
     // in which case we don't need to allocate a vector
     let mut iter = expressions
         .iter()
-        .map(|item| transform(item.as_deref()))
+        .enumerate()
+        .map(|(index, item)| transform(index, item.as_deref()))
         .enumerate()
         .filter_map(|(index, result)| result.map(|result| (index, result)));
     // Pull the first value from the iterator, returning if there were no transformed expressions
@@ -1580,6 +1589,11 @@ impl<T: Expression> EvaluationResult<T> {
             dependencies: self.dependencies.union(dependencies),
         }
     }
+}
+
+pub trait ModuleLoader {
+    type Output: Expression;
+    fn load(&self, import_path: &str, current_path: &Path) -> Option<Result<Self::Output, String>>;
 }
 
 pub fn validate_function_application_arity<T: Expression>(

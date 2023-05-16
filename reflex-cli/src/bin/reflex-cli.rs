@@ -75,7 +75,7 @@ use reflex_interpreter::{
 use reflex_json::{JsonMap, JsonValue};
 use reflex_lang::{allocator::DefaultAllocator, CachedSharedTerm, SharedTermFactory};
 use reflex_macros::{blanket_trait, task_factory_enum, Matcher, Named};
-use reflex_parser::{create_parser, DefaultModuleLoader, Syntax, SyntaxParser};
+use reflex_parser::{create_parser, syntax::js::default_js_loaders, Syntax, SyntaxParser};
 use reflex_protobuf::types::WellKnownTypesTranscoder;
 use reflex_runtime::{
     action::{bytecode_interpreter::*, effect::*, evaluate::*, query::*, RuntimeActions},
@@ -141,7 +141,6 @@ pub async fn main() -> Result<()> {
     type T = CachedSharedTerm<TBuiltin>;
     type TFactory = SharedTermFactory<TBuiltin>;
     type TAllocator = DefaultAllocator<T>;
-    type TLoader = DefaultModuleLoader<T>;
     type TConnect = hyper_rustls::HttpsConnector<hyper::client::HttpConnector>;
     type TReconnect = NoopReconnectTimeout;
     type TGrpcConfig = DefaultGrpcConfig;
@@ -179,7 +178,7 @@ pub async fn main() -> Result<()> {
             let parser = create_parser(
                 syntax,
                 None,
-                Option::<TLoader>::None,
+                default_js_loaders(empty(), &factory, &allocator),
                 empty(),
                 &factory,
                 &allocator,
@@ -204,7 +203,7 @@ pub async fn main() -> Result<()> {
             let parser = create_parser(
                 syntax,
                 Some(&input_path),
-                Option::<TLoader>::None,
+                default_js_loaders(empty(), &factory, &allocator),
                 std::env::vars(),
                 &factory,
                 &allocator,

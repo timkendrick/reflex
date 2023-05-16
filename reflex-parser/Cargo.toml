@@ -16,3 +16,4 @@ reflex-json = { path = "../reflex-json" }
 reflex-lisp = { path = "../reflex-lisp" }
 reflex-macros = { path = "../reflex-macros" }
 anyhow = "1.0"
+derivative = "2.2.0"

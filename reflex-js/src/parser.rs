@@ -11,7 +11,7 @@ use std::{
 
 use reflex::core::{
     as_integer, create_record, Builtin, Expression, ExpressionFactory, FloatTermType,
-    HeapAllocator, IntTermType, IntValue, RefType, StringTermType, StringValue,
+    HeapAllocator, IntTermType, IntValue, ModuleLoader, RefType, StringTermType, StringValue,
 };
 use reflex_stdlib::{
     Add, And, Apply, Chain, CollectHashMap, CollectHashSet, CollectList, Concat, Contains, Divide,
@@ -185,7 +185,7 @@ pub fn parse_module<T: Expression>(
     input: &str,
     env: &Env<T>,
     path: &Path,
-    loader: &impl Fn(&str, &Path) -> Option<Result<T, String>>,
+    loader: &impl ModuleLoader<Output = T>,
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
@@ -291,7 +291,7 @@ fn parse_module_contents<T: Expression>(
     program: impl IntoIterator<Item = ModuleItem> + ExactSizeIterator,
     env: &Env<T>,
     path: &Path,
-    loader: &impl Fn(&str, &Path) -> Option<Result<T, String>>,
+    loader: &impl ModuleLoader<Output = T>,
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<T>
@@ -346,7 +346,7 @@ where
 fn parse_module_import<T: Expression>(
     node: &ImportDecl,
     path: &Path,
-    loader: &impl Fn(&str, &Path) -> Option<Result<T, String>>,
+    loader: &impl ModuleLoader<Output = T>,
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
 ) -> ParserResult<Vec<(String, T)>>
@@ -354,15 +354,15 @@ where
     T::Builtin: JsParserBuiltin,
 {
     let module_path = parse_string(&node.src);
-    let module = match loader(&module_path, path)
+    let module = loader
+        .load(&module_path, path)
         .unwrap_or_else(|| Err(String::from("No compatible loaders registered")))
-    {
-        Ok(module) => Ok(module),
-        Err(error) => Err(err(
-            &format!("Failed to import '{}': {}", module_path, error),
-            node,
-        )),
-    }?;
+        .map_err(|error| {
+            err(
+                &format!("Failed to import '{}': {}", module_path, error),
+                node,
+            )
+        })?;
     Ok(node
         .specifiers
         .iter()
@@ -2123,6 +2123,7 @@ mod tests {
         builtins::JsBuiltins,
         globals::{builtin_globals, global_error},
         imports::builtin_imports,
+        loader::create_default_module_export,
         static_module_loader, Env,
     };
     use reflex::{
@@ -5243,7 +5244,9 @@ mod tests {
             "
             import { graph } from 'reflex::utils';
             export default graph((foo) => ({
-                foo,
+                get foo() {
+                    return foo;
+                },
                 bar: 3,
                 baz: 4,
             })).foo.foo.foo.bar;
@@ -5274,7 +5277,10 @@ mod tests {
         let allocator = DefaultAllocator::default();
         let env = Env::new();
         let path = Path::new("./foo.js");
-        let loader = static_module_loader(vec![(String::from("foo"), factory.create_nil_term())]);
+        let loader = static_module_loader(vec![(
+            String::from("foo"),
+            create_default_module_export(factory.create_nil_term(), &factory, &allocator),
+        )]);
         let expression = parse_module(
             "
             import Foo from 'foo';
