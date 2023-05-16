@@ -1210,8 +1210,9 @@ where
                                 .iter()
                                 .any(|(_, value, eagerness)| match eagerness {
                                     ArgType::Strict => {
-                                        !(value.is_static()
-                                            && factory.match_signal_term(value).is_some())
+                                        let is_static_value = value.is_static()
+                                            && factory.match_signal_term(value).is_none();
+                                        !is_static_value
                                     }
                                     ArgType::Eager => !value.is_static(),
                                     ArgType::Lazy => true,

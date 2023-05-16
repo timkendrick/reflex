@@ -23,7 +23,7 @@ pub fn default_js_loaders<T: Expression + 'static>(
     imports: impl IntoIterator<Item = (String, T)>,
     factory: &(impl ExpressionFactory<T> + Clone + 'static),
     allocator: &(impl HeapAllocator<T> + Clone + 'static),
-) -> impl ModuleLoader<Output = T>
+) -> impl ModuleLoader<Output = T> + Clone
 where
     T::Builtin: JsParserBuiltin
         + JsGlobalsBuiltin

@@ -125,8 +125,7 @@ impl std::fmt::Display for WasmCompilerError {
 }
 
 pub fn compile_wasm_module<T: Expression + 'static>(
-    expression: &T,
-    export_name: &str,
+    entry_points: impl IntoIterator<Item = (impl Into<String>, T)>,
     runtime: &[u8],
     factory: &(impl ExpressionFactory<T> + Clone + 'static),
     allocator: &(impl HeapAllocator<T> + Clone + 'static),
@@ -138,45 +137,53 @@ where
     T: Rewritable<T>,
     T::Builtin: Into<stdlib::Stdlib>,
 {
-    // Abstract any free variables from any internal lambda functions within the expression
-    let expression = expression
-        .hoist_free_variables(factory, allocator)
-        .unwrap_or_else(|| expression.clone());
-
-    // Partially-evaluate any pure expressions within the expression
-    let expression = expression
-        .normalize(factory, allocator, &mut SubstitutionCache::new())
-        .unwrap_or(expression);
-
-    // Convert the expression into the WASM term representation
     let mut arena = VecAllocator::default();
-    let allocator = &mut arena;
-    let shared_arena = Rc::new(RefCell::new(allocator));
-    let wasm_term = WasmTermFactory::from(Rc::clone(&shared_arena))
-        .import(&expression, factory)
-        .map_err(|term| anyhow::anyhow!("Failed to compile term: {}", term))
-        .map_err(WasmCompilerError::CompilerError)?;
+    let shared_arena = Rc::new(RefCell::new(&mut arena));
 
-    let factory = {
-        let factory_term = Term::new(
-            TermType::Lambda(LambdaTerm {
-                num_args: 0,
-                body: wasm_term.pointer,
-            }),
-            &shared_arena,
-        );
-        let factory_pointer = shared_arena
-            .deref()
-            .borrow_mut()
-            .deref_mut()
-            .deref_mut()
-            .allocate(factory_term);
-        ArenaRef::<TypedTerm<LambdaTerm>, _>::new(Rc::clone(&shared_arena), factory_pointer)
-    };
+    let entry_point_functions = entry_points
+        .into_iter()
+        .map(|(export_name, expression)| {
+            // Abstract any free variables from any internal lambda functions within the expression
+            let expression = expression
+                .hoist_free_variables(factory, allocator)
+                .unwrap_or_else(|| expression.clone());
+
+            // Partially-evaluate any pure expressions within the expression
+            let expression = expression
+                .normalize(factory, allocator, &mut SubstitutionCache::new())
+                .unwrap_or(expression);
+
+            // Convert the expression into the WASM term representation
+            let wasm_term = WasmTermFactory::from(Rc::clone(&shared_arena))
+                .import(&expression, factory)
+                .map_err(|term| anyhow::anyhow!("Failed to compile term: {}", term))
+                .map_err(WasmCompilerError::CompilerError)?;
+
+            // Create a zero-argument factory function that returns the evaluated expression
+            let entry_point_function = {
+                let factory_term = Term::new(
+                    TermType::Lambda(LambdaTerm {
+                        num_args: 0,
+                        body: wasm_term.pointer,
+                    }),
+                    &shared_arena,
+                );
+                let factory_pointer = shared_arena
+                    .deref()
+                    .borrow_mut()
+                    .deref_mut()
+                    .deref_mut()
+                    .allocate(factory_term);
+                ArenaRef::<TypedTerm<LambdaTerm>, _>::new(Rc::clone(&shared_arena), factory_pointer)
+            };
+
+            Ok((export_name.into(), entry_point_function))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
 
     // Compile the expression into a WASM module
     compile_module(
-        [(String::from(export_name), factory)],
+        entry_point_functions,
         runtime,
         None,
         compiler_options,
