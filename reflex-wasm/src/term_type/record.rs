@@ -5,8 +5,8 @@
 use std::collections::HashSet;
 
 use reflex::core::{
-    DependencyList, Eagerness, Expression, GraphNode, Internable, NodeId, RecordTermType,
-    SerializeJson, StackOffset,
+    DependencyList, Eagerness, Expression, GraphNode, HashmapTermType, Internable, NodeId,
+    RecordTermType, SerializeJson, StackOffset,
 };
 use reflex_utils::json::is_empty_json_object;
 use serde_json::{Map as JsonMap, Value as JsonValue};
@@ -18,7 +18,7 @@ use crate::{
         CompilerOptions, CompilerResult, CompilerStack, CompilerState, Strictness,
     },
     hash::{TermHash, TermHasher, TermSize},
-    term_type::{list::compile_list, ListTerm, TypedTerm, WasmExpression},
+    term_type::{hashmap::HashmapTerm, list::compile_list, ListTerm, TypedTerm, WasmExpression},
     ArenaPointer, ArenaRef, PointerIter, Term,
 };
 
@@ -55,23 +55,32 @@ impl<A: Arena + Clone> ArenaRef<RecordTerm, A> {
             self.read_value(|term| term.values),
         )
     }
-    pub fn get<T: Expression>(&self, key: &T) -> Option<ArenaRef<Term, A>> {
-        // TODO: implement `Record::get()` using hashmap lookup if one exists
-        self.keys()
-            .as_inner()
-            .iter()
-            .position(|existing_key| existing_key.id() == key.id())
-            .and_then(|index| {
-                self.values()
-                    .as_inner()
-                    .items()
-                    .get(index)
-                    .map(|pointer| ArenaRef::<Term, _>::new(self.arena.clone(), pointer))
-            })
+    pub fn lookup_table(&self) -> Option<ArenaRef<TypedTerm<HashmapTerm>, A>> {
+        let lookup_table = self.read_value(|term| term.lookup_table.as_non_null());
+        lookup_table
+            .map(|pointer| ArenaRef::<TypedTerm<HashmapTerm>, _>::new(self.arena.clone(), pointer))
+    }
+    pub fn get(&self, key: &ArenaRef<Term, A>) -> Option<ArenaRef<Term, A>> {
+        if let Some(lookup_table) = self.lookup_table() {
+            lookup_table.as_inner().get(key)
+        } else {
+            self.keys()
+                .as_inner()
+                .iter()
+                .position(|existing_key| existing_key.id() == key.id())
+                .and_then(|index| {
+                    self.values()
+                        .as_inner()
+                        .items()
+                        .get(index)
+                        .map(|pointer| ArenaRef::<Term, _>::new(self.arena.clone(), pointer))
+                })
+        }
     }
 }
 
-pub type RecordTermPointerIter = std::array::IntoIter<ArenaPointer, 2>;
+pub type RecordTermPointerIter =
+    std::iter::Chain<std::array::IntoIter<ArenaPointer, 2>, std::option::IntoIter<ArenaPointer>>;
 
 impl<A: Arena + Clone> PointerIter for ArenaRef<RecordTerm, A> {
     type Iter<'a> = RecordTermPointerIter
@@ -83,7 +92,12 @@ impl<A: Arena + Clone> PointerIter for ArenaRef<RecordTerm, A> {
     {
         let keys = self.inner_pointer(|term| &term.keys);
         let values = self.inner_pointer(|term| &term.values);
-        [keys, values].into_iter()
+        let lookup_table = self.read_value(|term| {
+            term.lookup_table
+                .as_non_null()
+                .map(|_| self.inner_pointer(|term| &term.lookup_table))
+        });
+        [keys, values].into_iter().chain(lookup_table)
     }
 }
 
