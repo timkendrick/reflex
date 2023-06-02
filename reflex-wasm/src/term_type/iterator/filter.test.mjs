@@ -53,5 +53,69 @@ export default (describe) => {
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });
+
+    test('signals', (assert, {
+      createApplication,
+      createBuiltin,
+      createErrorCondition,
+      createFilterIterator,
+      createInt,
+      createLambda,
+      createPair,
+      createRangeIterator,
+      createSignal,
+      createString,
+      createTriple,
+      createUnitList,
+      createVariable,
+      evaluate,
+      format,
+      NULL,
+      Stdlib,
+    }) => {
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.Apply),
+          createPair(
+            createBuiltin(Stdlib.ConstructList),
+            createFilterIterator(
+              createTriple(
+                createSignal(createErrorCondition(createString('foo'))),
+                createInt(3),
+                createSignal(createErrorCondition(createString('bar'))),
+              ),
+              createBuiltin(Stdlib.Identity),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(
+          format(result),
+          '[{<ErrorCondition:"foo">}, 3, {<ErrorCondition:"bar">}]',
+        );
+        assert.deepEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.Apply),
+          createPair(
+            createBuiltin(Stdlib.ConstructList),
+            createFilterIterator(
+              createRangeIterator(3, 3),
+              createLambda(
+                1,
+                createApplication(createBuiltin(Stdlib.Throw), createUnitList(createVariable(0))),
+              ),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(
+          format(result),
+          '[{<ErrorCondition:3>}, {<ErrorCondition:4>}, {<ErrorCondition:5>}]',
+        );
+        assert.deepEqual(format(dependencies), 'NULL');
+      })();
+    });
   });
 };

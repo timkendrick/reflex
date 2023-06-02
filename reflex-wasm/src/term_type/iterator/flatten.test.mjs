@@ -108,5 +108,73 @@ export default (describe) => {
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });
+
+    test('signals', (assert, {
+      createApplication,
+      createBuiltin,
+      createErrorCondition,
+      createFlattenIterator,
+      createMapIterator,
+      createLambda,
+      createPair,
+      createRangeIterator,
+      createSignal,
+      createString,
+      createTriple,
+      createUnitList,
+      createVariable,
+      evaluate,
+      format,
+      NULL,
+      Stdlib,
+    }) => {
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.Apply),
+          createPair(
+            createBuiltin(Stdlib.ConstructList),
+            createFlattenIterator(
+              createMapIterator(
+                createTriple(
+                  createSignal(createErrorCondition(createString('foo'))),
+                  createRangeIterator(3, 3),
+                  createSignal(createErrorCondition(createString('bar'))),
+                ),
+                createBuiltin(Stdlib.Identity),
+              ),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(
+          format(result),
+          '[{<ErrorCondition:"foo">}, 3, 4, 5, {<ErrorCondition:"bar">}]',
+        );
+        assert.deepEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.Apply),
+          createPair(
+            createBuiltin(Stdlib.ConstructList),
+            createFlattenIterator(
+              createMapIterator(
+                createRangeIterator(3, 3),
+                createLambda(
+                  1,
+                  createApplication(createBuiltin(Stdlib.Throw), createUnitList(createVariable(0))),
+                ),
+              ),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(
+          format(result),
+          '[{<ErrorCondition:3>}, {<ErrorCondition:4>}, {<ErrorCondition:5>}]',
+        );
+        assert.deepEqual(format(dependencies), 'NULL');
+      })();
+    });
   });
 };

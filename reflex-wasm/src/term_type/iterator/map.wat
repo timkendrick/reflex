@@ -93,6 +93,9 @@
           (local.get $state))
         ;; Combine the function application dependencies with the iteration dependencies
         (local.set $dependencies (call $Dependencies::traits::union (local.get $dependencies)))
+        ;; Evaluate the result and combine the accumulated dependencies
+        (call $Term::traits::evaluate (local.get $state))
+        (local.set $dependencies (call $Dependencies::traits::union (local.get $dependencies)))
         ;; Emit the transformed value and the source iterator state
         (local.get $iterator_state)
         (local.get $dependencies)))))

@@ -17,13 +17,12 @@
         ;; Resolve the arguments and convert to debug representation, combining them into a space-separated string
         (call $Term::String::traits::collect
           (call $Term::IntersperseIterator::new
-            (call $Term::EvaluateIterator::new
-              (call $Term::MapIterator::new
-                (call $Term::FlattenIterator::new
-                  (call $Term::List::create_pair
-                    (call $Term::OnceIterator::new (local.get $self))
-                    (local.get $varargs)))
-                (call $Term::Builtin::new (global.get $Stdlib_Debug))))
+            (call $Term::MapIterator::new
+              (call $Term::FlattenIterator::new
+                (call $Term::List::create_pair
+                  (call $Term::OnceIterator::new (local.get $self))
+                  (local.get $varargs)))
+              (call $Term::Builtin::new (global.get $Stdlib_Debug)))
             (global.get $Stdlib_Log::SPACE))
           (local.get $state))
         ;; Drop the dependencies of the iteration

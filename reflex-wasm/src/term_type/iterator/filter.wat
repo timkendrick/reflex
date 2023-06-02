@@ -73,6 +73,7 @@
   (func $Term::FilterIterator::traits::next (param $self i32) (param $iterator_state i32) (param $state i32) (result i32 i32 i32)
     (local $value i32)
     (local $dependencies i32)
+    (local $filter_result i32)
     ;; Consume the next item from the source iterator
     (call $Term::traits::next (call $Term::FilterIterator::get::source (local.get $self)) (local.get $iterator_state) (local.get $state))
     (local.set $dependencies)
@@ -95,14 +96,23 @@
         ;; Evaluate the result and combine the accumulated dependencies
         (call $Term::traits::evaluate (local.get $state))
         (local.set $dependencies (call $Dependencies::traits::union (local.get $dependencies)))
-        ;; If the predicate returned a truthy result, emit the iterator value
+        (local.tee $filter_result)
+        ;; If the predicate returned a signal result, emit the signal
         (if (result i32 i32 i32)
-          (call $Term::traits::is_truthy)
+          (call $Term::Signal::is)
           (then
-            (local.get $value)
+            (local.get $filter_result)
             (local.get $iterator_state)
             (local.get $dependencies))
           (else
-            ;; Otherwise try the next item
-            (call $Term::FilterIterator::traits::next (local.get $self) (local.get $iterator_state) (local.get $state))
-            (call $Dependencies::traits::union (local.get $dependencies))))))))
+            ;; Otherwise if the predicate returned a truthy result, emit the iterator value
+            (if (result i32 i32 i32)
+              (call $Term::traits::is_truthy (local.get $filter_result))
+              (then
+                (local.get $value)
+                (local.get $iterator_state)
+                (local.get $dependencies))
+              (else
+                ;; Otherwise try the next item
+                (call $Term::FilterIterator::traits::next (local.get $self) (local.get $iterator_state) (local.get $state))
+                (call $Dependencies::traits::union (local.get $dependencies))))))))))
