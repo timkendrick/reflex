@@ -6,12 +6,12 @@ use std::{collections::HashSet, marker::PhantomData};
 
 use reflex::core::{
     ConditionType, DependencyList, Eagerness, Expression, GraphNode, Internable, SerializeJson,
-    SignalType, StackOffset, StateToken, StringValue,
+    SignalType, StackOffset, StateToken,
 };
 use serde_json::Value as JsonValue;
 use strum_macros::EnumDiscriminants;
 
-use super::{ListTerm, StringTerm, WasmExpression};
+use super::{ListTerm, WasmExpression};
 use crate::{
     allocator::Arena,
     hash::{TermHash, TermHasher, TermSize},
@@ -95,7 +95,7 @@ impl TermHash for ConditionTerm {
 }
 
 impl<A: Arena + Clone> ArenaRef<ConditionTerm, A> {
-    pub fn signal_type(&self) -> SignalType {
+    pub fn signal_type(&self) -> SignalType<WasmExpression<A>> {
         match self.condition_type() {
             ConditionTermDiscriminants::Custom => self
                 .as_typed_condition::<CustomCondition>()
@@ -239,7 +239,7 @@ impl<A: Arena + Clone> ConditionType<WasmExpression<A>> for ArenaRef<TypedTerm<C
     fn id(&self) -> StateToken {
         self.read_value(|term| term.id())
     }
-    fn signal_type(&self) -> SignalType {
+    fn signal_type(&self) -> SignalType<WasmExpression<A>> {
         self.as_inner().signal_type()
     }
     fn payload<'a>(&'a self) -> <WasmExpression<A> as Expression>::ExpressionRef<'a> {
@@ -682,19 +682,9 @@ impl TermHash for CustomCondition {
 }
 
 impl<A: Arena + Clone> ArenaRef<CustomCondition, A> {
-    pub fn signal_type(&self) -> SignalType {
+    pub fn signal_type(&self) -> SignalType<WasmExpression<A>> {
         let effect_type = self.effect_type();
-        // FIXME: Allow arbitrary expressions as condition types
-        let custom_effect_type = match effect_type.read_value(|term| term.type_id()) {
-            TermTypeDiscriminants::String => String::from(
-                effect_type
-                    .as_typed_term::<StringTerm>()
-                    .as_inner()
-                    .as_str(),
-            ),
-            _ => format!("{}", effect_type),
-        };
-        SignalType::Custom(custom_effect_type)
+        SignalType::Custom(effect_type)
     }
 }
 

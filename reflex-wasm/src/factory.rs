@@ -75,7 +75,13 @@ where
             let condition = {
                 let condition = term.condition();
                 let condition = condition.as_deref();
-                let signal_type = condition.signal_type();
+                let signal_type = match condition.signal_type() {
+                    SignalType::Custom(effect_type) => {
+                        self.import(&effect_type, factory).map(SignalType::Custom)
+                    }
+                    SignalType::Pending => Ok(SignalType::Pending),
+                    SignalType::Error => Ok(SignalType::Error),
+                }?;
                 let payload = self.import(condition.payload().as_deref(), factory)?;
                 let token = self.import(condition.token().as_deref(), factory)?;
                 self.create_signal(signal_type, payload, token)
@@ -191,10 +197,16 @@ where
                 .iter()
                 .map(|condition| {
                     let condition = condition.as_deref();
-                    let effect_type = condition.signal_type();
+                    let signal_type = match condition.signal_type() {
+                        SignalType::Custom(effect_type) => {
+                            self.import(&effect_type, factory).map(SignalType::Custom)
+                        }
+                        SignalType::Pending => Ok(SignalType::Pending),
+                        SignalType::Error => Ok(SignalType::Error),
+                    }?;
                     let payload = self.import(condition.payload().as_deref(), factory)?;
                     let token = self.import(condition.token().as_deref(), factory)?;
-                    Ok(self.create_signal(effect_type, payload, token))
+                    Ok(self.create_signal(signal_type, payload, token))
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             let conditions = self.create_signal_list(conditions);
@@ -234,7 +246,13 @@ where
             let condition = {
                 let condition = term.condition();
                 let condition = condition.as_deref();
-                let signal_type = condition.signal_type();
+                let signal_type = match condition.signal_type() {
+                    SignalType::Custom(effect_type) => self
+                        .export(&effect_type, factory, allocator)
+                        .map(SignalType::Custom),
+                    SignalType::Pending => Ok(SignalType::Pending),
+                    SignalType::Error => Ok(SignalType::Error),
+                }?;
                 let payload = self.export(condition.payload().as_deref(), factory, allocator)?;
                 let token = self.export(condition.token().as_deref(), factory, allocator)?;
                 allocator.create_signal(signal_type, payload, token)
@@ -348,11 +366,17 @@ where
                 .iter()
                 .map(|condition| {
                     let condition = condition.as_deref();
-                    let effect_type = condition.signal_type();
+                    let signal_type = match condition.signal_type() {
+                        SignalType::Custom(effect_type) => self
+                            .export(&effect_type, factory, allocator)
+                            .map(SignalType::Custom),
+                        SignalType::Pending => Ok(SignalType::Pending),
+                        SignalType::Error => Ok(SignalType::Error),
+                    }?;
                     let payload =
                         self.export(condition.payload().as_deref(), factory, allocator)?;
                     let token = self.export(condition.token().as_deref(), factory, allocator)?;
-                    Ok(allocator.create_signal(effect_type, payload, token))
+                    Ok(allocator.create_signal(signal_type, payload, token))
                 })
                 .collect::<Result<Vec<_>, WasmExpression<Rc<RefCell<A>>>>>()?;
             let conditions = allocator.create_signal_list(conditions);
@@ -561,7 +585,7 @@ where
 
     fn create_signal(
         &self,
-        effect_type: SignalType,
+        effect_type: SignalType<ArenaRef<Term, Self>>,
         payload: ArenaRef<Term, Self>,
         token: ArenaRef<Term, Self>,
     ) -> <ArenaRef<Term, Self> as Expression>::Signal {
@@ -580,14 +604,11 @@ where
                     payload: payload.pointer,
                 }),
                 SignalType::Pending => ConditionTerm::Pending(PendingCondition),
-                SignalType::Custom(effect_type) => {
-                    let effect_type = self.create_string(effect_type);
-                    ConditionTerm::Custom(CustomCondition {
-                        effect_type: effect_type.pointer,
-                        payload: payload.pointer,
-                        token: token.pointer,
-                    })
-                }
+                SignalType::Custom(effect_type) => ConditionTerm::Custom(CustomCondition {
+                    effect_type: effect_type.pointer,
+                    payload: payload.pointer,
+                    token: token.pointer,
+                }),
             }),
             self.arena.deref().borrow().deref(),
         );
