@@ -5,7 +5,7 @@
 use std::collections::HashSet;
 
 use reflex::core::{
-    DependencyList, FloatTermType, FloatValue, GraphNode, RefType, SerializeJson, StackOffset,
+    DependencyList, FloatTermType, FloatValue, GraphNode, SerializeJson, StackOffset,
 };
 use serde_json::Value as JsonValue;
 
@@ -70,7 +70,7 @@ fn chunks_to_f64(value: [u32; 2]) -> f64 {
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, FloatTerm, A> {
     pub fn value(&self) -> f64 {
-        chunks_to_f64(self.as_deref().value)
+        chunks_to_f64(self.as_value().value)
     }
 }
 
@@ -144,7 +144,7 @@ impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, FloatTerm, A> {}
 
 impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, FloatTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_deref(), f)
+        std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 

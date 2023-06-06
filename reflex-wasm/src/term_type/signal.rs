@@ -5,7 +5,7 @@
 use std::collections::HashSet;
 
 use reflex::core::{
-    DependencyList, Expression, GraphNode, RefType, SerializeJson, SignalTermType, StackOffset,
+    DependencyList, Expression, GraphNode, SerializeJson, SignalTermType, StackOffset,
 };
 use serde_json::Value as JsonValue;
 
@@ -16,7 +16,7 @@ use crate::{
     ArenaRef, TermPointer,
 };
 
-use super::TreeTerm;
+use super::{TreeTerm, WasmExpression};
 
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
@@ -36,20 +36,33 @@ impl TermHash for SignalTerm {
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, SignalTerm, A> {
     fn conditions(&self) -> ArenaRef<'heap, TypedTerm<TreeTerm>, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_deref().conditions))
+        ArenaRef::new(self.arena, self.arena.get(self.as_value().conditions))
     }
 }
 
-impl<'heap, T: Expression, A: ArenaAllocator> SignalTermType<T> for ArenaRef<'heap, SignalTerm, A>
-where
-    for<'a> T::SignalListRef<'a, T>: From<ArenaRef<'a, TypedTerm<TreeTerm>, A>>,
+impl<'heap, A: ArenaAllocator> SignalTermType<WasmExpression<'heap, A>>
+    for ArenaRef<'heap, SignalTerm, A>
 {
-    fn signals<'a>(&'a self) -> T::SignalListRef<'a, T>
+    fn signals<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::SignalListRef<'a>
     where
-        T::SignalList<T>: 'a,
-        T: 'a,
+        <WasmExpression<'heap, A> as Expression>::SignalList: 'a,
+        WasmExpression<'heap, A>: 'a,
     {
         self.conditions().into()
+    }
+}
+
+impl<'heap, A: ArenaAllocator> SignalTermType<WasmExpression<'heap, A>>
+    for ArenaRef<'heap, TypedTerm<SignalTerm>, A>
+{
+    fn signals<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::SignalListRef<'a>
+    where
+        <WasmExpression<'heap, A> as Expression>::SignalList: 'a,
+        WasmExpression<'heap, A>: 'a,
+    {
+        <ArenaRef<'heap, SignalTerm, A> as SignalTermType<WasmExpression<'heap, A>>>::signals(
+            &self.as_inner(),
+        )
     }
 }
 
@@ -104,7 +117,7 @@ impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, SignalTerm, A> {}
 
 impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, SignalTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_deref(), f)
+        std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 

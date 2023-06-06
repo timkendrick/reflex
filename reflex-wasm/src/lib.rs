@@ -42,7 +42,7 @@ pub mod term_type;
 //     }
 // }
 
-struct ArenaRef<'a, T, A: ArenaAllocator> {
+pub struct ArenaRef<'a, T, A: ArenaAllocator> {
     pub(crate) arena: &'a A,
     value: &'a T,
 }
@@ -51,17 +51,15 @@ where
     T: Hash,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.as_deref().hash(state)
+        self.as_value().hash(state)
     }
 }
 impl<'a, T, A: ArenaAllocator> ArenaRef<'a, T, A> {
     fn new(arena: &'a A, value: &'a T) -> Self {
         Self { arena, value }
     }
-}
-impl<'a, T, A: ArenaAllocator> RefType<'a, T> for ArenaRef<'a, T, A> {
-    fn as_deref(&self) -> &'a T {
-        self.value
+    pub fn as_value(&self) -> &'a T {
+        &self.value
     }
 }
 impl<'a, T, A: ArenaAllocator> Copy for ArenaRef<'a, T, A> {}
@@ -74,13 +72,23 @@ impl<'a, T, A: ArenaAllocator> Clone for ArenaRef<'a, T, A> {
     }
 }
 
-impl<'a, 'heap, T, A: ArenaAllocator> From<&'a ArenaRef<'heap, T, A>> for ArenaRef<'heap, T, A> {
+impl<'a, 'heap: 'a, T, A: ArenaAllocator> From<&'a ArenaRef<'heap, T, A>>
+    for ArenaRef<'heap, T, A>
+{
     fn from(value: &'a ArenaRef<'heap, T, A>) -> Self {
         *value
     }
 }
 
-struct IntoArenaRefIterator<'a, T: 'a, A: ArenaAllocator, TInner: Iterator<Item = TermPointer>> {
+impl<'a, 'heap: 'a, T, A: ArenaAllocator> RefType<'a, Self> for ArenaRef<'heap, T, A> {
+    fn as_deref(&self) -> &'a Self {
+        // This is safe because we know 'heap lasts longer than 'a, which ensures the reference will be freed before 'heap
+        unsafe { std::mem::transmute::<&Self, &'a Self>(self) }
+    }
+}
+
+pub struct IntoArenaRefIterator<'a, T: 'a, A: ArenaAllocator, TInner: Iterator<Item = TermPointer>>
+{
     arena: &'a A,
     inner: TInner,
     _item: PhantomData<T>,
@@ -134,7 +142,7 @@ impl Term {
             value,
         }
     }
-    pub fn id(&mut self) -> HashId {
+    pub fn id(self) -> HashId {
         // FIXME: 64-bit term hash
         u32::from(self.header.hash) as HashId
     }
@@ -302,13 +310,13 @@ where
 
 impl<'heap, T, A: ArenaAllocator> ArenaRef<'heap, Array<T>, A> {
     pub fn len(&self) -> usize {
-        self.as_deref().len()
+        self.as_value().len()
     }
-    pub fn iter(&self) -> ArrayIter<T> {
-        self.as_deref().iter()
+    pub fn iter(&self) -> ArrayIter<'heap, T> {
+        self.as_value().iter()
     }
     pub fn get(&self, index: usize) -> Option<&T> {
-        self.as_deref().get(index)
+        self.as_value().get(index)
     }
 }
 

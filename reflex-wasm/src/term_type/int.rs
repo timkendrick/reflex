@@ -4,9 +4,7 @@
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use std::collections::HashSet;
 
-use reflex::core::{
-    DependencyList, GraphNode, IntTermType, IntValue, RefType, SerializeJson, StackOffset,
-};
+use reflex::core::{DependencyList, GraphNode, IntTermType, IntValue, SerializeJson, StackOffset};
 use serde_json::Value as JsonValue;
 
 use crate::{
@@ -44,8 +42,8 @@ impl Into<i32> for IntTerm {
 }
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, IntTerm, A> {
-    fn value(&self) -> i32 {
-        self.as_deref().value
+    pub fn value(&self) -> i32 {
+        self.as_value().value
     }
 }
 
@@ -113,7 +111,7 @@ impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, IntTerm, A> {}
 
 impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, IntTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_deref(), f)
+        std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 

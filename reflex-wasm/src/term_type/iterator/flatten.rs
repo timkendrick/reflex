@@ -4,7 +4,7 @@
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use std::collections::HashSet;
 
-use reflex::core::{DependencyList, GraphNode, RefType, SerializeJson, StackOffset};
+use reflex::core::{DependencyList, GraphNode, SerializeJson, StackOffset};
 use serde_json::Value as JsonValue;
 
 use crate::{
@@ -30,11 +30,8 @@ impl TermHash for FlattenIteratorTerm {
 }
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, FlattenIteratorTerm, A> {
-    fn source(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_deref().source))
-    }
-    fn predicate(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_deref().source))
+    pub fn source(&self) -> ArenaRef<'heap, Term, A> {
+        ArenaRef::new(self.arena, self.arena.get(self.as_value().source))
     }
 }
 
@@ -59,7 +56,7 @@ impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, FlattenIteratorTerm, A> {}
 
 impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, FlattenIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_deref(), f)
+        std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 

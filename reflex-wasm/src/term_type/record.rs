@@ -5,7 +5,8 @@
 use std::collections::HashSet;
 
 use reflex::core::{
-    DependencyList, Expression, GraphNode, RecordTermType, RefType, SerializeJson, StackOffset,
+    DependencyList, Expression, GraphNode, NodeId, RecordTermType, RefType, SerializeJson,
+    StackOffset,
 };
 use reflex_utils::json::is_empty_json_object;
 use serde_json::{Map as JsonMap, Value as JsonValue};
@@ -17,7 +18,7 @@ use crate::{
     ArenaRef, Term, TermPointer,
 };
 
-use super::ListTerm;
+use super::{ListTerm, WasmExpression};
 
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
@@ -38,10 +39,10 @@ impl TermHash for RecordTerm {
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, RecordTerm, A> {
     fn keys(&self) -> ArenaRef<'heap, TypedTerm<ListTerm>, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_deref().keys))
+        ArenaRef::new(self.arena, self.arena.get(self.as_value().keys))
     }
     fn values(&self) -> ArenaRef<'heap, TypedTerm<ListTerm>, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_deref().values))
+        ArenaRef::new(self.arena, self.arena.get(self.as_value().values))
     }
     fn get<T: Expression>(&self, key: &T) -> Option<ArenaRef<'heap, Term, A>> {
         self.keys()
@@ -60,60 +61,66 @@ impl<'heap, A: ArenaAllocator> ArenaRef<'heap, RecordTerm, A> {
     }
 }
 
-impl<'heap, T: Expression, A: ArenaAllocator> RecordTermType<T> for ArenaRef<'heap, RecordTerm, A>
-where
-    for<'a> T::ExpressionRef<'a>: From<ArenaRef<'a, Term, A>>,
-    for<'a> T::StructPrototypeRef<'a, T>: From<ArenaRef<'a, TypedTerm<ListTerm>, A>>,
-    for<'a> T::ExpressionListRef<'a, T>: From<ArenaRef<'a, TypedTerm<ListTerm>, A>>,
+impl<'heap, A: ArenaAllocator> RecordTermType<WasmExpression<'heap, A>>
+    for ArenaRef<'heap, RecordTerm, A>
 {
-    fn prototype<'a>(&'a self) -> T::StructPrototypeRef<'a, T>
+    fn prototype<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::StructPrototypeRef<'a>
     where
-        T::StructPrototype<T>: 'a,
-        T: 'a,
+        <WasmExpression<'heap, A> as Expression>::StructPrototype: 'a,
+        WasmExpression<'heap, A>: 'a,
     {
         self.keys().into()
     }
-    fn values<'a>(&'a self) -> T::ExpressionListRef<'a, T>
+    fn values<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::ExpressionListRef<'a>
     where
-        T::ExpressionList<T>: 'a,
-        T: 'a,
+        <WasmExpression<'heap, A> as Expression>::ExpressionList: 'a,
+        WasmExpression<'heap, A>: 'a,
     {
         self.values().into()
     }
-    fn get<'a>(&'a self, key: &T) -> Option<T::ExpressionRef<'a>>
+    fn get<'a>(
+        &'a self,
+        key: &WasmExpression<'heap, A>,
+    ) -> Option<<WasmExpression<'heap, A> as Expression>::ExpressionRef<'a>>
     where
-        T: 'a,
+        WasmExpression<'heap, A>: 'a,
     {
         self.get(key).map(|value| value.into())
     }
 }
 
-impl<'heap, T: Expression, A: ArenaAllocator> RecordTermType<T>
+impl<'heap, A: ArenaAllocator> RecordTermType<WasmExpression<'heap, A>>
     for ArenaRef<'heap, TypedTerm<RecordTerm>, A>
-where
-    for<'a> T::ExpressionRef<'a>: From<ArenaRef<'a, Term, A>>,
-    for<'a> T::StructPrototypeRef<'a, T>: From<ArenaRef<'a, TypedTerm<ListTerm>, A>>,
-    for<'a> T::ExpressionListRef<'a, T>: From<ArenaRef<'a, TypedTerm<ListTerm>, A>>,
 {
-    fn prototype<'a>(&'a self) -> T::StructPrototypeRef<'a, T>
+    fn prototype<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::StructPrototypeRef<'a>
     where
-        <T as Expression>::StructPrototype<T>: 'a,
-        T: 'a,
+        <WasmExpression<'heap, A> as Expression>::StructPrototype: 'a,
+        WasmExpression<'heap, A>: 'a,
     {
-        <ArenaRef<'heap, RecordTerm, A> as RecordTermType<T>>::prototype(&self.as_inner())
+        <ArenaRef<'heap, RecordTerm, A> as RecordTermType<WasmExpression<'heap, A>>>::prototype(
+            &self.as_inner(),
+        )
     }
-    fn values<'a>(&'a self) -> <T as Expression>::ExpressionListRef<'a, T>
+    fn values<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::ExpressionListRef<'a>
     where
-        <T as Expression>::ExpressionList<T>: 'a,
-        T: 'a,
+        <WasmExpression<'heap, A> as Expression>::ExpressionList: 'a,
+        WasmExpression<'heap, A>: 'a,
     {
-        <ArenaRef<'heap, RecordTerm, A> as RecordTermType<T>>::values(&self.as_inner())
+        <ArenaRef<'heap, RecordTerm, A> as RecordTermType<WasmExpression<'heap, A>>>::values(
+            &self.as_inner(),
+        )
     }
-    fn get<'a>(&'a self, key: &T) -> Option<<T as Expression>::ExpressionRef<'a>>
+    fn get<'a>(
+        &'a self,
+        key: &WasmExpression<'heap, A>,
+    ) -> Option<<WasmExpression<'heap, A> as Expression>::ExpressionRef<'a>>
     where
-        T: 'a,
+        WasmExpression<'heap, A>: 'a,
     {
-        <ArenaRef<'heap, RecordTerm, A> as RecordTermType<T>>::get(&self.as_inner(), key)
+        <ArenaRef<'heap, RecordTerm, A> as RecordTermType<WasmExpression<'heap, A>>>::get(
+            &self.as_inner(),
+            key,
+        )
     }
 }
 
@@ -223,7 +230,7 @@ impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, RecordTerm, A> {}
 
 impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, RecordTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_deref(), f)
+        std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 

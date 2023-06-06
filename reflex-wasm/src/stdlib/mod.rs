@@ -141,6 +141,8 @@ pub use take::*;
 pub use values::*;
 pub use zip::*;
 
+use crate::term_type::FunctionIndex;
+
 #[derive(Matcher, PartialEq, Eq, Clone, Copy, Debug, EnumDiscriminants)]
 pub enum Stdlib {
     Abs(Abs),
@@ -231,6 +233,12 @@ pub enum Stdlib {
 impl std::hash::Hash for Stdlib {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         core::mem::discriminant(self).hash(state);
+    }
+}
+
+impl From<FunctionIndex> for Stdlib {
+    fn from(value: FunctionIndex) -> Self {
+        Self::try_from(u32::from(value)).expect("Invalid function index")
     }
 }
 
@@ -651,10 +659,10 @@ impl Builtin for Stdlib {
     }
     fn apply<T: Expression<Builtin = Self> + Applicable<T>>(
         &self,
-        args: impl ExactSizeIterator<Item = T>,
-        factory: &impl ExpressionFactory<T>,
-        allocator: &impl HeapAllocator<T>,
-        cache: &mut impl EvaluationCache<T>,
+        _args: impl ExactSizeIterator<Item = T>,
+        _factory: &impl ExpressionFactory<T>,
+        _allocator: &impl HeapAllocator<T>,
+        _cache: &mut impl EvaluationCache<T>,
     ) -> Result<T, String> {
         Err(format!(
             "Unable to apply native WebAssembly function: {:?}",
@@ -663,7 +671,7 @@ impl Builtin for Stdlib {
     }
     fn should_parallelize<T: Expression<Builtin = Self> + Applicable<T>>(
         &self,
-        args: &[T],
+        _args: &[T],
     ) -> bool {
         false
     }

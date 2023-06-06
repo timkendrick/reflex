@@ -5,7 +5,7 @@
 use std::collections::HashSet;
 
 use reflex::core::{
-    DependencyList, EffectTermType, Expression, GraphNode, RefType, SerializeJson, StackOffset,
+    DependencyList, EffectTermType, Expression, GraphNode, SerializeJson, StackOffset,
 };
 use serde_json::Value as JsonValue;
 
@@ -16,7 +16,7 @@ use crate::{
     ArenaRef, TermPointer,
 };
 
-use super::ConditionTerm;
+use super::{ConditionTerm, WasmExpression};
 
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
@@ -36,34 +36,33 @@ impl TermHash for EffectTerm {
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, EffectTerm, A> {
     pub fn condition(&self) -> ArenaRef<'heap, TypedTerm<ConditionTerm>, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_deref().condition))
+        ArenaRef::new(self.arena, self.arena.get(self.as_value().condition))
     }
 }
 
-impl<'heap, T: Expression, A: ArenaAllocator> EffectTermType<T> for ArenaRef<'heap, EffectTerm, A>
-where
-    for<'a> T::SignalRef<'a, T>: From<ArenaRef<'a, TypedTerm<ConditionTerm>, A>>,
+impl<'heap, A: ArenaAllocator> EffectTermType<WasmExpression<'heap, A>>
+    for ArenaRef<'heap, EffectTerm, A>
 {
-    fn condition<'a>(&'a self) -> T::SignalRef<'a, T>
+    fn condition<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::SignalRef<'a>
     where
-        T::Signal<T>: 'a,
-        T: 'a,
+        <WasmExpression<'heap, A> as Expression>::Signal: 'a,
+        WasmExpression<'heap, A>: 'a,
     {
         self.condition().into()
     }
 }
 
-impl<'heap, T: Expression, A: ArenaAllocator> EffectTermType<T>
+impl<'heap, A: ArenaAllocator> EffectTermType<WasmExpression<'heap, A>>
     for ArenaRef<'heap, TypedTerm<EffectTerm>, A>
-where
-    for<'a> T::SignalRef<'a, T>: From<ArenaRef<'a, TypedTerm<ConditionTerm>, A>>,
 {
-    fn condition<'a>(&'a self) -> T::SignalRef<'a, T>
+    fn condition<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::SignalRef<'a>
     where
-        T::Signal<T>: 'a,
-        T: 'a,
+        <WasmExpression<'heap, A> as Expression>::Signal: 'a,
+        WasmExpression<'heap, A>: 'a,
     {
-        <ArenaRef<'heap, EffectTerm, A> as EffectTermType<T>>::condition(&self.as_inner())
+        <ArenaRef<'heap, EffectTerm, A> as EffectTermType<WasmExpression<'heap, A>>>::condition(
+            &self.as_inner(),
+        )
     }
 }
 
@@ -81,7 +80,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, EffectTerm, A> {
         0
     }
     fn dynamic_dependencies(&self, _deep: bool) -> DependencyList {
-        DependencyList::of(self.condition().as_deref().id())
+        DependencyList::of(self.condition().as_value().id())
     }
     fn has_dynamic_dependencies(&self, _deep: bool) -> bool {
         true
@@ -118,7 +117,7 @@ impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, EffectTerm, A> {}
 
 impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, EffectTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_deref(), f)
+        std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 

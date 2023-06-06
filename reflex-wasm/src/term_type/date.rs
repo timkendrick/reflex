@@ -5,7 +5,7 @@
 use std::collections::HashSet;
 
 use chrono::{DateTime, NaiveDateTime, SecondsFormat, Utc};
-use reflex::core::{DependencyList, GraphNode, RefType, SerializeJson, StackOffset};
+use reflex::core::{DependencyList, GraphNode, SerializeJson, StackOffset};
 use serde_json::Value as JsonValue;
 
 use crate::{
@@ -45,7 +45,7 @@ impl From<DateTerm> for i64 {
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, DateTerm, A> {
     pub fn timestamp(&self) -> i64 {
-        i64::from(*self.as_deref())
+        i64::from(*self.as_value())
     }
 }
 
@@ -101,13 +101,13 @@ impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, DateTerm, A> {}
 
 impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, DateTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_deref(), f)
+        std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
 impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, DateTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let timestamp = i64::from(*self.as_deref());
+        let timestamp = i64::from(*self.as_value());
         let seconds = timestamp / 1000;
         let millis = timestamp % 10;
         let nanos = millis * 1000;

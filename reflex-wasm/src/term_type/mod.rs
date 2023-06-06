@@ -5,7 +5,7 @@
 use std::{collections::HashSet, marker::PhantomData};
 
 use reflex::{
-    core::{Arity, DependencyList, Expression, GraphNode, RefType, SerializeJson, StackOffset},
+    core::{Arity, DependencyList, Expression, GraphNode, NodeId, SerializeJson, StackOffset},
     hash::HashId,
 };
 use serde_json::Value as JsonValue;
@@ -660,8 +660,8 @@ impl<'a> Into<Option<&'a ZipIteratorTerm>> for &'a TermType {
 }
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, Term, A> {
-    pub(crate) fn arity(&self) -> Option<Arity> {
-        match &self.as_deref().value {
+    pub fn arity(&self) -> Option<Arity> {
+        match &self.as_value().value {
             TermType::Builtin(term) => ArenaRef::new(self.arena, term).arity(),
             TermType::Compiled(term) => Some(ArenaRef::new(self.arena, term).arity()),
             TermType::Constructor(term) => Some(ArenaRef::new(self.arena, term).arity()),
@@ -678,7 +678,7 @@ impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, Term, A> {
         if self.value.header.hash != other.value.header.hash {
             return false;
         }
-        match (&self.as_deref().value, &other.as_deref().value) {
+        match (&self.as_value().value, &other.as_value().value) {
             (TermType::Application(left), TermType::Application(right)) => {
                 ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
             }
@@ -799,55 +799,60 @@ impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, Term, A> {
             (TermType::ZipIterator(left), TermType::ZipIterator(right)) => {
                 ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
             }
+            _ => false,
         }
     }
 }
 
+pub(crate) type WasmExpression<'heap, A> = ArenaRef<'heap, Term, A>;
+
 impl<'heap, A: ArenaAllocator> Expression for ArenaRef<'heap, Term, A> {
     type String = ArenaRef<'heap, TypedTerm<StringTerm>, A>;
     type Builtin = Stdlib;
-    type Signal<T: Expression> = ArenaRef<'heap, TypedTerm<ConditionTerm>, A>;
-    type SignalList<T: Expression> = ArenaRef<'heap, TypedTerm<TreeTerm>, A>;
-    type StructPrototype<T: Expression> = ArenaRef<'heap, TypedTerm<ListTerm>, A>;
-    type ExpressionList<T: Expression> = ArenaRef<'heap, TypedTerm<ListTerm>, A>;
+    type Signal = ArenaRef<'heap, TypedTerm<ConditionTerm>, A>;
+    type SignalList = ArenaRef<'heap, TypedTerm<TreeTerm>, A>;
+    type StructPrototype = ArenaRef<'heap, TypedTerm<ListTerm>, A>;
+    type ExpressionList = ArenaRef<'heap, TypedTerm<ListTerm>, A>;
     type NilTerm = ArenaRef<'heap, TypedTerm<NilTerm>, A>;
     type BooleanTerm = ArenaRef<'heap, TypedTerm<BooleanTerm>, A>;
     type IntTerm = ArenaRef<'heap, TypedTerm<IntTerm>, A>;
     type FloatTerm = ArenaRef<'heap, TypedTerm<FloatTerm>, A>;
-    type StringTerm<T: Expression> = ArenaRef<'heap, TypedTerm<StringTerm>, A>;
+    type StringTerm = ArenaRef<'heap, TypedTerm<StringTerm>, A>;
     type SymbolTerm = ArenaRef<'heap, TypedTerm<SymbolTerm>, A>;
     type VariableTerm = ArenaRef<'heap, TypedTerm<VariableTerm>, A>;
-    type EffectTerm<T: Expression> = ArenaRef<'heap, TypedTerm<EffectTerm>, A>;
-    type LetTerm<T: Expression> = ArenaRef<'heap, TypedTerm<LetTerm>, A>;
-    type LambdaTerm<T: Expression> = ArenaRef<'heap, TypedTerm<LambdaTerm>, A>;
-    type ApplicationTerm<T: Expression> = ArenaRef<'heap, TypedTerm<ApplicationTerm>, A>;
-    type PartialApplicationTerm<T: Expression> = ArenaRef<'heap, TypedTerm<PartialTerm>, A>;
+    type EffectTerm = ArenaRef<'heap, TypedTerm<EffectTerm>, A>;
+    type LetTerm = ArenaRef<'heap, TypedTerm<LetTerm>, A>;
+    type LambdaTerm = ArenaRef<'heap, TypedTerm<LambdaTerm>, A>;
+    type ApplicationTerm = ArenaRef<'heap, TypedTerm<ApplicationTerm>, A>;
+    type PartialApplicationTerm = ArenaRef<'heap, TypedTerm<PartialTerm>, A>;
     // FIXME: implement recursive term type
-    type RecursiveTerm<T: Expression> = ArenaRef<'heap, TypedTerm<NilTerm>, A>;
-    type BuiltinTerm<T: Expression> = ArenaRef<'heap, TypedTerm<BuiltinTerm>, A>;
-    type CompiledFunctionTerm<T: Expression> = ArenaRef<'heap, TypedTerm<CompiledTerm>, A>;
-    type RecordTerm<T: Expression> = ArenaRef<'heap, TypedTerm<RecordTerm>, A>;
-    type ConstructorTerm<T: Expression> = ArenaRef<'heap, TypedTerm<ConstructorTerm>, A>;
-    type ListTerm<T: Expression> = ArenaRef<'heap, TypedTerm<ListTerm>, A>;
-    type HashmapTerm<T: Expression> = ArenaRef<'heap, TypedTerm<HashmapTerm>, A>;
-    type HashsetTerm<T: Expression> = ArenaRef<'heap, TypedTerm<HashsetTerm>, A>;
-    type SignalTerm<T: Expression> = ArenaRef<'heap, TypedTerm<SignalTerm>, A>;
+    type RecursiveTerm = ArenaRef<'heap, TypedTerm<NilTerm>, A>;
+    type BuiltinTerm = ArenaRef<'heap, TypedTerm<BuiltinTerm>, A>;
+    type CompiledFunctionTerm = ArenaRef<'heap, TypedTerm<CompiledTerm>, A>;
+    type RecordTerm = ArenaRef<'heap, TypedTerm<RecordTerm>, A>;
+    type ConstructorTerm = ArenaRef<'heap, TypedTerm<ConstructorTerm>, A>;
+    type ListTerm = ArenaRef<'heap, TypedTerm<ListTerm>, A>;
+    type HashmapTerm = ArenaRef<'heap, TypedTerm<HashmapTerm>, A>;
+    type HashsetTerm = ArenaRef<'heap, TypedTerm<HashsetTerm>, A>;
+    type SignalTerm = ArenaRef<'heap, TypedTerm<SignalTerm>, A>;
 
-    type StringRef<'a> = ArenaRef<'a, TypedTerm<StringTerm>, A> where Self: 'a;
-    type SignalRef<'a, T: Expression> = ArenaRef<'a, TypedTerm<ConditionTerm>, A> where T: 'a, Self::Signal<T>: 'a, Self: 'a;
-    type StructPrototypeRef<'a, T: Expression> = ArenaRef<'a, TypedTerm<ListTerm>, A> where T: 'a, Self::StructPrototype<T>: 'a, Self: 'a;
-    type SignalListRef<'a, T: Expression> = ArenaRef<'a, TypedTerm<TreeTerm>, A> where T: 'a, Self::SignalList<T>: 'a, Self: 'a;
-    type ExpressionListRef<'a, T: Expression> = ArenaRef<'a, TypedTerm<ListTerm>, A> where T: 'a, Self::ExpressionList<T>: 'a, Self: 'a;
-    type ExpressionRef<'a> = ArenaRef<'a, Term, A> where Self: 'a;
+    type StringRef<'a> = ArenaRef<'heap, TypedTerm<StringTerm>, A> where Self: 'a;
+    type SignalRef<'a> = ArenaRef<'heap, TypedTerm<ConditionTerm>, A> where Self::Signal: 'a, Self: 'a;
+    type StructPrototypeRef<'a> = ArenaRef<'heap, TypedTerm<ListTerm>, A> where Self::StructPrototype: 'a, Self: 'a;
+    type SignalListRef<'a> = ArenaRef<'heap, TypedTerm<TreeTerm>, A> where Self::SignalList: 'a, Self: 'a;
+    type ExpressionListRef<'a> = ArenaRef<'heap, TypedTerm<ListTerm>, A> where Self::ExpressionList: 'a, Self: 'a;
+    type ExpressionRef<'a> = ArenaRef<'heap, Term, A> where Self: 'a;
+}
 
+impl<'heap, A: ArenaAllocator> NodeId for ArenaRef<'heap, Term, A> {
     fn id(&self) -> HashId {
-        self.as_deref().id()
+        self.as_value().id()
     }
 }
 
 impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, Term, A> {
     fn size(&self) -> usize {
-        match &self.as_deref().value {
+        match &self.as_value().value {
             TermType::Application(term) => ArenaRef::new(self.arena, term).size(),
             TermType::Boolean(term) => ArenaRef::new(self.arena, term).size(),
             TermType::Builtin(term) => ArenaRef::new(self.arena, term).size(),
@@ -891,7 +896,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, Term, A> {
         }
     }
     fn capture_depth(&self) -> StackOffset {
-        match &self.as_deref().value {
+        match &self.as_value().value {
             TermType::Application(term) => ArenaRef::new(self.arena, term).capture_depth(),
             TermType::Boolean(term) => ArenaRef::new(self.arena, term).capture_depth(),
             TermType::Builtin(term) => ArenaRef::new(self.arena, term).capture_depth(),
@@ -937,7 +942,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, Term, A> {
         }
     }
     fn free_variables(&self) -> HashSet<StackOffset> {
-        match &self.as_deref().value {
+        match &self.as_value().value {
             TermType::Application(term) => ArenaRef::new(self.arena, term).free_variables(),
             TermType::Boolean(term) => ArenaRef::new(self.arena, term).free_variables(),
             TermType::Builtin(term) => ArenaRef::new(self.arena, term).free_variables(),
@@ -983,7 +988,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, Term, A> {
         }
     }
     fn count_variable_usages(&self, offset: StackOffset) -> usize {
-        match &self.as_deref().value {
+        match &self.as_value().value {
             TermType::Application(term) => {
                 ArenaRef::new(self.arena, term).count_variable_usages(offset)
             }
@@ -1079,7 +1084,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, Term, A> {
         }
     }
     fn dynamic_dependencies(&self, deep: bool) -> DependencyList {
-        match &self.as_deref().value {
+        match &self.as_value().value {
             TermType::Application(term) => {
                 ArenaRef::new(self.arena, term).dynamic_dependencies(deep)
             }
@@ -1157,7 +1162,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, Term, A> {
         }
     }
     fn has_dynamic_dependencies(&self, deep: bool) -> bool {
-        match &self.as_deref().value {
+        match &self.as_value().value {
             TermType::Application(term) => {
                 ArenaRef::new(self.arena, term).has_dynamic_dependencies(deep)
             }
@@ -1265,7 +1270,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, Term, A> {
         }
     }
     fn is_static(&self) -> bool {
-        match &self.as_deref().value {
+        match &self.as_value().value {
             TermType::Application(term) => ArenaRef::new(self.arena, term).is_static(),
             TermType::Boolean(term) => ArenaRef::new(self.arena, term).is_static(),
             TermType::Builtin(term) => ArenaRef::new(self.arena, term).is_static(),
@@ -1309,7 +1314,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, Term, A> {
         }
     }
     fn is_atomic(&self) -> bool {
-        match &self.as_deref().value {
+        match &self.as_value().value {
             TermType::Application(term) => ArenaRef::new(self.arena, term).is_atomic(),
             TermType::Boolean(term) => ArenaRef::new(self.arena, term).is_atomic(),
             TermType::Builtin(term) => ArenaRef::new(self.arena, term).is_atomic(),
@@ -1353,7 +1358,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, Term, A> {
         }
     }
     fn is_complex(&self) -> bool {
-        match &self.as_deref().value {
+        match &self.as_value().value {
             TermType::Application(term) => ArenaRef::new(self.arena, term).is_complex(),
             TermType::Boolean(term) => ArenaRef::new(self.arena, term).is_complex(),
             TermType::Builtin(term) => ArenaRef::new(self.arena, term).is_complex(),
@@ -1400,7 +1405,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, Term, A> {
 
 impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, Term, A> {
     fn to_json(&self) -> Result<JsonValue, String> {
-        match &self.as_deref().value {
+        match &self.as_value().value {
             TermType::Application(term) => ArenaRef::new(self.arena, term).to_json(),
             TermType::Boolean(term) => ArenaRef::new(self.arena, term).to_json(),
             TermType::Builtin(term) => ArenaRef::new(self.arena, term).to_json(),
@@ -1447,7 +1452,7 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, Term, A> {
         if self.id() == target.id() {
             return Ok(None);
         }
-        match (&self.as_deref().value, &target.as_deref().value) {
+        match (&self.as_value().value, &target.as_value().value) {
             (TermType::Application(term), TermType::Application(target)) => {
                 ArenaRef::new(self.arena, term).patch(&ArenaRef::new(self.arena, target))
             }
@@ -1575,7 +1580,7 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, Term, A> {
 
 impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, Term, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self.as_deref().value {
+        match &self.as_value().value {
             TermType::Application(term) => {
                 std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
             }
@@ -1656,7 +1661,7 @@ impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, Term, A> {
 
 impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, Term, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self.as_deref().value {
+        match &self.as_value().value {
             TermType::Application(term) => {
                 std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f)
             }
@@ -1738,7 +1743,7 @@ impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, Term, A> {
 }
 impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, TermType, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.as_deref() {
+        match self.as_value() {
             TermType::Application(term) => {
                 std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
             }
@@ -1826,7 +1831,7 @@ impl TermType {
 }
 
 #[repr(C)]
-struct TypedTerm<V> {
+pub struct TypedTerm<V> {
     term: Term,
     _type: PhantomData<V>,
 }
@@ -1910,7 +1915,12 @@ impl<V> TypedTerm<V> {
 
 impl<'heap, A: ArenaAllocator, V> ArenaRef<'heap, TypedTerm<V>, A> {
     pub fn as_inner(&self) -> ArenaRef<'heap, V, A> {
-        ArenaRef::new(self.arena, self.as_deref().get_inner())
+        ArenaRef::new(self.arena, self.as_value().get_inner())
+    }
+    pub(crate) fn as_term(&self) -> ArenaRef<'heap, Term, A> {
+        unsafe {
+            std::mem::transmute::<ArenaRef<'heap, TypedTerm<V>, A>, ArenaRef<'heap, Term, A>>(*self)
+        }
     }
 }
 

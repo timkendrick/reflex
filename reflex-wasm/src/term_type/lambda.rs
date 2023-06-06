@@ -5,8 +5,7 @@
 use std::collections::HashSet;
 
 use reflex::core::{
-    Arity, DependencyList, Expression, GraphNode, LambdaTermType, RefType, SerializeJson,
-    StackOffset,
+    Arity, DependencyList, Expression, GraphNode, LambdaTermType, SerializeJson, StackOffset,
 };
 use serde_json::Value as JsonValue;
 
@@ -16,6 +15,8 @@ use crate::{
     term_type::TypedTerm,
     ArenaRef, Term, TermPointer,
 };
+
+use super::WasmExpression;
 
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
@@ -36,44 +37,45 @@ impl TermHash for LambdaTerm {
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, LambdaTerm, A> {
     pub fn num_args(&self) -> u32 {
-        self.as_deref().num_args
+        self.as_value().num_args
     }
     pub fn body(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_deref().body))
+        ArenaRef::new(self.arena, self.arena.get(self.as_value().body))
     }
     pub fn arity(&self) -> Arity {
         Arity::lazy(self.num_args() as usize, 0, false)
     }
 }
 
-impl<'heap, T: Expression, A: ArenaAllocator> LambdaTermType<T> for ArenaRef<'heap, LambdaTerm, A>
-where
-    for<'a> T::ExpressionRef<'a>: From<ArenaRef<'a, Term, A>>,
+impl<'heap, A: ArenaAllocator> LambdaTermType<WasmExpression<'heap, A>>
+    for ArenaRef<'heap, LambdaTerm, A>
 {
     fn num_args<'a>(&'a self) -> StackOffset {
         self.num_args() as StackOffset
     }
-    fn body<'a>(&'a self) -> T::ExpressionRef<'a>
+    fn body<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::ExpressionRef<'a>
     where
-        T: 'a,
+        WasmExpression<'heap, A>: 'a,
     {
         self.body().into()
     }
 }
 
-impl<'heap, T: Expression, A: ArenaAllocator> LambdaTermType<T>
+impl<'heap, A: ArenaAllocator> LambdaTermType<WasmExpression<'heap, A>>
     for ArenaRef<'heap, TypedTerm<LambdaTerm>, A>
-where
-    for<'a> T::ExpressionRef<'a>: From<ArenaRef<'a, Term, A>>,
 {
     fn num_args<'a>(&'a self) -> StackOffset {
-        <ArenaRef<'heap, LambdaTerm, A> as LambdaTermType<T>>::num_args(&self.as_inner())
+        <ArenaRef<'heap, LambdaTerm, A> as LambdaTermType<WasmExpression<'heap, A>>>::num_args(
+            &self.as_inner(),
+        )
     }
-    fn body<'a>(&'a self) -> T::ExpressionRef<'a>
+    fn body<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::ExpressionRef<'a>
     where
-        T: 'a,
+        WasmExpression<'heap, A>: 'a,
     {
-        <ArenaRef<'heap, LambdaTerm, A> as LambdaTermType<T>>::body(&self.as_inner())
+        <ArenaRef<'heap, LambdaTerm, A> as LambdaTermType<WasmExpression<'heap, A>>>::body(
+            &self.as_inner(),
+        )
     }
 }
 
@@ -146,7 +148,7 @@ impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, LambdaTerm, A> {}
 
 impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, LambdaTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_deref(), f)
+        std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 

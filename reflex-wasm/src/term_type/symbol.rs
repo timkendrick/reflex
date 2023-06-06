@@ -5,7 +5,7 @@
 use std::collections::HashSet;
 
 use reflex::core::{
-    DependencyList, GraphNode, RefType, SerializeJson, StackOffset, SymbolId, SymbolTermType,
+    DependencyList, GraphNode, SerializeJson, StackOffset, SymbolId, SymbolTermType,
 };
 use serde_json::Value as JsonValue;
 
@@ -33,8 +33,8 @@ impl TermHash for SymbolTerm {
 }
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, SymbolTerm, A> {
-    fn id(&self) -> u32 {
-        self.as_deref().id
+    pub fn id(&self) -> u32 {
+        self.as_value().id
     }
 }
 
@@ -101,7 +101,7 @@ impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, SymbolTerm, A> {}
 
 impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, SymbolTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_deref(), f)
+        std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 

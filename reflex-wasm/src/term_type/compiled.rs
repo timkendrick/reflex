@@ -9,7 +9,7 @@ use std::{
 
 use reflex::{
     core::{
-        Arity, CompiledFunctionTermType, DependencyList, GraphNode, InstructionPointer, RefType,
+        Arity, CompiledFunctionTermType, DependencyList, GraphNode, InstructionPointer,
         SerializeJson, StackOffset,
     },
     hash::HashId,
@@ -73,10 +73,10 @@ impl TermHash for CompiledTerm {
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, CompiledTerm, A> {
     pub fn target(&self) -> CompiledFunctionIndex {
-        self.as_deref().target
+        self.as_value().target
     }
     pub fn num_args(&self) -> u32 {
-        self.as_deref().num_args
+        self.as_value().num_args
     }
     pub fn arity(&self) -> Arity {
         Arity::lazy(self.num_args() as usize, 0, false)
@@ -172,7 +172,7 @@ impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, CompiledTerm, A> {}
 
 impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, CompiledTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_deref(), f)
+        std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 

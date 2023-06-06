@@ -4,7 +4,7 @@
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use std::collections::HashSet;
 
-use reflex::core::{DependencyList, GraphNode, RefType, SerializeJson, StackOffset};
+use reflex::core::{DependencyList, GraphNode, SerializeJson, StackOffset};
 use serde_json::Value as JsonValue;
 
 use crate::{
@@ -31,11 +31,11 @@ impl TermHash for RangeIteratorTerm {
 }
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, RangeIteratorTerm, A> {
-    fn offset(&self) -> i32 {
-        self.as_deref().offset
+    pub fn offset(&self) -> i32 {
+        self.as_value().offset
     }
-    fn length(&self) -> u32 {
-        self.as_deref().length
+    pub fn length(&self) -> u32 {
+        self.as_value().length
     }
 }
 
@@ -60,7 +60,7 @@ impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, RangeIteratorTerm, A> {}
 
 impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, RangeIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_deref(), f)
+        std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 

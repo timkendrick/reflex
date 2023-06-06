@@ -9,8 +9,8 @@ use std::{
 
 use reflex::{
     core::{
-        DependencyList, Expression, ExpressionListType, GraphNode, ListTermType, RefType,
-        SerializeJson, StackOffset, StructPrototypeType,
+        DependencyList, Expression, ExpressionListType, GraphNode, ListTermType, SerializeJson,
+        StackOffset, StructPrototypeType,
     },
     hash::HashId,
 };
@@ -24,6 +24,8 @@ use crate::{
     term_type::TypedTerm,
     ArenaRef, Array, ArrayIter, IntoArenaRefIterator, Term, TermPointer,
 };
+
+use super::WasmExpression;
 
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
@@ -73,11 +75,11 @@ impl ListTerm {
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, ListTerm, A> {
     pub fn items(&self) -> ArenaRef<'heap, Array<TermPointer>, A> {
-        ArenaRef::new(self.arena, &self.as_deref().items)
+        ArenaRef::new(self.arena, &self.as_value().items)
     }
     pub fn iter<'a>(
         &'a self,
-    ) -> IntoArenaRefIterator<'a, Term, A, Copied<ArrayIter<'a, TermPointer>>> {
+    ) -> IntoArenaRefIterator<'heap, Term, A, Copied<ArrayIter<'heap, TermPointer>>> {
         IntoArenaRefIterator::new(self.arena, self.items().iter().copied())
     }
     pub fn len(&self) -> usize {
@@ -130,56 +132,53 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, ListTerm, A> {
     }
 }
 
-impl<'heap, T: Expression, A: ArenaAllocator> ListTermType<T>
+impl<'heap, A: ArenaAllocator> ListTermType<WasmExpression<'heap, A>>
     for ArenaRef<'heap, TypedTerm<ListTerm>, A>
-where
-    for<'a> T::ExpressionListRef<'a, T>: From<ArenaRef<'a, TypedTerm<ListTerm>, A>>,
 {
-    fn items<'a>(&'a self) -> T::ExpressionListRef<'a, T>
+    fn items<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::ExpressionListRef<'a>
     where
-        T::ExpressionList<T>: 'a,
-        T: 'a,
+        <WasmExpression<'heap, A> as Expression>::ExpressionList: 'a,
+        WasmExpression<'heap, A>: 'a,
     {
         (*self).into()
     }
 }
 
-impl<'heap, T: Expression, A: ArenaAllocator> StructPrototypeType<T>
+impl<'heap, A: ArenaAllocator> StructPrototypeType<WasmExpression<'heap, A>>
     for ArenaRef<'heap, TypedTerm<ListTerm>, A>
-where
-    for<'a> T::ExpressionListRef<'a, T>: From<ArenaRef<'a, TypedTerm<ListTerm>, A>>,
 {
-    fn keys<'a>(&'a self) -> T::ExpressionListRef<'a, T>
+    fn keys<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::ExpressionListRef<'a>
     where
-        T::ExpressionList<T>: 'a,
-        T: 'a,
+        <WasmExpression<'heap, A> as Expression>::ExpressionList: 'a,
+        WasmExpression<'heap, A>: 'a,
     {
         (*self).into()
     }
 }
 
-impl<'heap, T: Expression, A: ArenaAllocator> ExpressionListType<T>
+impl<'heap, A: ArenaAllocator> ExpressionListType<WasmExpression<'heap, A>>
     for ArenaRef<'heap, TypedTerm<ListTerm>, A>
-where
-    for<'a> T::ExpressionRef<'a>: From<ArenaRef<'a, Term, A>>,
 {
     type Iterator<'a> = MapIntoIterator<
-        IntoArenaRefIterator<'a, Term, A, Copied<ArrayIter<'a, TermPointer>>>,
-        ArenaRef<'a, Term, A>,
-        T::ExpressionRef<'a>,
+        IntoArenaRefIterator<'heap, Term, A, Copied<ArrayIter<'heap, TermPointer>>>,
+        ArenaRef<'heap, Term, A>,
+        <WasmExpression<'heap, A> as Expression>::ExpressionRef<'a>,
     >
     where
-        T: 'a,
+        WasmExpression<'heap, A>: 'a,
         Self: 'a;
     fn id(&self) -> HashId {
-        self.as_deref().id()
+        self.as_value().id()
     }
     fn len(&self) -> usize {
         self.as_inner().items().len()
     }
-    fn get<'a>(&'a self, index: usize) -> Option<T::ExpressionRef<'a>>
+    fn get<'a>(
+        &'a self,
+        index: usize,
+    ) -> Option<<WasmExpression<'heap, A> as Expression>::ExpressionRef<'a>>
     where
-        T: 'a,
+        WasmExpression<'heap, A>: 'a,
     {
         self.as_inner()
             .items()
@@ -189,7 +188,7 @@ where
     }
     fn iter<'a>(&'a self) -> Self::Iterator<'a>
     where
-        T: 'a,
+        WasmExpression<'heap, A>: 'a,
     {
         MapIntoIterator::new(self.as_inner().iter())
     }
@@ -244,7 +243,7 @@ impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, ListTerm, A> {}
 
 impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, ListTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_deref(), f)
+        std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 

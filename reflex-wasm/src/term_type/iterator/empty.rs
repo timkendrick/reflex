@@ -4,7 +4,7 @@
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use std::collections::HashSet;
 
-use reflex::core::{DependencyList, GraphNode, RefType, SerializeJson, StackOffset};
+use reflex::core::{DependencyList, GraphNode, SerializeJson, StackOffset};
 use serde_json::Value as JsonValue;
 
 use crate::{
@@ -40,7 +40,7 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, EmptyIteratorTe
 }
 
 impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, EmptyIteratorTerm, A> {
-    fn eq(&self, other: &Self) -> bool {
+    fn eq(&self, _other: &Self) -> bool {
         true
     }
 }
@@ -48,7 +48,7 @@ impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, EmptyIteratorTerm, A> {}
 
 impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, EmptyIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_deref(), f)
+        std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 

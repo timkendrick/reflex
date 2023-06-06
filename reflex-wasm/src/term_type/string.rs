@@ -6,7 +6,7 @@ use std::{collections::HashSet, slice};
 
 use reflex::{
     core::{
-        DependencyList, Expression, GraphNode, RefType, SerializeJson, StackOffset, StringTermType,
+        DependencyList, Expression, GraphNode, SerializeJson, StackOffset, StringTermType,
         StringValue,
     },
     hash::HashId,
@@ -19,6 +19,8 @@ use crate::{
     term_type::{TermType, TypedTerm},
     ArenaRef, Array, Term, TermPointer,
 };
+
+use super::WasmExpression;
 
 #[derive(Clone, Copy)]
 #[repr(C)]
@@ -107,16 +109,16 @@ impl std::fmt::Display for StringTerm {
 }
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, StringTerm, A> {
-    fn string_hash(&self) -> HashId {
+    pub fn string_hash(&self) -> HashId {
         // FIXME: Convert to 64-bit hashes
         u32::from(
-            self.as_deref()
+            self.as_value()
                 .hash(TermHasher::default(), self.arena)
                 .finish(),
         ) as HashId
     }
-    fn as_str(&self) -> &str {
-        self.as_deref().as_str()
+    pub fn as_str(&self) -> &str {
+        self.as_value().as_str()
     }
 }
 
@@ -127,7 +129,7 @@ impl<'heap, A: ArenaAllocator> StringValue for ArenaRef<'heap, StringTerm, A> {
     fn as_str(&self) -> &str {
         self.as_str()
     }
-    fn from_static(_self: Option<Self>, value: &'static str) -> Option<Self> {
+    fn from_static(_self: Option<Self>, _value: &'static str) -> Option<Self> {
         // FIXME: Implement StringValue::from_static() for WASM StringTerm type
         None
     }
@@ -138,23 +140,33 @@ impl<'heap, A: ArenaAllocator> StringValue for ArenaRef<'heap, TypedTerm<StringT
         <ArenaRef<'heap, StringTerm, A> as StringValue>::id(&self.as_inner())
     }
     fn as_str(&self) -> &str {
-        <ArenaRef<'heap, StringTerm, A> as StringValue>::as_str(&self.as_inner())
+        self.as_inner().as_value().as_str()
     }
-    fn from_static(_self: Option<Self>, value: &'static str) -> Option<Self> {
+    fn from_static(_self: Option<Self>, _value: &'static str) -> Option<Self> {
         // FIXME: Implement StringValue::from_static() for WASM StringTerm type
         None
     }
 }
 
-impl<'heap, T: Expression, A: ArenaAllocator> StringTermType<T>
+// impl<'heap, A: ArenaAllocator> StringTermType<ArenaRef<'heap, Term, A>>
+//     for ArenaRef<'heap, TypedTerm<StringTerm>, A>
+// {
+//     fn value<'a>(&'a self) -> <ArenaRef<'heap, Term, A> as Expression>::StringRef<'a>
+//     where
+//         <ArenaRef<'heap, Term, A> as Expression>::String: 'a,
+//         ArenaRef<'heap, Term, A>: 'a,
+//     {
+//         (*self).into()
+//     }
+// }
+
+impl<'heap, A: ArenaAllocator> StringTermType<WasmExpression<'heap, A>>
     for ArenaRef<'heap, TypedTerm<StringTerm>, A>
-where
-    for<'a> T::StringRef<'a>: From<ArenaRef<'a, TypedTerm<StringTerm>, A>>,
 {
-    fn value<'a>(&'a self) -> T::StringRef<'a>
+    fn value<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::StringRef<'a>
     where
-        T::String: 'a,
-        T: 'a,
+        <WasmExpression<'heap, A> as Expression>::String: 'a,
+        WasmExpression<'heap, A>: 'a,
     {
         (*self).into()
     }
@@ -205,20 +217,20 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, StringTerm, A> 
 
 impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, StringTerm, A> {
     fn eq(&self, other: &Self) -> bool {
-        self.as_deref() == other.as_deref()
+        self.as_value() == other.as_value()
     }
 }
 impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, StringTerm, A> {}
 
 impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, StringTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_deref(), f)
+        std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
 impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, StringTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_deref(), f)
+        std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 

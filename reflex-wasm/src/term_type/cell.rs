@@ -4,7 +4,7 @@
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use std::collections::HashSet;
 
-use reflex::core::{DependencyList, GraphNode, RefType, SerializeJson, StackOffset};
+use reflex::core::{DependencyList, GraphNode, SerializeJson, StackOffset};
 use serde_json::Value as JsonValue;
 
 use crate::{
@@ -53,7 +53,7 @@ impl CellTerm {
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, CellTerm, A> {
     pub fn fields(&self) -> impl Iterator<Item = u32> + '_ {
-        self.as_deref().fields.iter().copied()
+        self.as_value().fields.iter().copied()
     }
 }
 
@@ -101,14 +101,14 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, CellTerm, A> {
 
 impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, CellTerm, A> {
     fn eq(&self, other: &Self) -> bool {
-        std::ptr::eq(&self.as_deref().fields, &other.as_deref().fields)
+        std::ptr::eq(&self.as_value().fields, &other.as_value().fields)
     }
 }
 impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, CellTerm, A> {}
 
 impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, CellTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_deref(), f)
+        std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 

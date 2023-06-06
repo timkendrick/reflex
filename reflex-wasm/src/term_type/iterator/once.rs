@@ -4,7 +4,7 @@
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use std::collections::HashSet;
 
-use reflex::core::{DependencyList, GraphNode, RefType, SerializeJson, StackOffset};
+use reflex::core::{DependencyList, GraphNode, SerializeJson, StackOffset};
 use serde_json::Value as JsonValue;
 
 use crate::{
@@ -30,8 +30,8 @@ impl TermHash for OnceIteratorTerm {
 }
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, OnceIteratorTerm, A> {
-    fn value(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_deref().value))
+    pub fn value(&self) -> ArenaRef<'heap, Term, A> {
+        ArenaRef::new(self.arena, self.arena.get(self.as_value().value))
     }
 }
 
@@ -56,7 +56,7 @@ impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, OnceIteratorTerm, A> {}
 
 impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, OnceIteratorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_deref(), f)
+        std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 

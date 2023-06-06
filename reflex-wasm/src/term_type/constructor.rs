@@ -5,8 +5,7 @@
 use std::collections::HashSet;
 
 use reflex::core::{
-    Arity, ConstructorTermType, DependencyList, Expression, GraphNode, RefType, SerializeJson,
-    StackOffset,
+    Arity, ConstructorTermType, DependencyList, Expression, GraphNode, SerializeJson, StackOffset,
 };
 use serde_json::Value as JsonValue;
 
@@ -17,7 +16,7 @@ use crate::{
     ArenaRef, TermPointer,
 };
 
-use super::ListTerm;
+use super::{ListTerm, WasmExpression};
 
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
@@ -37,38 +36,34 @@ impl TermHash for ConstructorTerm {
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, ConstructorTerm, A> {
     pub fn keys(&self) -> ArenaRef<'heap, TypedTerm<ListTerm>, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_deref().keys))
+        ArenaRef::new(self.arena, self.arena.get(self.as_value().keys))
     }
     pub fn arity(&self) -> Arity {
         Arity::lazy(self.keys().as_inner().len(), 0, false)
     }
 }
 
-impl<'heap, T: Expression, A: ArenaAllocator> ConstructorTermType<T>
+impl<'heap, A: ArenaAllocator> ConstructorTermType<WasmExpression<'heap, A>>
     for ArenaRef<'heap, ConstructorTerm, A>
-where
-    for<'a> T::StructPrototypeRef<'a, T>: From<ArenaRef<'a, TypedTerm<ListTerm>, A>>,
 {
-    fn prototype<'a>(&'a self) -> T::StructPrototypeRef<'a, T>
+    fn prototype<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::StructPrototypeRef<'a>
     where
-        T::StructPrototype<T>: 'a,
-        T: 'a,
+        <WasmExpression<'heap, A> as Expression>::StructPrototype: 'a,
+        WasmExpression<'heap, A>: 'a,
     {
         self.keys().into()
     }
 }
 
-impl<'heap, T: Expression, A: ArenaAllocator> ConstructorTermType<T>
+impl<'heap, A: ArenaAllocator> ConstructorTermType<WasmExpression<'heap, A>>
     for ArenaRef<'heap, TypedTerm<ConstructorTerm>, A>
-where
-    for<'a> T::StructPrototypeRef<'a, T>: From<ArenaRef<'a, TypedTerm<ListTerm>, A>>,
 {
-    fn prototype<'a>(&'a self) -> T::StructPrototypeRef<'a, T>
+    fn prototype<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::StructPrototypeRef<'a>
     where
-        T::StructPrototype<T>: 'a,
-        T: 'a,
+        <WasmExpression<'heap, A> as Expression>::StructPrototype: 'a,
+        WasmExpression<'heap, A>: 'a,
     {
-        <ArenaRef<'heap, ConstructorTerm, A> as ConstructorTermType<T>>::prototype(&self.as_inner())
+        <ArenaRef<'heap, ConstructorTerm, A> as ConstructorTermType<WasmExpression<'heap, A>>>::prototype(&self.as_inner())
     }
 }
 
@@ -123,7 +118,7 @@ impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, ConstructorTerm, A> {}
 
 impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, ConstructorTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_deref(), f)
+        std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 

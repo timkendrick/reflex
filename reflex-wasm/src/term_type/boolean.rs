@@ -4,9 +4,7 @@
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use std::collections::HashSet;
 
-use reflex::core::{
-    BooleanTermType, DependencyList, GraphNode, RefType, SerializeJson, StackOffset,
-};
+use reflex::core::{BooleanTermType, DependencyList, GraphNode, SerializeJson, StackOffset};
 use serde_json::Value as JsonValue;
 
 use crate::{
@@ -47,7 +45,7 @@ impl Into<bool> for BooleanTerm {
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, BooleanTerm, A> {
     pub fn value(&self) -> bool {
-        self.as_deref().value != 0
+        self.as_value().value != 0
     }
 }
 
@@ -115,7 +113,7 @@ impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, BooleanTerm, A> {}
 
 impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, BooleanTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_deref(), f)
+        std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 

@@ -5,8 +5,7 @@
 use std::collections::HashSet;
 
 use reflex::core::{
-    Arity, BuiltinTermType, DependencyList, Expression, GraphNode, RefType, SerializeJson,
-    StackOffset,
+    Arity, BuiltinTermType, DependencyList, Expression, GraphNode, SerializeJson, StackOffset,
 };
 use serde_json::Value as JsonValue;
 
@@ -75,7 +74,7 @@ impl From<Stdlib> for BuiltinTerm {
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, BuiltinTerm, A> {
     pub fn target(&self) -> FunctionIndex {
-        self.as_deref().uid
+        self.as_value().uid
     }
     pub fn arity(&self) -> Option<Arity> {
         Stdlib::try_from(u32::from(self.target()))
@@ -162,7 +161,7 @@ impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, BuiltinTerm, A> {}
 
 impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, BuiltinTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_deref(), f)
+        std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 

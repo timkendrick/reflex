@@ -4,9 +4,7 @@
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use std::{collections::HashSet, iter::once};
 
-use reflex::core::{
-    DependencyList, GraphNode, RefType, SerializeJson, StackOffset, VariableTermType,
-};
+use reflex::core::{DependencyList, GraphNode, SerializeJson, StackOffset, VariableTermType};
 use serde_json::Value as JsonValue;
 
 use crate::{
@@ -34,7 +32,7 @@ impl TermHash for VariableTerm {
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, VariableTerm, A> {
     pub fn stack_offset(&self) -> u32 {
-        self.as_deref().stack_offset
+        self.as_value().stack_offset
     }
 }
 
@@ -105,7 +103,7 @@ impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, VariableTerm, A> {}
 
 impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, VariableTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_deref(), f)
+        std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 

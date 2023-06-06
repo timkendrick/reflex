@@ -4,7 +4,10 @@
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use std::collections::HashSet;
 
-use reflex::core::{DependencyList, GraphNode, NilTermType, RefType, SerializeJson, StackOffset};
+use reflex::core::{
+    DependencyList, Expression, GraphNode, NilTermType, RecursiveTermType, SerializeJson,
+    StackOffset,
+};
 use serde_json::Value as JsonValue;
 
 use crate::{
@@ -13,6 +16,8 @@ use crate::{
     term_type::TypedTerm,
     ArenaRef,
 };
+
+use super::WasmExpression;
 
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
@@ -31,6 +36,18 @@ impl TermHash for NilTerm {
 impl<'heap, A: ArenaAllocator> NilTermType for ArenaRef<'heap, NilTerm, A> {}
 
 impl<'heap, A: ArenaAllocator> NilTermType for ArenaRef<'heap, TypedTerm<NilTerm>, A> {}
+
+// FIXME: implement RecursiveTerm
+impl<'heap, A: ArenaAllocator> RecursiveTermType<WasmExpression<'heap, A>>
+    for ArenaRef<'heap, TypedTerm<NilTerm>, A>
+{
+    fn factory<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::ExpressionRef<'a>
+    where
+        WasmExpression<'heap, A>: 'a,
+    {
+        panic!("Recursive terms not current supported")
+    }
+}
 
 impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, NilTerm, A> {
     fn size(&self) -> usize {
@@ -72,7 +89,7 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, NilTerm, A> {
 }
 
 impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, NilTerm, A> {
-    fn eq(&self, other: &Self) -> bool {
+    fn eq(&self, _other: &Self) -> bool {
         true
     }
 }
@@ -80,7 +97,7 @@ impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, NilTerm, A> {}
 
 impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, NilTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_deref(), f)
+        std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 

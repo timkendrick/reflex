@@ -4,7 +4,7 @@
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use std::collections::HashSet;
 
-use reflex::core::{DependencyList, GraphNode, RefType, SerializeJson, StackOffset};
+use reflex::core::{DependencyList, GraphNode, SerializeJson, StackOffset};
 use serde_json::Value as JsonValue;
 
 use crate::{
@@ -31,7 +31,7 @@ impl TermHash for PointerTerm {
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, PointerTerm, A> {
     pub fn target(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_deref().target))
+        ArenaRef::new(self.arena, self.arena.get(self.as_value().target))
     }
 }
 
@@ -86,13 +86,13 @@ impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, PointerTerm, A> {}
 
 impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, PointerTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_deref(), f)
+        std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
 impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, PointerTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Pointer({:#x})", u32::from(self.as_deref().target))
+        write!(f, "Pointer({:#x})", u32::from(self.as_value().target))
     }
 }
 

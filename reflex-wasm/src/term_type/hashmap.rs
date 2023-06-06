@@ -5,7 +5,8 @@
 use std::{collections::HashSet, iter::once, marker::PhantomData};
 
 use reflex::core::{
-    DependencyList, Expression, GraphNode, HashmapTermType, RefType, SerializeJson, StackOffset,
+    DependencyList, Expression, GraphNode, HashmapTermType, NodeId, RefType, SerializeJson,
+    StackOffset,
 };
 use reflex_utils::MapIntoIterator;
 use serde_json::Value as JsonValue;
@@ -16,6 +17,8 @@ use crate::{
     term_type::{TermType, TypedTerm},
     ArenaRef, Array, ArrayIter, IntoArenaRefIterator, Term, TermPointer,
 };
+
+use super::WasmExpression;
 
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
@@ -119,18 +122,18 @@ impl TermHash for HashmapBucket {
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, HashmapTerm, A> {
     pub fn num_entries(&self) -> u32 {
-        self.as_deref().num_entries
+        self.as_value().num_entries
     }
     pub fn buckets(&self) -> ArenaRef<'heap, Array<HashmapBucket>, A> {
-        ArenaRef::new(self.arena, &self.as_deref().buckets)
+        ArenaRef::new(self.arena, &self.as_value().buckets)
     }
-    fn entries(&self) -> HashmapBucketsIterator<'heap, ArrayIter<'heap, HashmapBucket>> {
+    pub fn entries(&self) -> HashmapBucketsIterator<'heap, ArrayIter<'heap, HashmapBucket>> {
         HashmapBucketsIterator::new(
             self.num_entries() as usize,
-            self.buckets().as_deref().iter(),
+            self.buckets().as_value().iter(),
         )
     }
-    fn keys(
+    pub fn keys(
         &self,
     ) -> IntoArenaRefIterator<
         'heap,
@@ -138,15 +141,9 @@ impl<'heap, A: ArenaAllocator> ArenaRef<'heap, HashmapTerm, A> {
         A,
         HashmapBucketKeysIterator<'heap, ArrayIter<'heap, HashmapBucket>>,
     > {
-        IntoArenaRefIterator::new(
-            self.arena,
-            HashmapBucketKeysIterator::new(
-                self.num_entries() as usize,
-                self.buckets().as_deref().iter(),
-            ),
-        )
+        IntoArenaRefIterator::new(self.arena, HashmapBucketKeysIterator::new(self.entries()))
     }
-    fn values(
+    pub fn values(
         &self,
     ) -> IntoArenaRefIterator<
         'heap,
@@ -154,39 +151,35 @@ impl<'heap, A: ArenaAllocator> ArenaRef<'heap, HashmapTerm, A> {
         A,
         HashmapBucketValuesIterator<'heap, ArrayIter<'heap, HashmapBucket>>,
     > {
-        IntoArenaRefIterator::new(
-            self.arena,
-            HashmapBucketValuesIterator::new(
-                self.num_entries() as usize,
-                self.buckets().as_deref().iter(),
-            ),
-        )
+        IntoArenaRefIterator::new(self.arena, HashmapBucketValuesIterator::new(self.entries()))
     }
 }
 
-impl<'heap, T: Expression, A: ArenaAllocator> HashmapTermType<T> for ArenaRef<'heap, HashmapTerm, A>
-where
-    for<'a> T::ExpressionRef<'a>: From<ArenaRef<'a, Term, A>>,
+impl<'heap, A: ArenaAllocator> HashmapTermType<WasmExpression<'heap, A>>
+    for ArenaRef<'heap, HashmapTerm, A>
 {
     type KeysIterator<'a> = MapIntoIterator<
-        IntoArenaRefIterator<'a, Term, A, HashmapBucketKeysIterator<'a, ArrayIter<'a, HashmapBucket>>>,
-        ArenaRef<'a, Term, A>,
-        T::ExpressionRef<'a>
+        IntoArenaRefIterator<'heap, Term, A, HashmapBucketKeysIterator<'heap, ArrayIter<'heap, HashmapBucket>>>,
+        ArenaRef<'heap, Term, A>,
+        <WasmExpression<'heap, A> as Expression>::ExpressionRef<'a>
     >
     where
-        T: 'a,
+        WasmExpression<'heap, A>: 'a,
         Self: 'a;
     type ValuesIterator<'a> = MapIntoIterator<
-        IntoArenaRefIterator<'a, Term, A, HashmapBucketValuesIterator<'a, ArrayIter<'a, HashmapBucket>>>,
-        ArenaRef<'a, Term, A>,
-        T::ExpressionRef<'a>
+        IntoArenaRefIterator<'heap, Term, A, HashmapBucketValuesIterator<'heap, ArrayIter<'heap, HashmapBucket>>>,
+        ArenaRef<'heap, Term, A>,
+        <WasmExpression<'heap, A> as Expression>::ExpressionRef<'a>
     >
     where
-        T: 'a,
+        WasmExpression<'heap, A>: 'a,
         Self: 'a;
-    fn get<'a>(&'a self, key: &T) -> Option<T::ExpressionRef<'a>>
+    fn get<'a>(
+        &'a self,
+        key: &WasmExpression<'heap, A>,
+    ) -> Option<<WasmExpression<'heap, A> as Expression>::ExpressionRef<'a>>
     where
-        T: 'a,
+        WasmExpression<'heap, A>: 'a,
     {
         // TODO: implement `HashMapTermType::get()` using hashmap lookup
         self.entries()
@@ -210,48 +203,56 @@ where
     }
     fn keys<'a>(&'a self) -> Self::KeysIterator<'a>
     where
-        T: 'a,
+        WasmExpression<'heap, A>: 'a,
     {
         MapIntoIterator::new(self.keys())
     }
     fn values<'a>(&'a self) -> Self::ValuesIterator<'a>
     where
-        T: 'a,
+        WasmExpression<'heap, A>: 'a,
     {
         MapIntoIterator::new(self.values())
     }
 }
 
-impl<'heap, T: Expression, A: ArenaAllocator> HashmapTermType<T>
+impl<'heap, A: ArenaAllocator> HashmapTermType<WasmExpression<'heap, A>>
     for ArenaRef<'heap, TypedTerm<HashmapTerm>, A>
-where
-    for<'a> T::ExpressionRef<'a>: From<ArenaRef<'a, Term, A>>,
 {
-    type KeysIterator<'a> = <ArenaRef<'heap, HashmapTerm, A> as HashmapTermType<T>>::KeysIterator<'a>
+    type KeysIterator<'a> = <ArenaRef<'heap, HashmapTerm, A> as HashmapTermType<WasmExpression<'heap, A>>>::KeysIterator<'a>
     where
-        T: 'a,
+        WasmExpression<'heap, A>: 'a,
         Self: 'a;
-    type ValuesIterator<'a> = <ArenaRef<'heap, HashmapTerm, A> as HashmapTermType<T>>::ValuesIterator<'a>
+    type ValuesIterator<'a> = <ArenaRef<'heap, HashmapTerm, A> as HashmapTermType<WasmExpression<'heap, A>>>::ValuesIterator<'a>
     where
-        T: 'a,
+        WasmExpression<'heap, A>: 'a,
         Self: 'a;
-    fn get<'a>(&'a self, key: &T) -> Option<T::ExpressionRef<'a>>
+    fn get<'a>(
+        &'a self,
+        key: &WasmExpression<'heap, A>,
+    ) -> Option<<WasmExpression<'heap, A> as Expression>::ExpressionRef<'a>>
     where
-        T: 'a,
+        WasmExpression<'heap, A>: 'a,
     {
-        <ArenaRef<'heap, HashmapTerm, A> as HashmapTermType<T>>::get(&self.as_inner(), key)
+        <ArenaRef<'heap, HashmapTerm, A> as HashmapTermType<WasmExpression<'heap, A>>>::get(
+            &self.as_inner(),
+            key,
+        )
     }
     fn keys<'a>(&'a self) -> Self::KeysIterator<'a>
     where
-        T: 'a,
+        WasmExpression<'heap, A>: 'a,
     {
-        <ArenaRef<'heap, HashmapTerm, A> as HashmapTermType<T>>::keys(&self.as_inner())
+        <ArenaRef<'heap, HashmapTerm, A> as HashmapTermType<WasmExpression<'heap, A>>>::keys(
+            &self.as_inner(),
+        )
     }
     fn values<'a>(&'a self) -> Self::ValuesIterator<'a>
     where
-        T: 'a,
+        WasmExpression<'heap, A>: 'a,
     {
-        <ArenaRef<'heap, HashmapTerm, A> as HashmapTermType<T>>::values(&self.as_inner())
+        <ArenaRef<'heap, HashmapTerm, A> as HashmapTermType<WasmExpression<'heap, A>>>::values(
+            &self.as_inner(),
+        )
     }
 }
 
@@ -344,27 +345,15 @@ impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, HashmapTerm, A> {}
 
 impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, HashmapTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_deref(), f)
+        std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
 impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, HashmapTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let max_displayed_entries = 10;
-        let keys = IntoArenaRefIterator::<'heap, Term, A, _>::new(
-            self.arena,
-            HashmapBucketKeysIterator::new(
-                self.num_entries() as usize,
-                self.buckets().as_deref().iter(),
-            ),
-        );
-        let values = IntoArenaRefIterator::<'heap, Term, A, _>::new(
-            self.arena,
-            HashmapBucketKeysIterator::new(
-                self.num_entries() as usize,
-                self.buckets().as_deref().iter(),
-            ),
-        );
+        let keys = self.keys();
+        let values = self.values();
         let entries = keys.zip(values);
         let num_entries = entries.len();
         write!(
@@ -394,10 +383,8 @@ pub struct HashmapBucketKeysIterator<'a, TInner: Iterator<Item = &'a HashmapBuck
     buckets: HashmapBucketsIterator<'a, TInner>,
 }
 impl<'a, TInner: Iterator<Item = &'a HashmapBucket>> HashmapBucketKeysIterator<'a, TInner> {
-    pub fn new(num_entries: usize, buckets: TInner) -> Self {
-        Self {
-            buckets: HashmapBucketsIterator::new(num_entries, buckets),
-        }
+    pub fn new(buckets: HashmapBucketsIterator<'a, TInner>) -> Self {
+        Self { buckets }
     }
 }
 impl<'a, TInner: Iterator<Item = &'a HashmapBucket>> Iterator
@@ -425,10 +412,8 @@ pub struct HashmapBucketValuesIterator<'a, TInner: Iterator<Item = &'a HashmapBu
     buckets: HashmapBucketsIterator<'a, TInner>,
 }
 impl<'a, TInner: Iterator<Item = &'a HashmapBucket>> HashmapBucketValuesIterator<'a, TInner> {
-    pub fn new(num_entries: usize, buckets: TInner) -> Self {
-        Self {
-            buckets: HashmapBucketsIterator::new(num_entries, buckets),
-        }
+    pub fn new(buckets: HashmapBucketsIterator<'a, TInner>) -> Self {
+        Self { buckets }
     }
 }
 impl<'a, TInner: Iterator<Item = &'a HashmapBucket>> Iterator
@@ -452,8 +437,10 @@ where
     }
 }
 
-struct HashmapBucketsIterator<'a, TInner: Iterator<Item = &'a HashmapBucket>> {
+pub struct HashmapBucketsIterator<'a, TInner: Iterator<Item = &'a HashmapBucket>> {
+    /// Iterator containing both empty and non-empty source buckets
     buckets: TInner,
+    /// Number of non-empty buckets (i.e. actual length of the iterator)
     num_entries: usize,
     index: usize,
     _item: PhantomData<&'a HashmapBucket>,
@@ -476,12 +463,14 @@ impl<'a, TInner: Iterator<Item = &'a HashmapBucket>> Iterator
         if self.index >= self.num_entries {
             None
         } else {
-            let index = self.index;
             self.index += 1;
             let mut item = self.buckets.next();
             loop {
                 match item {
-                    Some(HashmapBucket { key, value }) if *key == TermPointer::uninitialized() => {
+                    // If this is an empty bucket, skip to the next bucket
+                    Some(HashmapBucket { key, value: _ })
+                        if *key == TermPointer::uninitialized() =>
+                    {
                         item = self.buckets.next();
                     }
                     _ => break,
@@ -491,7 +480,7 @@ impl<'a, TInner: Iterator<Item = &'a HashmapBucket>> Iterator
         }
     }
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = self.num_entries - self.index;
+        let len = self.num_entries.saturating_sub(self.index);
         (len, Some(len))
     }
 }

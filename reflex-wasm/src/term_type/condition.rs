@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
-use std::{collections::HashSet, marker::PhantomData};
+use std::collections::HashSet;
 
 use reflex::core::{
-    ConditionType, DependencyList, Expression, GraphNode, RefType, SerializeJson, SignalType,
-    StackOffset, StateToken,
+    ConditionType, DependencyList, Expression, GraphNode, SerializeJson, SignalType, StackOffset,
+    StateToken,
 };
 use serde_json::Value as JsonValue;
 use strum_macros::EnumDiscriminants;
@@ -18,7 +18,7 @@ use crate::{
     ArenaRef, Term, TermPointer,
 };
 
-use super::{ListTerm, StringTerm};
+use super::{ListTerm, StringTerm, WasmExpression};
 
 #[derive(Clone, Copy, Debug, EnumDiscriminants)]
 #[repr(C)]
@@ -62,7 +62,7 @@ impl TermHash for ConditionTerm {
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, ConditionTerm, A> {
     pub fn signal_type(&self) -> SignalType {
-        match self.as_deref() {
+        match self.as_value() {
             ConditionTerm::Custom(condition) => ArenaRef::new(self.arena, condition).signal_type(),
             ConditionTerm::Pending(_) => SignalType::Pending,
             ConditionTerm::Error(_) => SignalType::Error,
@@ -72,79 +72,43 @@ impl<'heap, A: ArenaAllocator> ArenaRef<'heap, ConditionTerm, A> {
             ConditionTerm::InvalidPointer(_) => SignalType::Error,
         }
     }
+    pub fn payload(&self) -> Option<ArenaRef<'heap, Term, A>> {
+        match self.as_value() {
+            ConditionTerm::Custom(inner) => Some(ArenaRef::new(self.arena, inner).payload()),
+            ConditionTerm::Error(inner) => Some(ArenaRef::new(self.arena, inner).payload()),
+            _ => None,
+        }
+    }
+    pub fn token(&self) -> Option<ArenaRef<'heap, Term, A>> {
+        match self.as_value() {
+            ConditionTerm::Custom(inner) => Some(ArenaRef::new(self.arena, inner).token()),
+            _ => None,
+        }
+    }
 }
 
-impl<'heap, T: Expression, A: ArenaAllocator> ConditionType<T>
+impl<'heap, A: ArenaAllocator> ConditionType<WasmExpression<'heap, A>>
     for ArenaRef<'heap, TypedTerm<ConditionTerm>, A>
-where
-    T: 'heap,
-    for<'a> T::ExpressionRef<'a>: From<ArenaRef<'a, Term, A>>,
 {
     fn id(&self) -> StateToken {
-        self.as_deref().id()
+        self.as_value().id()
     }
     fn signal_type(&self) -> SignalType {
         self.as_inner().signal_type()
     }
-    fn payload<'a>(&'a self) -> <T as Expression>::ExpressionRef<'a> {
-        todo!()
+    fn payload<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::ExpressionRef<'a> {
+        // FIXME: Improve condition API
+        self.as_inner().payload().unwrap_or_else(|| self.as_term())
     }
-    fn token<'a>(&'a self) -> <T as Expression>::ExpressionRef<'a> {
-        todo!()
+    fn token<'a>(&'a self) -> <WasmExpression<'heap, A> as Expression>::ExpressionRef<'a> {
+        // FIXME: Improve condition API
+        self.as_inner().token().unwrap_or_else(|| self.as_term())
     }
-}
-
-struct ConditionTypeArgs<'a, T: Expression + 'a, A: ArenaAllocator> {
-    condition: ArenaRef<'a, ConditionTerm, A>,
-    index: usize,
-    _expression: PhantomData<T>,
-}
-impl<'a, T: Expression + 'a, A: ArenaAllocator> ConditionTypeArgs<'a, T, A> {
-    fn new(condition: ArenaRef<'a, ConditionTerm, A>) -> Self {
-        Self {
-            condition,
-            index: 0,
-            _expression: PhantomData,
-        }
-    }
-}
-impl<'heap, T: Expression + 'heap, A: ArenaAllocator> Iterator for ConditionTypeArgs<'heap, T, A>
-where
-    for<'a> T::ExpressionRef<'a>: From<ArenaRef<'a, Term, A>>,
-{
-    type Item = T::ExpressionRef<'heap>;
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.condition.as_deref() {
-            ConditionTerm::Custom(condition) => {
-                if self.index == 0 {
-                    self.index += 1;
-                    let arena = self.condition.arena;
-                    Some(ArenaRef::new(arena, arena.get::<Term>(condition.payload)).into())
-                } else {
-                    None
-                }
-            }
-            _ => None,
-        }
-    }
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let max = match self.condition.as_deref() {
-            ConditionTerm::Custom(_) => 1,
-            _ => 0,
-        };
-        (0, Some(max - self.index))
-    }
-}
-impl<'heap, T: Expression + 'heap, A: ArenaAllocator> ExactSizeIterator
-    for ConditionTypeArgs<'heap, T, A>
-where
-    for<'a> T::ExpressionRef<'a>: From<ArenaRef<'a, Term, A>>,
-{
 }
 
 impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, ConditionTerm, A> {
     fn size(&self) -> usize {
-        match self.as_deref() {
+        match self.as_value() {
             ConditionTerm::Custom(inner) => ArenaRef::new(self.arena, inner).size(),
             ConditionTerm::Pending(inner) => ArenaRef::new(self.arena, inner).size(),
             ConditionTerm::Error(inner) => ArenaRef::new(self.arena, inner).size(),
@@ -155,7 +119,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, ConditionTerm, A> {
         }
     }
     fn capture_depth(&self) -> StackOffset {
-        match self.as_deref() {
+        match self.as_value() {
             ConditionTerm::Custom(inner) => ArenaRef::new(self.arena, inner).capture_depth(),
             ConditionTerm::Pending(inner) => ArenaRef::new(self.arena, inner).capture_depth(),
             ConditionTerm::Error(inner) => ArenaRef::new(self.arena, inner).capture_depth(),
@@ -172,7 +136,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, ConditionTerm, A> {
         }
     }
     fn free_variables(&self) -> HashSet<StackOffset> {
-        match self.as_deref() {
+        match self.as_value() {
             ConditionTerm::Custom(inner) => ArenaRef::new(self.arena, inner).free_variables(),
             ConditionTerm::Pending(inner) => ArenaRef::new(self.arena, inner).free_variables(),
             ConditionTerm::Error(inner) => ArenaRef::new(self.arena, inner).free_variables(),
@@ -189,7 +153,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, ConditionTerm, A> {
         }
     }
     fn count_variable_usages(&self, offset: StackOffset) -> usize {
-        match self.as_deref() {
+        match self.as_value() {
             ConditionTerm::Custom(inner) => {
                 ArenaRef::new(self.arena, inner).count_variable_usages(offset)
             }
@@ -214,7 +178,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, ConditionTerm, A> {
         }
     }
     fn dynamic_dependencies(&self, deep: bool) -> DependencyList {
-        match self.as_deref() {
+        match self.as_value() {
             ConditionTerm::Custom(inner) => {
                 ArenaRef::new(self.arena, inner).dynamic_dependencies(deep)
             }
@@ -239,7 +203,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, ConditionTerm, A> {
         }
     }
     fn has_dynamic_dependencies(&self, deep: bool) -> bool {
-        match self.as_deref() {
+        match self.as_value() {
             ConditionTerm::Custom(inner) => {
                 ArenaRef::new(self.arena, inner).has_dynamic_dependencies(deep)
             }
@@ -264,7 +228,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, ConditionTerm, A> {
         }
     }
     fn is_static(&self) -> bool {
-        match self.as_deref() {
+        match self.as_value() {
             ConditionTerm::Custom(inner) => ArenaRef::new(self.arena, inner).is_static(),
             ConditionTerm::Pending(inner) => ArenaRef::new(self.arena, inner).is_static(),
             ConditionTerm::Error(inner) => ArenaRef::new(self.arena, inner).is_static(),
@@ -279,7 +243,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, ConditionTerm, A> {
         }
     }
     fn is_atomic(&self) -> bool {
-        match self.as_deref() {
+        match self.as_value() {
             ConditionTerm::Custom(inner) => ArenaRef::new(self.arena, inner).is_atomic(),
             ConditionTerm::Pending(inner) => ArenaRef::new(self.arena, inner).is_atomic(),
             ConditionTerm::Error(inner) => ArenaRef::new(self.arena, inner).is_atomic(),
@@ -294,7 +258,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, ConditionTerm, A> {
         }
     }
     fn is_complex(&self) -> bool {
-        match self.as_deref() {
+        match self.as_value() {
             ConditionTerm::Custom(inner) => ArenaRef::new(self.arena, inner).is_complex(),
             ConditionTerm::Pending(inner) => ArenaRef::new(self.arena, inner).is_complex(),
             ConditionTerm::Error(inner) => ArenaRef::new(self.arena, inner).is_complex(),
@@ -324,7 +288,7 @@ impl<'heap, A: ArenaAllocator> SerializeJson for ArenaRef<'heap, ConditionTerm, 
 
 impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, ConditionTerm, A> {
     fn eq(&self, other: &Self) -> bool {
-        match (self.as_deref(), other.as_deref()) {
+        match (self.as_value(), other.as_value()) {
             (ConditionTerm::Custom(condition), ConditionTerm::Custom(other)) => {
                 ArenaRef::new(self.arena, condition) == ArenaRef::new(self.arena, other)
             }
@@ -348,6 +312,7 @@ impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, ConditionTerm, A> {
             (ConditionTerm::InvalidPointer(condition), ConditionTerm::InvalidPointer(other)) => {
                 ArenaRef::new(self.arena, condition) == ArenaRef::new(self.arena, other)
             }
+            _ => false,
         }
     }
 }
@@ -355,7 +320,7 @@ impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, ConditionTerm, A> {}
 
 impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, ConditionTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.as_deref() {
+        match self.as_value() {
             ConditionTerm::Custom(condition) => {
                 std::fmt::Display::fmt(&ArenaRef::new(self.arena, condition), f)
             }
@@ -382,7 +347,7 @@ impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, ConditionTe
 }
 impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, ConditionTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_deref(), f)
+        std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
@@ -411,13 +376,13 @@ impl<'heap, A: ArenaAllocator> ArenaRef<'heap, CustomCondition, A> {
     pub fn signal_type(&self) -> SignalType {
         let effect_type = self.effect_type();
         // FIXME: Allow arbitrary expressions as condition types
-        let custom_effect_type = match effect_type.as_deref().type_id() {
+        let custom_effect_type = match effect_type.as_value().type_id() {
             TermTypeDiscriminants::String => {
                 let string_term = ArenaRef::<TypedTerm<StringTerm>, A>::new(
                     self.arena,
-                    self.arena.get(self.as_deref().effect_type),
+                    self.arena.get(self.as_value().effect_type),
                 );
-                String::from(string_term.as_inner().as_deref().as_str())
+                String::from(string_term.as_inner().as_value().as_str())
             }
             _ => format!("{}", effect_type),
         };
@@ -426,14 +391,14 @@ impl<'heap, A: ArenaAllocator> ArenaRef<'heap, CustomCondition, A> {
 }
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, CustomCondition, A> {
-    fn effect_type(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_deref().effect_type))
+    pub fn effect_type(&self) -> ArenaRef<'heap, Term, A> {
+        ArenaRef::new(self.arena, self.arena.get(self.as_value().effect_type))
     }
-    fn payload(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_deref().payload))
+    pub fn payload(&self) -> ArenaRef<'heap, Term, A> {
+        ArenaRef::new(self.arena, self.arena.get(self.as_value().payload))
     }
-    fn token(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_deref().token))
+    pub fn token(&self) -> ArenaRef<'heap, Term, A> {
+        ArenaRef::new(self.arena, self.arena.get(self.as_value().token))
     }
 }
 
@@ -495,7 +460,7 @@ impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, CustomCondition, A> {}
 
 impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, CustomCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_deref(), f)
+        std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
@@ -535,13 +500,13 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, PendingCondition, A
     fn free_variables(&self) -> HashSet<StackOffset> {
         Default::default()
     }
-    fn count_variable_usages(&self, offset: StackOffset) -> usize {
+    fn count_variable_usages(&self, _offset: StackOffset) -> usize {
         0
     }
-    fn dynamic_dependencies(&self, deep: bool) -> DependencyList {
+    fn dynamic_dependencies(&self, _deep: bool) -> DependencyList {
         DependencyList::empty()
     }
-    fn has_dynamic_dependencies(&self, deep: bool) -> bool {
+    fn has_dynamic_dependencies(&self, _deep: bool) -> bool {
         false
     }
     fn is_static(&self) -> bool {
@@ -556,7 +521,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, PendingCondition, A
 }
 
 impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, PendingCondition, A> {
-    fn eq(&self, other: &Self) -> bool {
+    fn eq(&self, _other: &Self) -> bool {
         true
     }
 }
@@ -564,7 +529,7 @@ impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, PendingCondition, A> {}
 
 impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, PendingCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_deref(), f)
+        std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
@@ -591,8 +556,8 @@ impl TermHash for ErrorCondition {
 }
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, ErrorCondition, A> {
-    fn payload(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_deref().payload))
+    pub fn payload(&self) -> ArenaRef<'heap, Term, A> {
+        ArenaRef::new(self.arena, self.arena.get(self.as_value().payload))
     }
 }
 
@@ -643,7 +608,7 @@ impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, ErrorCondition, A> {}
 
 impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, ErrorCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_deref(), f)
+        std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
@@ -673,11 +638,11 @@ impl TermHash for TypeErrorCondition {
 }
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, TypeErrorCondition, A> {
-    fn expected(&self) -> Option<TermTypeDiscriminants> {
-        TermTypeDiscriminants::try_from(self.as_deref().expected).ok()
+    pub fn expected(&self) -> Option<TermTypeDiscriminants> {
+        TermTypeDiscriminants::try_from(self.as_value().expected).ok()
     }
-    fn payload(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_deref().payload))
+    pub fn payload(&self) -> ArenaRef<'heap, Term, A> {
+        ArenaRef::new(self.arena, self.arena.get(self.as_value().payload))
     }
 }
 
@@ -721,14 +686,14 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, TypeErrorCondition,
 
 impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, TypeErrorCondition, A> {
     fn eq(&self, other: &Self) -> bool {
-        self.as_deref().expected == other.as_deref().expected && self.payload() == other.payload()
+        self.as_value().expected == other.as_value().expected && self.payload() == other.payload()
     }
 }
 impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, TypeErrorCondition, A> {}
 
 impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, TypeErrorCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_deref(), f)
+        std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
@@ -759,8 +724,8 @@ impl TermHash for InvalidFunctionTargetCondition {
 }
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, InvalidFunctionTargetCondition, A> {
-    fn target(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_deref().target))
+    pub fn target(&self) -> ArenaRef<'heap, Term, A> {
+        ArenaRef::new(self.arena, self.arena.get(self.as_value().target))
     }
 }
 
@@ -813,7 +778,7 @@ impl<'heap, A: ArenaAllocator> std::fmt::Debug
     for ArenaRef<'heap, InvalidFunctionTargetCondition, A>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_deref(), f)
+        std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
@@ -843,11 +808,11 @@ impl TermHash for InvalidFunctionArgsCondition {
 }
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, InvalidFunctionArgsCondition, A> {
-    fn target(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_deref().target))
+    pub fn target(&self) -> ArenaRef<'heap, Term, A> {
+        ArenaRef::new(self.arena, self.arena.get(self.as_value().target))
     }
-    fn args(&self) -> ArenaRef<'heap, TypedTerm<ListTerm>, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_deref().args))
+    pub fn args(&self) -> ArenaRef<'heap, TypedTerm<ListTerm>, A> {
+        ArenaRef::new(self.arena, self.arena.get(self.as_value().args))
     }
 }
 
@@ -909,7 +874,7 @@ impl<'heap, A: ArenaAllocator> std::fmt::Debug
     for ArenaRef<'heap, InvalidFunctionArgsCondition, A>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_deref(), f)
+        std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
@@ -945,13 +910,13 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, InvalidPointerCondi
     fn free_variables(&self) -> HashSet<StackOffset> {
         Default::default()
     }
-    fn count_variable_usages(&self, offset: StackOffset) -> usize {
+    fn count_variable_usages(&self, _offset: StackOffset) -> usize {
         0
     }
-    fn dynamic_dependencies(&self, deep: bool) -> DependencyList {
+    fn dynamic_dependencies(&self, _deep: bool) -> DependencyList {
         DependencyList::empty()
     }
-    fn has_dynamic_dependencies(&self, deep: bool) -> bool {
+    fn has_dynamic_dependencies(&self, _deep: bool) -> bool {
         false
     }
     fn is_static(&self) -> bool {
@@ -966,7 +931,7 @@ impl<'heap, A: ArenaAllocator> GraphNode for ArenaRef<'heap, InvalidPointerCondi
 }
 
 impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, InvalidPointerCondition, A> {
-    fn eq(&self, other: &Self) -> bool {
+    fn eq(&self, _other: &Self) -> bool {
         true
     }
 }
@@ -974,7 +939,7 @@ impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, InvalidPointerCondition, A
 
 impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, InvalidPointerCondition, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self.as_deref(), f)
+        std::fmt::Debug::fmt(self.as_value(), f)
     }
 }
 
