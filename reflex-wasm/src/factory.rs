@@ -491,7 +491,10 @@ where
     fn clone_list<'a>(
         &self,
         expressions: <ArenaRef<Term, Self> as Expression>::ExpressionListRef<'a>,
-    ) -> <ArenaRef<Term, Self> as Expression>::ExpressionList {
+    ) -> <ArenaRef<Term, Self> as Expression>::ExpressionList
+    where
+        Self: 'a,
+    {
         expressions
     }
 
@@ -553,7 +556,10 @@ where
     fn clone_struct_prototype<'a>(
         &self,
         prototype: <ArenaRef<Term, Self> as Expression>::StructPrototypeRef<'a>,
-    ) -> <ArenaRef<Term, Self> as Expression>::StructPrototype {
+    ) -> <ArenaRef<Term, Self> as Expression>::StructPrototype
+    where
+        Self: 'a,
+    {
         prototype
     }
 
@@ -596,7 +602,10 @@ where
     fn clone_signal<'a>(
         &self,
         signal: <ArenaRef<Term, Self> as Expression>::SignalRef<'a>,
-    ) -> <ArenaRef<Term, Self> as Expression>::Signal {
+    ) -> <ArenaRef<Term, Self> as Expression>::Signal
+    where
+        Self: 'a,
+    {
         signal
     }
 
@@ -619,7 +628,10 @@ where
     fn clone_string<'a>(
         &self,
         value: <ArenaRef<Term, Self> as Expression>::StringRef<'a>,
-    ) -> <ArenaRef<Term, Self> as Expression>::String {
+    ) -> <ArenaRef<Term, Self> as Expression>::String
+    where
+        Self: 'a,
+    {
         value
     }
 }
