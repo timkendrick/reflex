@@ -5,8 +5,7 @@
 use std::collections::HashSet;
 
 use reflex::core::{
-    DependencyList, Expression, GraphNode, NodeId, RecordTermType, RefType, SerializeJson,
-    StackOffset,
+    DependencyList, Expression, GraphNode, NodeId, RecordTermType, SerializeJson, StackOffset,
 };
 use reflex_utils::json::is_empty_json_object;
 use serde_json::{Map as JsonMap, Value as JsonValue};
@@ -54,7 +53,6 @@ impl<A: ArenaAllocator + Clone> ArenaRef<RecordTerm, A> {
         self.keys()
             .as_inner()
             .iter()
-            .map(|item| item.as_deref())
             .position(|existing_key| existing_key.id() == key.id())
             .and_then(|index| {
                 self.values()

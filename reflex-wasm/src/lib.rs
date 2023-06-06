@@ -81,12 +81,9 @@ where
     }
 }
 
-impl<'a, T, A: ArenaAllocator> RefType<'a, Self> for ArenaRef<T, A> {
-    fn as_deref(&self) -> &'a Self {
-        // FIXME: this is vulnerable to use-after-free errors
-        // We know 'heap lasts longer than 'a, which ensures the reference to `self` will be freed before 'heap,
-        // however there is no guarantee that `self` will not be dropped from the stack while 'a is still ongoing
-        unsafe { std::mem::transmute::<&Self, &'a Self>(self) }
+impl<T, A: ArenaAllocator> RefType<Self> for ArenaRef<T, A> {
+    fn as_deref(&self) -> &Self {
+        self
     }
 }
 
