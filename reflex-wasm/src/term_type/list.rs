@@ -1,11 +1,22 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
+// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
+use std::iter::Copied;
+
+use reflex::{
+    core::{
+        Expression, ExpressionListType, FromRefTypeIterator, ListTermType, RefType,
+        StructPrototypeType,
+    },
+    hash::HashId,
+};
+
 use crate::{
-    allocator::TermAllocator,
+    allocator::ArenaAllocator,
     hash::{TermHash, TermHasher, TermSize},
     term_type::TermType,
-    Array, Term, TermPointer,
+    ArenaRef, Array, ArrayIter, IntoArenaRefIterator, Term, TermPointer, TypedTerm,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -19,8 +30,8 @@ impl TermSize for ListTerm {
     }
 }
 impl TermHash for ListTerm {
-    fn hash(&self, hasher: TermHasher, allocator: &impl TermAllocator) -> TermHasher {
-        hasher.hash(&self.items, allocator)
+    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+        hasher.hash(&self.items, arena)
     }
 }
 impl ListTerm {
@@ -29,27 +40,93 @@ impl ListTerm {
             Item = TermPointer,
             IntoIter = impl ExactSizeIterator<Item = TermPointer>,
         >,
-        allocator: &mut impl TermAllocator,
+        arena: &mut impl ArenaAllocator,
     ) -> TermPointer {
         let values = values.into_iter();
         let term = Term::new(
             TermType::List(ListTerm {
                 items: Default::default(),
             }),
-            allocator,
+            arena,
         );
         let term_size = term.size();
-        let instance = allocator.allocate(term);
+        let instance = arena.allocate(term);
         let list = instance.offset((term_size - std::mem::size_of::<Array<TermPointer>>()) as u32);
-        Array::<TermPointer>::extend(list, values, allocator);
+        Array::<TermPointer>::extend(list, values, arena);
         let hash = {
-            allocator
+            arena
                 .get::<Term>(instance)
-                .hash(Default::default(), allocator)
+                .hash(Default::default(), arena)
                 .finish()
         };
-        allocator.get_mut::<Term>(instance).set_hash(hash);
+        arena.get_mut::<Term>(instance).set_hash(hash);
         instance
+    }
+}
+
+impl<'heap, A: ArenaAllocator> ArenaRef<'heap, TypedTerm<ListTerm>, A> {
+    fn items(&self) -> ArenaRef<'heap, Array<TermPointer>, A> {
+        ArenaRef::new(self.arena, &self.as_deref().items)
+    }
+}
+
+impl<'heap, T: Expression, A: ArenaAllocator> ListTermType<T>
+    for ArenaRef<'heap, TypedTerm<ListTerm>, A>
+where
+    for<'a> T::Ref<'a, T::ExpressionList<T>>: From<ArenaRef<'a, TypedTerm<ListTerm>, A>>,
+{
+    fn items<'a>(&'a self) -> T::Ref<'a, T::ExpressionList<T>>
+    where
+        T::ExpressionList<T>: 'a,
+        T: 'a,
+    {
+        self.into()
+    }
+}
+
+impl<'heap, T: Expression, A: ArenaAllocator> StructPrototypeType<T>
+    for ArenaRef<'heap, TypedTerm<ListTerm>, A>
+where
+    for<'a> T::Ref<'a, T::ExpressionList<T>>: From<ArenaRef<'a, TypedTerm<ListTerm>, A>>,
+{
+    fn keys<'a>(&'a self) -> T::Ref<'a, T::ExpressionList<T>>
+    where
+        T::ExpressionList<T>: 'a,
+        T: 'a,
+    {
+        self.into()
+    }
+}
+
+impl<'heap, T: Expression, A: ArenaAllocator> ExpressionListType<T>
+    for ArenaRef<'heap, TypedTerm<ListTerm>, A>
+where
+    for<'a> T::Ref<'a, T>: From<ArenaRef<'a, Term, A>>,
+{
+    type Iterator<'a> = FromRefTypeIterator<'a, T, T::Ref<'a, T>, IntoArenaRefIterator<'a, Term, A, Copied<ArrayIter<'a, TermPointer>>>>
+    where
+        T: 'a,
+        Self: 'a;
+    fn id(&self) -> HashId {
+        self.as_deref().id()
+    }
+    fn len(&self) -> usize {
+        self.items().len()
+    }
+    fn get<'a>(&'a self, index: usize) -> Option<T::Ref<'a, T>>
+    where
+        T: 'a,
+    {
+        self.items()
+            .get(index)
+            .copied()
+            .map(|pointer| ArenaRef::new(self.arena, self.arena.get::<Term>(pointer)).into())
+    }
+    fn iter<'a>(&'a self) -> Self::Iterator<'a> {
+        FromRefTypeIterator::new(IntoArenaRefIterator::new(
+            self.arena,
+            self.items().iter().copied(),
+        ))
     }
 }
 

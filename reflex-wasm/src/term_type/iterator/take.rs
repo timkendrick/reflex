@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
+// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use crate::{
-    allocator::TermAllocator,
+    allocator::ArenaAllocator,
     hash::{TermHash, TermHasher, TermSize},
     TermPointer,
 };
@@ -19,8 +20,8 @@ impl TermSize for TakeIteratorTerm {
     }
 }
 impl TermHash for TakeIteratorTerm {
-    fn hash(&self, hasher: TermHasher, allocator: &impl TermAllocator) -> TermHasher {
-        hasher.hash(&self.source, allocator).write_u32(self.count)
+    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+        hasher.hash(&self.source, arena).write_u32(self.count)
     }
 }
 

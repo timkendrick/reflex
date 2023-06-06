@@ -1,57 +1,58 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
+// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use crate::TermAllocator;
+use crate::ArenaAllocator;
 
 pub trait TermSize {
     fn size(&self) -> usize;
 }
 
 pub trait TermHash {
-    fn hash(&self, hasher: TermHasher, allocator: &impl TermAllocator) -> TermHasher;
+    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher;
 }
 impl TermHash for bool {
-    fn hash(&self, hasher: TermHasher, _allocator: &impl TermAllocator) -> TermHasher {
-        hasher.write_byte(*self as u8)
+    fn hash(&self, hasher: TermHasher, _arena: &impl ArenaAllocator) -> TermHasher {
+        hasher.write_bool(*self)
     }
 }
 impl TermHash for u8 {
-    fn hash(&self, hasher: TermHasher, _allocator: &impl TermAllocator) -> TermHasher {
-        hasher.write_byte(*self)
+    fn hash(&self, hasher: TermHasher, _arena: &impl ArenaAllocator) -> TermHasher {
+        hasher.write_u8(*self)
     }
 }
 impl TermHash for u32 {
-    fn hash(&self, hasher: TermHasher, _allocator: &impl TermAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, _arena: &impl ArenaAllocator) -> TermHasher {
         hasher.write_u32(*self)
     }
 }
 impl TermHash for [u32; 2] {
-    fn hash(&self, hasher: TermHasher, _allocator: &impl TermAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, _arena: &impl ArenaAllocator) -> TermHasher {
         hasher.write_u64(unsafe { std::mem::transmute::<[u32; 2], u64>(*self) })
     }
 }
 impl TermHash for u64 {
-    fn hash(&self, hasher: TermHasher, _allocator: &impl TermAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, _arena: &impl ArenaAllocator) -> TermHasher {
         hasher.write_u64(*self)
     }
 }
 impl TermHash for i32 {
-    fn hash(&self, hasher: TermHasher, _allocator: &impl TermAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, _arena: &impl ArenaAllocator) -> TermHasher {
         hasher.write_i32(*self)
     }
 }
 impl TermHash for i64 {
-    fn hash(&self, hasher: TermHasher, _allocator: &impl TermAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, _arena: &impl ArenaAllocator) -> TermHasher {
         hasher.write_i64(*self)
     }
 }
 impl TermHash for f32 {
-    fn hash(&self, hasher: TermHasher, _allocator: &impl TermAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, _arena: &impl ArenaAllocator) -> TermHasher {
         hasher.write_f32(*self)
     }
 }
 impl TermHash for f64 {
-    fn hash(&self, hasher: TermHasher, _allocator: &impl TermAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, _arena: &impl ArenaAllocator) -> TermHasher {
         hasher.write_f64(*self)
     }
 }
@@ -82,18 +83,17 @@ impl Default for TermHasher {
     }
 }
 impl TermHasher {
-    pub fn hash<T: TermHash, TAllocator: TermAllocator>(
-        self,
-        value: &T,
-        allocator: &TAllocator,
-    ) -> Self {
-        value.hash(self, allocator)
+    pub fn hash<T: TermHash, A: ArenaAllocator>(self, value: &T, arena: &A) -> Self {
+        value.hash(self, arena)
     }
     pub fn finish(self) -> TermHashState {
         let Self { state } = self;
         state
     }
-    pub fn write_byte(self, value: u8) -> Self {
+    pub fn write_bool(self, value: bool) -> Self {
+        self.write_u8(value as u8)
+    }
+    pub fn write_u8(self, value: u8) -> Self {
         let Self { state } = self;
         let TermHashState(state) = state;
         Self {
@@ -101,20 +101,20 @@ impl TermHasher {
         }
     }
     pub fn write_u32(self, value: u32) -> Self {
-        self.write_byte(u32_get_byte(value, 0))
-            .write_byte(u32_get_byte(value, 1))
-            .write_byte(u32_get_byte(value, 2))
-            .write_byte(u32_get_byte(value, 3))
+        self.write_u8(u32_get_byte(value, 0))
+            .write_u8(u32_get_byte(value, 1))
+            .write_u8(u32_get_byte(value, 2))
+            .write_u8(u32_get_byte(value, 3))
     }
     pub fn write_u64(self, value: u64) -> Self {
-        self.write_byte(u64_get_byte(value, 0))
-            .write_byte(u64_get_byte(value, 1))
-            .write_byte(u64_get_byte(value, 2))
-            .write_byte(u64_get_byte(value, 3))
-            .write_byte(u64_get_byte(value, 4))
-            .write_byte(u64_get_byte(value, 5))
-            .write_byte(u64_get_byte(value, 6))
-            .write_byte(u64_get_byte(value, 7))
+        self.write_u8(u64_get_byte(value, 0))
+            .write_u8(u64_get_byte(value, 1))
+            .write_u8(u64_get_byte(value, 2))
+            .write_u8(u64_get_byte(value, 3))
+            .write_u8(u64_get_byte(value, 4))
+            .write_u8(u64_get_byte(value, 5))
+            .write_u8(u64_get_byte(value, 6))
+            .write_u8(u64_get_byte(value, 7))
     }
     pub fn write_i32(self, value: i32) -> Self {
         self.write_u32(unsafe { std::mem::transmute::<i32, u32>(value) })

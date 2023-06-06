@@ -1,9 +1,13 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
+// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
+use reflex::core::{FloatTermType, FloatValue};
+
 use crate::{
-    allocator::TermAllocator,
+    allocator::ArenaAllocator,
     hash::{TermHash, TermHasher, TermSize},
+    ArenaRef,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -17,8 +21,8 @@ impl TermSize for FloatTerm {
     }
 }
 impl TermHash for FloatTerm {
-    fn hash(&self, hasher: TermHasher, allocator: &impl TermAllocator) -> TermHasher {
-        hasher.hash(&self.value, allocator)
+    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+        hasher.hash(&self.value, arena)
     }
 }
 impl From<f64> for FloatTerm {
@@ -56,6 +60,18 @@ fn chunks_to_f64(value: [u32; 2]) -> f64 {
         high_bytes[2],
         high_bytes[3],
     ])
+}
+
+impl<'heap, A: ArenaAllocator> ArenaRef<'heap, FloatTerm, A> {
+    fn value(&self) -> f64 {
+        chunks_to_f64(self.as_deref().value)
+    }
+}
+
+impl<'heap, A: ArenaAllocator> FloatTermType for ArenaRef<'heap, FloatTerm, A> {
+    fn value(&self) -> FloatValue {
+        self.value()
+    }
 }
 
 #[cfg(test)]

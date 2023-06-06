@@ -1,10 +1,14 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
+// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
+use reflex::core::{BuiltinTermType, Expression};
+
 use crate::{
-    allocator::TermAllocator,
+    allocator::ArenaAllocator,
     hash::{TermHash, TermHasher, TermSize},
     stdlib::Stdlib,
+    ArenaRef,
 };
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
@@ -16,9 +20,9 @@ impl TermSize for FunctionIndex {
     }
 }
 impl TermHash for FunctionIndex {
-    fn hash(&self, hasher: TermHasher, allocator: &impl TermAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
         let Self(uid) = self;
-        hasher.hash(uid, allocator)
+        hasher.hash(uid, arena)
     }
 }
 impl From<Stdlib> for FunctionIndex {
@@ -38,13 +42,32 @@ impl TermSize for BuiltinTerm {
     }
 }
 impl TermHash for BuiltinTerm {
-    fn hash(&self, hasher: TermHasher, allocator: &impl TermAllocator) -> TermHasher {
-        hasher.hash(&self.uid, allocator)
+    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+        hasher.hash(&self.uid, arena)
     }
 }
 impl From<Stdlib> for BuiltinTerm {
     fn from(value: Stdlib) -> Self {
         Self { uid: value.into() }
+    }
+}
+
+impl<'heap, A: ArenaAllocator> ArenaRef<'heap, BuiltinTerm, A> {
+    fn target(&self) -> FunctionIndex {
+        self.as_deref().uid
+    }
+}
+
+impl<'heap, T: Expression, A: ArenaAllocator> BuiltinTermType<T> for ArenaRef<'heap, BuiltinTerm, A>
+where
+    T::Builtin: From<FunctionIndex>,
+{
+    fn target<'a>(&'a self) -> T::Builtin
+    where
+        T: 'a,
+        T::Builtin: 'a,
+    {
+        self.target().into()
     }
 }
 

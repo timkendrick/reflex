@@ -2391,6 +2391,7 @@ name = "reflex-wasm"
 version = "0.1.0"
 dependencies = [
  "reflex",
+ "serde_json",
  "strum",
  "strum_macros",
  "swc_common",

@@ -1,13 +1,17 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
+// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
+use reflex::core::{ConditionType, Expression, RefType, SignalType, StateToken};
 use strum_macros::EnumDiscriminants;
 
 use crate::{
-    allocator::TermAllocator,
+    allocator::ArenaAllocator,
     hash::{TermHash, TermHasher, TermSize},
-    TermPointer,
+    ArenaRef, TermPointer, TypedTerm,
 };
+
+use super::ListTerm;
 
 #[derive(Clone, Copy, Debug, EnumDiscriminants)]
 #[repr(C)]
@@ -24,34 +28,56 @@ impl TermSize for ConditionTerm {
     fn size(&self) -> usize {
         let discriminant_size = std::mem::size_of::<u32>();
         let value_size = match self {
-            ConditionTerm::Custom(condition) => condition.size(),
-            ConditionTerm::Pending(condition) => condition.size(),
-            ConditionTerm::Error(condition) => condition.size(),
-            ConditionTerm::TypeError(condition) => condition.size(),
-            ConditionTerm::InvalidFunctionTarget(condition) => condition.size(),
-            ConditionTerm::InvalidFunctionArgs(condition) => condition.size(),
-            ConditionTerm::InvalidPointer(condition) => condition.size(),
+            Self::Custom(condition) => condition.size(),
+            Self::Pending(condition) => condition.size(),
+            Self::Error(condition) => condition.size(),
+            Self::TypeError(condition) => condition.size(),
+            Self::InvalidFunctionTarget(condition) => condition.size(),
+            Self::InvalidFunctionArgs(condition) => condition.size(),
+            Self::InvalidPointer(condition) => condition.size(),
         };
         discriminant_size + value_size
     }
 }
 impl TermHash for ConditionTerm {
-    fn hash(&self, hasher: TermHasher, allocator: &impl TermAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
         match self {
-            ConditionTerm::Custom(condition) => condition.hash(hasher.write_byte(0), allocator),
-            ConditionTerm::Pending(condition) => condition.hash(hasher.write_byte(0), allocator),
-            ConditionTerm::Error(condition) => condition.hash(hasher.write_byte(0), allocator),
-            ConditionTerm::TypeError(condition) => condition.hash(hasher.write_byte(0), allocator),
-            ConditionTerm::InvalidFunctionTarget(condition) => {
-                condition.hash(hasher.write_byte(0), allocator)
-            }
-            ConditionTerm::InvalidFunctionArgs(condition) => {
-                condition.hash(hasher.write_byte(0), allocator)
-            }
-            ConditionTerm::InvalidPointer(condition) => {
-                condition.hash(hasher.write_byte(0), allocator)
-            }
+            Self::Custom(condition) => condition.hash(hasher.write_u8(0), arena),
+            Self::Pending(condition) => condition.hash(hasher.write_u8(0), arena),
+            Self::Error(condition) => condition.hash(hasher.write_u8(0), arena),
+            Self::TypeError(condition) => condition.hash(hasher.write_u8(0), arena),
+            Self::InvalidFunctionTarget(condition) => condition.hash(hasher.write_u8(0), arena),
+            Self::InvalidFunctionArgs(condition) => condition.hash(hasher.write_u8(0), arena),
+            Self::InvalidPointer(condition) => condition.hash(hasher.write_u8(0), arena),
         }
+    }
+}
+
+impl<'heap, T: Expression, A: ArenaAllocator> ConditionType<T> for ArenaRef<'heap, ConditionTerm, A>
+where
+    for<'a> T::Ref<'a, T::ExpressionList<T>>: From<ArenaRef<'a, TypedTerm<ListTerm>, A>>,
+{
+    fn id(&self) -> StateToken {
+        self.hash(TermHasher::default(), self.arena)
+    }
+    fn signal_type(&self) -> SignalType {
+        match self.as_deref() {
+            ConditionTerm::Custom(condition) => {
+                SignalType::Custom(ArenaRef::new(self.arena, condition).signal_type())
+            }
+            ConditionTerm::Pending(_) => SignalType::Pending,
+            ConditionTerm::Error(_) => SignalType::Error,
+            ConditionTerm::TypeError(_) => SignalType::Error,
+            ConditionTerm::InvalidFunctionTarget(_) => SignalType::Error,
+            ConditionTerm::InvalidFunctionArgs(_) => SignalType::Error,
+            ConditionTerm::InvalidPointer(_) => SignalType::Error,
+        }
+    }
+    fn args<'a>(&'a self) -> T::Ref<'a, T::ExpressionList<T>>
+    where
+        T::ExpressionList<T>: 'a,
+        T: 'a,
+    {
     }
 }
 
@@ -68,11 +94,11 @@ impl TermSize for CustomCondition {
     }
 }
 impl TermHash for CustomCondition {
-    fn hash(&self, hasher: TermHasher, allocator: &impl TermAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
         hasher
-            .hash(&self.effect_type, allocator)
-            .hash(&self.payload, allocator)
-            .hash(&self.token, allocator)
+            .hash(&self.effect_type, arena)
+            .hash(&self.payload, arena)
+            .hash(&self.token, arena)
     }
 }
 
@@ -85,7 +111,7 @@ impl TermSize for PendingCondition {
     }
 }
 impl TermHash for PendingCondition {
-    fn hash(&self, hasher: TermHasher, _allocator: &impl TermAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, _arena: &impl ArenaAllocator) -> TermHasher {
         hasher
     }
 }
@@ -101,8 +127,8 @@ impl TermSize for ErrorCondition {
     }
 }
 impl TermHash for ErrorCondition {
-    fn hash(&self, hasher: TermHasher, allocator: &impl TermAllocator) -> TermHasher {
-        hasher.hash(&self.payload, allocator)
+    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+        hasher.hash(&self.payload, arena)
     }
 }
 
@@ -118,10 +144,10 @@ impl TermSize for TypeErrorCondition {
     }
 }
 impl TermHash for TypeErrorCondition {
-    fn hash(&self, hasher: TermHasher, allocator: &impl TermAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
         hasher
-            .hash(&self.expected, allocator)
-            .hash(&self.payload, allocator)
+            .hash(&self.expected, arena)
+            .hash(&self.payload, arena)
     }
 }
 
@@ -136,8 +162,8 @@ impl TermSize for InvalidFunctionTargetCondition {
     }
 }
 impl TermHash for InvalidFunctionTargetCondition {
-    fn hash(&self, hasher: TermHasher, allocator: &impl TermAllocator) -> TermHasher {
-        hasher.hash(&self.target, allocator)
+    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+        hasher.hash(&self.target, arena)
     }
 }
 
@@ -153,10 +179,8 @@ impl TermSize for InvalidFunctionArgsCondition {
     }
 }
 impl TermHash for InvalidFunctionArgsCondition {
-    fn hash(&self, hasher: TermHasher, allocator: &impl TermAllocator) -> TermHasher {
-        hasher
-            .hash(&self.target, allocator)
-            .hash(&self.args, allocator)
+    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+        hasher.hash(&self.target, arena).hash(&self.args, arena)
     }
 }
 
@@ -169,7 +193,7 @@ impl TermSize for InvalidPointerCondition {
     }
 }
 impl TermHash for InvalidPointerCondition {
-    fn hash(&self, hasher: TermHasher, _allocator: &impl TermAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, _arena: &impl ArenaAllocator) -> TermHasher {
         hasher
     }
 }

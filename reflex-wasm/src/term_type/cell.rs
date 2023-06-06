@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
+// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use crate::{
-    allocator::TermAllocator,
+    allocator::ArenaAllocator,
     hash::{TermHash, TermHashState, TermHasher, TermSize},
     term_type::TermType,
     Array, Term, TermPointer,
@@ -19,28 +20,28 @@ impl TermSize for CellTerm {
     }
 }
 impl TermHash for CellTerm {
-    fn hash(&self, hasher: TermHasher, _allocator: &impl TermAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, _arena: &impl ArenaAllocator) -> TermHasher {
         hasher
     }
 }
 impl CellTerm {
     pub fn allocate(
         values: impl IntoIterator<Item = u32, IntoIter = impl ExactSizeIterator<Item = u32>>,
-        allocator: &mut impl TermAllocator,
+        arena: &mut impl ArenaAllocator,
     ) -> TermPointer {
         let values = values.into_iter();
         let term = Term::new(
             TermType::Cell(Self {
                 fields: Default::default(),
             }),
-            allocator,
+            arena,
         );
         let term_size = term.size();
-        let instance = allocator.allocate(term);
+        let instance = arena.allocate(term);
         let list = instance.offset((term_size - std::mem::size_of::<Array<u32>>()) as u32);
-        Array::<u32>::extend(list, values, allocator);
+        Array::<u32>::extend(list, values, arena);
         let hash = TermHashState::from(u32::from(instance));
-        allocator.get_mut::<Term>(instance).set_hash(hash);
+        arena.get_mut::<Term>(instance).set_hash(hash);
         instance
     }
 }

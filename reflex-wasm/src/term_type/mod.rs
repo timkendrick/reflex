@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
+// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
+use reflex::core::RefType;
 use strum_macros::EnumDiscriminants;
 
 mod application;
@@ -58,8 +60,9 @@ pub use tree::*;
 pub use variable::*;
 
 use crate::{
-    allocator::TermAllocator,
+    allocator::ArenaAllocator,
     hash::{TermHash, TermHasher, TermSize},
+    ArenaRef,
 };
 
 #[derive(Clone, Copy, Debug, EnumDiscriminants)]
@@ -110,180 +113,180 @@ impl TermSize for TermType {
     fn size(&self) -> usize {
         let discriminant_size = std::mem::size_of::<u32>();
         let value_size = match self {
-            TermType::Application(term) => term.size(),
-            TermType::Boolean(term) => term.size(),
-            TermType::Builtin(term) => term.size(),
-            TermType::Cell(term) => term.size(),
-            TermType::Compiled(term) => term.size(),
-            TermType::Condition(term) => term.size(),
-            TermType::Constructor(term) => term.size(),
-            TermType::Date(term) => term.size(),
-            TermType::Effect(term) => term.size(),
-            TermType::Float(term) => term.size(),
-            TermType::Hashmap(term) => term.size(),
-            TermType::Hashset(term) => term.size(),
-            TermType::Int(term) => term.size(),
-            TermType::Lambda(term) => term.size(),
-            TermType::Let(term) => term.size(),
-            TermType::List(term) => term.size(),
-            TermType::Nil(term) => term.size(),
-            TermType::Partial(term) => term.size(),
-            TermType::Pointer(term) => term.size(),
-            TermType::Record(term) => term.size(),
-            TermType::Signal(term) => term.size(),
-            TermType::String(term) => term.size(),
-            TermType::Symbol(term) => term.size(),
-            TermType::Tree(term) => term.size(),
-            TermType::Variable(term) => term.size(),
-            TermType::EmptyIterator(term) => term.size(),
-            TermType::EvaluateIterator(term) => term.size(),
-            TermType::FilterIterator(term) => term.size(),
-            TermType::FlattenIterator(term) => term.size(),
-            TermType::HashmapKeysIterator(term) => term.size(),
-            TermType::HashmapValuesIterator(term) => term.size(),
-            TermType::IntegersIterator(term) => term.size(),
-            TermType::IntersperseIterator(term) => term.size(),
-            TermType::MapIterator(term) => term.size(),
-            TermType::OnceIterator(term) => term.size(),
-            TermType::RangeIterator(term) => term.size(),
-            TermType::RepeatIterator(term) => term.size(),
-            TermType::SkipIterator(term) => term.size(),
-            TermType::TakeIterator(term) => term.size(),
-            TermType::ZipIterator(term) => term.size(),
+            Self::Application(term) => term.size(),
+            Self::Boolean(term) => term.size(),
+            Self::Builtin(term) => term.size(),
+            Self::Cell(term) => term.size(),
+            Self::Compiled(term) => term.size(),
+            Self::Condition(term) => term.size(),
+            Self::Constructor(term) => term.size(),
+            Self::Date(term) => term.size(),
+            Self::Effect(term) => term.size(),
+            Self::Float(term) => term.size(),
+            Self::Hashmap(term) => term.size(),
+            Self::Hashset(term) => term.size(),
+            Self::Int(term) => term.size(),
+            Self::Lambda(term) => term.size(),
+            Self::Let(term) => term.size(),
+            Self::List(term) => term.size(),
+            Self::Nil(term) => term.size(),
+            Self::Partial(term) => term.size(),
+            Self::Pointer(term) => term.size(),
+            Self::Record(term) => term.size(),
+            Self::Signal(term) => term.size(),
+            Self::String(term) => term.size(),
+            Self::Symbol(term) => term.size(),
+            Self::Tree(term) => term.size(),
+            Self::Variable(term) => term.size(),
+            Self::EmptyIterator(term) => term.size(),
+            Self::EvaluateIterator(term) => term.size(),
+            Self::FilterIterator(term) => term.size(),
+            Self::FlattenIterator(term) => term.size(),
+            Self::HashmapKeysIterator(term) => term.size(),
+            Self::HashmapValuesIterator(term) => term.size(),
+            Self::IntegersIterator(term) => term.size(),
+            Self::IntersperseIterator(term) => term.size(),
+            Self::MapIterator(term) => term.size(),
+            Self::OnceIterator(term) => term.size(),
+            Self::RangeIterator(term) => term.size(),
+            Self::RepeatIterator(term) => term.size(),
+            Self::SkipIterator(term) => term.size(),
+            Self::TakeIterator(term) => term.size(),
+            Self::ZipIterator(term) => term.size(),
         };
         discriminant_size + value_size
     }
 }
 impl TermHash for TermType {
-    fn hash(&self, hasher: TermHasher, allocator: &impl TermAllocator) -> TermHasher {
+    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
         match self {
             Self::Application(term) => hasher
-                .write_byte(TermTypeDiscriminants::Application as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::Application as u8)
+                .hash(term, arena),
             Self::Boolean(term) => hasher
-                .write_byte(TermTypeDiscriminants::Boolean as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::Boolean as u8)
+                .hash(term, arena),
             Self::Builtin(term) => hasher
-                .write_byte(TermTypeDiscriminants::Builtin as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::Builtin as u8)
+                .hash(term, arena),
             Self::Cell(term) => hasher
-                .write_byte(TermTypeDiscriminants::Cell as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::Cell as u8)
+                .hash(term, arena),
             Self::Compiled(term) => hasher
-                .write_byte(TermTypeDiscriminants::Compiled as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::Compiled as u8)
+                .hash(term, arena),
             Self::Condition(term) => hasher
-                .write_byte(TermTypeDiscriminants::Condition as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::Condition as u8)
+                .hash(term, arena),
             Self::Constructor(term) => hasher
-                .write_byte(TermTypeDiscriminants::Constructor as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::Constructor as u8)
+                .hash(term, arena),
             Self::Date(term) => hasher
-                .write_byte(TermTypeDiscriminants::Date as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::Date as u8)
+                .hash(term, arena),
             Self::Effect(term) => hasher
-                .write_byte(TermTypeDiscriminants::Effect as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::Effect as u8)
+                .hash(term, arena),
             Self::Float(term) => hasher
-                .write_byte(TermTypeDiscriminants::Float as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::Float as u8)
+                .hash(term, arena),
             Self::Hashmap(term) => hasher
-                .write_byte(TermTypeDiscriminants::Hashmap as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::Hashmap as u8)
+                .hash(term, arena),
             Self::Hashset(term) => hasher
-                .write_byte(TermTypeDiscriminants::Hashset as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::Hashset as u8)
+                .hash(term, arena),
             Self::Int(term) => hasher
-                .write_byte(TermTypeDiscriminants::Int as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::Int as u8)
+                .hash(term, arena),
             Self::Lambda(term) => hasher
-                .write_byte(TermTypeDiscriminants::Lambda as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::Lambda as u8)
+                .hash(term, arena),
             Self::Let(term) => hasher
-                .write_byte(TermTypeDiscriminants::Let as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::Let as u8)
+                .hash(term, arena),
             Self::List(term) => hasher
-                .write_byte(TermTypeDiscriminants::List as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::List as u8)
+                .hash(term, arena),
             Self::Nil(term) => hasher
-                .write_byte(TermTypeDiscriminants::Nil as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::Nil as u8)
+                .hash(term, arena),
             Self::Partial(term) => hasher
-                .write_byte(TermTypeDiscriminants::Partial as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::Partial as u8)
+                .hash(term, arena),
             Self::Pointer(term) => hasher
-                .write_byte(TermTypeDiscriminants::Pointer as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::Pointer as u8)
+                .hash(term, arena),
             Self::Record(term) => hasher
-                .write_byte(TermTypeDiscriminants::Record as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::Record as u8)
+                .hash(term, arena),
             Self::Signal(term) => hasher
-                .write_byte(TermTypeDiscriminants::Signal as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::Signal as u8)
+                .hash(term, arena),
             Self::String(term) => hasher
-                .write_byte(TermTypeDiscriminants::String as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::String as u8)
+                .hash(term, arena),
             Self::Symbol(term) => hasher
-                .write_byte(TermTypeDiscriminants::Symbol as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::Symbol as u8)
+                .hash(term, arena),
             Self::Tree(term) => hasher
-                .write_byte(TermTypeDiscriminants::Tree as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::Tree as u8)
+                .hash(term, arena),
             Self::Variable(term) => hasher
-                .write_byte(TermTypeDiscriminants::Variable as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::Variable as u8)
+                .hash(term, arena),
             Self::EmptyIterator(term) => hasher
-                .write_byte(TermTypeDiscriminants::EmptyIterator as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::EmptyIterator as u8)
+                .hash(term, arena),
             Self::EvaluateIterator(term) => hasher
-                .write_byte(TermTypeDiscriminants::EvaluateIterator as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::EvaluateIterator as u8)
+                .hash(term, arena),
             Self::FilterIterator(term) => hasher
-                .write_byte(TermTypeDiscriminants::FilterIterator as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::FilterIterator as u8)
+                .hash(term, arena),
             Self::FlattenIterator(term) => hasher
-                .write_byte(TermTypeDiscriminants::FlattenIterator as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::FlattenIterator as u8)
+                .hash(term, arena),
             Self::HashmapKeysIterator(term) => hasher
-                .write_byte(TermTypeDiscriminants::HashmapKeysIterator as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::HashmapKeysIterator as u8)
+                .hash(term, arena),
             Self::HashmapValuesIterator(term) => hasher
-                .write_byte(TermTypeDiscriminants::HashmapValuesIterator as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::HashmapValuesIterator as u8)
+                .hash(term, arena),
             Self::IntegersIterator(term) => hasher
-                .write_byte(TermTypeDiscriminants::IntegersIterator as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::IntegersIterator as u8)
+                .hash(term, arena),
             Self::IntersperseIterator(term) => hasher
-                .write_byte(TermTypeDiscriminants::IntersperseIterator as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::IntersperseIterator as u8)
+                .hash(term, arena),
             Self::MapIterator(term) => hasher
-                .write_byte(TermTypeDiscriminants::MapIterator as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::MapIterator as u8)
+                .hash(term, arena),
             Self::OnceIterator(term) => hasher
-                .write_byte(TermTypeDiscriminants::OnceIterator as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::OnceIterator as u8)
+                .hash(term, arena),
             Self::RangeIterator(term) => hasher
-                .write_byte(TermTypeDiscriminants::RangeIterator as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::RangeIterator as u8)
+                .hash(term, arena),
             Self::RepeatIterator(term) => hasher
-                .write_byte(TermTypeDiscriminants::RepeatIterator as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::RepeatIterator as u8)
+                .hash(term, arena),
             Self::SkipIterator(term) => hasher
-                .write_byte(TermTypeDiscriminants::SkipIterator as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::SkipIterator as u8)
+                .hash(term, arena),
             Self::TakeIterator(term) => hasher
-                .write_byte(TermTypeDiscriminants::TakeIterator as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::TakeIterator as u8)
+                .hash(term, arena),
             Self::ZipIterator(term) => hasher
-                .write_byte(TermTypeDiscriminants::ZipIterator as u8)
-                .hash(term, allocator),
+                .write_u8(TermTypeDiscriminants::ZipIterator as u8)
+                .hash(term, arena),
         }
     }
 }
 impl<'a> Into<Option<&'a ApplicationTerm>> for &'a TermType {
     fn into(self) -> Option<&'a ApplicationTerm> {
         match self {
-            TermType::Application(term) => Some(term),
+            Self::Application(term) => Some(term),
             _ => None,
         }
     }
@@ -291,7 +294,7 @@ impl<'a> Into<Option<&'a ApplicationTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a BooleanTerm>> for &'a TermType {
     fn into(self) -> Option<&'a BooleanTerm> {
         match self {
-            TermType::Boolean(term) => Some(term),
+            Self::Boolean(term) => Some(term),
             _ => None,
         }
     }
@@ -299,7 +302,7 @@ impl<'a> Into<Option<&'a BooleanTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a BuiltinTerm>> for &'a TermType {
     fn into(self) -> Option<&'a BuiltinTerm> {
         match self {
-            TermType::Builtin(term) => Some(term),
+            Self::Builtin(term) => Some(term),
             _ => None,
         }
     }
@@ -307,7 +310,7 @@ impl<'a> Into<Option<&'a BuiltinTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a CellTerm>> for &'a TermType {
     fn into(self) -> Option<&'a CellTerm> {
         match self {
-            TermType::Cell(term) => Some(term),
+            Self::Cell(term) => Some(term),
             _ => None,
         }
     }
@@ -315,7 +318,7 @@ impl<'a> Into<Option<&'a CellTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a CompiledTerm>> for &'a TermType {
     fn into(self) -> Option<&'a CompiledTerm> {
         match self {
-            TermType::Compiled(term) => Some(term),
+            Self::Compiled(term) => Some(term),
             _ => None,
         }
     }
@@ -323,7 +326,7 @@ impl<'a> Into<Option<&'a CompiledTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a ConditionTerm>> for &'a TermType {
     fn into(self) -> Option<&'a ConditionTerm> {
         match self {
-            TermType::Condition(term) => Some(term),
+            Self::Condition(term) => Some(term),
             _ => None,
         }
     }
@@ -331,7 +334,7 @@ impl<'a> Into<Option<&'a ConditionTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a ConstructorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a ConstructorTerm> {
         match self {
-            TermType::Constructor(term) => Some(term),
+            Self::Constructor(term) => Some(term),
             _ => None,
         }
     }
@@ -339,7 +342,7 @@ impl<'a> Into<Option<&'a ConstructorTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a DateTerm>> for &'a TermType {
     fn into(self) -> Option<&'a DateTerm> {
         match self {
-            TermType::Date(term) => Some(term),
+            Self::Date(term) => Some(term),
             _ => None,
         }
     }
@@ -347,7 +350,7 @@ impl<'a> Into<Option<&'a DateTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a EffectTerm>> for &'a TermType {
     fn into(self) -> Option<&'a EffectTerm> {
         match self {
-            TermType::Effect(term) => Some(term),
+            Self::Effect(term) => Some(term),
             _ => None,
         }
     }
@@ -355,7 +358,7 @@ impl<'a> Into<Option<&'a EffectTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a FloatTerm>> for &'a TermType {
     fn into(self) -> Option<&'a FloatTerm> {
         match self {
-            TermType::Float(term) => Some(term),
+            Self::Float(term) => Some(term),
             _ => None,
         }
     }
@@ -363,7 +366,7 @@ impl<'a> Into<Option<&'a FloatTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a HashmapTerm>> for &'a TermType {
     fn into(self) -> Option<&'a HashmapTerm> {
         match self {
-            TermType::Hashmap(term) => Some(term),
+            Self::Hashmap(term) => Some(term),
             _ => None,
         }
     }
@@ -371,7 +374,7 @@ impl<'a> Into<Option<&'a HashmapTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a HashsetTerm>> for &'a TermType {
     fn into(self) -> Option<&'a HashsetTerm> {
         match self {
-            TermType::Hashset(term) => Some(term),
+            Self::Hashset(term) => Some(term),
             _ => None,
         }
     }
@@ -379,7 +382,7 @@ impl<'a> Into<Option<&'a HashsetTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a IntTerm>> for &'a TermType {
     fn into(self) -> Option<&'a IntTerm> {
         match self {
-            TermType::Int(term) => Some(term),
+            Self::Int(term) => Some(term),
             _ => None,
         }
     }
@@ -387,7 +390,7 @@ impl<'a> Into<Option<&'a IntTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a LambdaTerm>> for &'a TermType {
     fn into(self) -> Option<&'a LambdaTerm> {
         match self {
-            TermType::Lambda(term) => Some(term),
+            Self::Lambda(term) => Some(term),
             _ => None,
         }
     }
@@ -395,7 +398,7 @@ impl<'a> Into<Option<&'a LambdaTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a LetTerm>> for &'a TermType {
     fn into(self) -> Option<&'a LetTerm> {
         match self {
-            TermType::Let(term) => Some(term),
+            Self::Let(term) => Some(term),
             _ => None,
         }
     }
@@ -403,7 +406,7 @@ impl<'a> Into<Option<&'a LetTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a ListTerm>> for &'a TermType {
     fn into(self) -> Option<&'a ListTerm> {
         match self {
-            TermType::List(term) => Some(term),
+            Self::List(term) => Some(term),
             _ => None,
         }
     }
@@ -411,7 +414,7 @@ impl<'a> Into<Option<&'a ListTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a NilTerm>> for &'a TermType {
     fn into(self) -> Option<&'a NilTerm> {
         match self {
-            TermType::Nil(term) => Some(term),
+            Self::Nil(term) => Some(term),
             _ => None,
         }
     }
@@ -419,7 +422,7 @@ impl<'a> Into<Option<&'a NilTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a PartialTerm>> for &'a TermType {
     fn into(self) -> Option<&'a PartialTerm> {
         match self {
-            TermType::Partial(term) => Some(term),
+            Self::Partial(term) => Some(term),
             _ => None,
         }
     }
@@ -427,7 +430,7 @@ impl<'a> Into<Option<&'a PartialTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a PointerTerm>> for &'a TermType {
     fn into(self) -> Option<&'a PointerTerm> {
         match self {
-            TermType::Pointer(term) => Some(term),
+            Self::Pointer(term) => Some(term),
             _ => None,
         }
     }
@@ -435,7 +438,7 @@ impl<'a> Into<Option<&'a PointerTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a RecordTerm>> for &'a TermType {
     fn into(self) -> Option<&'a RecordTerm> {
         match self {
-            TermType::Record(term) => Some(term),
+            Self::Record(term) => Some(term),
             _ => None,
         }
     }
@@ -443,7 +446,7 @@ impl<'a> Into<Option<&'a RecordTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a SignalTerm>> for &'a TermType {
     fn into(self) -> Option<&'a SignalTerm> {
         match self {
-            TermType::Signal(term) => Some(term),
+            Self::Signal(term) => Some(term),
             _ => None,
         }
     }
@@ -451,7 +454,7 @@ impl<'a> Into<Option<&'a SignalTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a StringTerm>> for &'a TermType {
     fn into(self) -> Option<&'a StringTerm> {
         match self {
-            TermType::String(term) => Some(term),
+            Self::String(term) => Some(term),
             _ => None,
         }
     }
@@ -459,7 +462,7 @@ impl<'a> Into<Option<&'a StringTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a SymbolTerm>> for &'a TermType {
     fn into(self) -> Option<&'a SymbolTerm> {
         match self {
-            TermType::Symbol(term) => Some(term),
+            Self::Symbol(term) => Some(term),
             _ => None,
         }
     }
@@ -467,7 +470,7 @@ impl<'a> Into<Option<&'a SymbolTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a TreeTerm>> for &'a TermType {
     fn into(self) -> Option<&'a TreeTerm> {
         match self {
-            TermType::Tree(term) => Some(term),
+            Self::Tree(term) => Some(term),
             _ => None,
         }
     }
@@ -475,7 +478,7 @@ impl<'a> Into<Option<&'a TreeTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a VariableTerm>> for &'a TermType {
     fn into(self) -> Option<&'a VariableTerm> {
         match self {
-            TermType::Variable(term) => Some(term),
+            Self::Variable(term) => Some(term),
             _ => None,
         }
     }
@@ -483,7 +486,7 @@ impl<'a> Into<Option<&'a VariableTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a EmptyIteratorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a EmptyIteratorTerm> {
         match self {
-            TermType::EmptyIterator(term) => Some(term),
+            Self::EmptyIterator(term) => Some(term),
             _ => None,
         }
     }
@@ -491,7 +494,7 @@ impl<'a> Into<Option<&'a EmptyIteratorTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a EvaluateIteratorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a EvaluateIteratorTerm> {
         match self {
-            TermType::EvaluateIterator(term) => Some(term),
+            Self::EvaluateIterator(term) => Some(term),
             _ => None,
         }
     }
@@ -499,7 +502,7 @@ impl<'a> Into<Option<&'a EvaluateIteratorTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a FilterIteratorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a FilterIteratorTerm> {
         match self {
-            TermType::FilterIterator(term) => Some(term),
+            Self::FilterIterator(term) => Some(term),
             _ => None,
         }
     }
@@ -507,7 +510,7 @@ impl<'a> Into<Option<&'a FilterIteratorTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a FlattenIteratorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a FlattenIteratorTerm> {
         match self {
-            TermType::FlattenIterator(term) => Some(term),
+            Self::FlattenIterator(term) => Some(term),
             _ => None,
         }
     }
@@ -515,7 +518,7 @@ impl<'a> Into<Option<&'a FlattenIteratorTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a HashmapKeysIteratorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a HashmapKeysIteratorTerm> {
         match self {
-            TermType::HashmapKeysIterator(term) => Some(term),
+            Self::HashmapKeysIterator(term) => Some(term),
             _ => None,
         }
     }
@@ -523,7 +526,7 @@ impl<'a> Into<Option<&'a HashmapKeysIteratorTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a HashmapValuesIteratorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a HashmapValuesIteratorTerm> {
         match self {
-            TermType::HashmapValuesIterator(term) => Some(term),
+            Self::HashmapValuesIterator(term) => Some(term),
             _ => None,
         }
     }
@@ -531,7 +534,7 @@ impl<'a> Into<Option<&'a HashmapValuesIteratorTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a IntegersIteratorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a IntegersIteratorTerm> {
         match self {
-            TermType::IntegersIterator(term) => Some(term),
+            Self::IntegersIterator(term) => Some(term),
             _ => None,
         }
     }
@@ -539,7 +542,7 @@ impl<'a> Into<Option<&'a IntegersIteratorTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a IntersperseIteratorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a IntersperseIteratorTerm> {
         match self {
-            TermType::IntersperseIterator(term) => Some(term),
+            Self::IntersperseIterator(term) => Some(term),
             _ => None,
         }
     }
@@ -547,7 +550,7 @@ impl<'a> Into<Option<&'a IntersperseIteratorTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a MapIteratorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a MapIteratorTerm> {
         match self {
-            TermType::MapIterator(term) => Some(term),
+            Self::MapIterator(term) => Some(term),
             _ => None,
         }
     }
@@ -555,7 +558,7 @@ impl<'a> Into<Option<&'a MapIteratorTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a OnceIteratorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a OnceIteratorTerm> {
         match self {
-            TermType::OnceIterator(term) => Some(term),
+            Self::OnceIterator(term) => Some(term),
             _ => None,
         }
     }
@@ -563,7 +566,7 @@ impl<'a> Into<Option<&'a OnceIteratorTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a RangeIteratorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a RangeIteratorTerm> {
         match self {
-            TermType::RangeIterator(term) => Some(term),
+            Self::RangeIterator(term) => Some(term),
             _ => None,
         }
     }
@@ -571,7 +574,7 @@ impl<'a> Into<Option<&'a RangeIteratorTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a RepeatIteratorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a RepeatIteratorTerm> {
         match self {
-            TermType::RepeatIterator(term) => Some(term),
+            Self::RepeatIterator(term) => Some(term),
             _ => None,
         }
     }
@@ -579,7 +582,7 @@ impl<'a> Into<Option<&'a RepeatIteratorTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a SkipIteratorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a SkipIteratorTerm> {
         match self {
-            TermType::SkipIterator(term) => Some(term),
+            Self::SkipIterator(term) => Some(term),
             _ => None,
         }
     }
@@ -587,7 +590,7 @@ impl<'a> Into<Option<&'a SkipIteratorTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a TakeIteratorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a TakeIteratorTerm> {
         match self {
-            TermType::TakeIterator(term) => Some(term),
+            Self::TakeIterator(term) => Some(term),
             _ => None,
         }
     }
@@ -595,8 +598,298 @@ impl<'a> Into<Option<&'a TakeIteratorTerm>> for &'a TermType {
 impl<'a> Into<Option<&'a ZipIteratorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a ZipIteratorTerm> {
         match self {
-            TermType::ZipIterator(term) => Some(term),
+            Self::ZipIterator(term) => Some(term),
             _ => None,
+        }
+    }
+}
+
+impl<'heap, A: ArenaAllocator> Eq for ArenaRef<'heap, TermType, A> {}
+impl<'heap, A: ArenaAllocator> PartialEq for ArenaRef<'heap, TermType, A> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self.as_deref(), other.as_deref()) {
+            (TermType::Application(left), TermType::Application(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::Boolean(left), TermType::Boolean(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::Builtin(left), TermType::Builtin(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::Cell(left), TermType::Cell(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::Compiled(left), TermType::Compiled(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::Condition(left), TermType::Condition(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::Constructor(left), TermType::Constructor(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::Date(left), TermType::Date(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::Effect(left), TermType::Effect(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::Float(left), TermType::Float(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::Hashmap(left), TermType::Hashmap(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::Hashset(left), TermType::Hashset(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::Int(left), TermType::Int(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::Lambda(left), TermType::Lambda(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::Let(left), TermType::Let(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::List(left), TermType::List(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::Nil(left), TermType::Nil(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::Partial(left), TermType::Partial(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::Pointer(left), TermType::Pointer(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::Record(left), TermType::Record(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::Signal(left), TermType::Signal(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::String(left), TermType::String(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::Symbol(left), TermType::Symbol(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::Tree(left), TermType::Tree(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::Variable(left), TermType::Variable(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::EmptyIterator(left), TermType::EmptyIterator(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::EvaluateIterator(left), TermType::EvaluateIterator(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::FilterIterator(left), TermType::FilterIterator(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::FlattenIterator(left), TermType::FlattenIterator(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::HashmapKeysIterator(left), TermType::HashmapKeysIterator(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::HashmapValuesIterator(left), TermType::HashmapValuesIterator(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::IntegersIterator(left), TermType::IntegersIterator(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::IntersperseIterator(left), TermType::IntersperseIterator(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::MapIterator(left), TermType::MapIterator(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::OnceIterator(left), TermType::OnceIterator(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::RangeIterator(left), TermType::RangeIterator(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::RepeatIterator(left), TermType::RepeatIterator(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::SkipIterator(left), TermType::SkipIterator(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::TakeIterator(left), TermType::TakeIterator(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+            (TermType::ZipIterator(left), TermType::ZipIterator(right)) => {
+                ArenaRef::new(self.arena, left) == ArenaRef::new(other.arena, right)
+            }
+        }
+    }
+}
+impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, TermType, A> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.as_deref() {
+            TermType::Application(term) => {
+                std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::Boolean(term) => std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Builtin(term) => std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Cell(term) => std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Compiled(term) => std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Condition(term) => {
+                std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::Constructor(term) => {
+                std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::Date(term) => std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Effect(term) => std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Float(term) => std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Hashmap(term) => std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Hashset(term) => std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Int(term) => std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Lambda(term) => std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Let(term) => std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::List(term) => std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Nil(term) => std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Partial(term) => std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Pointer(term) => std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Record(term) => std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Signal(term) => std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::String(term) => std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Symbol(term) => std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Tree(term) => std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Variable(term) => std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::EmptyIterator(term) => {
+                std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::EvaluateIterator(term) => {
+                std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::FilterIterator(term) => {
+                std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::FlattenIterator(term) => {
+                std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::HashmapKeysIterator(term) => {
+                std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::HashmapValuesIterator(term) => {
+                std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::IntegersIterator(term) => {
+                std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::IntersperseIterator(term) => {
+                std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::MapIterator(term) => {
+                std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::OnceIterator(term) => {
+                std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::RangeIterator(term) => {
+                std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::RepeatIterator(term) => {
+                std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::SkipIterator(term) => {
+                std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::TakeIterator(term) => {
+                std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::ZipIterator(term) => {
+                std::fmt::Display::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+        }
+    }
+}
+impl<'heap, A: ArenaAllocator> std::fmt::Debug for ArenaRef<'heap, TermType, A> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.as_deref() {
+            TermType::Application(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::Boolean(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Builtin(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Cell(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Compiled(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Condition(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Constructor(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::Date(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Effect(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Float(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Hashmap(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Hashset(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Int(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Lambda(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Let(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::List(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Nil(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Partial(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Pointer(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Record(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Signal(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::String(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Symbol(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Tree(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::Variable(term) => std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f),
+            TermType::EmptyIterator(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::EvaluateIterator(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::FilterIterator(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::FlattenIterator(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::HashmapKeysIterator(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::HashmapValuesIterator(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::IntegersIterator(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::IntersperseIterator(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::MapIterator(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::OnceIterator(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::RangeIterator(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::RepeatIterator(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::SkipIterator(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::TakeIterator(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
+            TermType::ZipIterator(term) => {
+                std::fmt::Debug::fmt(&ArenaRef::new(self.arena, term), f)
+            }
         }
     }
 }

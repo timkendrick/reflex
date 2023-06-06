@@ -1,9 +1,13 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
+// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
+use reflex::core::{IntTermType, IntValue};
+
 use crate::{
-    allocator::TermAllocator,
+    allocator::ArenaAllocator,
     hash::{TermHash, TermHasher, TermSize},
+    ArenaRef,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -17,8 +21,8 @@ impl TermSize for IntTerm {
     }
 }
 impl TermHash for IntTerm {
-    fn hash(&self, hasher: TermHasher, allocator: &impl TermAllocator) -> TermHasher {
-        hasher.hash(&self.value, allocator)
+    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+        hasher.hash(&self.value, arena)
     }
 }
 impl From<i32> for IntTerm {
@@ -30,6 +34,18 @@ impl Into<i32> for IntTerm {
     fn into(self) -> i32 {
         let Self { value } = self;
         value
+    }
+}
+
+impl<'heap, A: ArenaAllocator> ArenaRef<'heap, IntTerm, A> {
+    fn value(&self) -> i32 {
+        self.as_deref().value
+    }
+}
+
+impl<'heap, A: ArenaAllocator> IntTermType for ArenaRef<'heap, IntTerm, A> {
+    fn value(&self) -> IntValue {
+        self.value()
     }
 }
 

@@ -1,32 +1,33 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
+// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use std::iter::repeat;
+use std::{cell::Cell, iter::repeat};
 
 use crate::{hash::TermSize, TermPointer};
 
-pub trait TermAllocator {
+pub trait ArenaAllocator: Sized {
     fn len(&self) -> usize;
-    fn allocate<T: TermSize>(&mut self, value: T) -> TermPointer;
+    fn allocate<T: TermSize>(&self, value: T) -> TermPointer;
     fn get<T>(&self, offset: TermPointer) -> &T;
     fn get_mut<T>(&mut self, offset: TermPointer) -> &mut T;
     fn slice<T: Sized>(&self, offset: TermPointer, count: usize) -> &[T];
-    fn extend(&mut self, offset: TermPointer, size: usize);
+    fn extend(&self, offset: TermPointer, size: usize);
     fn shrink(&mut self, offset: TermPointer, size: usize);
 }
 
-pub struct VecAllocator(Vec<u32>);
+pub struct VecAllocator(Cell<Vec<u32>>);
 impl Default for VecAllocator {
     fn default() -> Self {
-        Self(vec![0])
+        Self(Default::default())
     }
 }
-impl TermAllocator for VecAllocator {
+impl ArenaAllocator for VecAllocator {
     fn len(&self) -> usize {
         let Self(data) = self;
         data.len() * 4
     }
-    fn allocate<T: TermSize>(&mut self, value: T) -> TermPointer {
+    fn allocate<T: TermSize>(&self, value: T) -> TermPointer {
         let offset = TermPointer(self.len() as u32);
         let static_size = pad_to_4_byte_offset(std::mem::size_of::<T>());
         let actual_size = pad_to_4_byte_offset(value.size());
@@ -99,7 +100,7 @@ impl Into<Vec<u8>> for VecAllocator {
 }
 
 pub struct SliceAllocator<'a>(&'a mut [u32]);
-impl<'a> TermAllocator for SliceAllocator<'a> {
+impl<'a> ArenaAllocator for SliceAllocator<'a> {
     fn len(&self) -> usize {
         self.data()[0] as usize
     }

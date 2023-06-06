@@ -1,9 +1,13 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
+// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
+use reflex::core::{BooleanTermType, RefType};
+
 use crate::{
-    allocator::TermAllocator,
+    allocator::ArenaAllocator,
     hash::{TermHash, TermHasher, TermSize},
+    ArenaRef,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -17,8 +21,8 @@ impl TermSize for BooleanTerm {
     }
 }
 impl TermHash for BooleanTerm {
-    fn hash(&self, hasher: TermHasher, allocator: &impl TermAllocator) -> TermHasher {
-        hasher.hash(&self.value, allocator)
+    fn hash(&self, hasher: TermHasher, arena: &impl ArenaAllocator) -> TermHasher {
+        hasher.hash(&self.value, arena)
     }
 }
 impl From<bool> for BooleanTerm {
@@ -32,6 +36,18 @@ impl Into<bool> for BooleanTerm {
     fn into(self) -> bool {
         let Self { value, .. } = self;
         value != 0
+    }
+}
+
+impl<'heap, A: ArenaAllocator> ArenaRef<'heap, BooleanTerm, A> {
+    fn value(&self) -> bool {
+        self.as_deref().value as bool
+    }
+}
+
+impl<'heap, A: ArenaAllocator> BooleanTermType for ArenaRef<'heap, BooleanTerm, A> {
+    fn value(&self) -> bool {
+        self.value()
     }
 }
 
