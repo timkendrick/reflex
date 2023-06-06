@@ -22,4 +22,5 @@ members = [
   "reflex-tests",
   "reflex-server",
   "reflex-utils",
+  "reflex-wasm",
 ]
