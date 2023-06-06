@@ -146,10 +146,6 @@ impl<A: ArenaAllocator + Clone> StringValue for ArenaRef<StringTerm, A> {
     fn as_str<'a>(&'a self) -> Self::StringRef<'a> {
         self.as_utf8()
     }
-    fn from_static(_self: Option<Self>, _value: &'static str) -> Option<Self> {
-        // FIXME: Implement StringValue::from_static() for WASM StringTerm type
-        None
-    }
 }
 
 impl<A: ArenaAllocator + Clone> StringValue for ArenaRef<TypedTerm<StringTerm>, A> {
@@ -162,10 +158,6 @@ impl<A: ArenaAllocator + Clone> StringValue for ArenaRef<TypedTerm<StringTerm>, 
     fn as_str<'a>(&'a self) -> Self::StringRef<'a> {
         let inner = self.as_inner();
         Utf8Bytes(self.arena.as_slice(inner.offset(), inner.len()))
-    }
-    fn from_static(_self: Option<Self>, _value: &'static str) -> Option<Self> {
-        // FIXME: Implement StringValue::from_static() for WASM StringTerm type
-        None
     }
 }
 
