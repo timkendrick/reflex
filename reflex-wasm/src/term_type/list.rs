@@ -75,7 +75,10 @@ impl ListTerm {
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, ListTerm, A> {
     pub fn items(&self) -> ArenaRef<'heap, Array<TermPointer>, A> {
-        ArenaRef::new(self.arena, &self.as_value().items)
+        ArenaRef::<Array<TermPointer>, _>::new(
+            self.arena,
+            self.arena.get_offset(&self.as_value().items),
+        )
     }
     pub fn iter<'a>(
         &'a self,
@@ -184,7 +187,7 @@ impl<'heap, A: ArenaAllocator> ExpressionListType<WasmExpression<'heap, A>>
             .items()
             .get(index)
             .copied()
-            .map(|pointer| ArenaRef::new(self.arena, self.arena.get::<Term>(pointer)).into())
+            .map(|pointer| ArenaRef::<Term, _>::new(self.arena, pointer).into())
     }
     fn iter<'a>(&'a self) -> Self::Iterator<'a>
     where

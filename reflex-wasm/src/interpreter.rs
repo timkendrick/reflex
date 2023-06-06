@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
+// SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 use wasmtime::{Engine, ExternType, Instance, IntoFunc, Linker, Memory, Module, Store};
 use wasmtime_wasi::{sync::WasiCtxBuilder, WasiCtx};
 
@@ -40,15 +41,12 @@ pub struct InterpreterEvaluationResult<'heap, A: ArenaAllocator> {
 
 impl<'heap, A: ArenaAllocator> InterpreterEvaluationResult<'heap, A> {
     pub fn result(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::new(self.arena, self.arena.get::<Term>(self.result_pointer))
+        ArenaRef::<Term, _>::new(self.arena, self.result_pointer)
     }
 
     pub fn dependencies(&self) -> Option<ArenaRef<'heap, TypedTerm<TreeTerm>, A>> {
         self.dependencies_pointer.map(|dependencies_pointer| {
-            ArenaRef::new(
-                self.arena,
-                self.arena.get::<TypedTerm<TreeTerm>>(dependencies_pointer),
-            )
+            ArenaRef::<TypedTerm<TreeTerm>, _>::new(self.arena, dependencies_pointer)
         })
     }
 }
@@ -195,6 +193,10 @@ impl ArenaAllocator for WasmInterpreter {
         self.0.get_mut(offset)
     }
 
+    fn get_offset<T>(&self, value: &T) -> TermPointer {
+        self.0.get_offset(value)
+    }
+
     fn slice<T: Sized>(&self, offset: TermPointer, count: usize) -> &[T] {
         self.0.slice(offset, count)
     }
@@ -238,6 +240,12 @@ impl ArenaAllocator for WasmContext {
         let offset = u32::from(offset) as usize;
         let item = &mut data[offset];
         unsafe { std::mem::transmute::<&mut u8, &mut T>(item) }
+    }
+
+    fn get_offset<T>(&self, value: &T) -> TermPointer {
+        let data = self.memory.data(&self.store);
+        let offset = (value as *const T as usize) - (&data[0] as *const u8 as usize);
+        TermPointer::from(offset as u32)
     }
 
     fn slice<T: Sized>(&self, offset: crate::TermPointer, count: usize) -> &[T] {
@@ -286,7 +294,7 @@ mod tests {
         stdlib::{Add, Stdlib},
         term_type::{
             ApplicationTerm, BuiltinTerm, ConditionTerm, CustomCondition, EffectTerm, HashmapTerm,
-            IntTerm, ListTerm, NilTerm, SignalTerm, SymbolTerm, TermType, TreeTerm, TypedTerm,
+            IntTerm, ListTerm, NilTerm, SignalTerm, SymbolTerm, TermType, TreeTerm,
         },
         ArenaRef, Term, TermPointer,
     };
@@ -440,6 +448,7 @@ mod tests {
             }),
             &interpreter,
         );
+        let expected_result = interpreter.allocate(expected_result);
 
         let interpreter_result = interpreter
             .interpret(input.into(), state.into())
@@ -447,16 +456,13 @@ mod tests {
             .bind(&interpreter);
         assert_eq!(
             interpreter_result.result(),
-            ArenaRef::new(&interpreter, &expected_result)
+            ArenaRef::new(&interpreter, expected_result)
         );
 
         let refer = interpreter_result.dependencies();
         assert_eq!(
             refer,
-            Some(ArenaRef::new(
-                &interpreter,
-                interpreter.get::<TypedTerm<TreeTerm>>(expected_dependencies)
-            )),
+            Some(ArenaRef::new(&interpreter, expected_dependencies)),
         );
 
         let stateful_value =
@@ -464,16 +470,17 @@ mod tests {
 
         let updated_state = HashmapTerm::allocate([(condition, stateful_value)], &mut interpreter);
 
+        let expected_result = Term::new(TermType::Int(IntTerm { value: 2 + 3 }), &interpreter);
+        let expected_result = interpreter.allocate(expected_result);
+
         let interpreter_result = interpreter
             .interpret(input.into(), updated_state.into())
             .unwrap()
             .bind(&interpreter);
 
-        let expected_result = Term::new(TermType::Int(IntTerm { value: 2 + 3 }), &interpreter);
-
         assert_eq!(
             interpreter_result.result(),
-            ArenaRef::new(&interpreter, &expected_result)
+            ArenaRef::new(&interpreter, expected_result)
         );
 
         assert!(interpreter_result.dependencies().is_some());
@@ -481,10 +488,7 @@ mod tests {
         let refer = interpreter_result.dependencies();
         assert_eq!(
             refer,
-            Some(ArenaRef::new(
-                &interpreter,
-                interpreter.get::<TypedTerm<TreeTerm>>(expected_dependencies)
-            )),
+            Some(ArenaRef::new(&interpreter, expected_dependencies)),
         );
     }
 }

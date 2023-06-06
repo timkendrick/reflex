@@ -40,7 +40,7 @@ impl<'heap, A: ArenaAllocator> ArenaRef<'heap, LambdaTerm, A> {
         self.as_value().num_args
     }
     pub fn body(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_value().body))
+        ArenaRef::<Term, _>::new(self.arena, self.as_value().body)
     }
     pub fn arity(&self) -> Arity {
         Arity::lazy(self.num_args() as usize, 0, false)

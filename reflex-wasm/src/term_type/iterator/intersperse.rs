@@ -34,10 +34,10 @@ impl TermHash for IntersperseIteratorTerm {
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, IntersperseIteratorTerm, A> {
     pub fn source(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_value().source))
+        ArenaRef::<Term, _>::new(self.arena, self.as_value().source)
     }
     pub fn separator(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_value().separator))
+        ArenaRef::<Term, _>::new(self.arena, self.as_value().separator)
     }
 }
 

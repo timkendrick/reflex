@@ -39,10 +39,10 @@ impl TermHash for RecordTerm {
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, RecordTerm, A> {
     fn keys(&self) -> ArenaRef<'heap, TypedTerm<ListTerm>, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_value().keys))
+        ArenaRef::<TypedTerm<ListTerm>, _>::new(self.arena, self.as_value().keys)
     }
     fn values(&self) -> ArenaRef<'heap, TypedTerm<ListTerm>, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_value().values))
+        ArenaRef::<TypedTerm<ListTerm>, _>::new(self.arena, self.as_value().values)
     }
     fn get<T: Expression>(&self, key: &T) -> Option<ArenaRef<'heap, Term, A>> {
         self.keys()
@@ -56,7 +56,7 @@ impl<'heap, A: ArenaAllocator> ArenaRef<'heap, RecordTerm, A> {
                     .items()
                     .get(index)
                     .copied()
-                    .map(|pointer| ArenaRef::new(self.arena, self.arena.get::<Term>(pointer)))
+                    .map(|pointer| ArenaRef::<Term, _>::new(self.arena, pointer))
             })
     }
 }

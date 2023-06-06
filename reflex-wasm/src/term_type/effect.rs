@@ -36,7 +36,7 @@ impl TermHash for EffectTerm {
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, EffectTerm, A> {
     pub fn condition(&self) -> ArenaRef<'heap, TypedTerm<ConditionTerm>, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_value().condition))
+        ArenaRef::<TypedTerm<ConditionTerm>, _>::new(self.arena, self.as_value().condition)
     }
 }
 

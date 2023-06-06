@@ -32,10 +32,10 @@ impl TermHash for ZipIteratorTerm {
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, ZipIteratorTerm, A> {
     pub fn left(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_value().left))
+        ArenaRef::<Term, _>::new(self.arena, self.as_value().left)
     }
     pub fn right(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_value().right))
+        ArenaRef::<Term, _>::new(self.arena, self.as_value().right)
     }
 }
 

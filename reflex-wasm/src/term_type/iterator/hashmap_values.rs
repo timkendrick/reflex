@@ -31,7 +31,7 @@ impl TermHash for HashmapValuesIteratorTerm {
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, HashmapValuesIteratorTerm, A> {
     pub fn source(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_value().source))
+        ArenaRef::<Term, _>::new(self.arena, self.as_value().source)
     }
 }
 

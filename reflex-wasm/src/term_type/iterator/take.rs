@@ -32,7 +32,7 @@ impl TermHash for TakeIteratorTerm {
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, TakeIteratorTerm, A> {
     pub fn source(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_value().source))
+        ArenaRef::<Term, _>::new(self.arena, self.as_value().source)
     }
     pub fn count(&self) -> u32 {
         self.as_value().count

@@ -34,10 +34,10 @@ impl TermHash for FilterIteratorTerm {
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, FilterIteratorTerm, A> {
     pub fn source(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_value().source))
+        ArenaRef::<Term, _>::new(self.arena, self.as_value().source)
     }
     pub fn predicate(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_value().predicate))
+        ArenaRef::<Term, _>::new(self.arena, self.as_value().predicate)
     }
 }
 

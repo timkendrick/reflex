@@ -36,7 +36,7 @@ impl TermHash for SignalTerm {
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, SignalTerm, A> {
     fn conditions(&self) -> ArenaRef<'heap, TypedTerm<TreeTerm>, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_value().conditions))
+        ArenaRef::<TypedTerm<TreeTerm>, _>::new(self.arena, self.as_value().conditions)
     }
 }
 

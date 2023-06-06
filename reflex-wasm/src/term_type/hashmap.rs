@@ -125,13 +125,13 @@ impl<'heap, A: ArenaAllocator> ArenaRef<'heap, HashmapTerm, A> {
         self.as_value().num_entries
     }
     pub fn buckets(&self) -> ArenaRef<'heap, Array<HashmapBucket>, A> {
-        ArenaRef::new(self.arena, &self.as_value().buckets)
+        ArenaRef::<Array<HashmapBucket>, _>::new(
+            self.arena,
+            self.arena.get_offset(&self.as_value().buckets),
+        )
     }
     pub fn entries(&self) -> HashmapBucketsIterator<'heap, ArrayIter<'heap, HashmapBucket>> {
-        HashmapBucketsIterator::new(
-            self.num_entries() as usize,
-            self.buckets().as_value().iter(),
-        )
+        HashmapBucketsIterator::new(self.num_entries() as usize, self.buckets().iter())
     }
     pub fn keys(
         &self,
@@ -185,8 +185,8 @@ impl<'heap, A: ArenaAllocator> HashmapTermType<WasmExpression<'heap, A>>
         self.entries()
             .map(|bucket| {
                 (
-                    ArenaRef::new(self.arena, self.arena.get::<Term>(bucket.key)),
-                    ArenaRef::new(self.arena, self.arena.get::<Term>(bucket.value)),
+                    ArenaRef::<Term, _>::new(self.arena, bucket.key),
+                    ArenaRef::<Term, _>::new(self.arena, bucket.value),
                 )
             })
             .filter_map({

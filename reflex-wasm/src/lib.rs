@@ -17,35 +17,10 @@ pub mod parser;
 pub mod stdlib;
 pub mod term_type;
 
-// impl<'heap, A: ArenaAllocator> ExpressionFactory<ArenaRef<'heap, Term, A>> for &'heap A {
-//     fn create_let_term(
-//         &self,
-//         initializer: ArenaRef<'heap, Term, A>,
-//         body: ArenaRef<'heap, Term, A>,
-//     ) -> ArenaRef<'heap, Term, A> {
-//         let arena = *self;
-//         debug_assert!(initializer.allocator == arena && body.allocator == arena);
-//         let instance = self.allocate(LetTerm {
-//             initializer: initializer.into(),
-//             body: body.into(),
-//         });
-//         ArenaRef::new(arena, instance)
-//     }
-//     fn match_let_term<'a>(
-//         &self,
-//         expression: &'a ArenaRef<'heap, Term, A>,
-//     ) -> Option<&'a ArenaRef<'heap, TypedTerm<LetTerm>, A>> {
-//         let arena = *self;
-//         match &expression.as_deref().value {
-//             TermType::Let(_) => Some(unsafe { expression.transmute::<TypedTerm<LetTerm>>() }),
-//             _ => None,
-//         }
-//     }
-// }
-
 pub struct ArenaRef<'a, T, A: ArenaAllocator> {
     pub(crate) arena: &'a A,
-    value: &'a T,
+    pointer: TermPointer,
+    _type: PhantomData<T>,
 }
 impl<'a, T, A: ArenaAllocator> std::hash::Hash for ArenaRef<'a, T, A>
 where
@@ -56,11 +31,15 @@ where
     }
 }
 impl<'a, T, A: ArenaAllocator> ArenaRef<'a, T, A> {
-    fn new(arena: &'a A, value: &'a T) -> Self {
-        Self { arena, value }
+    fn new(arena: &'a A, pointer: TermPointer) -> Self {
+        Self {
+            arena,
+            pointer,
+            _type: PhantomData,
+        }
     }
     pub fn as_value(&self) -> &'a T {
-        &self.value
+        self.arena.get::<T>(self.pointer)
     }
 }
 impl<'a, T, A: ArenaAllocator> Copy for ArenaRef<'a, T, A> {}
@@ -68,7 +47,8 @@ impl<'a, T, A: ArenaAllocator> Clone for ArenaRef<'a, T, A> {
     fn clone(&self) -> Self {
         Self {
             arena: self.arena,
-            value: self.value,
+            pointer: self.pointer,
+            _type: PhantomData,
         }
     }
 }
@@ -83,7 +63,9 @@ impl<'a, 'heap: 'a, T, A: ArenaAllocator> From<&'a ArenaRef<'heap, T, A>>
 
 impl<'a, 'heap: 'a, T, A: ArenaAllocator> RefType<'a, Self> for ArenaRef<'heap, T, A> {
     fn as_deref(&self) -> &'a Self {
-        // This is safe because we know 'heap lasts longer than 'a, which ensures the reference will be freed before 'heap
+        // FIXME: this is vulnerable to use-after-free errors
+        // We know 'heap lasts longer than 'a, which ensures the reference to `self` will be freed before 'heap,
+        // however there is no guarantee that `self` will not be dropped from the stack while 'a is still ongoing
         unsafe { std::mem::transmute::<&Self, &'a Self>(self) }
     }
 }
@@ -112,7 +94,7 @@ impl<'a, T: 'a, A: ArenaAllocator, TInner: Iterator<Item = TermPointer>> Iterato
     fn next(&mut self) -> Option<Self::Item> {
         self.inner
             .next()
-            .map(|pointer| ArenaRef::new(self.arena, self.arena.get(pointer)))
+            .map(|pointer| ArenaRef::<T, _>::new(self.arena, pointer))
     }
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.inner.size_hint()

@@ -31,7 +31,7 @@ impl TermHash for OnceIteratorTerm {
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, OnceIteratorTerm, A> {
     pub fn value(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_value().value))
+        ArenaRef::<Term, _>::new(self.arena, self.as_value().value)
     }
 }
 

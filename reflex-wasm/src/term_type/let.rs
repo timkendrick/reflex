@@ -39,10 +39,10 @@ impl TermHash for LetTerm {
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, LetTerm, A> {
     pub fn initializer(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_value().initializer))
+        ArenaRef::<Term, _>::new(self.arena, self.as_value().initializer)
     }
     pub fn body(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_value().body))
+        ArenaRef::<Term, _>::new(self.arena, self.as_value().body)
     }
 }
 

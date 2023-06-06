@@ -38,10 +38,10 @@ impl TermHash for ApplicationTerm {
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, ApplicationTerm, A> {
     pub fn target(&self) -> ArenaRef<'heap, Term, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_value().target))
+        ArenaRef::<Term, _>::new(self.arena, self.as_value().target)
     }
     pub fn args(&self) -> ArenaRef<'heap, TypedTerm<ListTerm>, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_value().args))
+        ArenaRef::<TypedTerm<ListTerm>, _>::new(self.arena, self.as_value().args)
     }
 }
 

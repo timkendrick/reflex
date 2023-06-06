@@ -11,6 +11,7 @@ pub trait ArenaAllocator: Sized {
     fn allocate<T: TermSize>(&mut self, value: T) -> TermPointer;
     fn get<T>(&self, offset: TermPointer) -> &T;
     fn get_mut<T>(&mut self, offset: TermPointer) -> &mut T;
+    fn get_offset<T>(&self, value: &T) -> TermPointer;
     fn slice<T: Sized>(&self, offset: TermPointer, count: usize) -> &[T];
     fn extend(&mut self, offset: TermPointer, size: usize);
     fn shrink(&mut self, offset: TermPointer, size: usize);
@@ -56,6 +57,11 @@ impl ArenaAllocator for VecAllocator {
         let offset = u32::from(offset) as usize;
         let item = &mut data[offset / 4];
         unsafe { std::mem::transmute::<&mut u32, &mut T>(item) }
+    }
+    fn get_offset<T>(&self, value: &T) -> TermPointer {
+        let Self(data) = self;
+        let offset = (value as *const T as usize) - (&data[0] as *const u32 as usize);
+        TermPointer::from(offset as u32)
     }
     fn slice<T: Sized>(&self, offset: TermPointer, count: usize) -> &[T] {
         let Self(data) = self;
@@ -123,6 +129,10 @@ impl<'a> ArenaAllocator for SliceAllocator<'a> {
     fn get_mut<T>(&mut self, offset: TermPointer) -> &'a mut T {
         let pointer = self.get_pointer(offset.into());
         unsafe { std::mem::transmute::<*const T, &mut T>(pointer) }
+    }
+    fn get_offset<T>(&self, value: &T) -> TermPointer {
+        let offset = (value as *const T as usize) - (self.data()[0] as *const u32 as usize);
+        TermPointer::from(offset as u32)
     }
     fn slice<T: Sized>(&self, offset: TermPointer, count: usize) -> &[T] {
         let pointer = self.get_pointer(offset.into());

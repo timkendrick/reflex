@@ -42,7 +42,7 @@ impl<'heap, A: ArenaAllocator> ArenaRef<'heap, HashsetTerm, A> {
         self.entries().keys()
     }
     fn entries(&self) -> ArenaRef<'heap, TypedTerm<HashmapTerm>, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_value().entries))
+        ArenaRef::<TypedTerm<HashmapTerm>, _>::new(self.arena, self.as_value().entries)
     }
 }
 

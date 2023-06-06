@@ -36,7 +36,7 @@ impl TermHash for ConstructorTerm {
 
 impl<'heap, A: ArenaAllocator> ArenaRef<'heap, ConstructorTerm, A> {
     pub fn keys(&self) -> ArenaRef<'heap, TypedTerm<ListTerm>, A> {
-        ArenaRef::new(self.arena, self.arena.get(self.as_value().keys))
+        ArenaRef::<TypedTerm<ListTerm>, _>::new(self.arena, self.as_value().keys)
     }
     pub fn arity(&self) -> Arity {
         Arity::lazy(self.keys().as_inner().len(), 0, false)

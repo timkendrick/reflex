@@ -54,7 +54,7 @@ impl<'heap, A: ArenaAllocator> ArenaRef<'heap, TreeTerm, A> {
         if pointer == TermPointer::null() {
             None
         } else {
-            Some(ArenaRef::new(self.arena, self.arena.get(pointer)))
+            Some(ArenaRef::<Term, _>::new(self.arena, pointer))
         }
     }
     pub fn right(&self) -> Option<ArenaRef<'heap, Term, A>> {
@@ -62,7 +62,7 @@ impl<'heap, A: ArenaAllocator> ArenaRef<'heap, TreeTerm, A> {
         if pointer == TermPointer::null() {
             None
         } else {
-            Some(ArenaRef::new(self.arena, self.arena.get(pointer)))
+            Some(ArenaRef::<Term, _>::new(self.arena, pointer))
         }
     }
     pub fn iter<'a>(&'a self) -> TreeIterator<'heap, A> {
@@ -168,13 +168,11 @@ where
     type Item = ArenaRef<'heap, TypedTerm<ConditionTerm>, A>;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next().and_then(|item_pointer| {
-            let item = ArenaRef::<'heap, Term, A>::new(self.arena, self.arena.get(item_pointer));
+            let item = ArenaRef::<Term, _>::new(self.arena, item_pointer);
             match item.as_value().type_id() {
                 TermTypeDiscriminants::Condition => {
-                    let condition_term = ArenaRef::<TypedTerm<ConditionTerm>, A>::new(
-                        self.arena,
-                        self.arena.get(item_pointer),
-                    );
+                    let condition_term =
+                        ArenaRef::<TypedTerm<ConditionTerm>, _>::new(self.arena, item_pointer);
                     Some(condition_term)
                 }
                 _ => self.next(),
@@ -309,21 +307,13 @@ impl<'heap, A: ArenaAllocator> std::fmt::Display for ArenaRef<'heap, TreeTerm, A
         if TermPointer::is_null(left) {
             write!(f, "NULL")?;
         } else {
-            write!(
-                f,
-                "{}",
-                ArenaRef::new(self.arena, self.arena.get::<Term>(left))
-            )?;
+            write!(f, "{}", ArenaRef::<Term, _>::new(self.arena, left))?;
         }
         write!(f, " . ")?;
         if TermPointer::is_null(right) {
             write!(f, "NULL")?;
         } else {
-            write!(
-                f,
-                "{}",
-                ArenaRef::new(self.arena, self.arena.get::<Term>(right))
-            )?;
+            write!(f, "{}", ArenaRef::<Term, _>::new(self.arena, right))?;
         }
         write!(f, ")")
     }
@@ -406,10 +396,8 @@ impl<'heap, A: ArenaAllocator> Iterator for TreeIterator<'heap, A> {
                     match child.as_value().type_id() {
                         // If so, push the cell to the stack and repeat the iteration with the updated stack
                         TermTypeDiscriminants::Tree => {
-                            let tree_term = ArenaRef::<TypedTerm<TreeTerm>, A>::new(
-                                self.arena,
-                                self.arena.get(child_pointer),
-                            );
+                            let tree_term =
+                                ArenaRef::<TypedTerm<TreeTerm>, _>::new(self.arena, child_pointer);
                             self.stack.push(tree_term.as_inner());
                             return self.next();
                         }
@@ -433,10 +421,8 @@ impl<'heap, A: ArenaAllocator> Iterator for TreeIterator<'heap, A> {
                     match child.as_value().type_id() {
                         // If so, push the cell to the stack and repeat the iteration with the updated stack
                         TermTypeDiscriminants::Tree => {
-                            let tree_term = ArenaRef::<TypedTerm<TreeTerm>, A>::new(
-                                self.arena,
-                                self.arena.get(child_pointer),
-                            );
+                            let tree_term =
+                                ArenaRef::<TypedTerm<TreeTerm>, _>::new(self.arena, child_pointer);
                             self.stack.push(tree_term.as_inner());
                             return self.next();
                         }
