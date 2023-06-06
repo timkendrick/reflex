@@ -1299,17 +1299,17 @@ mod tests {
     fn condition_custom() {
         assert_eq!(
             TermType::Condition(ConditionTerm::Custom(CustomCondition {
-                effect_type: ArenaPointer(12345),
-                payload: ArenaPointer(45678),
-                token: ArenaPointer(67890),
+                effect_type: ArenaPointer(0x54321),
+                payload: ArenaPointer(0x98765),
+                token: ArenaPointer(0x12345),
             }))
             .as_bytes(),
             [
                 TermTypeDiscriminants::Condition as u32,
                 ConditionTermDiscriminants::Custom as u32,
-                12345,
-                45678,
-                67890,
+                0x54321,
+                0x98765,
+                0x12345,
             ],
         );
     }
@@ -1329,13 +1329,13 @@ mod tests {
     fn condition_error() {
         assert_eq!(
             TermType::Condition(ConditionTerm::Error(ErrorCondition {
-                payload: ArenaPointer(12345),
+                payload: ArenaPointer(0x54321),
             }))
             .as_bytes(),
             [
                 TermTypeDiscriminants::Condition as u32,
                 ConditionTermDiscriminants::Error as u32,
-                12345,
+                0x54321,
             ],
         );
     }
@@ -1344,15 +1344,15 @@ mod tests {
     fn condition_type_error() {
         assert_eq!(
             TermType::Condition(ConditionTerm::TypeError(TypeErrorCondition {
-                expected: 12345,
-                payload: ArenaPointer(67890),
+                expected: 0x54321,
+                payload: ArenaPointer(0x98765),
             }))
             .as_bytes(),
             [
                 TermTypeDiscriminants::Condition as u32,
                 ConditionTermDiscriminants::TypeError as u32,
-                12345,
-                67890,
+                0x54321,
+                0x98765,
             ],
         );
     }
@@ -1362,14 +1362,14 @@ mod tests {
         assert_eq!(
             TermType::Condition(ConditionTerm::InvalidFunctionTarget(
                 InvalidFunctionTargetCondition {
-                    target: ArenaPointer(12345),
+                    target: ArenaPointer(0x54321),
                 },
             ))
             .as_bytes(),
             [
                 TermTypeDiscriminants::Condition as u32,
                 ConditionTermDiscriminants::InvalidFunctionTarget as u32,
-                12345,
+                0x54321,
             ],
         );
     }
@@ -1379,16 +1379,16 @@ mod tests {
         assert_eq!(
             TermType::Condition(ConditionTerm::InvalidFunctionArgs(
                 InvalidFunctionArgsCondition {
-                    target: ArenaPointer(12345),
-                    args: ArenaPointer(67890),
+                    target: ArenaPointer(0x54321),
+                    args: ArenaPointer(0x98765),
                 },
             ))
             .as_bytes(),
             [
                 TermTypeDiscriminants::Condition as u32,
                 ConditionTermDiscriminants::InvalidFunctionArgs as u32,
-                12345,
-                67890,
+                0x54321,
+                0x98765,
             ],
         );
     }

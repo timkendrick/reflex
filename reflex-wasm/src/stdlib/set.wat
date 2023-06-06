@@ -15,7 +15,7 @@
         (if (result i32 i32)
           ;; If the given key index is within the list bounds, return a new list with the updated value
           (i32.and
-            (i32.ge_s (local.tee $index (call $Term::Int::get::value (local.get $key))) (i32.const 0))
+            (i32.ge_s (local.tee $index (i32.wrap_i64 (call $Term::Int::get::value (local.get $key)))) (i32.const 0))
             (i32.lt_u (local.get $index) (call $Term::List::get_length (local.get $self))))
           (then
             (call $Term::List::update_index (local.get $self) (local.get $index) (local.get $value))
@@ -34,7 +34,9 @@
         (if (result i32 i32)
           ;; If the given key index is within the list bounds, return a new list with the updated value
           (i32.and
-            (i32.ne (local.tee $index (call $Term::Float::get_non_negative_integer_value (local.get $key))) (global.get $NULL))
+            (i32.ne
+              (local.tee $index (i32.wrap_i64 (call $Term::Float::get_non_negative_integer_value (local.get $key))))
+              (i32.const -1))
             (i32.and
               (i32.ge_s (local.get $index) (i32.const 0))
               (i32.lt_u (local.get $index) (call $Term::List::get_length (local.get $self)))))

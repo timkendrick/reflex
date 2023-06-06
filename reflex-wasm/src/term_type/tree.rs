@@ -475,12 +475,17 @@ mod tests {
     fn tree() {
         assert_eq!(
             TermType::Tree(TreeTerm {
-                left: ArenaPointer(12345),
-                right: ArenaPointer(67890),
-                length: 54321
+                left: ArenaPointer(0x54321),
+                right: ArenaPointer(0x98765),
+                length: 0x12345
             })
             .as_bytes(),
-            [TermTypeDiscriminants::Tree as u32, 12345, 67890, 54321],
+            [
+                TermTypeDiscriminants::Tree as u32,
+                0x54321,
+                0x98765,
+                0x12345
+            ],
         );
     }
 }

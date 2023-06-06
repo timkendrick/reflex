@@ -5,7 +5,7 @@ use std::{collections::HashMap, iter::once, ops::Deref, path::Path};
 
 use reflex::core::{
     as_integer, create_record, Builtin, Expression, ExpressionFactory, FloatTermType,
-    HeapAllocator, IntTermType, RefType, StringTermType, StringValue,
+    HeapAllocator, IntTermType, IntValue, RefType, StringTermType, StringValue,
 };
 use reflex_macros::blanket_trait;
 use swc_common::{source_map::Pos, sync::Lrc, FileName, SourceMap, Span, Spanned};
@@ -1936,7 +1936,7 @@ where
 {
     get_dynamic_field(
         target,
-        factory.create_int_term(index as i32),
+        factory.create_int_term(index as IntValue),
         factory,
         allocator,
     )

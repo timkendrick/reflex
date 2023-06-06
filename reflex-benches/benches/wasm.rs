@@ -178,7 +178,7 @@ fn generate_3_plus_5_wasm(interpreter: &mut WasmInterpreter) -> (ArenaPointer, A
 
 fn generate_deep_add_wasm(
     interpreter: &mut WasmInterpreter,
-    depth: i32,
+    depth: i64,
 ) -> (ArenaPointer, ArenaPointer) {
     let mut current = interpreter.allocate(Term::new(TermType::Int(IntTerm::from(1)), interpreter));
 
@@ -210,7 +210,7 @@ fn generate_deep_add_wasm(
 fn generate_deep_add_rust(
     _factory: &mut SharedTermFactory<reflex_stdlib::Stdlib>,
     _allocator: &mut DefaultAllocator<CachedSharedTerm<reflex_stdlib::Stdlib>>,
-    depth: i32,
+    depth: i64,
 ) -> (
     CachedSharedTerm<reflex_stdlib::Stdlib>,
     StateCache<CachedSharedTerm<reflex_stdlib::Stdlib>>,

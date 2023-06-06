@@ -121,10 +121,10 @@ mod tests {
     fn evaluate_iterator() {
         assert_eq!(
             TermType::EvaluateIterator(EvaluateIteratorTerm {
-                source: ArenaPointer(12345),
+                source: ArenaPointer(0x54321),
             })
             .as_bytes(),
-            [TermTypeDiscriminants::EvaluateIterator as u32, 12345],
+            [TermTypeDiscriminants::EvaluateIterator as u32, 0x54321],
         );
     }
 }

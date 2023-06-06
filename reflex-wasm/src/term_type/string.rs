@@ -288,11 +288,11 @@ mod tests {
     fn string() {
         assert_eq!(
             TermType::String(StringTerm {
-                length: 12345,
+                length: 0x54321,
                 data: Default::default(),
             })
             .as_bytes(),
-            [TermTypeDiscriminants::String as u32, 12345, 0, 0],
+            [TermTypeDiscriminants::String as u32, 0x54321, 0, 0],
         );
         let mut allocator = VecAllocator::default();
         {

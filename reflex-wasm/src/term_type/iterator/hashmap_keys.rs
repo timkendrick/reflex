@@ -123,10 +123,10 @@ mod tests {
     fn hashmap_keys_iterator() {
         assert_eq!(
             TermType::HashmapKeysIterator(HashmapKeysIteratorTerm {
-                source: ArenaPointer(12345),
+                source: ArenaPointer(0x54321),
             })
             .as_bytes(),
-            [TermTypeDiscriminants::HashmapKeysIterator as u32, 12345],
+            [TermTypeDiscriminants::HashmapKeysIterator as u32, 0x54321],
         );
     }
 }

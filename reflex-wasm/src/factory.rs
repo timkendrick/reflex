@@ -656,7 +656,7 @@ where
     }
 
     fn create_int_term(&self, value: IntValue) -> ArenaRef<Term, Self> {
-        let term = Term::new(TermType::Int(IntTerm { value }), &*self.arena.borrow());
+        let term = Term::new(TermType::Int(IntTerm::from(value)), &*self.arena.borrow());
         let pointer = self.arena.borrow_mut().allocate(term);
         ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }

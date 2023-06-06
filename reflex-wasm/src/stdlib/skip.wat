@@ -9,7 +9,7 @@
       (call $TermType::implements::iterate)
       (i32.eq (global.get $TermType::Int))
       (func $Stdlib_Skip::impl::<iterate>::Int (param $self i32) (param $count i32) (param $state i32) (result i32 i32)
-        (call $Term::SkipIterator::new (local.get $self) (call $Term::Int::get::value (local.get $count)))
+        (call $Term::SkipIterator::new (local.get $self) (i32.wrap_i64 (call $Term::Int::get::value (local.get $count))))
         (global.get $NULL)))
 
     (@impl
@@ -18,7 +18,9 @@
       (func $Stdlib_Skip::impl::<iterate>::Float (param $self i32) (param $count i32) (param $state i32) (result i32 i32)
         (local $count_value i32)
         (if (result i32 i32)
-          (i32.ne (local.tee $count_value (call $Term::Float::get_non_negative_integer_value (local.get $count))) (global.get $NULL))
+          (i32.ne
+            (local.tee $count_value (i32.wrap_i64 (call $Term::Float::get_non_negative_integer_value (local.get $count))))
+            (i32.const -1))
           (then
             (call $Term::SkipIterator::new (local.get $self) (local.get $count_value))
             (global.get $NULL))

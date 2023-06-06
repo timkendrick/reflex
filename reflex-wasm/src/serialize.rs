@@ -120,15 +120,10 @@ mod tests {
     fn serialize_trait() {
         let mut source_arena = VecAllocator::default();
 
-        let _filler = source_arena.allocate(Term::new(
-            TermType::Int(IntTerm { value: 1 }),
-            &source_arena,
-        ));
+        let _filler =
+            source_arena.allocate(Term::new(TermType::Int(IntTerm::from(1)), &source_arena));
 
-        let leaf = source_arena.allocate(Term::new(
-            TermType::Int(IntTerm { value: 2 }),
-            &source_arena,
-        ));
+        let leaf = source_arena.allocate(Term::new(TermType::Int(IntTerm::from(2)), &source_arena));
 
         let root = source_arena.allocate(Term::new(
             TermType::Tree(TreeTerm {
@@ -146,15 +141,11 @@ mod tests {
 
         let mut target_arena = VecAllocator::default();
 
-        let _filler = target_arena.allocate(Term::new(
-            TermType::Int(IntTerm { value: 3 }),
-            &target_arena,
-        ));
+        let _filler =
+            target_arena.allocate(Term::new(TermType::Int(IntTerm::from(3)), &target_arena));
 
-        let _filler = target_arena.allocate(Term::new(
-            TermType::Int(IntTerm { value: 4 }),
-            &target_arena,
-        ));
+        let _filler =
+            target_arena.allocate(Term::new(TermType::Int(IntTerm::from(4)), &target_arena));
 
         let mut serializer_state = {
             let arena = &target_arena;

@@ -173,11 +173,11 @@ mod tests {
     fn r#let() {
         assert_eq!(
             TermType::Let(LetTerm {
-                initializer: ArenaPointer(12345),
-                body: ArenaPointer(67890),
+                initializer: ArenaPointer(0x54321),
+                body: ArenaPointer(0x98765),
             })
             .as_bytes(),
-            [TermTypeDiscriminants::Let as u32, 12345, 67890],
+            [TermTypeDiscriminants::Let as u32, 0x54321, 0x98765],
         );
     }
 }

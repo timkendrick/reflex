@@ -128,8 +128,8 @@ mod tests {
     #[test]
     fn symbol() {
         assert_eq!(
-            TermType::Symbol(SymbolTerm { id: 12345 }).as_bytes(),
-            [TermTypeDiscriminants::Symbol as u32, 12345],
+            TermType::Symbol(SymbolTerm { id: 0x54321 }).as_bytes(),
+            [TermTypeDiscriminants::Symbol as u32, 0x54321],
         );
     }
 }

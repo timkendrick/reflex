@@ -142,10 +142,10 @@ mod tests {
     fn effect() {
         assert_eq!(
             TermType::Effect(EffectTerm {
-                condition: ArenaPointer(12345)
+                condition: ArenaPointer(0x54321)
             })
             .as_bytes(),
-            [TermTypeDiscriminants::Effect as u32, 12345],
+            [TermTypeDiscriminants::Effect as u32, 0x54321],
         );
     }
 }

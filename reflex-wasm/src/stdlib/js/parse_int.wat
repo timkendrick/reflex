@@ -22,7 +22,7 @@
               (f64.ge (local.get $value) (f64.convert_i32_s (i32.const -0x7FFFFFFF)))
               (f64.le (local.get $value) (f64.convert_i32_s (i32.const 0x7FFFFFFF)))))
           (then
-            (call $Term::Int::new (i32.trunc_f64_s (local.get $value)))
+            (call $Term::Int::new (i64.trunc_f64_s (local.get $value)))
             (global.get $NULL))
           (else
             (call $Stdlib_ParseInt::impl::default (local.get $self) (local.get $state))))))

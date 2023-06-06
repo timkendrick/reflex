@@ -564,7 +564,7 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<IntTerm, A> {
         let mut instructions = CompiledExpression::default();
         // Push the value argument onto the stack
         // => [value]
-        instructions.push(CompiledInstruction::i32_const(value));
+        instructions.push(CompiledInstruction::i64_const(value));
         // Invoke the term constructor
         // => [IntTerm]
         instructions.push(CompiledInstruction::CallRuntimeBuiltin(
@@ -1193,7 +1193,7 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<RangeIteratorTerm, A> {
         let mut instructions = CompiledExpression::default();
         // Push the offset argument onto the stack
         // => [offset]
-        instructions.push(CompiledInstruction::i32_const(offset));
+        instructions.push(CompiledInstruction::i64_const(offset));
         // Push the length argument onto the stack
         // => [offset, length]
         instructions.push(CompiledInstruction::u32_const(length));

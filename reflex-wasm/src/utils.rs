@@ -33,7 +33,7 @@ pub(crate) fn chunks_to_i64(value: [u32; 2]) -> i64 {
 }
 
 #[allow(dead_code)]
-pub fn into_twos_complement(value: i32) -> u32 {
+pub fn into_twos_complement_i32(value: i32) -> u32 {
     if value >= 0 {
         value as u32
     } else {
@@ -41,11 +41,27 @@ pub fn into_twos_complement(value: i32) -> u32 {
     }
 }
 
-pub fn from_twos_complement(value: u32) -> i32 {
+pub fn from_twos_complement_i32(value: u32) -> i32 {
     if value <= 0x7FFFFFFF {
         value as i32
     } else {
         -0x80000000i32 + ((value - 0x80000000) as i32)
+    }
+}
+
+pub fn into_twos_complement_i64(value: i64) -> u64 {
+    if value >= 0 {
+        value as u64
+    } else {
+        0xFFFFFFFFFFFFFFFFu64 - ((value + 1).abs() as u64)
+    }
+}
+
+pub fn from_twos_complement_i64(value: u64) -> i64 {
+    if value <= 0x7FFFFFFFFFFFFFFF {
+        value as i64
+    } else {
+        -0x8000000000000000i64 + ((value - 0x8000000000000000) as i64)
     }
 }
 
@@ -57,20 +73,20 @@ mod tests {
     fn twos_complement() {
         assert_eq!(i32::MIN, -0x80000000);
         assert_eq!(i32::MAX, 0x7FFFFFFF);
-        assert_eq!(into_twos_complement(0), 0);
-        assert_eq!(into_twos_complement(1), 1);
-        assert_eq!(into_twos_complement(0x10000000), 0x10000000);
-        assert_eq!(into_twos_complement(0x7FFFFFFF), 0x7FFFFFFF);
-        assert_eq!(into_twos_complement(-0x80000000), 0x80000000);
-        assert_eq!(into_twos_complement(-1), 0xFFFFFFFF);
+        assert_eq!(into_twos_complement_i32(0), 0);
+        assert_eq!(into_twos_complement_i32(1), 1);
+        assert_eq!(into_twos_complement_i32(0x10000000), 0x10000000);
+        assert_eq!(into_twos_complement_i32(0x7FFFFFFF), 0x7FFFFFFF);
+        assert_eq!(into_twos_complement_i32(-0x80000000), 0x80000000);
+        assert_eq!(into_twos_complement_i32(-1), 0xFFFFFFFF);
 
         assert_eq!(u32::MIN, 0);
         assert_eq!(u32::MAX, 0xFFFFFFFF);
-        assert_eq!(from_twos_complement(0), 0);
-        assert_eq!(from_twos_complement(1), 1);
-        assert_eq!(from_twos_complement(0x10000000), 0x10000000);
-        assert_eq!(from_twos_complement(0x7FFFFFFF), 0x7FFFFFFF);
-        assert_eq!(from_twos_complement(0x80000000), -0x80000000);
-        assert_eq!(from_twos_complement(0xFFFFFFFF), -1);
+        assert_eq!(from_twos_complement_i32(0), 0);
+        assert_eq!(from_twos_complement_i32(1), 1);
+        assert_eq!(from_twos_complement_i32(0x10000000), 0x10000000);
+        assert_eq!(from_twos_complement_i32(0x7FFFFFFF), 0x7FFFFFFF);
+        assert_eq!(from_twos_complement_i32(0x80000000), -0x80000000);
+        assert_eq!(from_twos_complement_i32(0xFFFFFFFF), -1);
     }
 }

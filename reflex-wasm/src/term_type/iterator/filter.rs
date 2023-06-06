@@ -134,11 +134,15 @@ mod tests {
     fn filter_iterator() {
         assert_eq!(
             TermType::FilterIterator(FilterIteratorTerm {
-                source: ArenaPointer(12345),
-                predicate: ArenaPointer(67890),
+                source: ArenaPointer(0x54321),
+                predicate: ArenaPointer(0x98765),
             })
             .as_bytes(),
-            [TermTypeDiscriminants::FilterIterator as u32, 12345, 67890],
+            [
+                TermTypeDiscriminants::FilterIterator as u32,
+                0x54321,
+                0x98765
+            ],
         );
     }
 }

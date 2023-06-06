@@ -218,11 +218,11 @@ mod tests {
     fn partial() {
         assert_eq!(
             TermType::Partial(PartialTerm {
-                target: ArenaPointer(12345),
-                args: ArenaPointer(67890),
+                target: ArenaPointer(0x54321),
+                args: ArenaPointer(0x98765),
             })
             .as_bytes(),
-            [TermTypeDiscriminants::Partial as u32, 12345, 67890],
+            [TermTypeDiscriminants::Partial as u32, 0x54321, 0x98765],
         );
     }
 }

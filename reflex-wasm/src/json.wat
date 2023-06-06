@@ -189,7 +189,7 @@
   (func $Json::parse_number (param $offset i32) (param $end_offset i32) (result i32 i32)
     (local $char i32)
     (local $is_negative i32)
-    (local $integer_value i32)
+    (local $integer_value i64)
     (local $decimal_value i32)
     (local $decimal_precision i32)
     (local $exponent_value i32)
@@ -206,9 +206,9 @@
             (call $Json::is_digit (local.tee $char (i32.load8_u (local.get $offset))))
             (then
               (local.set $integer_value
-                (i32.add
-                  (i32.mul (local.get $integer_value) (i32.const 10))
-                  (call $Json::parse_digit (local.get $char))))
+                (i64.add
+                  (i64.mul (local.get $integer_value) (i64.const 10))
+                  (i64.extend_i32_u (call $Json::parse_digit (local.get $char)))))
               (br_if $LOOP (i32.lt_u (local.tee $offset (i32.add (local.get $offset) (i32.const 1))) (local.get $end_offset))))
             (else)))
         (block $default
@@ -266,7 +266,10 @@
                                 (then
                                   (return (call $Json::parse_error (local.get $offset))))
                                 (else
-                                  (call $Json::set_negative (local.get $exponent_value) (local.get $is_negative_exponent)))))
+                                  (select
+                                    (call $Utils::i32::neg (local.get $exponent_value))
+                                    (local.get $exponent_value)
+                                    (local.get $is_negative_exponent)))))
                             (else
                               (i32.const 0)))))
                       (local.get $offset)))))))
@@ -287,10 +290,17 @@
                     (local.get $integer_value)
                     (i32.const 0)
                     (i32.const 0)
-                    (call $Json::set_negative (local.get $exponent_value) (local.get $is_negative_exponent))))
+                    (select
+                      (call $Utils::i32::neg (local.get $exponent_value))
+                      (local.get $exponent_value)
+                      (local.get $is_negative_exponent))))
                   (local.get $offset)))))
         ;; Default implementation
-        (call $Term::Int::new (call $Json::set_negative (local.get $integer_value) (local.get $is_negative)))
+        (call $Term::Int::new
+          (select
+            (call $Utils::i64::neg (local.get $integer_value))
+            (local.get $integer_value)
+            (local.get $is_negative)))
         (local.get $offset))))
 
   (func $Json::is_digit (param $char i32) (result i32)
@@ -347,17 +357,11 @@
             (local.get $exponent_value)
             (local.get $offset))))))
 
-  (func $Json::set_negative (param $value i32) (param $is_negative i32) (result i32)
-    (select
-      (call $Utils::i32::neg (local.get $value))
-      (local.get $value)
-      (local.get $is_negative)))
-
-  (func $Json::parse_float (param $is_negative i32) (param $integer_value i32) (param $decimal_value i32) (param $decimal_precision i32) (param $exponent_value i32) (result f64)
+  (func $Json::parse_float (param $is_negative i32) (param $integer_value i64) (param $decimal_value i32) (param $decimal_precision i32) (param $exponent_value i32) (result f64)
     (local $value f64)
     (local.set $value
       (f64.add
-        (f64.convert_i32_s (local.get $integer_value))
+        (f64.convert_i64_s (local.get $integer_value))
         (f64.div
           (f64.convert_i32_u (local.get $decimal_value))
           (call $Utils::f64::pow_int (f64.const 10) (local.get $decimal_precision)))))

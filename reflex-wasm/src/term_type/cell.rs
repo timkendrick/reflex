@@ -155,7 +155,7 @@ mod tests {
         );
         let mut allocator = VecAllocator::default();
         {
-            let entries = [12345, 67890];
+            let entries = [0x54321, 0x98765];
             let instance = CellTerm::allocate(entries, &mut allocator);
             let result = allocator.get_ref::<Term>(instance).as_bytes();
             let hash = result[0];
@@ -167,7 +167,7 @@ mod tests {
             assert_eq!(discriminant, TermTypeDiscriminants::Cell as u32);
             assert_eq!(data_length, entries.len() as u32);
             assert_eq!(data_capacity, entries.len() as u32);
-            assert_eq!(data, [12345, 67890]);
+            assert_eq!(data, [0x54321, 0x98765]);
         }
     }
 }

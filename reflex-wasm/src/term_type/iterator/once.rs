@@ -121,10 +121,10 @@ mod tests {
     fn once_iterator() {
         assert_eq!(
             TermType::OnceIterator(OnceIteratorTerm {
-                value: ArenaPointer(12345),
+                value: ArenaPointer(0x54321),
             })
             .as_bytes(),
-            [TermTypeDiscriminants::OnceIterator as u32, 12345],
+            [TermTypeDiscriminants::OnceIterator as u32, 0x54321],
         );
     }
 }

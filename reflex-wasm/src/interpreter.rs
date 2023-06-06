@@ -587,7 +587,7 @@ mod tests {
                 .deref()
                 .borrow_mut()
                 .deref_mut()
-                .allocate(Term::new(TermType::Int(IntTerm { value: 3 }), &interpreter)),
+                .allocate(Term::new(TermType::Int(IntTerm::from(3)), &interpreter)),
         );
 
         assert_eq!(interpreter_result.result(), expected_result);
@@ -640,7 +640,7 @@ mod tests {
                 .deref()
                 .borrow_mut()
                 .deref_mut()
-                .allocate(Term::new(TermType::Int(IntTerm { value: 5 }), &interpreter)),
+                .allocate(Term::new(TermType::Int(IntTerm::from(5)), &interpreter)),
         );
 
         assert_eq!(interpreter_result.result(), expected_result);
@@ -658,7 +658,7 @@ mod tests {
             ));
 
             let payload =
-                interpreter.allocate(Term::new(TermType::Int(IntTerm { value: 3 }), &interpreter));
+                interpreter.allocate(Term::new(TermType::Int(IntTerm::from(3)), &interpreter));
 
             let token = interpreter.allocate(Term::new(TermType::Nil(NilTerm), &interpreter));
 
@@ -750,14 +750,14 @@ mod tests {
             .deref()
             .borrow_mut()
             .deref_mut()
-            .allocate(Term::new(TermType::Int(IntTerm { value: 3 }), &interpreter));
+            .allocate(Term::new(TermType::Int(IntTerm::from(3)), &interpreter));
 
         let updated_state = HashmapTerm::allocate(
             [(condition, stateful_value)],
             interpreter.deref().borrow_mut().deref_mut(),
         );
 
-        let expected_result = Term::new(TermType::Int(IntTerm { value: 2 + 3 }), &interpreter);
+        let expected_result = Term::new(TermType::Int(IntTerm::from(2 + 3)), &interpreter);
         let expected_result = interpreter
             .deref()
             .borrow_mut()

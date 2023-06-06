@@ -268,15 +268,15 @@ mod tests {
     fn record() {
         assert_eq!(
             TermType::Record(RecordTerm {
-                keys: ArenaPointer(12345),
-                values: ArenaPointer(67890),
+                keys: ArenaPointer(0x54321),
+                values: ArenaPointer(0x98765),
                 lookup_table: ArenaPointer::null(),
             })
             .as_bytes(),
             [
                 TermTypeDiscriminants::Record as u32,
-                12345,
-                67890,
+                0x54321,
+                0x98765,
                 0xFFFFFFFF
             ],
         );

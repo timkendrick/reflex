@@ -170,11 +170,11 @@ mod tests {
     fn lambda() {
         assert_eq!(
             TermType::Lambda(LambdaTerm {
-                num_args: 12345,
-                body: ArenaPointer(67890),
+                num_args: 0x54321,
+                body: ArenaPointer(0x98765),
             })
             .as_bytes(),
-            [TermTypeDiscriminants::Lambda as u32, 12345, 67890],
+            [TermTypeDiscriminants::Lambda as u32, 0x54321, 0x98765],
         );
     }
 }

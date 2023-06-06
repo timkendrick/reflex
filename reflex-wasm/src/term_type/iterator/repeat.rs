@@ -121,10 +121,10 @@ mod tests {
     fn repeat_iterator() {
         assert_eq!(
             TermType::RepeatIterator(RepeatIteratorTerm {
-                value: ArenaPointer(12345),
+                value: ArenaPointer(0x54321),
             })
             .as_bytes(),
-            [TermTypeDiscriminants::RepeatIterator as u32, 12345],
+            [TermTypeDiscriminants::RepeatIterator as u32, 0x54321],
         );
     }
 }

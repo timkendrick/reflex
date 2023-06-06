@@ -422,7 +422,7 @@
         (if (result i32)
           ;; Determine whether the index is within the list bounds
           (i32.and
-            (i32.ge_s (local.tee $index (call $Term::Int::get::value (local.get $key))) (i32.const 0))
+            (i32.ge_s (local.tee $index (i32.wrap_i64 (call $Term::Int::get::value (local.get $key)))) (i32.const 0))
             (i32.lt_u (local.get $index) (call $Term::List::get::items::length (local.get $self))))
           (then
             ;; If the index is within the list bounds, etrieve the corresponding list item
@@ -441,11 +441,11 @@
       (else
         ;; Determine whether the index is within the list bounds
         (i32.and
-          (i32.ge_s (local.tee $index (call $Term::Int::get::value (local.get $key))) (i32.const 0))
+          (i32.ge_s (local.tee $index (i32.wrap_i64 (call $Term::Int::get::value (local.get $key)))) (i32.const 0))
           (i32.lt_u (local.get $index) (call $Term::List::get::items::length (local.get $self)))))))
 
   (func $Term::List::traits::keys (param $self i32) (result i32)
-    (call $Term::RangeIterator::new (i32.const 0) (call $Term::List::get::items::length (local.get $self))))
+    (call $Term::RangeIterator::new (i64.const 0) (call $Term::List::get::items::length (local.get $self))))
 
   (func $Term::List::traits::values (param $self i32) (result i32)
     (call $Term::List::traits::iterate (local.get $self)))

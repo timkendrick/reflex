@@ -8,7 +8,7 @@
     (@impl
       (i32.eq (global.get $TermType::Int))
       (func $Stdlib_Abs::impl::Int (param $self i32) (param $state i32) (result i32 i32)
-        (call $Term::Int::new (call $Utils::i32::abs (call $Term::Int::get::value (local.get $self))))
+        (call $Term::Int::new (call $Utils::i64::abs (call $Term::Int::get::value (local.get $self))))
         (global.get $NULL)))
 
     (@impl

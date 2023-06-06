@@ -8,7 +8,7 @@
     (@impl
       (i32.eq (global.get $TermType::Int))
       (func $Stdlib_ParseDate::impl::Int (param $self i32) (param $state i32) (result i32 i32)
-        (call $Term::Date::new (i64.extend_i32_s (call $Term::Int::get_value (local.get $self))))
+        (call $Term::Date::new (call $Term::Int::get_value (local.get $self)))
         (global.get $NULL)))
 
     (@impl

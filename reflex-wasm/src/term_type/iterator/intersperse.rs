@@ -134,14 +134,14 @@ mod tests {
     fn intersperse_iterator() {
         assert_eq!(
             TermType::IntersperseIterator(IntersperseIteratorTerm {
-                source: ArenaPointer(12345),
-                separator: ArenaPointer(67890),
+                source: ArenaPointer(0x54321),
+                separator: ArenaPointer(0x98765),
             })
             .as_bytes(),
             [
                 TermTypeDiscriminants::IntersperseIterator as u32,
-                12345,
-                67890
+                0x54321,
+                0x98765
             ],
         );
     }

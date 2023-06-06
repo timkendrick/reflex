@@ -10,7 +10,7 @@
       (i32.eq (global.get $TermType::Int))
       (func $Stdlib_Gte::impl::Int::Int (param $self i32) (param $other i32) (param $state i32) (result i32 i32)
         (call $Term::Boolean::new
-          (i32.ge_s
+          (i64.ge_s
             (call $Term::Int::get::value (local.get $self))
             (call $Term::Int::get::value (local.get $other))))
         (global.get $NULL)))
@@ -31,7 +31,7 @@
       (func $Stdlib_Gte::impl::Int::Float (param $self i32) (param $other i32) (param $state i32) (result i32 i32)
         (call $Term::Boolean::new
           (f64.ge
-            (f64.convert_i32_s (call $Term::Int::get::value (local.get $self)))
+            (f64.convert_i64_s (call $Term::Int::get::value (local.get $self)))
             (call $Term::Float::get::value (local.get $other))))
         (global.get $NULL)))
 
@@ -42,7 +42,7 @@
         (call $Term::Boolean::new
           (f64.ge
             (call $Term::Float::get::value (local.get $self))
-            (f64.convert_i32_s (call $Term::Int::get::value (local.get $other)))))
+            (f64.convert_i64_s (call $Term::Int::get::value (local.get $other)))))
         (global.get $NULL)))
 
     (@default

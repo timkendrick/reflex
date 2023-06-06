@@ -185,13 +185,14 @@ export function createRuntime(runtime) {
       return runtime.getBooleanValue(value) === 1;
     },
     createInt(value) {
-      return runtime.createInt(value);
+      return runtime.createInt(BigInt(value));
     },
     isInt(value) {
       return runtime.isInt(value);
     },
     getIntValue(value) {
-      return runtime.getIntValue(value);
+      const bigIntValue = runtime.getIntValue(value);
+      return bigIntValue > Number.MAX_SAFE_INTEGER ? bigIntValue : Number(bigIntValue);
     },
     createFloat(value) {
       return runtime.createFloat(value);
@@ -545,7 +546,7 @@ export function createRuntime(runtime) {
       return runtime.createIntersperseIterator(source, separator);
     },
     createRangeIterator(offset, length) {
-      return runtime.createRangeIterator(offset, length);
+      return runtime.createRangeIterator(BigInt(offset), length);
     },
     createHashmapKeysIterator(source) {
       return runtime.createHashmapKeysIterator(source);

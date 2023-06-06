@@ -121,10 +121,10 @@ mod tests {
     fn hashmap_values_iterator() {
         assert_eq!(
             TermType::HashmapValuesIterator(HashmapValuesIteratorTerm {
-                source: ArenaPointer(12345),
+                source: ArenaPointer(0x54321),
             })
             .as_bytes(),
-            [TermTypeDiscriminants::HashmapValuesIterator as u32, 12345],
+            [TermTypeDiscriminants::HashmapValuesIterator as u32, 0x54321],
         );
     }
 }

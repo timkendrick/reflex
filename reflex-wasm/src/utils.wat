@@ -7,11 +7,22 @@
       (i32.add (local.get $self) (local.tee $self (i32.shr_s (local.get $self) (i32.const 31))))
       (local.get $self)))
 
+  (func $Utils::i64::abs (param $self i64) (result i64)
+    (i64.xor
+      (i64.add (local.get $self) (local.tee $self (i64.shr_s (local.get $self) (i64.const 63))))
+      (local.get $self)))
+
   (func $Utils::i32::min_s (param $self i32) (param $other i32) (result i32)
     (select
       (local.get $self)
       (local.get $other)
       (i32.lt_s (local.get $self) (local.get $other))))
+
+  (func $Utils::i64::min_s (param $self i64) (param $other i64) (result i64)
+    (select
+      (local.get $self)
+      (local.get $other)
+      (i64.lt_s (local.get $self) (local.get $other))))
 
   (func $Utils::i32::max_s (param $self i32) (param $other i32) (result i32)
     (select
@@ -19,11 +30,23 @@
       (local.get $other)
       (i32.gt_s (local.get $self) (local.get $other))))
 
+  (func $Utils::i64::max_s (param $self i64) (param $other i64) (result i64)
+    (select
+      (local.get $self)
+      (local.get $other)
+      (i64.gt_s (local.get $self) (local.get $other))))
+
   (func $Utils::i32::min_u (param $self i32) (param $other i32) (result i32)
     (select
       (local.get $self)
       (local.get $other)
       (i32.lt_u (local.get $self) (local.get $other))))
+
+  (func $Utils::i64::min_u (param $self i64) (param $other i64) (result i64)
+    (select
+      (local.get $self)
+      (local.get $other)
+      (i64.lt_u (local.get $self) (local.get $other))))
 
   (func $Utils::i32::max_u (param $self i32) (param $other i32) (result i32)
     (select
@@ -31,11 +54,23 @@
       (local.get $other)
       (i32.gt_u (local.get $self) (local.get $other))))
 
+  (func $Utils::i64::max_u (param $self i64) (param $other i64) (result i64)
+    (select
+      (local.get $self)
+      (local.get $other)
+      (i64.gt_u (local.get $self) (local.get $other))))
+
   (func $Utils::i32::saturating_sub_u (param $self i32) (param $other i32) (result i32)
     (select
       (i32.sub (local.get $self) (local.get $other))
       (i32.const 0)
       (i32.le_u (local.get $other) (local.get $self))))
+
+  (func $Utils::i64::saturating_sub_u (param $self i64) (param $other i64) (result i64)
+    (select
+      (i64.sub (local.get $self) (local.get $other))
+      (i64.const 0)
+      (i64.le_u (local.get $other) (local.get $self))))
 
   (func $Utils::i32::pow (param $self i32) (param $exponent i32) (result i32)
     ;; See https://rosettacode.org/wiki/Exponentiation_operator#C
@@ -51,18 +86,39 @@
       (br_if $LOOP (local.tee $exponent (i32.shr_u (local.get $exponent) (i32.const 1)))))
     (local.get $result))
 
+  (func $Utils::i64::pow (param $self i64) (param $exponent i32) (result i64)
+    ;; See https://rosettacode.org/wiki/Exponentiation_operator#C
+    (local $result i64)
+    (local.set $result (i64.const 1))
+    (loop $LOOP
+      (local.set $result
+        (select
+          (i64.mul (local.get $result) (local.get $self))
+          (local.get $result)
+          (i32.and (local.get $exponent) (i32.const 0x00000001))))
+      (local.set $self (i64.mul (local.get $self) (local.get $self)))
+      (br_if $LOOP (local.tee $exponent (i32.shr_u (local.get $exponent) (i32.const 1)))))
+    (local.get $result))
+
   (func $Utils::i32::neg (param $self i32) (result i32)
     (i32.sub (i32.const 0) (local.get $self)))
 
+  (func $Utils::i64::neg (param $self i64) (result i64)
+    (i64.sub (i64.const 0) (local.get $self)))
+
   (func $Utils::i32::get_byte (param $self i32) (param $index i32) (result i32)
     (i32.and (i32.const 0xFF) (i32.shr_u (local.get $self) (i32.mul (local.get $index) (i32.const 8)))))
+
+  (func $Utils::i64::get_byte (param $self i64) (param $index i32) (result i32)
+    (i32.and (i32.const 0xFF) (i32.wrap_i64 (i64.shr_u (local.get $self) (i64.extend_i32_u (i32.mul (local.get $index) (i32.const 8)))))))
 
   (func $Utils::i32::round_to_next (param $self i32) (param $step i32) (result i32)
     ;; (step * ((self + (step - 1)) / step))
     (i32.mul (i32.div_u (i32.add (local.get $self) (i32.sub (local.get $step) (i32.const 1))) (local.get $step)) (local.get $step)))
 
-  (func $Utils::i64::get_byte (param $self i64) (param $index i32) (result i32)
-    (i32.and (i32.const 0xFF) (i32.wrap_i64 (i64.shr_u (local.get $self) (i64.extend_i32_u (i32.mul (local.get $index) (i32.const 8)))))))
+  (func $Utils::i64::round_to_next (param $self i64) (param $step i64) (result i64)
+    ;; (step * ((self + (step - 1)) / step))
+    (i64.mul (i64.div_u (i64.add (local.get $self) (i64.sub (local.get $step) (i64.const 1))) (local.get $step)) (local.get $step)))
 
   (func $Utils::f64::is_integer (param $self f64) (result i32)
     (f64.eq (local.get $self) (f64.convert_i32_s (i32.trunc_f64_s (local.get $self)))))
@@ -81,16 +137,16 @@
   (func $Utils::f64::neg (param $self f64) (result f64)
     (f64.sub (f64.const 0) (local.get $self)))
 
-  (func $Utils::f64::remainder_int (param $self f64) (param $divisor i32) (result f64)
-    (local $integer_value i32)
+  (func $Utils::f64::remainder_int (param $self f64) (param $divisor i64) (result f64)
+    (local $integer_value i64)
     (f64.add
-      (f64.convert_i32_s
-        (i32.rem_s
-          (local.tee $integer_value (i32.trunc_f64_s (local.get $self)))
+      (f64.convert_i64_s
+        (i64.rem_s
+          (local.tee $integer_value (i64.trunc_f64_s (local.get $self)))
           (local.get $divisor)))
       (f64.sub
         (local.get $self)
-        (f64.convert_i32_s (local.get $integer_value)))))
+        (f64.convert_i64_s (local.get $integer_value)))))
 
   (func $Utils::f64::pow_int (param $self f64) (param $exponent i32) (result f64)
     ;; See https://rosettacode.org/wiki/Exponentiation_operator#C
@@ -160,6 +216,33 @@
                 (i32.ne
                   (i32.load (i32.add (local.get $left_offset) (i32.mul (local.get $index) (i32.const 4))))
                   (i32.load (i32.add (local.get $right_offset) (i32.mul (local.get $index) (i32.const 4)))))
+                (then
+                  (global.get $FALSE))
+                (else
+                  (if (result i32)
+                    (i32.eq (local.tee $index (i32.add (local.get $index) (i32.const 1))) (local.get $left_length))
+                    (then
+                      (global.get $TRUE))
+                    (else
+                      (br $LOOP)))))))))))
+
+  (func $Utils::i64_array::equals (param $left_offset i32) (param $left_length i32) (param $right_offset i32) (param $right_length i32) (result i32)
+    (local $index i32)
+    (if (result i32)
+      (i32.ne (local.get $left_length) (local.get $right_length))
+      (then
+        (global.get $FALSE))
+      (else
+        (if (result i32)
+          (i32.eq (local.get $left_length) (i32.const 0))
+          (then
+            (global.get $TRUE))
+          (else
+            (loop $LOOP (result i32)
+              (if (result i32)
+                (i64.ne
+                  (i64.load (i32.add (local.get $left_offset) (i32.mul (local.get $index) (i32.const 8))))
+                  (i64.load (i32.add (local.get $right_offset) (i32.mul (local.get $index) (i32.const 8)))))
                 (then
                   (global.get $FALSE))
                 (else
@@ -332,6 +415,24 @@
     ;; Return the number of bytes written, taking into account the minus sign if one was written
     (i32.add (local.get $is_negative)))
 
+  (func $Utils::i64::write_string (param $value i64) (param $offset i32) (result i32)
+    (local $abs_value i64)
+    (local $is_negative i32)
+    ;; Find out how many bytes to allocate for the string representation
+    ;; Assign a temporary value to determine the number of digits of the positive integer
+    (local.set $abs_value (call $Utils::i64::abs (local.get $value)))
+    ;; If the number is negative, write a minus sign to the output
+    (if
+      (local.tee $is_negative (i64.ne (local.get $abs_value) (local.get $value)))
+      (then
+        (call $Allocator::extend (local.get $offset) (i32.const 1))
+        (i32.store8 (local.get $offset) (@char "-"))
+        (local.set $offset (i32.add (i32.const 1) (local.get $offset)))))
+    ;; Write the absolute integer value to the output
+    (call $Utils::u64::write_string (local.get $abs_value) (local.get $offset))
+    ;; Return the number of bytes written, taking into account the minus sign if one was written
+    (i32.add (local.get $is_negative)))
+
   (func $Utils::u32::write_string (param $value i32) (param $offset i32) (result i32)
     (local $remaining_digits i32)
     (local $num_chars i32)
@@ -356,6 +457,31 @@
         (i32.add (local.get $offset) (local.tee $num_chars (i32.sub (local.get $num_chars) (i32.const 1)))))
       ;; If the value is still greater than zero after being divided by 10, continue with the next digit
       (br_if $LOOP (local.tee $value (i32.div_u (local.get $value) (i32.const 10))))))
+
+  (func $Utils::u64::write_string (param $value i64) (param $offset i32) (result i32)
+    (local $remaining_digits i64)
+    (local $num_chars i32)
+    (local $index i32)
+    ;; Find out how many bytes to allocate for the string representation
+    ;; Assign a temporary value to determine the number of digits of the positive integer
+    (local.set $remaining_digits (local.get $value))
+    (loop $LOOP
+      ;; Increment the length
+      (local.set $num_chars (i32.add (local.get $num_chars) (i32.const 1)))
+      ;; If the temporary value is still greater than zero after being divided by 10, continue with the next digit
+      (br_if $LOOP (i64.ne (local.tee $remaining_digits (i64.div_u (local.get $remaining_digits) (i64.const 10))) (i64.const 0))))
+    ;; Allocate the required number of bytes to store the string representation,
+    (call $Allocator::extend (local.get $offset) (local.get $num_chars))
+    ;; Push the length onto the stack as the return value
+    (local.get $num_chars)
+    ;; Write the bytes in reverse order, starting from the least significant digit
+    (loop $LOOP
+      ;; Write the current least significant digit to the output and increment the offset
+      (call $Utils::u8::write_decimal_digit
+        (i32.wrap_i64 (i64.rem_u (local.get $value) (i64.const 10)))
+        (i32.add (local.get $offset) (local.tee $num_chars (i32.sub (local.get $num_chars) (i32.const 1)))))
+      ;; If the value is still greater than zero after being divided by 10, continue with the next digit
+      (br_if $LOOP (i32.wrap_i64 (local.tee $value (i64.div_u (local.get $value) (i64.const 10)))))))
 
   (func $Utils::f64::write_string (param $value f64) (param $offset i32) (result i32)
     (local $original_offset i32)

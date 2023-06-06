@@ -73,11 +73,11 @@
   (func $Term::Float::get_value (export "getFloatValue") (param $self i32) (result f64)
     (call $Term::Float::get::value (local.get $self)))
 
-  (func $Term::Float::get_non_negative_integer_value (param $self i32) (result i32)
+  (func $Term::Float::get_non_negative_integer_value (param $self i32) (result i64)
     (local $value f64)
     (select
-      (i32.trunc_f64_s (local.tee $value (call $Term::Float::get::value (local.get $self))))
-      (global.get $NULL)
+      (i64.trunc_f64_s (local.tee $value (call $Term::Float::get::value (local.get $self))))
+      (i64.const 0xFFFFFFFFFFFFFFFF)
       (i32.and
         (call $Utils::f64::is_integer (local.get $value))
         (f64.ge (local.get $value) (f64.const 0))))))

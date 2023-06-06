@@ -14,6 +14,7 @@ use crate::{
     allocator::Arena,
     hash::{TermHash, TermHasher, TermSize},
     term_type::TypedTerm,
+    utils::{chunks_to_i64, i64_to_chunks},
     ArenaRef,
 };
 
@@ -22,7 +23,7 @@ use reflex_macros::PointerIter;
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct IntTerm {
-    pub value: i32,
+    pub value: [u32; 2],
 }
 impl TermSize for IntTerm {
     fn size_of(&self) -> usize {
@@ -34,21 +35,23 @@ impl TermHash for IntTerm {
         hasher.hash(&self.value, arena)
     }
 }
-impl From<i32> for IntTerm {
-    fn from(value: i32) -> Self {
-        Self { value }
+impl From<i64> for IntTerm {
+    fn from(value: i64) -> Self {
+        Self {
+            value: i64_to_chunks(value),
+        }
     }
 }
-impl Into<i32> for IntTerm {
-    fn into(self) -> i32 {
+impl Into<i64> for IntTerm {
+    fn into(self) -> i64 {
         let Self { value } = self;
-        value
+        chunks_to_i64(value)
     }
 }
 
 impl<A: Arena + Clone> ArenaRef<IntTerm, A> {
-    pub fn value(&self) -> i32 {
-        self.read_value(|term| term.value)
+    pub fn value(&self) -> i64 {
+        self.read_value(|term| chunks_to_i64(term.value))
     }
 }
 
@@ -141,8 +144,12 @@ mod tests {
     #[test]
     fn int() {
         assert_eq!(
-            TermType::Int(IntTerm::from(12345)).as_bytes(),
-            [TermTypeDiscriminants::Int as u32, 12345],
+            TermType::Int(IntTerm::from(0x987654321)).as_bytes(),
+            [TermTypeDiscriminants::Int as u32, 0x87654321, 0x00000009],
         );
+        assert_eq!(TermType::Int(IntTerm::from(-0x987654321)).as_bytes(), {
+            let [low, high] = i64_to_chunks(-0x987654321);
+            [TermTypeDiscriminants::Int as u32, low, high]
+        },);
     }
 }

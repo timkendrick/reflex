@@ -16,7 +16,7 @@ use crate::{
     serialize::{Serialize, SerializerState},
     stdlib::Stdlib,
     term_type::*,
-    utils::from_twos_complement,
+    utils::from_twos_complement_i32,
     ArenaRef, IntoArenaRefIterator, PointerIter, Term,
 };
 
@@ -209,7 +209,7 @@ impl CompiledInstruction {
         })
     }
     pub fn u32_const(value: u32) -> Self {
-        Self::i32_const(from_twos_complement(value))
+        Self::i32_const(from_twos_complement_i32(value))
     }
     pub fn i64_const(value: i64) -> Self {
         Self::const_value(walrus::ir::Const {

@@ -132,10 +132,10 @@ mod tests {
     fn variable() {
         assert_eq!(
             TermType::Variable(VariableTerm {
-                stack_offset: 12345,
+                stack_offset: 0x54321,
             })
             .as_bytes(),
-            [TermTypeDiscriminants::Variable as u32, 12345],
+            [TermTypeDiscriminants::Variable as u32, 0x54321],
         );
     }
 }

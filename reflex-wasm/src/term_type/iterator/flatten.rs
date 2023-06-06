@@ -121,10 +121,10 @@ mod tests {
     fn flatten_iterator() {
         assert_eq!(
             TermType::FlattenIterator(FlattenIteratorTerm {
-                source: ArenaPointer(12345),
+                source: ArenaPointer(0x54321),
             })
             .as_bytes(),
-            [TermTypeDiscriminants::FlattenIterator as u32, 12345],
+            [TermTypeDiscriminants::FlattenIterator as u32, 0x54321],
         );
     }
 }

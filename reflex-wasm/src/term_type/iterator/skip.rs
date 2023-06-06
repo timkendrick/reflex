@@ -126,11 +126,11 @@ mod tests {
     fn skip_iterator() {
         assert_eq!(
             TermType::SkipIterator(SkipIteratorTerm {
-                source: ArenaPointer(12345),
-                count: 67890,
+                source: ArenaPointer(0x54321),
+                count: 0x98765,
             })
             .as_bytes(),
-            [TermTypeDiscriminants::SkipIterator as u32, 12345, 67890],
+            [TermTypeDiscriminants::SkipIterator as u32, 0x54321, 0x98765],
         );
     }
 }

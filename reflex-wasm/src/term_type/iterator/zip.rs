@@ -132,11 +132,11 @@ mod tests {
     fn zip_iterator() {
         assert_eq!(
             TermType::ZipIterator(ZipIteratorTerm {
-                left: ArenaPointer(12345),
-                right: ArenaPointer(67890),
+                left: ArenaPointer(0x54321),
+                right: ArenaPointer(0x98765),
             })
             .as_bytes(),
-            [TermTypeDiscriminants::ZipIterator as u32, 12345, 67890],
+            [TermTypeDiscriminants::ZipIterator as u32, 0x54321, 0x98765],
         );
     }
 }

@@ -29,7 +29,7 @@
         (call $Term::Builtin::new (global.get $Stdlib_Get))
         (call $Term::List::create_pair
           (call $Term::Variable::new (i32.const 0))
-          (call $Term::Int::new (i32.const 0))))))
+          (call $Term::Int::new (i64.const 0))))))
 
   (@builtin $Stdlib_Accessor "Accessor"
     (@args (@strict $self) (@strict $key))
@@ -77,7 +77,7 @@
             (local.tee $value
               (if (result i32)
                 (i32.lt_u
-                  (local.tee $index_value (call $Term::Int::get_value (local.get $index)))
+                  (local.tee $index_value (i32.wrap_i64 (call $Term::Int::get_value (local.get $index))))
                   (call $Term::List::get_length (local.get $self)))
                 (then
                   (call $Term::List::get_item (local.get $self) (local.get $index_value)))
@@ -99,8 +99,8 @@
         (local $value i32)
         (if (result i32 i32)
           (i32.ne
-            (local.tee $index_value (call $Term::Float::get_non_negative_integer_value (local.get $index)))
-            (global.get $NULL))
+            (local.tee $index_value (i32.wrap_i64 (call $Term::Float::get_non_negative_integer_value (local.get $index))))
+            (i32.const -1))
           (then
             (if (result i32 i32)
               (i32.ne
@@ -132,7 +132,7 @@
             (local.tee $value
               (if (result i32)
                 (i32.lt_u
-                  (local.tee $index_value (call $Term::Int::get_value (local.get $index)))
+                  (local.tee $index_value (i32.wrap_i64 (call $Term::Int::get_value (local.get $index))))
                   (call $Term::String::get_length (local.get $self)))
                 (then
                   (call $Term::String::get_char (local.get $self) (local.get $index_value)))
@@ -154,8 +154,8 @@
         (local $value i32)
         (if (result i32 i32)
           (i32.ne
-            (local.tee $index_value (call $Term::Float::get_non_negative_integer_value (local.get $index)))
-            (global.get $NULL))
+            (local.tee $index_value (i32.wrap_i64 (call $Term::Float::get_non_negative_integer_value (local.get $index))))
+            (i32.const -1))
           (then
             (if (result i32 i32)
               (i32.ne
@@ -183,7 +183,7 @@
         (local $value i32)
         (local $dependencies i32)
         (call $Term::traits::next
-          (call $Term::SkipIterator::new (local.get $self) (call $Term::Int::get_value (local.get $index)))
+          (call $Term::SkipIterator::new (local.get $self) (i32.wrap_i64 (call $Term::Int::get_value (local.get $index))))
           (global.get $NULL)
           (local.get $state))
         (local.set $dependencies)
@@ -206,8 +206,8 @@
         (local $dependencies i32)
         (if (result i32 i32)
           (i32.ne
-            (local.tee $index_value (call $Term::Float::get_non_negative_integer_value (local.get $index)))
-            (global.get $NULL))
+            (local.tee $index_value (i32.wrap_i64 (call $Term::Float::get_non_negative_integer_value (local.get $index))))
+            (i32.const -1))
           (then
             (call $Term::traits::next
               (call $Term::SkipIterator::new (local.get $self) (local.get $index_value))

@@ -226,10 +226,10 @@ mod tests {
     fn hashset() {
         assert_eq!(
             TermType::Hashset(HashsetTerm {
-                entries: ArenaPointer(12345),
+                entries: ArenaPointer(0x54321),
             })
             .as_bytes(),
-            [TermTypeDiscriminants::Hashset as u32, 12345],
+            [TermTypeDiscriminants::Hashset as u32, 0x54321],
         );
     }
 }

@@ -120,10 +120,10 @@ mod tests {
     fn pointer() {
         assert_eq!(
             TermType::Pointer(PointerTerm {
-                target: ArenaPointer(12345),
+                target: ArenaPointer(0x54321),
             })
             .as_bytes(),
-            [TermTypeDiscriminants::Pointer as u32, 12345],
+            [TermTypeDiscriminants::Pointer as u32, 0x54321],
         );
     }
 }

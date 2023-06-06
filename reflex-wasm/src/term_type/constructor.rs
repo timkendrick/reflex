@@ -149,10 +149,10 @@ mod tests {
     fn constructor() {
         assert_eq!(
             TermType::Constructor(ConstructorTerm {
-                keys: ArenaPointer(12345)
+                keys: ArenaPointer(0x54321)
             })
             .as_bytes(),
-            [TermTypeDiscriminants::Constructor as u32, 12345],
+            [TermTypeDiscriminants::Constructor as u32, 0x54321],
         );
     }
 }

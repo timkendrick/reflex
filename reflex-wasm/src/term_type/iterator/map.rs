@@ -131,11 +131,11 @@ mod tests {
     fn map_iterator() {
         assert_eq!(
             TermType::MapIterator(MapIteratorTerm {
-                source: ArenaPointer(12345),
-                iteratee: ArenaPointer(67890),
+                source: ArenaPointer(0x54321),
+                iteratee: ArenaPointer(0x98765),
             })
             .as_bytes(),
-            [TermTypeDiscriminants::MapIterator as u32, 12345, 67890],
+            [TermTypeDiscriminants::MapIterator as u32, 0x54321, 0x98765],
         );
     }
 }

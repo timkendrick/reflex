@@ -300,8 +300,8 @@ mod tests {
     fn application() {
         assert_eq!(
             TermType::Application(ApplicationTerm {
-                target: ArenaPointer(12345),
-                args: ArenaPointer(67890),
+                target: ArenaPointer(0x54321),
+                args: ArenaPointer(0x98765),
                 cache: ApplicationCache {
                     value: ArenaPointer::null(),
                     dependencies: ArenaPointer::null(),
@@ -312,8 +312,8 @@ mod tests {
             .as_bytes(),
             [
                 TermTypeDiscriminants::Application as u32,
-                12345,
-                67890,
+                0x54321,
+                0x98765,
                 0xFFFFFFFF,
                 0xFFFFFFFF,
                 0xFFFFFFFF,

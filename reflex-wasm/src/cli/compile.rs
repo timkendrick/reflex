@@ -541,7 +541,7 @@ mod tests {
                 .deref()
                 .borrow_mut()
                 .deref_mut()
-                .allocate(Term::new(TermType::Int(IntTerm { value: 5 }), &interpreter)),
+                .allocate(Term::new(TermType::Int(IntTerm::from(5)), &interpreter)),
         );
 
         assert_eq!(result.result(), expected_result);
@@ -599,10 +599,7 @@ mod tests {
                 .deref()
                 .borrow_mut()
                 .deref_mut()
-                .allocate(Term::new(
-                    TermType::Int(IntTerm { value: 5050 }),
-                    &interpreter,
-                )),
+                .allocate(Term::new(TermType::Int(IntTerm::from(5050)), &interpreter)),
         );
 
         assert_eq!(result.result(), expected_result);

@@ -150,10 +150,10 @@ mod tests {
     fn signal() {
         assert_eq!(
             TermType::Signal(SignalTerm {
-                conditions: ArenaPointer(12345),
+                conditions: ArenaPointer(0x54321),
             })
             .as_bytes(),
-            [TermTypeDiscriminants::Signal as u32, 12345],
+            [TermTypeDiscriminants::Signal as u32, 0x54321],
         );
     }
 }

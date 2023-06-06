@@ -8,7 +8,7 @@
     (@impl
       (i32.eq (global.get $TermType::Int))
       (func $Stdlib_ParseFloat::impl::Int (param $self i32) (param $state i32) (result i32 i32)
-        (call $Term::Float::new (f64.convert_i32_s (call $Term::Int::get_value (local.get $self))))
+        (call $Term::Float::new (f64.convert_i64_s (call $Term::Int::get_value (local.get $self))))
         (global.get $NULL)))
 
     (@impl

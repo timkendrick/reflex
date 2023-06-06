@@ -4,7 +4,7 @@
 (module
   (@let $RangeIterator
     (@struct $RangeIterator
-      (@field $offset i32)
+      (@field $offset i64)
       (@field $length i32))
 
     (@derive $size (@get $RangeIterator))
@@ -17,7 +17,7 @@
   (export "getRangeIteratorOffset" (func $Term::RangeIterator::get::offset))
   (export "getRangeIteratorLength" (func $Term::RangeIterator::get::length))
 
-  (func $Term::RangeIterator::new (export "createRangeIterator") (param $offset i32) (param $length i32) (result i32)
+  (func $Term::RangeIterator::new (export "createRangeIterator") (param $offset i64) (param $length i32) (result i32)
     (if (result i32)
       (i32.eqz (local.get $length))
       (then
@@ -64,6 +64,8 @@
       (else
         ;; Otherwise return the current value and increment the iterator state
         (call $Term::Int::new
-          (i32.add (call $Term::RangeIterator::get::offset (local.get $self)) (local.get $iterator_state)))
+          (i64.add
+            (call $Term::RangeIterator::get::offset (local.get $self))
+            (i64.extend_i32_u (local.get $iterator_state))))
         (i32.add (local.get $iterator_state) (i32.const 1))
         (global.get $NULL)))))

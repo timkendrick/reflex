@@ -589,11 +589,11 @@ mod tests {
     fn hashmap() {
         assert_eq!(
             TermType::Hashmap(HashmapTerm {
-                num_entries: 12345,
+                num_entries: 0x54321,
                 buckets: Default::default(),
             })
             .as_bytes(),
-            [TermTypeDiscriminants::Hashmap as u32, 12345, 0, 0],
+            [TermTypeDiscriminants::Hashmap as u32, 0x54321, 0, 0],
         );
         let mut allocator = VecAllocator::default();
         {

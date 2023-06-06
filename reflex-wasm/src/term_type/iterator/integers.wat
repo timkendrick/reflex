@@ -41,10 +41,11 @@
 
   (func $Term::IntegersIterator::traits::next (param $self i32) (param $iterator_state i32) (param $state i32) (result i32 i32 i32)
     (call $Term::Int::new
-      (local.tee $iterator_state
-        (select
-          (i32.const 0)
-          (i32.add (local.get $iterator_state) (i32.const 1))
-          (i32.eq (global.get $NULL) (local.get $iterator_state)))))
+      (i64.extend_i32_u
+        (local.tee $iterator_state
+          (select
+            (i32.const 0)
+            (i32.add (local.get $iterator_state) (i32.const 1))
+            (i32.eq (global.get $NULL) (local.get $iterator_state))))))
     (local.get $iterator_state)
     (global.get $NULL)))

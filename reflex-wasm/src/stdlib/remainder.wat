@@ -9,9 +9,9 @@
       (i32.eq (global.get $TermType::Int))
       (i32.eq (global.get $TermType::Int))
       (func $Stdlib_Remainder::impl::Int::Int (param $self i32) (param $divisor i32) (param $state i32) (result i32 i32)
-        (local $divisor_value i32)
+        (local $divisor_value i64)
         (if (result i32 i32)
-          (i32.eqz (local.tee $divisor_value (call $Term::Int::get::value (local.get $divisor))))
+          (i64.eqz (local.tee $divisor_value (call $Term::Int::get::value (local.get $divisor))))
           (then
             (call $Term::Signal::of
               (call $Term::Condition::invalid_builtin_function_args
@@ -19,7 +19,7 @@
                 (call $Term::List::create_pair (local.get $self) (local.get $divisor))))
             (global.get $NULL))
           (else
-            (call $Term::Int::new (i32.rem_s (call $Term::Int::get::value (local.get $self)) (local.get $divisor_value)))
+            (call $Term::Int::new (i64.rem_s (call $Term::Int::get::value (local.get $self)) (local.get $divisor_value)))
             (global.get $NULL)))))
 
     (@impl
@@ -43,7 +43,7 @@
                   ;; If the divisor is an integer, perform a fast remainder operation
                   (call $Utils::f64::remainder_int
                     (call $Term::Float::get::value (local.get $self))
-                    (i32.trunc_f64_s (local.get $divisor_value))))
+                    (i64.trunc_f64_s (local.get $divisor_value))))
                 (else
                   ;; Otherwise fall back to the default remainder operation
                   (call $Utils::f64::remainder
@@ -70,14 +70,14 @@
                 (call $Utils::f64::is_integer (local.get $divisor_value))
                 (then
                   ;; If the divisor is an integer, perform a fast integer remainder operation
-                  (f64.convert_i32_s
-                    (i32.rem_s
+                  (f64.convert_i64_s
+                    (i64.rem_s
                       (call $Term::Int::get::value (local.get $self))
-                      (i32.trunc_f64_s (local.get $divisor_value)))))
+                      (i64.trunc_f64_s (local.get $divisor_value)))))
                 (else
                   ;; Otherwise fall back to the default float remainder operation
                   (call $Utils::f64::remainder
-                    (f64.convert_i32_s (call $Term::Int::get::value (local.get $self)))
+                    (f64.convert_i64_s (call $Term::Int::get::value (local.get $self)))
                     (local.get $divisor_value)))))
             (global.get $NULL)))))
 
@@ -86,9 +86,9 @@
       (i32.eq (global.get $TermType::Int))
       (func $Stdlib_Remainder::impl::Float::Int (param $self i32) (param $divisor i32) (param $state i32) (result i32 i32)
         (local $self_value f64)
-        (local $divisor_value i32)
+        (local $divisor_value i64)
         (if (result i32 i32)
-          (i32.eqz (local.tee $divisor_value (call $Term::Int::get::value (local.get $divisor))))
+          (i64.eqz (local.tee $divisor_value (call $Term::Int::get::value (local.get $divisor))))
           (then
             (call $Term::Signal::of
               (call $Term::Condition::invalid_builtin_function_args
@@ -101,9 +101,9 @@
                 (call $Utils::f64::is_integer (local.tee $self_value (call $Term::Float::get::value (local.get $self))))
                 (then
                   ;; If the base is an integer, perform a fast integer remainder operation
-                  (f64.convert_i32_s
-                    (i32.rem_s
-                      (i32.trunc_f64_s (local.get $self_value))
+                  (f64.convert_i64_s
+                    (i64.rem_s
+                      (i64.trunc_f64_s (local.get $self_value))
                       (local.get $divisor_value))))
                 (else
                   ;; Otherwise fall perform a fast float remainder operation

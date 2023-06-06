@@ -10,6 +10,7 @@ use serde_json::Value as JsonValue;
 use crate::{
     allocator::Arena,
     hash::{TermHash, TermHasher, TermSize},
+    utils::{chunks_to_i64, i64_to_chunks},
     ArenaRef,
 };
 use reflex_macros::PointerIter;
@@ -17,8 +18,16 @@ use reflex_macros::PointerIter;
 #[derive(Clone, Copy, Debug, PointerIter)]
 #[repr(C)]
 pub struct RangeIteratorTerm {
-    pub offset: i32,
+    pub offset: [u32; 2],
     pub length: u32,
+}
+impl RangeIteratorTerm {
+    pub fn new(offset: i64, length: u32) -> Self {
+        Self {
+            offset: i64_to_chunks(offset),
+            length,
+        }
+    }
 }
 impl TermSize for RangeIteratorTerm {
     fn size_of(&self) -> usize {
@@ -32,8 +41,8 @@ impl TermHash for RangeIteratorTerm {
 }
 
 impl<A: Arena + Clone> ArenaRef<RangeIteratorTerm, A> {
-    pub fn offset(&self) -> i32 {
-        self.read_value(|term| term.offset)
+    pub fn offset(&self) -> i64 {
+        self.read_value(|term| chunks_to_i64(term.offset))
     }
     pub fn length(&self) -> u32 {
         self.read_value(|term| term.length)
@@ -109,34 +118,32 @@ impl<A: Arena + Clone> Internable for ArenaRef<RangeIteratorTerm, A> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        term_type::{TermType, TermTypeDiscriminants},
-        utils::into_twos_complement,
-    };
+    use crate::term_type::{TermType, TermTypeDiscriminants};
 
     use super::*;
 
     #[test]
     fn range_iterator() {
         assert_eq!(
-            TermType::RangeIterator(RangeIteratorTerm {
-                offset: 12345,
-                length: 67890,
-            })
-            .as_bytes(),
-            [TermTypeDiscriminants::RangeIterator as u32, 12345, 67890],
-        );
-        assert_eq!(
-            TermType::RangeIterator(RangeIteratorTerm {
-                offset: -12345,
-                length: 67890,
-            })
-            .as_bytes(),
+            TermType::RangeIterator(RangeIteratorTerm::new(0x987654321, 0x54321)).as_bytes(),
             [
                 TermTypeDiscriminants::RangeIterator as u32,
-                into_twos_complement(-12345),
-                67890
+                0x87654321,
+                0x00000009,
+                0x54321
             ],
+        );
+        assert_eq!(
+            TermType::RangeIterator(RangeIteratorTerm::new(-0x987654321, 0x54321)).as_bytes(),
+            {
+                let [low, high] = i64_to_chunks(-0x987654321);
+                [
+                    TermTypeDiscriminants::RangeIterator as u32,
+                    low,
+                    high,
+                    0x54321,
+                ]
+            },
         );
     }
 }
