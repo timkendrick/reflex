@@ -6,7 +6,7 @@ use std::iter::once;
 use reflex::core::{create_record, Expression, ExpressionFactory, HeapAllocator, SignalType};
 use types::import_types;
 
-use crate::stdlib::Stdlib as JsStdlib;
+use crate::stdlib::{Hash, Log, StructTypeFactory};
 
 mod types;
 
@@ -15,7 +15,7 @@ pub fn import_utils<T: Expression>(
     allocator: &impl HeapAllocator<T>,
 ) -> T
 where
-    T::Builtin: From<JsStdlib>,
+    T::Builtin: From<Hash> + From<Log> + From<StructTypeFactory>,
 {
     create_record(
         vec![
@@ -28,18 +28,22 @@ where
             ),
             (
                 factory.create_string_term(allocator.create_static_string("hash")),
-                factory.create_builtin_term(JsStdlib::Hash),
+                factory.create_builtin_term(Hash),
             ),
             (
                 factory.create_string_term(allocator.create_static_string("log")),
-                factory.create_builtin_term(JsStdlib::Log),
+                factory.create_builtin_term(Log),
             ),
             (
                 factory.create_string_term(allocator.create_static_string("pending")),
                 factory.create_lambda_term(
                     0,
                     factory.create_signal_term(allocator.create_signal_list(once(
-                        allocator.create_signal(SignalType::Pending, allocator.create_empty_list()),
+                        allocator.create_signal(
+                            SignalType::Pending,
+                            factory.create_nil_term(),
+                            factory.create_nil_term(),
+                        ),
                     ))),
                 ),
             ),

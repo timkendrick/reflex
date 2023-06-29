@@ -5,13 +5,14 @@
 use std::{borrow::Cow, collections::HashMap, iter::once};
 
 use reflex::core::{
-    create_record, ConditionListType, ConditionType, Expression, ExpressionFactory,
-    ExpressionListType, HeapAllocator, RefType, SignalTermType, SignalType,
+    create_record, Builtin, ConditionListType, ConditionType, Expression, ExpressionFactory,
+    HeapAllocator, RefType, SignalTermType, SignalType,
 };
 use reflex_json::{sanitize, JsonMap, JsonValue};
-use reflex_stdlib::Stdlib;
+use reflex_stdlib::{CollectRecord, Get};
 use reflex_utils::json::json_object;
 use serde::{Deserialize, Serialize};
+use stdlib::{DynamicQueryBranch, FlattenDeep};
 
 use crate::ast::{
     common::{Type, Value},
@@ -29,7 +30,14 @@ pub mod subscriptions;
 pub mod transform;
 pub mod validate;
 
-use crate::stdlib::Stdlib as GraphQlStdlib;
+pub trait GraphQlParserBuiltin:
+    Builtin + From<CollectRecord> + From<DynamicQueryBranch> + From<FlattenDeep> + From<Get>
+{
+}
+impl<T> GraphQlParserBuiltin for T where
+    T: Builtin + From<CollectRecord> + From<DynamicQueryBranch> + From<FlattenDeep> + From<Get>
+{
+}
 
 #[allow(type_alias_bounds)]
 type QueryFragments<'a> = HashMap<String, &'a FragmentDefinition>;
@@ -463,18 +471,12 @@ pub fn serialize_json_signal_errors<TTerm: SignalTermType<T>, T: Expression>(
             _ => false,
         })
         .map(|signal| {
-            signal
-                .args()
-                .as_deref()
-                .iter()
-                .map(|item| item.as_deref())
-                .next()
-                .and_then(|arg| sanitize(arg).ok())
+            sanitize(signal.payload().as_deref())
                 .map(|value| match value {
                     JsonValue::String(message) => create_json_error_object(message, None),
                     _ => value,
                 })
-                .unwrap_or_else(|| JsonValue::Null)
+                .unwrap_or_else(|_| JsonValue::Null)
         })
         .collect()
 }
@@ -485,7 +487,7 @@ pub fn parse_graphql_operation<T: Expression>(
     allocator: &impl HeapAllocator<T>,
 ) -> Result<T, String>
 where
-    T::Builtin: From<Stdlib> + From<GraphQlStdlib>,
+    T::Builtin: GraphQlParserBuiltin,
 {
     parse_ast_query(operation.query(), operation.variables(), factory, allocator)
 }
@@ -497,7 +499,7 @@ pub fn parse<'a, T: Expression>(
     allocator: &impl HeapAllocator<T>,
 ) -> Result<T, String>
 where
-    T::Builtin: From<Stdlib> + From<GraphQlStdlib>,
+    T::Builtin: GraphQlParserBuiltin,
 {
     match graphql_parser::parse_query::<String>(query) {
         Ok(query) => parse_ast_query(
@@ -517,7 +519,7 @@ fn parse_ast_query<'vars, T: Expression>(
     allocator: &impl HeapAllocator<T>,
 ) -> Result<T, String>
 where
-    T::Builtin: From<Stdlib> + From<GraphQlStdlib>,
+    T::Builtin: GraphQlParserBuiltin,
 {
     let fragments = query
         .definitions
@@ -559,7 +561,7 @@ fn parse_operation<T: Expression>(
     allocator: &impl HeapAllocator<T>,
 ) -> Result<T, String>
 where
-    T::Builtin: From<Stdlib> + From<GraphQlStdlib>,
+    T::Builtin: GraphQlParserBuiltin,
 {
     let (selection_set, variable_definitions) = match operation_root {
         OperationDefinition::Query(operation) => (
@@ -594,14 +596,14 @@ fn create_query_root<T: Expression>(
     allocator: &impl HeapAllocator<T>,
 ) -> T
 where
-    T::Builtin: From<Stdlib>,
+    T::Builtin: GraphQlParserBuiltin,
 {
     factory.create_lambda_term(
         1,
         factory.create_application_term(
             shape,
             allocator.create_unit_list(factory.create_application_term(
-                factory.create_builtin_term(Stdlib::Get),
+                factory.create_builtin_term(Get),
                 allocator.create_pair(
                     factory.create_variable_term(0),
                     factory.create_string_term(allocator.create_static_string(operation_type)),
@@ -650,7 +652,7 @@ fn parse_selection_set<T: Expression>(
     allocator: &impl HeapAllocator<T>,
 ) -> Result<T, String>
 where
-    T::Builtin: From<Stdlib> + From<GraphQlStdlib>,
+    T::Builtin: GraphQlParserBuiltin,
 {
     if selection_set.items.is_empty() {
         parse_leaf(factory)
@@ -662,7 +664,7 @@ where
             factory.create_lambda_term(
                 1,
                 factory.create_application_term(
-                    factory.create_builtin_term(Stdlib::CollectRecord),
+                    factory.create_builtin_term(CollectRecord),
                     allocator.create_sized_list(
                         values.len() + 1,
                         once(factory.create_constructor_term(
@@ -685,9 +687,9 @@ where
 
 fn parse_leaf<T: Expression>(factory: &impl ExpressionFactory<T>) -> Result<T, String>
 where
-    T::Builtin: From<GraphQlStdlib>,
+    T::Builtin: GraphQlParserBuiltin,
 {
-    Ok(factory.create_builtin_term(GraphQlStdlib::FlattenDeep))
+    Ok(factory.create_builtin_term(FlattenDeep))
 }
 
 fn parse_selection_set_fields<T: Expression>(
@@ -698,7 +700,7 @@ fn parse_selection_set_fields<T: Expression>(
     allocator: &impl HeapAllocator<T>,
 ) -> Result<Vec<(T, T)>, String>
 where
-    T::Builtin: From<Stdlib> + From<GraphQlStdlib>,
+    T::Builtin: GraphQlParserBuiltin,
 {
     selection_set
         .items
@@ -860,7 +862,7 @@ fn parse_fragment_fields<T: Expression>(
     allocator: &impl HeapAllocator<T>,
 ) -> impl IntoIterator<Item = Result<(T, T), String>>
 where
-    T::Builtin: From<Stdlib> + From<GraphQlStdlib>,
+    T::Builtin: GraphQlParserBuiltin,
 {
     match parse_selection_set_fields(
         &fragment.selection_set,
@@ -882,7 +884,7 @@ fn parse_field<T: Expression>(
     allocator: &impl HeapAllocator<T>,
 ) -> Result<T, String>
 where
-    T::Builtin: From<Stdlib> + From<GraphQlStdlib>,
+    T::Builtin: GraphQlParserBuiltin,
 {
     let field_args = if field.arguments.is_empty() {
         None
@@ -908,7 +910,7 @@ where
             body,
             allocator.create_unit_list({
                 let field = factory.create_application_term(
-                    factory.create_builtin_term(Stdlib::Get),
+                    factory.create_builtin_term(Get),
                     allocator.create_pair(
                         factory.create_variable_term(0),
                         factory.create_string_term(allocator.create_string(field.name.to_string())),
@@ -1004,12 +1006,12 @@ fn create_query_branch<T: Expression>(
     allocator: &impl HeapAllocator<T>,
 ) -> T
 where
-    T::Builtin: From<GraphQlStdlib>,
+    T::Builtin: GraphQlParserBuiltin,
 {
     factory.create_lambda_term(
         1,
         factory.create_application_term(
-            factory.create_builtin_term(GraphQlStdlib::DynamicQueryBranch),
+            factory.create_builtin_term(DynamicQueryBranch),
             allocator.create_pair(factory.create_variable_term(0), shape),
         ),
     )
@@ -1046,8 +1048,10 @@ mod tests {
         },
     };
     use reflex_lang::{allocator::DefaultAllocator, SharedTermFactory};
-    use reflex_stdlib::Stdlib;
+    use reflex_stdlib::{Add, Stdlib};
     use std::convert::{TryFrom, TryInto};
+
+    use crate as reflex_graphql;
 
     use super::{parse, stdlib::Stdlib as GraphQlStdlib};
 
@@ -1117,6 +1121,368 @@ mod tests {
                 Self::Stdlib(target) => std::fmt::Display::fmt(target, f),
                 Self::GraphQl(target) => std::fmt::Display::fmt(target, f),
             }
+        }
+    }
+
+    impl From<reflex_stdlib::stdlib::Abs> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Abs) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Add> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Add) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::And> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::And) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Append> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Append) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Apply> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Apply) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Car> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Car) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Cdr> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Cdr) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Ceil> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Ceil) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Collect> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Collect) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::CollectFilterResults> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::CollectFilterResults) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::CollectHashMap> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::CollectHashMap) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::CollectHashSet> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::CollectHashSet) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::CollectRecord> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::CollectRecord) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::CollectList> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::CollectList) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Concat> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Concat) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Cons> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Cons) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::ConstructHashMap> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::ConstructHashMap) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::ConstructHashSet> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::ConstructHashSet) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::ConstructRecord> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::ConstructRecord) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::ConstructList> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::ConstructList) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Contains> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Contains) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Divide> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Divide) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Effect> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Effect) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::EndsWith> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::EndsWith) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Entries> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Entries) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Eq> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Eq) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Equal> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Equal) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Filter> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Filter) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Flatten> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Flatten) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Floor> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Floor) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Get> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Get) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Gt> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Gt) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Gte> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Gte) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::If> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::If) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::IfError> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::IfError) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::IfPending> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::IfPending) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Insert> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Insert) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Keys> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Keys) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Length> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Length) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Lt> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Lt) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Lte> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Lte) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Map> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Map) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Match> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Match) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Max> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Max) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Merge> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Merge) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Min> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Min) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Multiply> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Multiply) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Not> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Not) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Or> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Or) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Pow> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Pow) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Push> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Push) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::PushFront> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::PushFront) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Reduce> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Reduce) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Remainder> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Remainder) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Replace> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Replace) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::ResolveArgs> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::ResolveArgs) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::ResolveDeep> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::ResolveDeep) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::ResolveHashMap> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::ResolveHashMap) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::ResolveHashSet> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::ResolveHashSet) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::ResolveShallow> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::ResolveShallow) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::ResolveRecord> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::ResolveRecord) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::ResolveList> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::ResolveList) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Round> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Round) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Sequence> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Sequence) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Slice> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Slice) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Split> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Split) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::StartsWith> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::StartsWith) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Subtract> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Subtract) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_stdlib::stdlib::Values> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Values) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
+
+    impl From<reflex_graphql::stdlib::CollectQueryListItems> for GraphQlTestBuiltins {
+        fn from(value: reflex_graphql::stdlib::CollectQueryListItems) -> Self {
+            Self::from(reflex_graphql::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_graphql::stdlib::DynamicQueryBranch> for GraphQlTestBuiltins {
+        fn from(value: reflex_graphql::stdlib::DynamicQueryBranch) -> Self {
+            Self::from(reflex_graphql::stdlib::Stdlib::from(value))
+        }
+    }
+    impl From<reflex_graphql::stdlib::FlattenDeep> for GraphQlTestBuiltins {
+        fn from(value: reflex_graphql::stdlib::FlattenDeep) -> Self {
+            Self::from(reflex_graphql::stdlib::Stdlib::from(value))
         }
     }
 
@@ -1214,7 +1580,7 @@ mod tests {
                                             allocator.create_static_string("first"),
                                         ),
                                         factory.create_application_term(
-                                            factory.create_builtin_term(Stdlib::Add),
+                                            factory.create_builtin_term(Add),
                                             allocator.create_pair(
                                                 factory.create_int_term(3),
                                                 factory.create_variable_term(0),
@@ -1226,7 +1592,7 @@ mod tests {
                                             allocator.create_static_string("second"),
                                         ),
                                         factory.create_application_term(
-                                            factory.create_builtin_term(Stdlib::Add),
+                                            factory.create_builtin_term(Add),
                                             allocator.create_pair(
                                                 factory.create_int_term(4),
                                                 factory.create_variable_term(0),
@@ -1238,7 +1604,7 @@ mod tests {
                                             allocator.create_static_string("third"),
                                         ),
                                         factory.create_application_term(
-                                            factory.create_builtin_term(Stdlib::Add),
+                                            factory.create_builtin_term(Add),
                                             allocator.create_pair(
                                                 factory.create_int_term(5),
                                                 factory.create_variable_term(0),

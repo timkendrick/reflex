@@ -68,9 +68,37 @@ impl<T: Expression> Expression for CachedExpression<T> {
     type HashsetTerm<TWrapper: Expression> = T::HashsetTerm<TWrapper>;
     type SignalTerm<TWrapper: Expression> = T::SignalTerm<TWrapper>;
 
-    type Ref<'a, TTarget> = T::Ref<'a, TTarget>
+    type StringRef<'a> = &'a Self::String
     where
-        TTarget: 'a,
+        Self::String: 'a,
+        Self: 'a;
+
+    type SignalRef<'a, TWrapper: Expression> = &'a Self::Signal<TWrapper>
+    where
+        TWrapper: 'a,
+        Self::Signal<TWrapper>: 'a,
+        Self: 'a;
+
+    type StructPrototypeRef<'a, TWrapper: Expression> = &'a Self::StructPrototype<TWrapper>
+    where
+        TWrapper: 'a,
+        Self::StructPrototype<TWrapper>: 'a,
+        Self: 'a;
+
+    type SignalListRef<'a, TWrapper: Expression> = &'a Self::SignalList<TWrapper>
+    where
+        TWrapper: 'a,
+        Self::SignalList<TWrapper>: 'a,
+        Self: 'a;
+
+    type ExpressionListRef<'a, TWrapper: Expression> = &'a Self::ExpressionList<TWrapper>
+    where
+        TWrapper: 'a,
+        Self::ExpressionList<TWrapper>: 'a,
+        Self: 'a;
+
+    type ExpressionRef<'a> = &'a Self
+    where
         Self: 'a;
 
     fn id(&self) -> HashId {
@@ -131,7 +159,10 @@ impl<T: Expression + CompoundNode<TWrapper>, TWrapper: Expression> CompoundNode<
         where
             TWrapper: 'a,
             Self: 'a;
-    fn children<'a>(&'a self) -> Self::Children<'a> {
+    fn children<'a>(&'a self) -> Self::Children<'a>
+    where
+        TWrapper: 'a,
+    {
         self.value.children()
     }
 }
@@ -307,6 +338,9 @@ impl<T: Expression> SerializeJson for CachedExpression<T> {
         self.value().to_json()
     }
     fn patch(&self, target: &Self) -> Result<Option<JsonValue>, String> {
+        if self.hash == target.hash {
+            return Ok(None);
+        }
         self.value().patch(target.value())
     }
 }
@@ -370,9 +404,37 @@ impl<T: Expression> Expression for SharedExpression<T> {
     type HashsetTerm<TWrapper: Expression> = T::HashsetTerm<TWrapper>;
     type SignalTerm<TWrapper: Expression> = T::SignalTerm<TWrapper>;
 
-    type Ref<'a, TTarget> = T::Ref<'a, TTarget>
+    type StringRef<'a> = &'a Self::String
     where
-        TTarget: 'a,
+        Self::String: 'a,
+        Self: 'a;
+
+    type SignalRef<'a, TWrapper: Expression> = &'a Self::Signal<TWrapper>
+    where
+        TWrapper: 'a,
+        Self::Signal<TWrapper>: 'a,
+        Self: 'a;
+
+    type StructPrototypeRef<'a, TWrapper: Expression> = &'a Self::StructPrototype<TWrapper>
+    where
+        TWrapper: 'a,
+        Self::StructPrototype<TWrapper>: 'a,
+        Self: 'a;
+
+    type SignalListRef<'a, TWrapper: Expression> = &'a Self::SignalList<TWrapper>
+    where
+        TWrapper: 'a,
+        Self::SignalList<TWrapper>: 'a,
+        Self: 'a;
+
+    type ExpressionListRef<'a, TWrapper: Expression> = &'a Self::ExpressionList<TWrapper>
+    where
+        TWrapper: 'a,
+        Self::ExpressionList<TWrapper>: 'a,
+        Self: 'a;
+
+    type ExpressionRef<'a> = &'a Self
+    where
         Self: 'a;
 
     fn id(&self) -> HashId {
@@ -415,7 +477,10 @@ impl<T: Expression + CompoundNode<TWrapper>, TWrapper: Expression> CompoundNode<
         where
             TWrapper: 'a,
             Self: 'a;
-    fn children<'a>(&'a self) -> Self::Children<'a> {
+    fn children<'a>(&'a self) -> Self::Children<'a>
+    where
+        TWrapper: 'a,
+    {
         self.value.children()
     }
 }

@@ -12,9 +12,9 @@ pub(crate) const EFFECT_TYPE_VARIABLE_SET: &'static str = "reflex::state::set";
 pub(crate) const EFFECT_TYPE_VARIABLE_INCREMENT: &'static str = "reflex::state::increment";
 pub(crate) const EFFECT_TYPE_VARIABLE_DECREMENT: &'static str = "reflex::state::decrement";
 
-pub struct GetVariable {}
+pub struct GetVariable;
 impl GetVariable {
-    pub(crate) const UUID: Uuid = uuid!("fb7bbe51-fa38-4c79-a361-c90607db2736");
+    pub const UUID: Uuid = uuid!("fb7bbe51-fa38-4c79-a361-c90607db2736");
     const ARITY: FunctionArity<2, 0> = FunctionArity {
         required: [ArgType::Strict, ArgType::Lazy],
         optional: [],
@@ -52,7 +52,8 @@ where
         if let Some(_) = factory.match_symbol_term(&state_token) {
             Ok(factory.create_effect_term(allocator.create_signal(
                 SignalType::Custom(String::from(EFFECT_TYPE_VARIABLE_GET)),
-                allocator.create_pair(state_token, initial_value),
+                factory.create_list_term(allocator.create_pair(state_token, initial_value)),
+                factory.create_nil_term(),
             )))
         } else {
             Err(format!(
@@ -63,9 +64,9 @@ where
     }
 }
 
-pub struct SetVariable {}
+pub struct SetVariable;
 impl SetVariable {
-    pub(crate) const UUID: Uuid = uuid!("c7a1b8e5-1045-4ce7-bd1a-4125bdb8d647");
+    pub const UUID: Uuid = uuid!("c7a1b8e5-1045-4ce7-bd1a-4125bdb8d647");
     const ARITY: FunctionArity<3, 0> = FunctionArity {
         required: [ArgType::Strict, ArgType::Lazy, ArgType::Strict],
         optional: [],
@@ -107,7 +108,8 @@ where
         ) {
             (Some(_), Some(_)) => Ok(factory.create_effect_term(allocator.create_signal(
                 SignalType::Custom(String::from(EFFECT_TYPE_VARIABLE_SET)),
-                allocator.create_triple(state_token, value, update_token),
+                factory.create_list_term(allocator.create_pair(state_token, value)),
+                update_token,
             ))),
             _ => Err(format!(
                 "Expected (Symbol, <any>, Symbol), received ({}, {}, {})",
@@ -117,9 +119,9 @@ where
     }
 }
 
-pub struct IncrementVariable {}
+pub struct IncrementVariable;
 impl IncrementVariable {
-    pub(crate) const UUID: Uuid = uuid!("c73a5dfa-61fb-4a19-956e-752f34526718");
+    pub const UUID: Uuid = uuid!("c73a5dfa-61fb-4a19-956e-752f34526718");
     const ARITY: FunctionArity<2, 0> = FunctionArity {
         required: [ArgType::Strict, ArgType::Strict],
         optional: [],
@@ -160,7 +162,8 @@ where
         ) {
             (Some(_), Some(_)) => Ok(factory.create_effect_term(allocator.create_signal(
                 SignalType::Custom(String::from(EFFECT_TYPE_VARIABLE_INCREMENT)),
-                allocator.create_pair(state_token, update_token),
+                factory.create_list_term(allocator.create_unit_list(state_token)),
+                update_token,
             ))),
             _ => Err(format!(
                 "Expected (Symbol, Symbol), received ({}, {})",
@@ -170,9 +173,9 @@ where
     }
 }
 
-pub struct DecrementVariable {}
+pub struct DecrementVariable;
 impl DecrementVariable {
-    pub(crate) const UUID: Uuid = uuid!("75b1d997-91ff-43e6-bbb6-b3f9d6c47a34");
+    pub const UUID: Uuid = uuid!("75b1d997-91ff-43e6-bbb6-b3f9d6c47a34");
     const ARITY: FunctionArity<2, 0> = FunctionArity {
         required: [ArgType::Strict, ArgType::Strict],
         optional: [],
@@ -213,7 +216,8 @@ where
         ) {
             (Some(_), Some(_)) => Ok(factory.create_effect_term(allocator.create_signal(
                 SignalType::Custom(String::from(EFFECT_TYPE_VARIABLE_DECREMENT)),
-                allocator.create_pair(state_token, update_token),
+                factory.create_list_term(allocator.create_unit_list(state_token)),
+                update_token,
             ))),
             _ => Err(format!(
                 "Expected (Symbol, Symbol), received ({}, {})",

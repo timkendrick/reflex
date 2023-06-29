@@ -10,9 +10,9 @@ use reflex::core::{
     SignalType, StringTermType, StringValue, Uid, Uuid,
 };
 
-pub struct Throw {}
+pub struct Throw;
 impl Throw {
-    pub(crate) const UUID: Uuid = uuid!("fb9bef4b-da7a-46ef-af03-50ed2984274c");
+    pub const UUID: Uuid = uuid!("fb9bef4b-da7a-46ef-af03-50ed2984274c");
     const ARITY: FunctionArity<1, 0> = FunctionArity {
         required: [ArgType::Strict],
         optional: [],
@@ -54,10 +54,10 @@ impl<T: Expression> Applicable<T> for Throw {
                     .iter()
                     .map(|item| item.as_deref())
                     .cloned()
-                    .map(|error| create_error_signal(error, allocator)),
+                    .map(|error| create_error_signal(error, factory, allocator)),
             )
         } else {
-            allocator.create_signal_list(once(create_error_signal(error, allocator)))
+            allocator.create_signal_list(once(create_error_signal(error, factory, allocator)))
         };
         Ok(factory.create_signal_term(signals))
     }
@@ -95,6 +95,10 @@ fn parse_aggregate_error<'a, T: Expression + 'a>(
     })
 }
 
-fn create_error_signal<T: Expression>(error: T, allocator: &impl HeapAllocator<T>) -> T::Signal<T> {
-    allocator.create_signal(SignalType::Error, allocator.create_unit_list(error))
+fn create_error_signal<T: Expression>(
+    error: T,
+    factory: &impl ExpressionFactory<T>,
+    allocator: &impl HeapAllocator<T>,
+) -> T::Signal<T> {
+    allocator.create_signal(SignalType::Error, error, factory.create_nil_term())
 }

@@ -60,14 +60,14 @@ impl<T: Expression> ExpressionList<T> {
 }
 
 impl<T: Expression> ExpressionListType<T> for ExpressionList<T> {
-    type Iterator<'a> = IntoRefTypeIterator<T, T::Ref<'a, T>, std::slice::Iter<'a, T>> where T: 'a, Self: 'a;
+    type Iterator<'a> = IntoRefTypeIterator<T, T::ExpressionRef<'a>, std::slice::Iter<'a, T>> where T: 'a, Self: 'a;
     fn id(&self) -> HashId {
         self.id
     }
     fn len(&self) -> usize {
         self.items.len()
     }
-    fn get<'a>(&'a self, index: usize) -> Option<T::Ref<'a, T>>
+    fn get<'a>(&'a self, index: usize) -> Option<T::ExpressionRef<'a>>
     where
         T: 'a,
     {
@@ -198,7 +198,7 @@ where
     }
 }
 impl<T: Expression> ConditionListType<T> for SignalList<T> {
-    type Iterator<'a> = IntoRefTypeIterator<T::Signal<T>, T::Ref<'a, T::Signal<T>>, std::collections::btree_set::Iter<'a, T::Signal<T>>>
+    type Iterator<'a> = IntoRefTypeIterator<T::Signal<T>, T::SignalRef<'a, T>, std::collections::btree_set::Iter<'a, T::Signal<T>>>
         where
             T::Signal<T>: 'a,
             T: 'a,
@@ -290,22 +290,24 @@ where
 pub struct Signal<T: Expression> {
     id: HashId,
     signal_type: SignalType,
-    args: T::ExpressionList<T>,
+    payload: T,
+    token: T,
 }
 impl<T: Expression> Signal<T> {
-    pub fn new(signal_type: SignalType, args: T::ExpressionList<T>) -> Self {
+    pub fn new(signal_type: SignalType, payload: T, token: T) -> Self {
         let hash = {
+            // FIXME: Ensure consistent hashes across alternative Condition implementations
             let mut hasher = FnvHasher::default();
             signal_type.hash(&mut hasher);
-            for arg in args.iter().map(|item| item.as_deref()) {
-                arg.id().hash(&mut hasher)
-            }
+            payload.id().hash(&mut hasher);
+            token.id().hash(&mut hasher);
             hasher.finish()
         };
         Self {
             id: hash,
             signal_type,
-            args,
+            payload,
+            token,
         }
     }
     pub fn is_type(&self, signal_type: &SignalType) -> bool {
@@ -335,26 +337,19 @@ impl<T: Expression> ConditionType<T> for Signal<T> {
         // FIXME: Prevent unnecessary cloning of signal type
         self.signal_type.clone()
     }
-    fn args<'a>(&'a self) -> T::Ref<'a, T::ExpressionList<T>>
-    where
-        T::ExpressionList<T>: 'a,
-        T: 'a,
-    {
-        (&self.args).into()
+    fn payload<'a>(&'a self) -> T::ExpressionRef<'a> {
+        (&self.payload).into()
+    }
+    fn token<'a>(&'a self) -> T::ExpressionRef<'a> {
+        (&self.token).into()
     }
 }
 impl<T: Expression> std::fmt::Display for Signal<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "<signal:{}:{}>",
-            self.signal_type,
-            self.args
-                .iter()
-                .map(|item| item.as_deref())
-                .map(|arg| format!("{}", arg))
-                .collect::<Vec<_>>()
-                .join(",")
+            "<signal:{}:{}:{}>",
+            self.signal_type, self.token, self.payload
         )
     }
 }
@@ -387,16 +382,19 @@ where
 struct SerializedSignal<T: Expression> {
     signal_type: SerializedSignalType,
     custom_type: Option<String>,
-    args: T::ExpressionList<T>,
+    payload: T,
+    token: T,
 }
 impl<'a, T: Expression> Into<SerializedSignal<T>> for &'a Signal<T> {
     fn into(self) -> SerializedSignal<T> {
         let (signal_type, custom_type) = serialize_signal_type(&self.signal_type);
-        let args = self.args.clone();
+        let payload = self.payload.clone();
+        let token = self.token.clone();
         SerializedSignal {
             signal_type,
             custom_type,
-            args,
+            payload,
+            token,
         }
     }
 }
@@ -405,10 +403,11 @@ impl<T: Expression> Into<Signal<T>> for SerializedSignal<T> {
         let SerializedSignal {
             signal_type,
             custom_type,
-            args,
+            payload,
+            token,
         } = self;
         let signal_type = deserialize_signal_type(signal_type, custom_type);
-        Signal::new(signal_type, args)
+        Signal::new(signal_type, payload, token)
     }
 }
 #[derive(Debug, Serialize, Deserialize)]
@@ -453,7 +452,7 @@ impl<T: Expression> StructPrototype<T> {
             .map(|item| item.as_deref())
             .enumerate()
             .find_map(|(offset, existing_key)| {
-                if existing_key == key {
+                if existing_key.id() == key.id() {
                     Some(offset)
                 } else {
                     None
@@ -462,7 +461,7 @@ impl<T: Expression> StructPrototype<T> {
     }
 }
 impl<T: Expression> StructPrototypeType<T> for StructPrototype<T> {
-    fn keys<'a>(&'a self) -> T::Ref<'a, T::ExpressionList<T>>
+    fn keys<'a>(&'a self) -> T::ExpressionListRef<'a, T>
     where
         T::ExpressionList<T>: 'a,
         T: 'a,

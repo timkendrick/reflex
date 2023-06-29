@@ -3,13 +3,13 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 use reflex::core::{
     uuid, Applicable, ArgType, Arity, ConditionListType, ConditionType, EvaluationCache,
-    Expression, ExpressionFactory, ExpressionListType, FunctionArity, HeapAllocator, RefType,
-    SignalTermType, SignalType, Uid, Uuid,
+    Expression, ExpressionFactory, FunctionArity, HeapAllocator, RefType, SignalTermType,
+    SignalType, Uid, Uuid,
 };
 
-pub struct IfError {}
+pub struct IfError;
 impl IfError {
-    pub(crate) const UUID: Uuid = uuid!("ca015984-8f33-49c5-b821-aca8fb122ee8");
+    pub const UUID: Uuid = uuid!("ca015984-8f33-49c5-b821-aca8fb122ee8");
     const ARITY: FunctionArity<2, 0> = FunctionArity {
         required: [ArgType::Eager, ArgType::Lazy],
         optional: [],
@@ -65,18 +65,17 @@ impl<T: Expression> Applicable<T> for IfError {
             } else {
                 Ok(factory.create_application_term(
                     handler,
-                    allocator.create_unit_list(factory.create_list_term(allocator.create_list(
-                        error_signals.into_iter().map(|signal| {
-                            signal
-                                .args()
-                                .as_deref()
-                                .iter()
-                                .map(|item| item.as_deref())
-                                .next()
-                                .cloned()
-                                .unwrap_or_else(|| factory.create_nil_term())
-                        }),
-                    ))),
+                    allocator.create_unit_list(
+                        factory.create_list_term(
+                            allocator.create_list(
+                                error_signals
+                                    .into_iter()
+                                    .map(|signal| signal.payload())
+                                    .map(|item| item.as_deref())
+                                    .cloned(),
+                            ),
+                        ),
+                    ),
                 ))
             }
         } else {

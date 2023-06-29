@@ -736,19 +736,24 @@ fn compile_signal<T: Expression + Compile<T>>(
     allocator: &impl HeapAllocator<T>,
     compiler: &mut Compiler,
 ) -> Result<Program, String> {
-    let args = signal.args().as_deref();
-    let compiled_args = compile_expressions(
-        args.iter().map(|item| item.as_deref()),
+    let compiled_token = compiler.compile_term(
+        signal.token().as_deref(),
         Eagerness::Lazy,
         stack_offset,
         factory,
         allocator,
-        compiler,
     )?;
-    let mut result = compiled_args;
+    let compiled_payload = compiler.compile_term(
+        signal.payload().as_deref(),
+        Eagerness::Lazy,
+        stack_offset,
+        factory,
+        allocator,
+    )?;
+    let mut result = compiled_token;
+    result.extend(compiled_payload);
     result.push(Instruction::ConstructCondition {
         signal_type: signal.signal_type().clone(),
-        num_args: args.len(),
     });
     Ok(result)
 }
@@ -772,7 +777,7 @@ fn match_compiled_function_result(
 mod tests {
     use reflex::core::{DependencyList, EvaluationResult, InstructionPointer, StateCache};
     use reflex_lang::{allocator::DefaultAllocator, SharedTermFactory};
-    use reflex_stdlib::Stdlib;
+    use reflex_stdlib::{Abs, Add, If, Stdlib};
 
     use crate::{
         compiler::{
@@ -892,7 +897,7 @@ mod tests {
             factory.create_let_term(
                 factory.create_int_term(3),
                 factory.create_application_term(
-                    factory.create_builtin_term(Stdlib::Abs),
+                    factory.create_builtin_term(Abs),
                     allocator.create_unit_list(factory.create_let_term(
                         factory.create_nil_term(),
                         factory.create_variable_term(1),
@@ -926,7 +931,7 @@ mod tests {
         let expression = factory.create_let_term(
             factory.create_int_term(3),
             factory.create_application_term(
-                factory.create_builtin_term(Stdlib::Add),
+                factory.create_builtin_term(Add),
                 allocator.create_pair(
                     factory.create_int_term(4),
                     factory.create_let_term(
@@ -963,12 +968,12 @@ mod tests {
         let expression = factory.create_let_term(
             factory.create_int_term(3),
             factory.create_application_term(
-                factory.create_builtin_term(Stdlib::If),
+                factory.create_builtin_term(If),
                 allocator.create_triple(
                     factory.create_boolean_term(false),
                     factory.create_nil_term(),
                     factory.create_application_term(
-                        factory.create_builtin_term(Stdlib::Add),
+                        factory.create_builtin_term(Add),
                         allocator.create_pair(
                             factory.create_int_term(4),
                             factory.create_let_term(
@@ -1010,7 +1015,7 @@ mod tests {
                 factory.create_lambda_term(
                     1,
                     factory.create_application_term(
-                        factory.create_builtin_term(Stdlib::Abs),
+                        factory.create_builtin_term(Abs),
                         allocator.create_unit_list(factory.create_application_term(
                             factory.create_variable_term(1),
                             allocator.create_unit_list(factory.create_variable_term(0)),

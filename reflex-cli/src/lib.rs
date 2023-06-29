@@ -7,17 +7,15 @@ use std::{path::Path, str::FromStr};
 
 use anyhow::{anyhow, Result};
 use reflex::core::{
-    Applicable, ConditionListType, ConditionType, Expression, ExpressionFactory,
-    ExpressionListType, HeapAllocator, InstructionPointer, Reducible, RefType, Rewritable,
-    SignalTermType, SignalType, StringTermType, StringValue,
+    Applicable, ConditionListType, ConditionType, Expression, ExpressionFactory, HeapAllocator,
+    InstructionPointer, Reducible, RefType, Rewritable, SignalTermType, SignalType,
 };
-use reflex_handlers::stdlib::Stdlib as HandlersStdlib;
+use reflex_handlers::imports::HandlerImportsBuiltin;
 use reflex_interpreter::compiler::{
     Compile, CompiledProgram, Compiler, CompilerMode, CompilerOptions,
 };
-use reflex_js::stdlib::Stdlib as JsStdlib;
-use reflex_json::stdlib::Stdlib as JsonStdlib;
-use reflex_stdlib::Stdlib;
+use reflex_js::{globals::JsGlobalsBuiltin, imports::JsImportsBuiltin, JsParserBuiltin};
+use reflex_lisp::LispParserBuiltin;
 
 use crate::syntax::{
     js::compile_js_entry_point,
@@ -78,7 +76,11 @@ pub fn create_parser<T>(
 ) -> impl SyntaxParser<T>
 where
     T: Expression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T> + 'static,
-    T::Builtin: From<Stdlib> + From<JsonStdlib> + From<JsStdlib> + From<HandlersStdlib>,
+    T::Builtin: JsParserBuiltin
+        + JsGlobalsBuiltin
+        + JsImportsBuiltin
+        + HandlerImportsBuiltin
+        + LispParserBuiltin,
 {
     match (syntax, entry_path) {
         (Syntax::JavaScript, None) => {
@@ -118,7 +120,7 @@ pub fn compile_entry_point<T, TLoader>(
 ) -> Result<(CompiledProgram, InstructionPointer)>
 where
     T: Expression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T> + 'static,
-    T::Builtin: From<Stdlib> + From<JsonStdlib> + From<JsStdlib>,
+    T::Builtin: JsParserBuiltin + JsGlobalsBuiltin + LispParserBuiltin,
     TLoader: Fn(&str, &Path) -> Option<Result<T, String>> + 'static,
 {
     match syntax {
@@ -148,95 +150,28 @@ fn compile_graph_root<T: Expression + Rewritable<T> + Reducible<T> + Applicable<
     Ok((program, InstructionPointer::default()))
 }
 
-pub fn format_signal_result<T: Expression>(
-    result: &T::SignalTerm<T>,
-    factory: &impl ExpressionFactory<T>,
+pub fn format_signal_result<T: Expression<SignalTerm<T> = V>, V: SignalTermType<T>>(
+    result: &V,
 ) -> String {
     result
         .signals()
         .as_deref()
         .iter()
         .map(|item| item.as_deref())
-        .map(|signal| format_signal(signal, factory))
+        .map(|signal| format_signal::<T>(signal))
         .collect::<Vec<_>>()
         .join("\n")
 }
 
-fn format_signal<T: Expression>(
-    signal: &T::Signal<T>,
-    factory: &impl ExpressionFactory<T>,
-) -> String {
+fn format_signal<T: Expression>(signal: &T::Signal<T>) -> String {
     match signal.signal_type() {
         SignalType::Error => {
-            let (message, args) = {
-                let args = signal.args().as_deref();
-                let (message, remaining_args) =
-                    match args.get(0).map(|value| value.as_deref()).map(|arg| {
-                        match factory.match_string_term(arg) {
-                            Some(message) => {
-                                Some(String::from(message.value().as_deref().as_str()))
-                            }
-                            _ => None,
-                        }
-                    }) {
-                        Some(message) => (
-                            message,
-                            if args.len() > 1 {
-                                Some((Some(args.iter().map(|item| item.as_deref()).skip(1)), None))
-                            } else {
-                                None
-                            },
-                        ),
-                        _ => (
-                            None,
-                            if args.len() > 0 {
-                                Some((None, Some(args.iter().map(|item| item.as_deref()))))
-                            } else {
-                                None
-                            },
-                        ),
-                    };
-                (
-                    message,
-                    remaining_args.map(|(remaining_args, original_args)| {
-                        remaining_args
-                            .into_iter()
-                            .flatten()
-                            .chain(original_args.into_iter().flatten())
-                    }),
-                )
-            };
-            format!(
-                "Error: {}",
-                match message {
-                    Some(message) => match args {
-                        None => format!("{}", message),
-                        Some(args) => format!(
-                            "{} {}",
-                            message,
-                            args.map(|arg| format!("{}", arg))
-                                .collect::<Vec<_>>()
-                                .join(" ")
-                        ),
-                    },
-                    None => String::from("<unknown>"),
-                }
-            )
+            format!("Error: {}", signal.payload().as_deref())
         }
         SignalType::Custom(signal_type) => format!(
             "<{}>{}",
             signal_type,
-            format!(
-                " {}",
-                signal
-                    .args()
-                    .as_deref()
-                    .iter()
-                    .map(|item| item.as_deref())
-                    .map(|arg| format!("{}", arg))
-                    .collect::<Vec<_>>()
-                    .join(" ")
-            )
+            format!(" {}", signal.payload().as_deref())
         ),
         SignalType::Pending => String::from("<pending>"),
     }

@@ -8,10 +8,10 @@ use std::{
     marker::PhantomData,
 };
 
-use metrics::{describe_counter, describe_gauge, gauge, increment_gauge, Unit};
+use metrics::{describe_counter, describe_gauge, gauge, increment_gauge, SharedString, Unit};
 use reflex::core::{
-    ConditionType, Expression, ExpressionFactory, ExpressionListType, HeapAllocator, RefType,
-    SignalType, StateToken, StringTermType, StringValue,
+    ConditionType, Expression, ExpressionFactory, ExpressionListType, HeapAllocator, ListTermType,
+    RefType, SignalType, StateToken,
 };
 use reflex_dispatcher::{
     Action, ActorEvents, HandlerContext, MessageData, NoopDisposeCallback, ProcessId,
@@ -120,7 +120,7 @@ impl<T: Expression> Default for ScanHandlerState<T> {
 }
 
 struct ScanHandlerReducerState<T: Expression> {
-    metric_labels: Vec<(String, String)>,
+    metric_labels: [(SharedString, SharedString); 2],
     source_effect: T::Signal<T>,
     source_value_effect: T::Signal<T>,
     source_value: Option<T>,
@@ -429,24 +429,42 @@ where
             Entry::Occupied(_) => None,
             Entry::Vacant(entry) => {
                 let ScanEffectArgs {
-                    label,
                     target,
                     seed,
                     iteratee,
                 } = args;
                 let source_value_effect = self.allocator.create_signal(
                     SignalType::Custom(String::from(EVENT_TYPE_SCAN_SOURCE)),
-                    self.allocator
-                        .create_triple(target.clone(), seed.clone(), iteratee.clone()),
+                    self.factory.create_list_term(self.allocator.create_triple(
+                        target.clone(),
+                        seed.clone(),
+                        iteratee.clone(),
+                    )),
+                    self.factory.create_nil_term(),
                 );
                 let state_value_effect = self.allocator.create_signal(
                     SignalType::Custom(String::from(EVENT_TYPE_SCAN_STATE)),
-                    self.allocator
-                        .create_triple(target.clone(), seed.clone(), iteratee.clone()),
+                    self.factory.create_list_term(self.allocator.create_triple(
+                        target.clone(),
+                        seed.clone(),
+                        iteratee.clone(),
+                    )),
+                    self.factory.create_nil_term(),
                 );
-                let reducer_label = format!("{} [reducer]", label);
+                let source_label = format!("{}:{} [scan]", target.id(), iteratee.id());
+                let reducer_label = format!("{}:{} [reducer]", target.id(), iteratee.id());
+                let metric_labels = [
+                    (
+                        SharedString::borrowed("source"),
+                        SharedString::owned(format!("{}", target.id())),
+                    ),
+                    (
+                        SharedString::borrowed("reducer"),
+                        SharedString::owned(format!("{}", iteratee.id())),
+                    ),
+                ];
                 let source_effect = create_evaluate_effect(
-                    label.clone(),
+                    source_label,
                     target,
                     QueryEvaluationMode::Standalone,
                     QueryInvalidationStrategy::Exact,
@@ -468,7 +486,7 @@ where
                     &self.allocator,
                 );
                 let reducer_state = ScanHandlerReducerState {
-                    metric_labels: vec![(String::from("label"), label)],
+                    metric_labels,
                     source_effect: source_effect.clone(),
                     source_value_effect,
                     source_value: None,
@@ -559,7 +577,6 @@ where
 }
 
 struct ScanEffectArgs<T: Expression> {
-    label: String,
     target: T,
     seed: T,
     iteratee: T,
@@ -569,43 +586,37 @@ fn parse_scan_effect_args<T: Expression>(
     effect: &T::Signal<T>,
     factory: &impl ExpressionFactory<T>,
 ) -> Result<ScanEffectArgs<T>, String> {
-    let args = effect.args().as_deref();
-    if args.len() != 4 {
-        return Err(format!(
-            "Invalid scan signal: Expected 4 arguments, received {}",
-            args.len()
-        ));
-    }
-    let mut remaining_args = args.iter().map(|item| item.as_deref());
-    let name = remaining_args.next().unwrap();
-    let target = remaining_args.next().unwrap();
-    let seed = remaining_args.next().unwrap();
-    let iteratee = remaining_args.next().unwrap();
-    if let Some(name) = factory.match_string_term(name) {
-        Ok(ScanEffectArgs {
-            label: String::from(name.value().as_deref().as_str()),
-            target: target.clone(),
-            seed: seed.clone(),
-            iteratee: iteratee.clone(),
-        })
-    } else {
-        Err(format!(
-            "Invalid scan signal arguments: Expected (String, <any>, <any>, <function:2>), received ({}, {}, {}, {})",
-            name,
-            target,
-            seed,
-            iteratee,
-        ))
-    }
+    let payload = effect.payload().as_deref();
+    let args = factory
+        .match_list_term(payload)
+        .map(|term| term.items().as_deref())
+        .filter(|args| args.len() == 3)
+        .ok_or_else(|| {
+            format!(
+                "Invalid scan signal: Expected 3 arguments, received {}",
+                payload
+            )
+        })?;
+    let mut args = args.iter().map(|iter| iter.as_deref());
+    let target = args.next().unwrap();
+    let seed = args.next().unwrap();
+    let iteratee = args.next().unwrap();
+    Ok(ScanEffectArgs {
+        target: target.clone(),
+        seed: seed.clone(),
+        iteratee: iteratee.clone(),
+    })
 }
 
 fn create_pending_expression<T: Expression>(
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
 ) -> T {
-    factory.create_signal_term(allocator.create_signal_list(once(
-        allocator.create_signal(SignalType::Pending, allocator.create_empty_list()),
-    )))
+    factory.create_signal_term(allocator.create_signal_list(once(allocator.create_signal(
+        SignalType::Pending,
+        factory.create_nil_term(),
+        factory.create_nil_term(),
+    ))))
 }
 
 fn create_error_expression<T: Expression>(
@@ -615,6 +626,7 @@ fn create_error_expression<T: Expression>(
 ) -> T {
     factory.create_signal_term(allocator.create_signal_list(once(allocator.create_signal(
         SignalType::Error,
-        allocator.create_unit_list(factory.create_string_term(allocator.create_string(message))),
+        factory.create_string_term(allocator.create_string(message)),
+        factory.create_nil_term(),
     ))))
 }

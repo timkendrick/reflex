@@ -33,13 +33,13 @@ impl<T: Expression> LetTerm<T> {
     }
 }
 impl<'term, T: Expression + 'term> LetTermType<T> for LetTerm<T> {
-    fn initializer<'a>(&'a self) -> T::Ref<'a, T>
+    fn initializer<'a>(&'a self) -> T::ExpressionRef<'a>
     where
         T: 'a,
     {
         (&self.initializer).into()
     }
-    fn body<'a>(&'a self) -> T::Ref<'a, T>
+    fn body<'a>(&'a self) -> T::ExpressionRef<'a>
     where
         T: 'a,
     {
@@ -69,14 +69,16 @@ impl<T: Expression> GraphNode for LetTerm<T> {
             .collect()
     }
     fn count_variable_usages(&self, offset: StackOffset) -> usize {
-        self.body.count_variable_usages(offset + 1)
+        self.initializer.count_variable_usages(offset) + self.body.count_variable_usages(offset + 1)
     }
     fn dynamic_dependencies(&self, deep: bool) -> DependencyList {
+        // TODO: Verify shallow dynamic dependencies for Let term
         self.initializer
             .dynamic_dependencies(deep)
             .union(self.body.dynamic_dependencies(deep))
     }
     fn has_dynamic_dependencies(&self, deep: bool) -> bool {
+        // TODO: Verify shallow dynamic dependencies for Let term
         self.initializer.has_dynamic_dependencies(deep) || self.body.has_dynamic_dependencies(deep)
     }
     fn is_static(&self) -> bool {
@@ -90,11 +92,14 @@ impl<T: Expression> GraphNode for LetTerm<T> {
     }
 }
 impl<T: Expression> CompoundNode<T> for LetTerm<T> {
-    type Children<'a> = std::iter::Chain<std::iter::Once<T::Ref<'a, T>>, std::iter::Once<T::Ref<'a, T>>>
+    type Children<'a> = std::iter::Chain<std::iter::Once<T::ExpressionRef<'a>>, std::iter::Once<T::ExpressionRef<'a>>>
         where
             T: 'a,
             Self: 'a;
-    fn children<'a>(&'a self) -> Self::Children<'a> {
+    fn children<'a>(&'a self) -> Self::Children<'a>
+    where
+        T: 'a,
+    {
         once((&self.initializer).into()).chain(once((&self.body).into()))
     }
 }

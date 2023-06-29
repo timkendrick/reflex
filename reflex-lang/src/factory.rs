@@ -408,9 +408,37 @@ impl<TBuiltin: Builtin> Expression for CachedSharedTerm<TBuiltin> {
     type HashsetTerm<T: Expression> = HashSetTerm<T>;
     type SignalTerm<T: Expression> = SignalTerm<T>;
 
-    type Ref<'a, TTarget> = &'a TTarget
+    type StringRef<'a> = &'a Self::String
     where
-        TTarget: 'a,
+        Self::String: 'a,
+        Self: 'a;
+
+    type SignalRef<'a, TWrapper: Expression> = &'a <Self as Expression>::Signal<TWrapper>
+    where
+        TWrapper: 'a,
+        <Self as Expression>::Signal<TWrapper>: 'a,
+        Self: 'a;
+
+    type StructPrototypeRef<'a, TWrapper: Expression> = &'a <Self as Expression>::StructPrototype<TWrapper>
+    where
+        TWrapper: 'a,
+        <Self as Expression>::StructPrototype<TWrapper>: 'a,
+        Self: 'a;
+
+    type SignalListRef<'a, TWrapper: Expression> = &'a <Self as Expression>::SignalList<TWrapper>
+    where
+        TWrapper: 'a,
+        <Self as Expression>::SignalList<TWrapper>: 'a,
+        Self: 'a;
+
+    type ExpressionListRef<'a, TWrapper: Expression> = &'a <Self as Expression>::ExpressionList<TWrapper>
+    where
+        TWrapper: 'a,
+        <Self as Expression>::ExpressionList<TWrapper>: 'a,
+        Self: 'a;
+
+    type ExpressionRef<'a> = &'a Self
+    where
         Self: 'a;
 
     fn id(&self) -> HashId {
@@ -446,11 +474,14 @@ impl<TBuiltin: Builtin> GraphNode for CachedSharedTerm<TBuiltin> {
         self.value.is_complex()
     }
 }
-impl<TStdlib: Builtin> CompoundNode<Self> for CachedSharedTerm<TStdlib> {
+impl<TStdlib: Builtin + 'static> CompoundNode<Self> for CachedSharedTerm<TStdlib> {
     type Children<'a> = TermChildren<'a, Self>
     where
         Self: 'a;
-    fn children<'a>(&'a self) -> Self::Children<'a> {
+    fn children<'a>(&'a self) -> Self::Children<'a>
+    where
+        Self: 'a,
+    {
         self.value.children()
     }
 }

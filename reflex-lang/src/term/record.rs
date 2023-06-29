@@ -43,21 +43,21 @@ impl<T: Expression> RecordTerm<T> {
     }
 }
 impl<T: Expression> RecordTermType<T> for RecordTerm<T> {
-    fn prototype<'a>(&'a self) -> T::Ref<'a, T::StructPrototype<T>>
+    fn prototype<'a>(&'a self) -> T::StructPrototypeRef<'a, T>
     where
         T::StructPrototype<T>: 'a,
         T: 'a,
     {
         (&self.prototype).into()
     }
-    fn values<'a>(&'a self) -> T::Ref<'a, T::ExpressionList<T>>
+    fn values<'a>(&'a self) -> T::ExpressionListRef<'a, T>
     where
         T::ExpressionList<T>: 'a,
         T: 'a,
     {
         (&self.values).into()
     }
-    fn get<'a>(&'a self, key: &T) -> Option<T::Ref<'a, T>>
+    fn get<'a>(&'a self, key: &T) -> Option<T::ExpressionRef<'a>>
     where
         T: 'a,
     {
@@ -67,7 +67,7 @@ impl<T: Expression> RecordTermType<T> for RecordTerm<T> {
             .as_deref()
             .iter()
             .map(|item| item.as_deref())
-            .position(|field_name| field_name == key)?;
+            .position(|field_name| field_name.id() == key.id())?;
         self.values.get(index)
     }
 }
@@ -113,7 +113,10 @@ impl<T: Expression> CompoundNode<T> for RecordTerm<T> {
         where
             T: 'a,
             Self: 'a;
-    fn children<'a>(&'a self) -> Self::Children<'a> {
+    fn children<'a>(&'a self) -> Self::Children<'a>
+    where
+        T: 'a,
+    {
         self.values.iter()
     }
 }

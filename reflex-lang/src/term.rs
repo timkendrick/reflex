@@ -130,7 +130,38 @@ where
     type HashsetTerm<TWrapper: Expression> = HashSetTerm<TWrapper>;
     type SignalTerm<TWrapper: Expression> = SignalTerm<TWrapper>;
 
-    type Ref<'a, TTarget> = T::Ref<'a, TTarget> where TTarget: 'a, Self: 'a;
+    type StringRef<'a> = &'a <Self as Expression>::String
+    where
+        <Self as Expression>::String: 'a,
+        Self: 'a;
+
+    type SignalRef<'a, TWrapper: Expression> = &'a <Self as Expression>::Signal<TWrapper>
+    where
+        TWrapper: 'a,
+        <Self as Expression>::Signal<TWrapper>: 'a,
+        Self: 'a;
+
+    type StructPrototypeRef<'a, TWrapper: Expression> = &'a <Self as Expression>::StructPrototype<TWrapper>
+    where
+        TWrapper: 'a,
+        <Self as Expression>::StructPrototype<TWrapper>: 'a,
+        Self: 'a;
+
+    type SignalListRef<'a, TWrapper: Expression> = &'a <Self as Expression>::SignalList<TWrapper>
+    where
+        TWrapper: 'a,
+        <Self as Expression>::SignalList<TWrapper>: 'a,
+        Self: 'a;
+
+    type ExpressionListRef<'a, TWrapper: Expression> = &'a <Self as Expression>::ExpressionList<TWrapper>
+    where
+        TWrapper: 'a,
+        <Self as Expression>::ExpressionList<TWrapper>: 'a,
+        Self: 'a;
+
+    type ExpressionRef<'a> = &'a Self
+    where
+        Self: 'a;
 
     fn id(&self) -> HashId {
         hash_object(self)
@@ -379,7 +410,7 @@ pub enum TermChildren<'a, T: Expression + 'a> {
     Empty,
 }
 impl<'a, T: Expression + 'a> Iterator for TermChildren<'a, T> {
-    type Item = T::Ref<'a, T>;
+    type Item = T::ExpressionRef<'a>;
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             Self::Let(iter) => iter.next(),
@@ -398,12 +429,16 @@ impl<'a, T: Expression + 'a> Iterator for TermChildren<'a, T> {
 impl<T: Expression> CompoundNode<T> for Term<T>
 where
     T::String: Hash,
+    for<'a> T::ExpressionRef<'a>: From<&'a T>,
 {
     type Children<'a> = TermChildren<'a, T>
         where
             T: 'a,
             Self: 'a;
-    fn children<'a>(&'a self) -> Self::Children<'a> {
+    fn children<'a>(&'a self) -> Self::Children<'a>
+    where
+        T: 'a,
+    {
         match self {
             Self::Let(term) => TermChildren::Let(term.children()),
             Self::Lambda(term) => TermChildren::Lambda(term.children()),
@@ -717,9 +752,6 @@ where
     }
 
     fn patch(&self, target: &Self) -> Result<Option<JsonValue>, String> {
-        if self.id() == target.id() {
-            return Ok(None);
-        }
         match (self, target) {
             (Self::Nil(term), Self::Nil(other)) => term.patch(other),
             (Self::Boolean(term), Self::Boolean(other)) => term.patch(other),
@@ -752,7 +784,7 @@ mod test {
     use super::*;
     use crate::{allocator::DefaultAllocator, CachedSharedTerm, SharedTermFactory};
     use reflex::core::SignalType;
-    use reflex_stdlib::Stdlib;
+    use reflex_stdlib::{Multiply, Stdlib};
 
     #[test]
     fn serialization() {
@@ -767,7 +799,8 @@ mod test {
         let input =
             factory.create_signal_term(allocator.create_signal_list([allocator.create_signal(
                 SignalType::Custom(String::from("foo")),
-                allocator.create_unit_list(factory.create_int_term(3)),
+                factory.create_int_term(3),
+                factory.create_symbol_term(123),
             )]));
         let serialized = serde_json::to_string(&input).unwrap();
         let deserialized: CachedSharedTerm<Stdlib> = serde_json::from_str(&serialized).unwrap();
@@ -781,10 +814,10 @@ mod test {
                 factory.create_lambda_term(
                     1,
                     factory.create_application_term(
-                        factory.create_builtin_term(Stdlib::Multiply),
+                        factory.create_builtin_term(Multiply),
                         allocator.create_pair(
                             factory.create_application_term(
-                                factory.create_builtin_term(Stdlib::Multiply),
+                                factory.create_builtin_term(Multiply),
                                 allocator.create_pair(
                                     factory.create_int_term(2),
                                     factory.create_int_term(3),

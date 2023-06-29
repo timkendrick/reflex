@@ -786,23 +786,12 @@ fn prefix_error_message_effects<T: Expression>(
                     if let Some(message) = as_error_message_effect(signal, factory) {
                         allocator.create_signal(
                             signal.signal_type().clone(),
-                            allocator.create_list(
-                                signal
-                                    .args()
-                                    .as_deref()
-                                    .iter()
-                                    .map(|item| item.as_deref())
-                                    .enumerate()
-                                    .map(|(index, arg)| {
-                                        if index == 0 {
-                                            factory.create_string_term(allocator.create_string(
-                                                format!("{}{}", prefix, message.as_str()),
-                                            ))
-                                        } else {
-                                            arg.clone()
-                                        }
-                                    }),
-                            ),
+                            factory.create_string_term(allocator.create_string(format!(
+                                "{}{}",
+                                prefix,
+                                message.as_str()
+                            ))),
+                            signal.token().as_deref().clone(),
                         )
                     } else {
                         signal.clone()
@@ -819,18 +808,11 @@ fn as_error_message_effect<'a, T: Expression + 'a>(
     if !matches!(effect.signal_type(), SignalType::Error) {
         return None;
     }
-    effect
-        .args()
-        .as_deref()
-        .iter()
-        .map(|item| item.as_deref())
-        .next()
-        .and_then(|arg| {
-            factory
-                .match_string_term(arg)
-                .map(|value| value.as_deref())
-                .map(|term| term.value().as_deref())
-        })
+    let payload = effect.payload().as_deref();
+    factory
+        .match_string_term(payload)
+        .map(|value| value.as_deref())
+        .map(|term| term.value().as_deref())
 }
 
 struct LoaderEffectArgs<T: Expression> {
@@ -843,17 +825,21 @@ fn parse_loader_effect_args<T: Expression + Applicable<T>>(
     effect: &T::Signal<T>,
     factory: &impl ExpressionFactory<T>,
 ) -> Result<LoaderEffectArgs<T>, String> {
-    let args = effect.args().as_deref();
-    if args.len() != 3 {
-        return Err(format!(
-            "Invalid loader signal: Expected 3 arguments, received {}",
-            args.len()
-        ));
-    }
-    let mut remaining_args = args.iter().map(|item| item.as_deref());
-    let name = remaining_args.next().unwrap();
-    let loader = remaining_args.next().unwrap();
-    let key = remaining_args.next().unwrap();
+    let payload = effect.payload().as_deref();
+    let args = factory
+        .match_list_term(payload)
+        .map(|term| term.items().as_deref())
+        .filter(|args| args.len() == 3)
+        .ok_or_else(|| {
+            format!(
+                "Invalid loader signal: Expected 3 arguments, received {}",
+                payload
+            )
+        })?;
+    let mut args = args.iter().map(|iter| iter.as_deref());
+    let name = args.next().unwrap();
+    let loader = args.next().unwrap();
+    let key = args.next().unwrap();
     let name = factory
         .match_string_term(name)
         .map(|term| term.value().as_deref().as_str())
@@ -883,9 +869,11 @@ fn create_pending_expression<T: Expression>(
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
 ) -> T {
-    factory.create_signal_term(allocator.create_signal_list(once(
-        allocator.create_signal(SignalType::Pending, allocator.create_empty_list()),
-    )))
+    factory.create_signal_term(allocator.create_signal_list(once(allocator.create_signal(
+        SignalType::Pending,
+        factory.create_nil_term(),
+        factory.create_nil_term(),
+    ))))
 }
 
 fn create_error_expression<T: Expression>(
@@ -895,6 +883,7 @@ fn create_error_expression<T: Expression>(
 ) -> T {
     factory.create_signal_term(allocator.create_signal_list(once(allocator.create_signal(
         SignalType::Error,
-        allocator.create_unit_list(factory.create_string_term(allocator.create_string(message))),
+        factory.create_string_term(allocator.create_string(message)),
+        factory.create_nil_term(),
     ))))
 }

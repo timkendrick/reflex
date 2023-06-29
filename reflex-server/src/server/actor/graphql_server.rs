@@ -19,17 +19,16 @@ use opentelemetry::{
 };
 use reflex::core::{
     ConditionListType, ConditionType, EvaluationResult, Expression, ExpressionFactory,
-    ExpressionListType, HeapAllocator, RecordTermType, RefType, SignalTermType, SignalType,
-    StringTermType, StringValue, Uuid,
+    HeapAllocator, RecordTermType, RefType, SignalTermType, SignalType, StringTermType,
+    StringValue, Uuid,
 };
 use reflex::hash::{HashId, IntMap};
 use reflex_dispatcher::{
     Action, ActorEvents, HandlerContext, MessageData, NoopDisposeCallback, ProcessId,
     SchedulerCommand, SchedulerMode, SchedulerTransition, TaskFactory, TaskInbox,
 };
-use reflex_graphql::{
-    graphql_variables_are_equal, stdlib::Stdlib as GraphQlStdlib, GraphQlOperation,
-};
+use reflex_graphql::GraphQlParserBuiltin;
+use reflex_graphql::{graphql_variables_are_equal, GraphQlOperation};
 use reflex_json::JsonValue;
 use reflex_macros::{dispatcher, Named};
 use reflex_runtime::action::evaluate::{
@@ -39,7 +38,6 @@ use reflex_runtime::action::query::{
     QueryEmitAction, QuerySubscribeAction, QueryUnsubscribeAction,
 };
 use reflex_runtime::actor::query_manager::create_query_evaluate_effect;
-use reflex_stdlib::Stdlib;
 
 use crate::server::action::graphql_server::{
     GraphQlServerEmitAction, GraphQlServerModifyAction, GraphQlServerParseErrorAction,
@@ -185,7 +183,7 @@ where
 pub struct GraphQlServer<T, TFactory, TAllocator, TQueryLabel, TMetricLabels, TTracer>
 where
     T: Expression,
-    T::Builtin: From<Stdlib> + From<GraphQlStdlib>,
+    T::Builtin: GraphQlParserBuiltin,
     TFactory: ExpressionFactory<T>,
     TAllocator: HeapAllocator<T>,
     TQueryLabel: GraphQlServerQueryLabel,
@@ -206,7 +204,7 @@ impl<T, TFactory, TAllocator, TQueryLabel, TMetricLabels, TTracer>
     GraphQlServer<T, TFactory, TAllocator, TQueryLabel, TMetricLabels, TTracer>
 where
     T: Expression,
-    T::Builtin: From<Stdlib> + From<GraphQlStdlib>,
+    T::Builtin: GraphQlParserBuiltin,
     TFactory: ExpressionFactory<T>,
     TAllocator: HeapAllocator<T>,
     TQueryLabel: GraphQlServerQueryLabel,
@@ -432,7 +430,7 @@ dispatcher!({
         for GraphQlServer<T, TFactory, TAllocator, TQueryLabel, TMetricLabels, TTracer>
     where
         T: Expression,
-        T::Builtin: From<Stdlib> + From<GraphQlStdlib>,
+        T::Builtin: GraphQlParserBuiltin,
         TFactory: ExpressionFactory<T>,
         TAllocator: HeapAllocator<T>,
         TQueryLabel: GraphQlServerQueryLabel,
@@ -602,7 +600,7 @@ impl<T, TFactory, TAllocator, TQueryLabel, TMetricLabels, TTracer>
     GraphQlServer<T, TFactory, TAllocator, TQueryLabel, TMetricLabels, TTracer>
 where
     T: Expression,
-    T::Builtin: From<Stdlib> + From<GraphQlStdlib>,
+    T::Builtin: GraphQlParserBuiltin,
     TFactory: ExpressionFactory<T>,
     TAllocator: HeapAllocator<T>,
     TQueryLabel: GraphQlServerQueryLabel,
@@ -1442,23 +1440,10 @@ fn parse_error_message<'a, T: Expression + 'a>(
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
 ) -> Option<&'a str> {
-    error
-        .args()
-        .as_deref()
-        .iter()
-        .map(|item| item.as_deref())
-        .next()
-        .and_then(|arg| parse_error_payload_message(arg, factory, allocator))
-}
-
-fn parse_error_payload_message<'a, T: Expression + 'a>(
-    value: &'a T,
-    factory: &impl ExpressionFactory<T>,
-    allocator: &impl HeapAllocator<T>,
-) -> Option<&'a str> {
-    if let Some(term) = factory.match_string_term(value) {
+    let payload = error.payload().as_deref();
+    if let Some(term) = factory.match_string_term(payload) {
         Some(term.value().as_deref().as_str())
-    } else if let Some(term) = factory.match_record_term(value) {
+    } else if let Some(term) = factory.match_record_term(payload) {
         parse_error_object_payload_message(term, factory, allocator)
     } else {
         None
@@ -1542,7 +1527,6 @@ impl GraphQlQueryStatus {
 #[cfg(test)]
 mod tests {
     use std::collections::{HashMap, HashSet};
-    use std::iter::empty;
 
     use metrics_exporter_prometheus::PrometheusHandle;
 
@@ -1554,8 +1538,7 @@ mod tests {
     };
     use reflex_handlers::utils::tls::hyper_tls;
     use reflex_json::{JsonMap, JsonValue};
-    use reflex_lang::allocator::DefaultAllocator;
-    use reflex_lang::{CachedSharedTerm, ExpressionList, SharedTermFactory};
+    use reflex_lang::{allocator::DefaultAllocator, CachedSharedTerm, SharedTermFactory};
     use reflex_utils::reconnect::NoopReconnectTimeout;
 
     use crate::action::ServerCliAction;
@@ -1595,8 +1578,16 @@ mod tests {
         //       error and pending maps to error
         let mixed_result = EvaluationResult::new(
             factory.create_signal_term(allocator.create_signal_list(vec![
-                allocator.create_signal(SignalType::Pending, ExpressionList::new(empty())),
-                allocator.create_signal(SignalType::Error, ExpressionList::new(empty())),
+                allocator.create_signal(
+                    SignalType::Pending,
+                    factory.create_nil_term(),
+                    factory.create_nil_term(),
+                ),
+                allocator.create_signal(
+                    SignalType::Error,
+                    factory.create_string_term(allocator.create_static_string("foo")),
+                    factory.create_nil_term(),
+                ),
             ])),
             DependencyList::empty(),
         );
@@ -2451,7 +2442,11 @@ mod tests {
     ) -> EvaluationResult<CachedSharedTerm<ServerBuiltins>> {
         EvaluationResult::new(
             factory.create_signal_term(allocator.create_signal_list(vec![
-                allocator.create_signal(SignalType::Error, ExpressionList::new(empty())),
+                allocator.create_signal(
+                    SignalType::Error,
+                    factory.create_string_term(allocator.create_static_string("foo")),
+                    factory.create_nil_term(),
+                ),
             ])),
             DependencyList::empty(),
         )
@@ -2469,7 +2464,11 @@ mod tests {
     ) -> EvaluationResult<CachedSharedTerm<ServerBuiltins>> {
         EvaluationResult::new(
             factory.create_signal_term(allocator.create_signal_list(vec![
-                allocator.create_signal(SignalType::Pending, ExpressionList::new(empty())),
+                allocator.create_signal(
+                    SignalType::Pending,
+                    factory.create_nil_term(),
+                    factory.create_nil_term(),
+                ),
             ])),
             DependencyList::empty(),
         )
@@ -2483,7 +2482,8 @@ mod tests {
             factory.create_signal_term(allocator.create_signal_list(vec![
                 allocator.create_signal(
                     SignalType::Custom(String::from("foo")),
-                    ExpressionList::new(empty()),
+                    factory.create_string_term(allocator.create_static_string("bar")),
+                    factory.create_symbol_term(123),
                 ),
             ])),
             DependencyList::empty(),

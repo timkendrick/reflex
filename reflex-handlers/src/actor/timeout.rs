@@ -11,7 +11,7 @@ use std::{
 
 use reflex::core::{
     ConditionType, Expression, ExpressionFactory, ExpressionListType, FloatTermType, HeapAllocator,
-    IntTermType, RefType, SignalType, StateToken, Uuid,
+    IntTermType, ListTermType, RefType, SignalType, StateToken, Uuid,
 };
 use reflex_dispatcher::{
     Action, ActorEvents, HandlerContext, MessageData, NoopDisposeCallback, ProcessId,
@@ -333,30 +333,23 @@ fn parse_timeout_effect_args<T: Expression>(
     effect: &T::Signal<T>,
     factory: &impl ExpressionFactory<T>,
 ) -> Result<Option<Duration>, String> {
-    let args = effect.args().as_deref();
-    if args.len() != 2 {
-        return Err(format!(
-            "Invalid timeout signal: Expected 2 arguments, received {}",
-            args.len()
-        ));
-    }
-    let mut remaining_args = args.iter().map(|item| item.as_deref());
-    let duration = parse_duration_millis_arg(remaining_args.next().unwrap(), factory);
-    let _token = remaining_args.next().unwrap();
+    let payload = effect.payload().as_deref();
+    let args = factory
+        .match_list_term(payload)
+        .map(|term| term.items().as_deref())
+        .filter(|args| args.len() == 1)
+        .ok_or_else(|| {
+            format!(
+                "Invalid timeout signal: Expected 1 argument, received {}",
+                payload
+            )
+        })?;
+    let mut args = args.iter().map(|item| item.as_deref());
+    let duration = parse_duration_millis_arg(args.next().unwrap(), factory);
     match duration {
         Some(duration) if duration.as_millis() == 0 => Ok(None),
         Some(duration) => Ok(Some(duration.max(Duration::from_millis(1)))),
-        _ => Err(format!(
-            "Invalid timeout signal arguments: {}",
-            effect
-                .args()
-                .as_deref()
-                .iter()
-                .map(|item| item.as_deref())
-                .map(|arg| format!("{}", arg))
-                .collect::<Vec<_>>()
-                .join(", "),
-        )),
+        _ => Err(format!("Invalid timeout signal arguments: {}", payload)),
     }
 }
 
@@ -391,9 +384,11 @@ fn create_pending_expression<T: Expression>(
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
 ) -> T {
-    factory.create_signal_term(allocator.create_signal_list(once(
-        allocator.create_signal(SignalType::Pending, allocator.create_empty_list()),
-    )))
+    factory.create_signal_term(allocator.create_signal_list(once(allocator.create_signal(
+        SignalType::Pending,
+        factory.create_nil_term(),
+        factory.create_nil_term(),
+    ))))
 }
 
 fn create_error_expression<T: Expression>(
@@ -403,6 +398,7 @@ fn create_error_expression<T: Expression>(
 ) -> T {
     factory.create_signal_term(allocator.create_signal_list(once(allocator.create_signal(
         SignalType::Error,
-        allocator.create_unit_list(factory.create_string_term(allocator.create_string(message))),
+        factory.create_string_term(allocator.create_string(message)),
+        factory.create_nil_term(),
     ))))
 }

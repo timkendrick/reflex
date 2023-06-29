@@ -11,7 +11,7 @@ use std::{
 use reflex::{
     core::{
         ConditionType, Expression, ExpressionFactory, ExpressionListType, FloatTermType,
-        HeapAllocator, IntTermType, RefType, SignalType, StateToken,
+        HeapAllocator, IntTermType, ListTermType, RefType, SignalType, StateToken,
     },
     hash::HashId,
 };
@@ -579,74 +579,87 @@ fn add_integer_value<T: Expression>(
 
 fn parse_get_effect_args<'a, T: Expression>(
     effect: &'a T::Signal<T>,
-    _factory: &'a impl ExpressionFactory<T>,
+    factory: &'a impl ExpressionFactory<T>,
     _allocator: &impl HeapAllocator<T>,
 ) -> Result<(&'a T, &'a T), String> {
-    let args = effect.args().as_deref();
-    if args.len() != 2 {
-        return Err(format!(
-            "Invalid variable get signal: Expected 2 argument, received {}",
-            args.len()
-        ));
-    }
-    let mut remaining_args = args.iter().map(|item| item.as_deref());
-    let state_token = remaining_args.next().unwrap();
-    let initial_value = remaining_args.next().unwrap();
+    let payload = effect.payload().as_deref();
+    let args = factory
+        .match_list_term(payload)
+        .map(|term| term.items().as_deref())
+        .filter(|args| args.len() == 2)
+        .ok_or_else(|| {
+            format!(
+                "Invalid variable get signal: Expected 2 arguments, received {}",
+                payload
+            )
+        })?;
+    let mut args = args.iter().map(|item| item.as_deref());
+    let state_token = args.next().unwrap();
+    let initial_value = args.next().unwrap();
     Ok((state_token, initial_value))
 }
 
 fn parse_set_effect_args<'a, T: Expression>(
     effect: &'a T::Signal<T>,
-    _factory: &'a impl ExpressionFactory<T>,
+    factory: &'a impl ExpressionFactory<T>,
     _allocator: &impl HeapAllocator<T>,
 ) -> Result<(&'a T, &'a T), String> {
-    let args = effect.args().as_deref();
-    if args.len() != 3 {
-        return Err(format!(
-            "Invalid variable set signal: Expected 3 arguments, received {}",
-            args.len()
-        ));
-    }
-    let mut remaining_args = args.iter().map(|item| item.as_deref());
-    let state_token = remaining_args.next().unwrap();
-    let value = remaining_args.next().unwrap();
-    let _token = remaining_args.next().unwrap();
+    let payload = effect.payload().as_deref();
+    let args = factory
+        .match_list_term(payload)
+        .map(|term| term.items().as_deref())
+        .filter(|args| args.len() == 2)
+        .ok_or_else(|| {
+            format!(
+                "Invalid variable set signal: Expected 2 arguments, received {}",
+                payload
+            )
+        })?;
+    let mut args = args.iter().map(|item| item.as_deref());
+    let state_token = args.next().unwrap();
+    let value = args.next().unwrap();
     Ok((state_token, value))
 }
 
 fn parse_increment_effect_args<'a, T: Expression>(
     effect: &'a T::Signal<T>,
-    _factory: &'a impl ExpressionFactory<T>,
+    factory: &'a impl ExpressionFactory<T>,
     _allocator: &impl HeapAllocator<T>,
 ) -> Result<&'a T, String> {
-    let args = effect.args().as_deref();
-    if args.len() != 2 {
-        return Err(format!(
-            "Invalid variable increment signal: Expected 2 arguments, received {}",
-            args.len()
-        ));
-    }
-    let mut remaining_args = args.iter().map(|item| item.as_deref());
-    let state_token = remaining_args.next().unwrap();
-    let _token = remaining_args.next().unwrap();
+    let payload = effect.payload().as_deref();
+    let args = factory
+        .match_list_term(payload)
+        .map(|term| term.items().as_deref())
+        .filter(|args| args.len() == 1)
+        .ok_or_else(|| {
+            format!(
+                "Invalid variable increment signal: Expected 1 argument, received {}",
+                payload
+            )
+        })?;
+    let mut args = args.iter().map(|item| item.as_deref());
+    let state_token = args.next().unwrap();
     Ok(state_token)
 }
 
 fn parse_decrement_effect_args<'a, T: Expression>(
     effect: &'a T::Signal<T>,
-    _factory: &'a impl ExpressionFactory<T>,
+    factory: &'a impl ExpressionFactory<T>,
     _allocator: &impl HeapAllocator<T>,
 ) -> Result<&'a T, String> {
-    let args = effect.args().as_deref();
-    if args.len() != 2 {
-        return Err(format!(
-            "Invalid variable decrement signal: Expected 2 arguments, received {}",
-            args.len()
-        ));
-    }
-    let mut remaining_args = args.iter().map(|item| item.as_deref());
-    let state_token = remaining_args.next().unwrap();
-    let _token = remaining_args.next().unwrap();
+    let payload = effect.payload().as_deref();
+    let args = factory
+        .match_list_term(payload)
+        .map(|term| term.items().as_deref())
+        .filter(|args| args.len() == 1)
+        .ok_or_else(|| {
+            format!(
+                "Invalid variable decrement signal: Expected 1 argument, received {}",
+                payload
+            )
+        })?;
+    let mut args = args.iter().map(|item| item.as_deref());
+    let state_token = args.next().unwrap();
     Ok(state_token)
 }
 
@@ -657,6 +670,7 @@ fn create_error_expression<T: Expression>(
 ) -> T {
     factory.create_signal_term(allocator.create_signal_list(once(allocator.create_signal(
         SignalType::Error,
-        allocator.create_unit_list(factory.create_string_term(allocator.create_string(message))),
+        factory.create_string_term(allocator.create_string(message)),
+        factory.create_nil_term(),
     ))))
 }
