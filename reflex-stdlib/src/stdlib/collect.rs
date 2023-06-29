@@ -211,7 +211,7 @@ impl<T: Expression> Applicable<T> for CollectHashSet {
         &self,
         args: impl ExactSizeIterator<Item = T>,
         factory: &impl ExpressionFactory<T>,
-        allocator: &impl HeapAllocator<T>,
+        _allocator: &impl HeapAllocator<T>,
         _cache: &mut impl EvaluationCache<T>,
     ) -> Result<T, String> {
         let values = args.collect::<Vec<_>>();
@@ -219,7 +219,7 @@ impl<T: Expression> Applicable<T> for CollectHashSet {
             Some(values) => values,
             None => values,
         };
-        Ok(factory.create_hashset_term(allocator.create_list(deduplicated_values)))
+        Ok(factory.create_hashset_term(deduplicated_values))
     }
 }
 
@@ -295,14 +295,14 @@ where
         }
         .unzip();
         // FIXME: prevent unnecessary vector allocations
-        let (keys, values) = match deduplicate_hashmap_entries(
-            &keys.iter().cloned().collect::<Vec<_>>(),
-            &values.iter().cloned().collect::<Vec<_>>(),
-        ) {
-            Some((keys, values)) => (keys, values),
-            None => (keys, values),
+        let entries = {
+            let entries = match deduplicate_hashmap_entries(&keys, &values) {
+                Some(entries) => entries,
+                None => keys.into_iter().zip(values).collect::<Vec<_>>(),
+            };
+            entries
         };
-        Ok(factory.create_hashmap_term(allocator.create_list(keys), allocator.create_list(values)))
+        Ok(factory.create_hashmap_term(entries))
     }
 }
 
