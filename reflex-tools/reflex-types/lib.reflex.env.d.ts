@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 
-import './lib.reflex.d.ts';
-import './lib.reflex.env.d.ts';
-import './lib.utils.d.ts';
+interface Process {
+  env: Record<string, string>;
+}
+declare const process: Process;
