@@ -17,6 +17,7 @@ pub trait AccessorBuiltin:
     + From<stdlib::Contains>
     + From<stdlib::Filter>
     + From<stdlib::Flatten>
+    + From<stdlib::EndsWith>
     + From<stdlib::Get>
     + From<stdlib::Insert>
     + From<stdlib::Keys>
@@ -31,6 +32,7 @@ pub trait AccessorBuiltin:
     + From<stdlib::ResolveList>
     + From<stdlib::Slice>
     + From<stdlib::Split>
+    + From<stdlib::StartsWith>
     + From<stdlib::Subtract>
     + From<crate::stdlib::ToString>
     + From<stdlib::Values>
@@ -42,6 +44,7 @@ impl<T> AccessorBuiltin for T where
         + From<stdlib::Apply>
         + From<stdlib::Concat>
         + From<stdlib::Contains>
+        + From<stdlib::EndsWith>
         + From<stdlib::Filter>
         + From<stdlib::Flatten>
         + From<stdlib::Get>
@@ -58,6 +61,7 @@ impl<T> AccessorBuiltin for T where
         + From<stdlib::ResolveList>
         + From<stdlib::Slice>
         + From<stdlib::Split>
+        + From<stdlib::StartsWith>
         + From<stdlib::Subtract>
         + From<crate::stdlib::ToString>
         + From<stdlib::Values>
@@ -200,8 +204,12 @@ fn get_string_property<T: Expression, TFactory: ExpressionFactory<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> Option<T>
 where
-    T::Builtin:
-        From<stdlib::Length> + From<stdlib::Replace> + From<stdlib::Slice> + From<stdlib::Split>,
+    T::Builtin: From<stdlib::EndsWith>
+        + From<stdlib::Length>
+        + From<stdlib::Replace>
+        + From<stdlib::Slice>
+        + From<stdlib::Split>
+        + From<stdlib::StartsWith>,
 {
     if let Some(key) = factory.match_int_term(key) {
         let index = key.value();
@@ -490,10 +498,18 @@ fn get_string_field<T: Expression, TFactory: ExpressionFactory<T>>(
     allocator: &impl HeapAllocator<T>,
 ) -> Option<T>
 where
-    T::Builtin:
-        From<stdlib::Length> + From<stdlib::Replace> + From<stdlib::Slice> + From<stdlib::Split>,
+    T::Builtin: From<stdlib::EndsWith>
+        + From<stdlib::Length>
+        + From<stdlib::Replace>
+        + From<stdlib::Slice>
+        + From<stdlib::Split>
+        + From<stdlib::StartsWith>,
 {
     match method {
+        "endsWith" => Some(factory.create_partial_application_term(
+            factory.create_builtin_term(stdlib::EndsWith),
+            allocator.create_unit_list(target.clone()),
+        )),
         "length" => Some(factory.create_application_term(
             factory.create_builtin_term(stdlib::Length),
             allocator.create_unit_list(target.clone()),
@@ -504,6 +520,10 @@ where
         )),
         "slice" => Some(factory.create_partial_application_term(
             factory.create_builtin_term(stdlib::Slice),
+            allocator.create_unit_list(target.clone()),
+        )),
+        "startsWith" => Some(factory.create_partial_application_term(
+            factory.create_builtin_term(stdlib::StartsWith),
             allocator.create_unit_list(target.clone()),
         )),
         "split" => Some(factory.create_partial_application_term(
