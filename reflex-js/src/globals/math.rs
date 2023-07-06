@@ -2,14 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 use reflex::core::{create_record, Expression, ExpressionFactory, HeapAllocator};
-use reflex_stdlib::{Abs, Ceil, Floor, Max, Min, Round};
+use reflex_stdlib::{Abs, Ceil, Floor, Max, Min, Pow, Round};
 
 pub fn global_math<T: Expression>(
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
 ) -> T
 where
-    T::Builtin: From<Abs> + From<Ceil> + From<Floor> + From<Max> + From<Min> + From<Round>,
+    T::Builtin:
+        From<Abs> + From<Ceil> + From<Floor> + From<Max> + From<Min> + From<Pow> + From<Round>,
 {
     create_record(
         vec![
@@ -32,6 +33,10 @@ where
             (
                 factory.create_string_term(allocator.create_static_string("min")),
                 factory.create_builtin_term(Min),
+            ),
+            (
+                factory.create_string_term(allocator.create_static_string("pow")),
+                factory.create_builtin_term(Pow),
             ),
             (
                 factory.create_string_term(allocator.create_static_string("round")),
