@@ -97,7 +97,7 @@ pub struct GetVariable;
 impl GetVariable {
     pub const UUID: Uuid = uuid!("fb7bbe51-fa38-4c79-a361-c90607db2736");
     const ARITY: FunctionArity<2, 0> = FunctionArity {
-        required: [ArgType::Strict, ArgType::Lazy],
+        required: [ArgType::Strict, ArgType::Strict],
         optional: [],
         variadic: None,
     };
