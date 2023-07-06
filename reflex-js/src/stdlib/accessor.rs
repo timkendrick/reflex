@@ -615,6 +615,10 @@ where
             factory.create_builtin_term(stdlib::Contains),
             allocator.create_unit_list(target.clone()),
         )),
+        "keys" => Some(factory.create_partial_application_term(
+            factory.create_builtin_term(stdlib::Values),
+            allocator.create_unit_list(target.clone()),
+        )),
         "size" => Some(factory.create_partial_application_term(
             factory.create_builtin_term(stdlib::Length),
             allocator.create_unit_list(target.clone()),
