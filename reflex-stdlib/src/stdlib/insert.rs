@@ -12,7 +12,7 @@ pub struct Insert;
 impl Insert {
     pub const UUID: Uuid = uuid!("177d4614-e261-47e8-93be-645427627dae");
     const ARITY: FunctionArity<3, 0> = FunctionArity {
-        required: [ArgType::Strict, ArgType::Strict, ArgType::Lazy],
+        required: [ArgType::Strict, ArgType::Strict, ArgType::Strict],
         optional: [],
         variadic: None,
     };
