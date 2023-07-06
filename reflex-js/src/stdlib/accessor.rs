@@ -26,7 +26,6 @@ pub trait AccessorBuiltin:
     + From<stdlib::Multiply>
     + From<crate::stdlib::ParseInt>
     + From<stdlib::Push>
-    + From<stdlib::PushFront>
     + From<stdlib::Reduce>
     + From<stdlib::Replace>
     + From<stdlib::ResolveList>
@@ -55,7 +54,6 @@ impl<T> AccessorBuiltin for T where
         + From<stdlib::Multiply>
         + From<crate::stdlib::ParseInt>
         + From<stdlib::Push>
-        + From<stdlib::PushFront>
         + From<stdlib::Reduce>
         + From<stdlib::Replace>
         + From<stdlib::ResolveList>
@@ -157,8 +155,6 @@ where
         + From<stdlib::Length>
         + From<stdlib::Map>
         + From<stdlib::Multiply>
-        + From<stdlib::Push>
-        + From<stdlib::PushFront>
         + From<stdlib::Reduce>
         + From<stdlib::ResolveList>
         + From<stdlib::Slice>
@@ -326,8 +322,6 @@ where
         + From<stdlib::Length>
         + From<stdlib::Map>
         + From<stdlib::Multiply>
-        + From<stdlib::Push>
-        + From<stdlib::PushFront>
         + From<stdlib::Reduce>
         + From<stdlib::ResolveList>
         + From<stdlib::Slice>
@@ -377,20 +371,12 @@ where
             factory.create_builtin_term(stdlib::Map),
             allocator.create_unit_list(target.clone()),
         )),
-        "push" => Some(factory.create_partial_application_term(
-            factory.create_builtin_term(stdlib::Push),
-            allocator.create_unit_list(target.clone()),
-        )),
         "reduce" => Some(factory.create_partial_application_term(
             factory.create_builtin_term(stdlib::Reduce),
             allocator.create_unit_list(target.clone()),
         )),
         "slice" => Some(factory.create_partial_application_term(
             factory.create_builtin_term(stdlib::Slice),
-            allocator.create_unit_list(target.clone()),
-        )),
-        "unshift" => Some(factory.create_partial_application_term(
-            factory.create_builtin_term(stdlib::PushFront),
             allocator.create_unit_list(target.clone()),
         )),
         "values" => Some(factory.create_partial_application_term(
