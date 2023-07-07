@@ -10,6 +10,8 @@ In practical terms, Reflex provides the [ReflexJS](./reflex-js) reactive languag
 
 ## Getting started
 
+See the [tooling documentation](./reflex-tools/README.md) for recommendations on how to set up your editing environment for working with Reflex.
+
 There are currently two out-of-the-box runtime environments for getting started with Reflex:
 
 - [`reflex-server`](./reflex-server): Subscription-based GraphQL Reflex server implementation ([tutorial](./reflex-server/examples))
