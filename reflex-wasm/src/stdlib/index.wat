@@ -66,6 +66,7 @@
   (@include "./pow.wat")
   (@include "./push.wat")
   (@include "./push_front.wat")
+  (@include "./raise.wat")
   (@include "./remainder.wat")
   (@include "./replace.wat")
   (@include "./resolve_args.wat")
@@ -145,6 +146,7 @@
       $Stdlib_Pow
       $Stdlib_Push
       $Stdlib_PushFront
+      $Stdlib_Raise
       $Stdlib_Remainder
       $Stdlib_Replace
       $Stdlib_ResolveArgs

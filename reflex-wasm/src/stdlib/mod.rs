@@ -57,6 +57,7 @@ pub mod or;
 pub mod pow;
 pub mod push;
 pub mod push_front;
+pub mod raise;
 pub mod remainder;
 pub mod replace;
 pub mod resolve_args;
@@ -125,6 +126,7 @@ pub use pow::*;
 pub use push::*;
 pub use push_front::*;
 pub use r#if::*;
+pub use raise::*;
 pub use remainder::*;
 pub use replace::*;
 pub use resolve_args::*;
@@ -206,6 +208,7 @@ pub enum Stdlib {
     Pow(Pow),
     Push(Push),
     PushFront(PushFront),
+    Raise(Raise),
     Remainder(Remainder),
     Replace(Replace),
     ResolveArgs(ResolveArgs),
@@ -307,6 +310,7 @@ impl From<Stdlib> for u32 {
             Stdlib::Pow(_) => StdlibDiscriminants::Pow as u32,
             Stdlib::Push(_) => StdlibDiscriminants::Push as u32,
             Stdlib::PushFront(_) => StdlibDiscriminants::PushFront as u32,
+            Stdlib::Raise(_) => StdlibDiscriminants::Raise as u32,
             Stdlib::Remainder(_) => StdlibDiscriminants::Remainder as u32,
             Stdlib::Replace(_) => StdlibDiscriminants::Replace as u32,
             Stdlib::ResolveArgs(_) => StdlibDiscriminants::ResolveArgs as u32,
@@ -430,6 +434,7 @@ impl TryFrom<u32> for Stdlib {
             value if value == StdlibDiscriminants::PushFront as u32 => {
                 Ok(Self::PushFront(PushFront))
             }
+            value if value == StdlibDiscriminants::Raise as u32 => Ok(Self::Raise(Raise)),
             value if value == StdlibDiscriminants::Remainder as u32 => {
                 Ok(Self::Remainder(Remainder))
             }
@@ -543,6 +548,7 @@ impl Stdlib {
             Self::Pow(inner) => inner.arity(),
             Self::Push(inner) => inner.arity(),
             Self::PushFront(inner) => inner.arity(),
+            Self::Raise(inner) => inner.arity(),
             Self::Remainder(inner) => inner.arity(),
             Self::Replace(inner) => inner.arity(),
             Self::ResolveArgs(inner) => inner.arity(),
@@ -631,6 +637,7 @@ impl Stdlib {
             Self::Pow(inner) => inner.uid(),
             Self::Push(inner) => inner.uid(),
             Self::PushFront(inner) => inner.uid(),
+            Self::Raise(inner) => inner.uid(),
             Self::Remainder(inner) => inner.uid(),
             Self::Replace(inner) => inner.uid(),
             Self::ResolveArgs(inner) => inner.uid(),
@@ -752,6 +759,7 @@ impl TryFrom<Uuid> for Stdlib {
             Pow::UUID => Ok(Self::Pow(Pow)),
             Push::UUID => Ok(Self::Push(Push)),
             PushFront::UUID => Ok(Self::PushFront(PushFront)),
+            Raise::UUID => Ok(Self::Raise(Raise)),
             Remainder::UUID => Ok(Self::Remainder(Remainder)),
             Replace::UUID => Ok(Self::Replace(Replace)),
             ResolveArgs::UUID => Ok(Self::ResolveArgs(ResolveArgs)),

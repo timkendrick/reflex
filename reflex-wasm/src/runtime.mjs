@@ -132,6 +132,7 @@ function createStdlib(runtime) {
     Pow: runtime.Stdlib_Pow.value,
     Push: runtime.Stdlib_Push.value,
     PushFront: runtime.Stdlib_PushFront.value,
+    Raise: runtime.Stdlib_Raise.value,
     Remainder: runtime.Stdlib_Remainder.value,
     Replace: runtime.Stdlib_Replace.value,
     ResolveArgs: runtime.Stdlib_ResolveArgs.value,

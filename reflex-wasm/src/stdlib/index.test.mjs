@@ -46,6 +46,7 @@ import or from './or.test.mjs';
 import pow from './pow.test.mjs';
 import push from './push.test.mjs';
 import pushFront from './push_front.test.mjs';
+import raise from './raise.test.mjs';
 import remainder from './remainder.test.mjs';
 import replace from './replace.test.mjs';
 import resolveArgs from './resolve_args.test.mjs';
@@ -140,6 +141,7 @@ export default (describe) => {
   pow(describe);
   push(describe);
   pushFront(describe);
+  raise(describe);
   remainder(describe);
   replace(describe);
   resolveArgs(describe);
