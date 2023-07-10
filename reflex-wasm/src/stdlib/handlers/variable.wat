@@ -31,7 +31,7 @@
         (global.get $NULL))))
 
   (@builtin $Stdlib_SetVariable "SetVariable"
-    (@args (@strict $self) (@lazy $value) (@strict $token))
+    (@args (@strict $self) (@strict $value) (@strict $token))
 
     (@impl
       (i32.eq (global.get $TermType::Symbol))
