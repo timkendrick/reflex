@@ -1730,6 +1730,11 @@ impl From<reflex_graphql::stdlib::Stdlib> for reflex_wasm::stdlib::Stdlib {
 impl From<reflex_handlers::stdlib::Stdlib> for reflex_wasm::stdlib::Stdlib {
     fn from(value: reflex_handlers::stdlib::Stdlib) -> Self {
         match value {
+            reflex_handlers::stdlib::Stdlib::ResolveLoaderResults => {
+                reflex_wasm::stdlib::Stdlib::ResolveLoaderResults(
+                    reflex_wasm::stdlib::ResolveLoaderResults,
+                )
+            }
             reflex_handlers::stdlib::Stdlib::Scan => {
                 reflex_wasm::stdlib::Stdlib::Scan(reflex_wasm::stdlib::Scan)
             }

@@ -55,15 +55,16 @@
           (call $Allocator::pad_to_4_byte_offset (local.get $length)))))
     ;; Then manually write the string struct contents into the term wrapper
     (call $TermType::String::construct (call $Term::pointer::value (local.get $self)) (i32.const 0))
-    (call $Term::String::set::data::capacity
-      (local.get $self)
-      (i32.div_u (call $Allocator::pad_to_4_byte_offset (local.get $length)) (i32.const 4))))
-
-  (func $Term::String::init (export "initString") (param $self i32) (param $length i32) (result i32)
     ;; Set the string character length
     (call $Term::String::set::length (local.get $self) (local.get $length))
-    ;; Update the length of the data array, padded to 4-byte cell size
-    (call $Term::String::set::data::length (local.get $self) (i32.div_u (call $Allocator::pad_to_4_byte_offset (local.get $length)) (i32.const 4)))
+    ;; Set the capacity of the data array, padded to 4-byte cell size
+    (call $Term::String::set::data::capacity
+      (local.get $self)
+      (i32.div_u (call $Allocator::pad_to_4_byte_offset (local.get $length)) (i32.const 4)))
+    ;; Set the length of the data array, padded to 4-byte cell size
+    (call $Term::String::set::data::length (local.get $self) (i32.div_u (call $Allocator::pad_to_4_byte_offset (local.get $length)) (i32.const 4))))
+
+  (func $Term::String::init (export "initString") (param $self i32) (result i32)
     ;; Instantiate the term
     (call $Term::init (local.get $self)))
 
@@ -83,8 +84,12 @@
     (call $Term::String::set::data::capacity
       (local.get $self)
       (i32.div_u (local.get $padded_length) (i32.const 4)))
+    ;; Update the length of the data array, padded to 4-byte cell size
+    (call $Term::String::set::data::length (local.get $self) (i32.div_u (call $Allocator::pad_to_4_byte_offset (local.get $length)) (i32.const 4)))
+    ;; Set the string character length
+    (call $Term::String::set::length (local.get $self) (local.get $length))
     ;; Instantiate the term
-    (call $Term::String::init (local.get $self) (local.get $length)))
+    (call $Term::String::init (local.get $self)))
 
   (func $Term::String::empty (result i32)
     ;; Allocate a new string of the required length
@@ -114,6 +119,70 @@
             (local.get $end_offset)
             (call $Term::String::get_char_pointer (local.get $instance) (i32.const 0)))))))
 
+  (func $Term::String::from_i32 (param $value i32) (result i32)
+    (local $instance i32)
+    (local $end_offset i32)
+     ;; Allocate a new dynamic string term
+    (local.set $instance (call $Term::String::allocate_unsized))
+    (local.set $end_offset (call $Term::String::get_char_pointer (local.get $instance) (i32.const 0)))
+    ;; Serialize the input term into the newly-allocated string contents
+    (call $Utils::i32::write_string (local.get $value) (local.get $end_offset))
+    (local.set $end_offset (i32.add (local.get $end_offset)))
+    ;; Initialize the dynamic string term
+    (call $Term::String::init_unsized
+      (local.get $instance)
+      (i32.sub
+        (local.get $end_offset)
+        (call $Term::String::get_char_pointer (local.get $instance) (i32.const 0)))))
+
+  (func $Term::String::from_u32 (param $value i32) (result i32)
+    (local $instance i32)
+    (local $end_offset i32)
+     ;; Allocate a new dynamic string term
+    (local.set $instance (call $Term::String::allocate_unsized))
+    (local.set $end_offset (call $Term::String::get_char_pointer (local.get $instance) (i32.const 0)))
+    ;; Serialize the input term into the newly-allocated string contents
+    (call $Utils::u32::write_string (local.get $value) (local.get $end_offset))
+    (local.set $end_offset (i32.add (local.get $end_offset)))
+    ;; Initialize the dynamic string term
+    (call $Term::String::init_unsized
+      (local.get $instance)
+      (i32.sub
+        (local.get $end_offset)
+        (call $Term::String::get_char_pointer (local.get $instance) (i32.const 0)))))
+
+  (func $Term::String::from_i64 (param $value i64) (result i32)
+    (local $instance i32)
+    (local $end_offset i32)
+     ;; Allocate a new dynamic string term
+    (local.set $instance (call $Term::String::allocate_unsized))
+    (local.set $end_offset (call $Term::String::get_char_pointer (local.get $instance) (i32.const 0)))
+    ;; Serialize the input term into the newly-allocated string contents
+    (call $Utils::i64::write_string (local.get $value) (local.get $end_offset))
+    (local.set $end_offset (i32.add (local.get $end_offset)))
+    ;; Initialize the dynamic string term
+    (call $Term::String::init_unsized
+      (local.get $instance)
+      (i32.sub
+        (local.get $end_offset)
+        (call $Term::String::get_char_pointer (local.get $instance) (i32.const 0)))))
+
+  (func $Term::String::from_u64 (param $value i64) (result i32)
+    (local $instance i32)
+    (local $end_offset i32)
+     ;; Allocate a new dynamic string term
+    (local.set $instance (call $Term::String::allocate_unsized))
+    (local.set $end_offset (call $Term::String::get_char_pointer (local.get $instance) (i32.const 0)))
+    ;; Serialize the input term into the newly-allocated string contents
+    (call $Utils::u64::write_string (local.get $value) (local.get $end_offset))
+    (local.set $end_offset (i32.add (local.get $end_offset)))
+    ;; Initialize the dynamic string term
+    (call $Term::String::init_unsized
+      (local.get $instance)
+      (i32.sub
+        (local.get $end_offset)
+        (call $Term::String::get_char_pointer (local.get $instance) (i32.const 0)))))
+
   (func $Term::String::from_char (param $char i32) (result i32)
     (local $instance i32)
     ;; Allocate a new String term with the correct capacity
@@ -121,7 +190,7 @@
     ;; Copy the character into the data array
     (i32.store8 (call $Term::String::get_char_pointer (local.get $instance) (i32.const 0)) (local.get $char))
     ;; Instantiate the term
-    (call $Term::String::init (i32.const 1)))
+    (call $Term::String::init))
 
   (func $Term::String::from_slice (param $offset i32) (param $length i32) (result i32)
     (local $self i32)
@@ -140,7 +209,17 @@
           (local.get $offset)
           (local.get $length))
         ;; Instantiate the term
-        (call $Term::String::init (local.get $length)))))
+        (call $Term::String::init))))
+
+  (func $Term::String::copy_contents (param $self i32) (param $target_offset i32) (result i32)
+    (local $length i32)
+    ;; Copy the slice into the target memory address
+    (memory.copy
+      (local.get $target_offset)
+      (call $Term::String::get::data::pointer (local.get $self) (i32.const 0))
+      (local.tee $length (call $Term::String::get_length (local.get $self))))
+    ;; Return the number of bytes written
+    (local.get $length))
 
   (func $Term::String::get_offset (export "getStringOffset") (param $self i32) (result i32)
     (call $Term::String::get::data::pointer (local.get $self) (i32.const 0)))
@@ -272,7 +351,7 @@
             (local.set $length (i32.add (local.get $length) (local.get $source_length)))
             (br_if $LOOP (i32.lt_u (local.tee $source_index (i32.add (local.get $source_index) (i32.const 1))) (local.get $source_count))))
           ;; Initialize the string term
-          (call $Term::String::init (local.get $length))))))
+          (call $Term::String::init)))))
 
   (func $Term::String::get_char_pointer (param $self i32) (param $index i32) (result i32)
     (i32.add
@@ -316,7 +395,7 @@
               (call $Term::String::get_char_pointer (local.get $self) (local.get $offset))
               (local.get $length))
             ;; Instantiate the new string
-            (call $Term::String::init (local.get $length)))))))
+            (call $Term::String::init))))))
 
   (func $Term::String::find_index (param $self i32) (param $offset i32) (param $pattern_offset i32) (param $pattern_length i32) (result i32)
     (local $length i32)
@@ -390,7 +469,7 @@
                   (local.get $replacement_offset)
                   (local.get $replacement_length))
                 ;; Instantiate the term
-                (call $Term::String::init (local.get $output_length)))))
+                (call $Term::String::init))))
           (else
             ;; Otherwise allocate a new string with the correct length
             (local.tee $instance
@@ -417,7 +496,7 @@
                 (local.get $input_length)
                 (i32.add (local.get $match_index) (local.get $pattern_length))))
             ;; Instantiate the term
-            (call $Term::String::init (local.get $output_length)))))))
+            (call $Term::String::init))))))
 
   (func $Term::String::split (param $self i32) (param $pattern_offset i32) (param $pattern_length i32) (result i32)
     (local $length i32)

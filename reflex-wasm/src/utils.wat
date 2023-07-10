@@ -436,11 +436,9 @@
     ;; Return the number of bytes written, taking into account the minus sign if one was written
     (i32.add (local.get $is_negative)))
 
-  (func $Utils::u32::write_string (param $value i32) (param $offset i32) (result i32)
+  (func $Utils::u32::get_num_chars (param $value i32) (result i32)
     (local $remaining_digits i32)
     (local $num_chars i32)
-    (local $index i32)
-    ;; Find out how many bytes to allocate for the string representation
     ;; Assign a temporary value to determine the number of digits of the positive integer
     (local.set $remaining_digits (local.get $value))
     (loop $LOOP
@@ -448,6 +446,13 @@
       (local.set $num_chars (i32.add (local.get $num_chars) (i32.const 1)))
       ;; If the temporary value is still greater than zero after being divided by 10, continue with the next digit
       (br_if $LOOP (local.tee $remaining_digits (i32.div_u (local.get $remaining_digits) (i32.const 10)))))
+    ;; Return the accumulated number of characters
+    (local.get $num_chars))
+
+  (func $Utils::u32::write_string (param $value i32) (param $offset i32) (result i32)
+    (local $num_chars i32)
+    ;; Find out how many bytes to allocate for the string representation
+    (local.set $num_chars (call $Utils::u32::get_num_chars (local.get $value)))
     ;; Allocate the required number of bytes to store the string representation,
     (call $Allocator::extend (local.get $offset) (local.get $num_chars))
     ;; Push the length onto the stack as the return value
@@ -461,11 +466,9 @@
       ;; If the value is still greater than zero after being divided by 10, continue with the next digit
       (br_if $LOOP (local.tee $value (i32.div_u (local.get $value) (i32.const 10))))))
 
-  (func $Utils::u64::write_string (param $value i64) (param $offset i32) (result i32)
+  (func $Utils::u64::get_num_chars (param $value i64) (result i32)
     (local $remaining_digits i64)
     (local $num_chars i32)
-    (local $index i32)
-    ;; Find out how many bytes to allocate for the string representation
     ;; Assign a temporary value to determine the number of digits of the positive integer
     (local.set $remaining_digits (local.get $value))
     (loop $LOOP
@@ -473,6 +476,13 @@
       (local.set $num_chars (i32.add (local.get $num_chars) (i32.const 1)))
       ;; If the temporary value is still greater than zero after being divided by 10, continue with the next digit
       (br_if $LOOP (i64.ne (local.tee $remaining_digits (i64.div_u (local.get $remaining_digits) (i64.const 10))) (i64.const 0))))
+    ;; Return the accumulated number of characters
+    (local.get $num_chars))
+
+  (func $Utils::u64::write_string (param $value i64) (param $offset i32) (result i32)
+    (local $num_chars i32)
+    ;; Find out how many bytes to allocate for the string representation
+    (local.set $num_chars (call $Utils::u64::get_num_chars (local.get $value)))
     ;; Allocate the required number of bytes to store the string representation,
     (call $Allocator::extend (local.get $offset) (local.get $num_chars))
     ;; Push the length onto the stack as the return value

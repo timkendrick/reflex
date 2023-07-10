@@ -147,6 +147,7 @@ function createStdlib(runtime) {
     ResolveHashmap: runtime.__Stdlib_ResolveHashmap.value,
     ResolveHashset: runtime.__Stdlib_ResolveHashset.value,
     ResolveList: runtime.__Stdlib_ResolveList.value,
+    ResolveLoaderResults: runtime.__Stdlib_ResolveLoaderResults.value,
     ResolveQueryBranch: runtime.__Stdlib_ResolveQueryBranch.value,
     ResolveQueryLeaf: runtime.__Stdlib_ResolveQueryLeaf.value,
     ResolveRecord: runtime.__Stdlib_ResolveRecord.value,

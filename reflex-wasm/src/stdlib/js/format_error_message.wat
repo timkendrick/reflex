@@ -136,7 +136,7 @@
     (@store-bytes $offset "...")
     (local.set $offset (i32.add (local.get $offset)))
     ;; Write the number of items
-    (call $Utils::i32::write_string (local.get $num_items) (local.get $offset))
+    (call $Utils::u32::write_string (local.get $num_items) (local.get $offset))
     (local.set $offset (i32.add (local.get $offset)))
     ;; Write the trailing label
     (@store-bytes $offset " more errors")

@@ -76,6 +76,7 @@ import take from './take.test.mjs';
 import unzip from './unzip.test.mjs';
 import values from './values.test.mjs';
 import zip from './zip.test.mjs';
+import resolveLoaderResults from './handlers/resolve_loader_results.test.mjs';
 import scan from './handlers/scan.test.mjs';
 import toRequest from './handlers/to_request.test.mjs';
 import variable from './handlers/variable.test.mjs';
@@ -171,6 +172,7 @@ export default (describe) => {
   resolveQueryBranch(describe);
   resolveQueryLeaf(describe);
   resolveList(describe);
+  resolveLoaderResults(describe);
   resolveRecord(describe);
   resolveShallow(describe);
   resolveTree(describe);

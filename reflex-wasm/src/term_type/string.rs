@@ -327,11 +327,6 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<StringTerm, A> {
                 });
                 block
             });
-        // Now that the string contents has been added, push the string length onto the stack
-        // => [StringTerm, length]
-        let block = block.push(instruction::core::Const {
-            value: ConstValue::U32(num_chars as u32),
-        });
         // Initialize the string term with the length that is on the stack
         // => [StringTerm]
         let block = block.push(instruction::runtime::CallRuntimeBuiltin {

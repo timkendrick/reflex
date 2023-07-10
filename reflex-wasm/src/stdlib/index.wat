@@ -38,6 +38,7 @@
   (@include "./gte.wat")
   (@include "./has.wat")
   (@include "./hash.wat")
+  (@include "./handlers/resolve_loader_results.wat")
   (@include "./handlers/scan.wat")
   (@include "./handlers/to_request.wat")
   (@include "./handlers/variable.wat")
@@ -174,6 +175,7 @@
       $Stdlib_ResolveHashmap
       $Stdlib_ResolveHashset
       $Stdlib_ResolveList
+      $Stdlib_ResolveLoaderResults
       $Stdlib_ResolveQueryBranch
       $Stdlib_ResolveQueryLeaf
       $Stdlib_ResolveRecord

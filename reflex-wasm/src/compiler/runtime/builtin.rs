@@ -257,10 +257,9 @@ impl RuntimeBuiltin {
                 (ValueType::HeapPointer, ValueType::U32),
                 ValueType::HeapPointer,
             ),
-            RuntimeBuiltin::InitString => TypeSignature::new(
-                (ValueType::HeapPointer, ValueType::U32),
-                ValueType::HeapPointer,
-            ),
+            RuntimeBuiltin::InitString => {
+                TypeSignature::new(ValueType::HeapPointer, ValueType::HeapPointer)
+            }
             RuntimeBuiltin::InsertHashmapEntry => TypeSignature::new(
                 (
                     ValueType::HeapPointer,

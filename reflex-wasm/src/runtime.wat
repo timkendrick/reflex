@@ -36,6 +36,12 @@
   (func $Dependencies::of (param $state_token i32) (result i32)
     (call $Term::Tree::of (local.get $state_token)))
 
+  (func $Dependencies::assert_empty (param $self i32)
+    (if
+      (i32.ne (local.get $self) (global.get $NULL))
+      (then
+        (unreachable))))
+
   (func $Dependencies::traits::union (export "combineDependencies") (param $self i32) (param $other i32) (result i32)
     (call $Term::Tree::traits::union (local.get $self) (local.get $other)))
 

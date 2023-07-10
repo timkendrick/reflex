@@ -1283,6 +1283,10 @@ fn parse_runtime_exports(module: &Module) -> Result<RuntimeExportMappings, WasmC
                 stdlib::ResolveHashset.into(),
             )?,
             resolve_list: get_stdlib_function(&exported_functions, stdlib::ResolveList.into())?,
+            resolve_loader_results: get_stdlib_function(
+                &exported_functions,
+                stdlib::ResolveLoaderResults.into(),
+            )?,
             resolve_query_branch: get_stdlib_function(
                 &exported_functions,
                 stdlib::ResolveQueryBranch.into(),
