@@ -537,6 +537,11 @@ impl From<reflex_js::stdlib::ToString> for CliBuiltins {
     }
 }
 
+impl From<reflex_handlers::stdlib::ResolveLoaderResults> for CliBuiltins {
+    fn from(value: reflex_handlers::stdlib::ResolveLoaderResults) -> Self {
+        Self::from(reflex_handlers::stdlib::Stdlib::from(value))
+    }
+}
 impl From<reflex_handlers::stdlib::Scan> for CliBuiltins {
     fn from(value: reflex_handlers::stdlib::Scan) -> Self {
         Self::from(reflex_handlers::stdlib::Stdlib::from(value))
