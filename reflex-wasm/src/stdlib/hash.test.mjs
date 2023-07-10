@@ -3,6 +3,27 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 export default (describe) => {
   describe('Stdlib_Hash', (test) => {
+    test('()', (assert, {
+      createApplication,
+      createBuiltin,
+      createEmptyList,
+      evaluate,
+      format,
+      hash,
+      NULL,
+      Stdlib,
+    }) => {
+      (() => {
+        const expression = createApplication(createBuiltin(Stdlib.Hash), createEmptyList());
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(
+          format(result),
+          `Symbol(${Number(hash(createEmptyList()) & BigInt(0x00000000ffffffff))})`,
+        );
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+    });
+
     test('(Int)', (assert, {
       createApplication,
       createBuiltin,
@@ -22,7 +43,7 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(
           format(result),
-          `Symbol(${Number(hash(createInt(0)) & BigInt(0x00000000ffffffff))})`,
+          `Symbol(${Number(hash(createUnitList(createInt(0))) & BigInt(0x00000000ffffffff))})`,
         );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
@@ -34,7 +55,7 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(
           format(result),
-          `Symbol(${Number(hash(createInt(3)) & BigInt(0x00000000ffffffff))})`,
+          `Symbol(${Number(hash(createUnitList(createInt(3))) & BigInt(0x00000000ffffffff))})`,
         );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
@@ -46,7 +67,7 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(
           format(result),
-          `Symbol(${Number(hash(createInt(-3)) & BigInt(0x00000000ffffffff))})`,
+          `Symbol(${Number(hash(createUnitList(createInt(-3))) & BigInt(0x00000000ffffffff))})`,
         );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
@@ -71,7 +92,7 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(
           format(result),
-          `Symbol(${Number(hash(createString('')) & BigInt(0x00000000ffffffff))})`,
+          `Symbol(${Number(hash(createUnitList(createString(''))) & BigInt(0x00000000ffffffff))})`,
         );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
@@ -83,7 +104,37 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(
           format(result),
-          `Symbol(${Number(hash(createString('foo')) & BigInt(0x00000000ffffffff))})`,
+          `Symbol(${Number(
+            hash(createUnitList(createString('foo'))) & BigInt(0x00000000ffffffff),
+          )})`,
+        );
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+    });
+
+    test('(Int, Int, Int)', (assert, {
+      createApplication,
+      createBuiltin,
+      createInt,
+      createTriple,
+      evaluate,
+      format,
+      hash,
+      NULL,
+      Stdlib,
+    }) => {
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.Hash),
+          createTriple(createInt(3), createInt(4), createInt(5)),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(
+          format(result),
+          `Symbol(${Number(
+            hash(createTriple(createInt(3), createInt(4), createInt(5))) &
+              BigInt(0x00000000ffffffff),
+          )})`,
         );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
