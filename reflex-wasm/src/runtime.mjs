@@ -85,6 +85,7 @@ function createStdlib(runtime) {
     CollectHashmap: runtime.Stdlib_CollectHashmap.value,
     CollectHashset: runtime.Stdlib_CollectHashset.value,
     CollectList: runtime.Stdlib_CollectList.value,
+    CollectSignal: runtime.Stdlib_CollectSignal.value,
     CollectString: runtime.Stdlib_CollectString.value,
     CollectTree: runtime.Stdlib_CollectTree.value,
     Cons: runtime.Stdlib_Cons.value,

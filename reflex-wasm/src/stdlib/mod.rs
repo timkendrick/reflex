@@ -19,6 +19,7 @@ pub mod chain;
 pub mod collect_hashmap;
 pub mod collect_hashset;
 pub mod collect_list;
+pub mod collect_signal;
 pub mod collect_string;
 pub mod collect_tree;
 pub mod cons;
@@ -87,6 +88,7 @@ pub use chain::*;
 pub use collect_hashmap::*;
 pub use collect_hashset::*;
 pub use collect_list::*;
+pub use collect_signal::*;
 pub use collect_string::*;
 pub use collect_tree::*;
 pub use cons::*;
@@ -161,6 +163,7 @@ pub enum Stdlib {
     CollectHashmap(CollectHashmap),
     CollectHashset(CollectHashset),
     CollectList(CollectList),
+    CollectSignal(CollectSignal),
     CollectString(CollectString),
     CollectTree(CollectTree),
     Cons(Cons),
@@ -263,6 +266,7 @@ impl From<Stdlib> for u32 {
             Stdlib::CollectHashmap(_) => StdlibDiscriminants::CollectHashmap as u32,
             Stdlib::CollectHashset(_) => StdlibDiscriminants::CollectHashset as u32,
             Stdlib::CollectList(_) => StdlibDiscriminants::CollectList as u32,
+            Stdlib::CollectSignal(_) => StdlibDiscriminants::CollectSignal as u32,
             Stdlib::CollectString(_) => StdlibDiscriminants::CollectString as u32,
             Stdlib::CollectTree(_) => StdlibDiscriminants::CollectTree as u32,
             Stdlib::Cons(_) => StdlibDiscriminants::Cons as u32,
@@ -360,6 +364,9 @@ impl TryFrom<u32> for Stdlib {
             }
             value if value == StdlibDiscriminants::CollectList as u32 => {
                 Ok(Self::CollectList(CollectList))
+            }
+            value if value == StdlibDiscriminants::CollectSignal as u32 => {
+                Ok(Self::CollectSignal(CollectSignal))
             }
             value if value == StdlibDiscriminants::CollectString as u32 => {
                 Ok(Self::CollectString(CollectString))
@@ -501,6 +508,7 @@ impl Stdlib {
             Self::CollectHashmap(inner) => inner.arity(),
             Self::CollectHashset(inner) => inner.arity(),
             Self::CollectList(inner) => inner.arity(),
+            Self::CollectSignal(inner) => inner.arity(),
             Self::CollectString(inner) => inner.arity(),
             Self::CollectTree(inner) => inner.arity(),
             Self::Cons(inner) => inner.arity(),
@@ -590,6 +598,7 @@ impl Stdlib {
             Self::CollectHashmap(inner) => inner.uid(),
             Self::CollectHashset(inner) => inner.uid(),
             Self::CollectList(inner) => inner.uid(),
+            Self::CollectSignal(inner) => inner.uid(),
             Self::CollectString(inner) => inner.uid(),
             Self::CollectTree(inner) => inner.uid(),
             Self::Cons(inner) => inner.uid(),
@@ -712,6 +721,7 @@ impl TryFrom<Uuid> for Stdlib {
             CollectHashmap::UUID => Ok(Self::CollectHashmap(CollectHashmap)),
             CollectHashset::UUID => Ok(Self::CollectHashset(CollectHashset)),
             CollectList::UUID => Ok(Self::CollectList(CollectList)),
+            CollectSignal::UUID => Ok(Self::CollectSignal(CollectSignal)),
             CollectString::UUID => Ok(Self::CollectString(CollectString)),
             CollectTree::UUID => Ok(Self::CollectTree(CollectTree)),
             Cons::UUID => Ok(Self::Cons(Cons)),

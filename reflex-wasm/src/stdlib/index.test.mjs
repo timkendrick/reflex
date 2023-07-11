@@ -12,6 +12,7 @@ import chain from './chain.test.mjs';
 import collectHashmap from './collect_hashmap.test.mjs';
 import collectHashset from './collect_hashset.test.mjs';
 import collectList from './collect_list.test.mjs';
+import collectSignal from './collect_signal.test.mjs';
 import collectString from './collect_string.test.mjs';
 import collectTree from './collect_tree.test.mjs';
 import cons from './cons.test.mjs';
@@ -97,6 +98,7 @@ export default (describe) => {
   collectHashmap(describe);
   collectHashset(describe);
   collectList(describe);
+  collectSignal(describe);
   collectString(describe);
   collectTree(describe);
   cons(describe);
