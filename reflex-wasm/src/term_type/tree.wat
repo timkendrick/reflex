@@ -32,10 +32,10 @@
         (call $Term::Tree::get_branch_length (local.get $left))
         (call $Term::Tree::get_branch_length (local.get $right)))))
 
-  (func $Term::Tree::empty (result i32)
+  (func $Term::Tree::empty (export "createEmptyTree") (result i32)
     (global.get $Term::Tree::EMPTY))
 
-  (func $Term::Tree::of (param $value i32) (result i32)
+  (func $Term::Tree::of (export "createUnitTree") (param $value i32) (result i32)
     (call $Term::Tree::new (local.get $value) (global.get $NULL)))
 
   (func $Term::Tree::traits::is_atomic (param $self i32) (result i32)

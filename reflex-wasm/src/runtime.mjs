@@ -252,6 +252,23 @@ export function createRuntime(runtime) {
     createSignal(condition) {
       return runtime.createSignal(condition);
     },
+    createCompositeSignal(conditions) {
+      const [seed, remaining] = (() => {
+        switch (conditions.length) {
+          case 0:
+            return [runtime.createEmptyTree(), []];
+          case 1:
+            return [runtime.createUnitTree(conditions[0]), []];
+          default: {
+            const [final, penultimate, ...remaining] = conditions.slice().reverse();
+            return [runtime.createTree(penultimate, final), remaining];
+          }
+        }
+      })();
+      return runtime.createSignalTree(
+        remaining.reduce((acc, item) => runtime.createTree(item, acc), seed),
+      );
+    },
     isSignal(value) {
       return runtime.isSignal(value);
     },

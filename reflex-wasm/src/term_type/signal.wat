@@ -23,7 +23,7 @@
   (func $Term::Signal::of (export "createSignal") (param $condition i32) (result i32)
     (call $Term::TermType::Signal::new (call $Term::Tree::of (local.get $condition))))
 
-  (func $Term::Signal::new (param $conditions i32) (result i32)
+  (func $Term::Signal::new (export "createSignalTree") (param $conditions i32) (result i32)
     (call $Term::TermType::Signal::new (local.get $conditions)))
 
   (func $Term::Signal::pending (export "createPendingSignal") (result i32)
