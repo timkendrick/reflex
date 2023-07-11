@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Chris Campbell <c.campbell@mwam.com> https://github.com/c-campbell-mwam
+// SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 use std::iter::once;
 
 use metrics::{gauge, SharedString};
@@ -25,7 +26,7 @@ impl std::fmt::Display for QuantileBucket {
     }
 }
 
-pub(crate) fn generate_quantile_metric_labels<const NUM_BUCKETS: usize>(
+pub fn generate_quantile_metric_labels<const NUM_BUCKETS: usize>(
     buckets: &[QuantileBucket; NUM_BUCKETS],
     metric_labels: &[(SharedString, SharedString)],
 ) -> [Vec<(SharedString, SharedString)>; NUM_BUCKETS] {
@@ -38,7 +39,7 @@ pub(crate) fn generate_quantile_metric_labels<const NUM_BUCKETS: usize>(
     })
 }
 
-pub(crate) fn compute_bucketed_values<const NUM_BUCKETS: usize>(
+pub fn compute_bucketed_values<const NUM_BUCKETS: usize>(
     values: impl IntoIterator<Item = f64>,
     buckets: &[QuantileBucket; NUM_BUCKETS],
     error: f64,
@@ -55,7 +56,7 @@ pub(crate) fn compute_bucketed_values<const NUM_BUCKETS: usize>(
     Some(values)
 }
 
-pub(crate) fn publish_quantile_bucketed_metric<const NUM_BUCKETS: usize>(
+pub fn publish_quantile_bucketed_metric<const NUM_BUCKETS: usize>(
     values: impl IntoIterator<Item = f64>,
     metric_name: &'static str,
     buckets: &[QuantileBucket; NUM_BUCKETS],

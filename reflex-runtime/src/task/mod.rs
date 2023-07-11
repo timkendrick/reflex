@@ -12,12 +12,12 @@ use reflex_macros::{blanket_trait, task_factory_enum, Matcher};
 use crate::{
     task::{
         bytecode_worker::{BytecodeWorkerAction, BytecodeWorkerTask, BytecodeWorkerTaskFactory},
-        evaluate_handler::EffectThrottleTaskFactory,
+        evaluate_handler::{
+            EffectThrottleTaskFactory, EvaluateHandlerTask, EvaluateHandlerTaskAction,
+        },
     },
     AsyncExpression, AsyncExpressionFactory, AsyncHeapAllocator,
 };
-
-use self::evaluate_handler::{EvaluateHandlerTask, EvaluateHandlerTaskAction};
 
 pub mod bytecode_worker;
 pub mod evaluate_handler;
