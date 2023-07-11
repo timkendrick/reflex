@@ -1,0 +1,18 @@
+[package]
+name = "reflex-parser"
+version = "0.1.0"
+authors = ["Tim Kendrick <timkendrick@gmail.com>"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+reflex = { path = "../reflex" }
+reflex-graphql = { path = "../reflex-graphql" }
+reflex-grpc = { path = "../reflex-grpc" }
+reflex-handlers = { path = "../reflex-handlers" }
+reflex-js = { path = "../reflex-js" }
+reflex-json = { path = "../reflex-json" }
+reflex-lisp = { path = "../reflex-lisp" }
+reflex-macros = { path = "../reflex-macros" }
+anyhow = "1.0"

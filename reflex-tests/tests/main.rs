@@ -1,29 +1,27 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Chris Campbell <c.campbell@mwam.com> https://github.com/c-campbell-mwam
+// SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 use serde_json::{json, Value};
 
 use reflex_graphql::subscriptions::GraphQlSubscriptionServerMessage;
-
-use crate::client::GraphQlConnection;
-
-mod client;
-mod server;
+use reflex_tests::{client::GraphQlConnection, server::serve_graphql};
 
 #[tokio::test]
 async fn duplicate_subscriptions() {
-    let input = r#"
-    import { Resolver } from 'reflex::graphql';
-    
-    export default new Resolver({
-      query: null,
-      mutation: null,
-      subscription: {
-        foo: 'hi',
-      },
-    });"#;
+    let graph_definition = r#"
+        import { Resolver } from 'reflex::graphql';
 
-    let (server_addr, server_killswitch) = server::serve_graphql(input);
+        export default new Resolver({
+            query: null,
+            mutation: null,
+            subscription: {
+                foo: 'hi',
+            },
+        });
+    "#;
+
+    let (server_addr, server_killswitch) = serve_graphql(graph_definition);
 
     let mut client1 = GraphQlConnection::new(&server_addr).await;
     let client1value1 = client1
@@ -61,18 +59,19 @@ async fn duplicate_subscriptions() {
 
 #[tokio::test]
 async fn modified_subscriptions() {
-    let input = r#"
-    import { Resolver } from 'reflex::graphql';
-    
-    export default new Resolver({
-      query: null,
-      mutation: null,
-      subscription: {
-        foo: ({ id }) => `ID: ${id}`,
-      },
-    });"#;
+    let graph_definition = r#"
+        import { Resolver } from 'reflex::graphql';
 
-    let (server_addr, server_killswitch) = server::serve_graphql(input);
+        export default new Resolver({
+            query: null,
+            mutation: null,
+            subscription: {
+                foo: ({ id }) => `ID: ${id}`,
+            },
+        });
+    "#;
+
+    let (server_addr, server_killswitch) = serve_graphql(graph_definition);
 
     let mut client1 = GraphQlConnection::new(&server_addr).await;
     let client1value1 = client1

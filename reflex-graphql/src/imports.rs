@@ -15,9 +15,12 @@ impl<T> GraphQlImportsBuiltin for T where T: Builtin + From<GraphQlResolver> {}
 pub fn graphql_imports<T: Expression>(
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
-) -> Vec<(&'static str, T)>
+) -> Vec<(String, T)>
 where
     T::Builtin: GraphQlImportsBuiltin,
 {
-    vec![("reflex::graphql", import_graphql(factory, allocator))]
+    vec![(
+        String::from("reflex::graphql"),
+        import_graphql(factory, allocator),
+    )]
 }

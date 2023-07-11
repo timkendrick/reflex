@@ -17,8 +17,8 @@ use reflex_dispatcher::{
     TaskFactory, TaskInbox,
 };
 use reflex_json::JsonValue;
-use reflex_macros::{dispatcher, Named};
-use reflex_protobuf::Bytes;
+use reflex_macros::{blanket_trait, dispatcher, Named};
+use reflex_protobuf::{Bytes, ProtoTranscoder};
 use tokio::task::JoinHandle;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{
@@ -38,6 +38,18 @@ use crate::{
     codec::bytes::BytesCodec,
     utils::{get_transport_error, GrpcMethodName, GrpcServiceName},
 };
+
+blanket_trait!(
+    pub trait GrpcHandlerTaskAction: GrpcHandlerConnectionTaskAction {}
+);
+
+blanket_trait!(
+    pub trait GrpcHandlerTask<TTranscoder>: From<GrpcHandlerConnectionTaskFactory>
+    where
+        TTranscoder: ProtoTranscoder + Send + 'static,
+    {
+    }
+);
 
 #[derive(PartialEq, Eq, Clone, Copy, Hash, Debug)]
 struct GrpcOperationId(Uuid);

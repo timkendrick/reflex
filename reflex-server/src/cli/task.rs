@@ -31,7 +31,8 @@ use reflex_runtime::{
         BytecodeInterpreter, BytecodeInterpreterAction, BytecodeInterpreterMetricLabels,
     },
     task::{
-        bytecode_worker::BytecodeWorkerTaskFactory, evaluate_handler::EffectThrottleTaskFactory,
+        bytecode_worker::{BytecodeWorkerAction, BytecodeWorkerTask, BytecodeWorkerTaskFactory},
+        evaluate_handler::EffectThrottleTaskFactory,
         RuntimeTask, RuntimeTaskFactory,
     },
     AsyncExpression, AsyncExpressionFactory, AsyncHeapAllocator,
@@ -56,7 +57,8 @@ blanket_trait!(
     pub trait ServerCliTaskAction<T: Expression>:
         ServerAction<T>
         + BytecodeInterpreterAction<T>
-        + ServerTaskAction<T>
+        + BytecodeWorkerAction<T>
+        + ServerTaskAction
         + HandlerAction<T>
         + GrpcHandlerAction<T>
     {
@@ -65,8 +67,9 @@ blanket_trait!(
 
 blanket_trait!(
     pub trait ServerCliTask<T, TFactory, TAllocator, TConnect>:
-        RuntimeTask<T, TFactory, TAllocator>
-        + ServerTask<T, TFactory, TAllocator, TConnect>
+        RuntimeTask
+        + BytecodeWorkerTask<T, TFactory, TAllocator>
+        + ServerTask<TConnect>
         + GraphQlWebServerTask<T, TFactory, TAllocator>
     where
         T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
@@ -127,7 +130,7 @@ task_factory_enum!({
         TTracer::Span: Send + Sync + 'static,
     {
         Runtime(EffectThrottleTaskFactory),
-        ServerTask(ServerTaskFactory<T, TFactory, TAllocator, TConnect>),
+        ServerTask(ServerTaskFactory<TConnect>),
         Server(
             ServerActor<
                 T,
@@ -143,6 +146,7 @@ task_factory_enum!({
             >,
         ),
         BytecodeInterpreter(BytecodeInterpreter<T, TFactory, TAllocator, TWorkerMetricLabels>),
+        BytecodeWorkerTask(BytecodeWorkerTaskFactory<T, TFactory, TAllocator>),
         Handler(HandlerActor<T, TFactory, TAllocator, TConnect, TReconnect>),
         Grpc(
             GrpcHandler<T, TFactory, TAllocator, WellKnownTypesTranscoder, TGrpcConfig, TReconnect>,
@@ -601,7 +605,7 @@ impl<
         TWorkerMetricLabels,
         TOperationMetricLabels,
         TTracer,
-    > From<RuntimeTaskFactory<T, TFactory, TAllocator>>
+    > From<RuntimeTaskFactory>
     for ServerCliTaskFactory<
         T,
         TFactory,
@@ -642,7 +646,7 @@ where
     TTracer: Tracer,
     TTracer::Span: Send + Sync + 'static,
 {
-    fn from(value: RuntimeTaskFactory<T, TFactory, TAllocator>) -> Self {
+    fn from(value: RuntimeTaskFactory) -> Self {
         Self::ServerTask(ServerTaskFactory::from(value))
     }
 }
@@ -765,67 +769,6 @@ where
     TTracer::Span: Send + Sync + 'static,
 {
     fn from(value: WebSocketGraphQlServerTaskFactory) -> Self {
-        Self::ServerTask(ServerTaskFactory::from(value))
-    }
-}
-
-impl<
-        T,
-        TFactory,
-        TAllocator,
-        TConnect,
-        TReconnect,
-        TGrpcConfig,
-        TTransformHttp,
-        TTransformWs,
-        TGraphQlQueryLabel,
-        THttpMetricLabels,
-        TConnectionMetricLabels,
-        TWorkerMetricLabels,
-        TOperationMetricLabels,
-        TTracer,
-    > From<BytecodeWorkerTaskFactory<T, TFactory, TAllocator>>
-    for ServerCliTaskFactory<
-        T,
-        TFactory,
-        TAllocator,
-        TConnect,
-        TReconnect,
-        TGrpcConfig,
-        TTransformHttp,
-        TTransformWs,
-        TGraphQlQueryLabel,
-        THttpMetricLabels,
-        TConnectionMetricLabels,
-        TWorkerMetricLabels,
-        TOperationMetricLabels,
-        TTracer,
-    >
-where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
-    T::String: Send,
-    T::Builtin: Send,
-    T::Signal: Send,
-    T::SignalList: Send,
-    T::StructPrototype: Send,
-    T::ExpressionList: Send,
-    T::Builtin: GraphQlParserBuiltin,
-    TFactory: AsyncExpressionFactory<T> + Default,
-    TAllocator: AsyncHeapAllocator<T> + Default,
-    TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
-    TReconnect: ReconnectTimeout + Send + Clone + 'static,
-    TGrpcConfig: GrpcConfig + Send + 'static,
-    TTransformHttp: HttpGraphQlServerQueryTransform,
-    TTransformWs: WebSocketGraphQlServerQueryTransform,
-    TGraphQlQueryLabel: GraphQlServerQueryLabel,
-    THttpMetricLabels: HttpGraphQlServerQueryMetricLabels,
-    TConnectionMetricLabels: WebSocketGraphQlServerConnectionMetricLabels,
-    TOperationMetricLabels: GraphQlServerOperationMetricLabels,
-    TWorkerMetricLabels: BytecodeInterpreterMetricLabels,
-    TTracer: Tracer,
-    TTracer::Span: Send + Sync + 'static,
-{
-    fn from(value: BytecodeWorkerTaskFactory<T, TFactory, TAllocator>) -> Self {
         Self::ServerTask(ServerTaskFactory::from(value))
     }
 }

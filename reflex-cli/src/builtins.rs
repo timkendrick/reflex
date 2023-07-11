@@ -16,6 +16,7 @@ pub enum CliBuiltins {
     Json(reflex_json::stdlib::Stdlib),
     Js(reflex_js::stdlib::Stdlib),
     Handlers(reflex_handlers::stdlib::Stdlib),
+    GraphQl(reflex_graphql::stdlib::Stdlib),
 }
 impl From<stdlib::Stdlib> for CliBuiltins {
     fn from(target: stdlib::Stdlib) -> Self {
@@ -37,6 +38,11 @@ impl From<reflex_handlers::stdlib::Stdlib> for CliBuiltins {
         CliBuiltins::Handlers(target)
     }
 }
+impl From<reflex_graphql::stdlib::Stdlib> for CliBuiltins {
+    fn from(target: reflex_graphql::stdlib::Stdlib) -> Self {
+        CliBuiltins::GraphQl(target)
+    }
+}
 impl Uid for CliBuiltins {
     fn uid(&self) -> reflex::core::Uuid {
         match self {
@@ -44,6 +50,7 @@ impl Uid for CliBuiltins {
             CliBuiltins::Json(term) => term.uid(),
             CliBuiltins::Js(term) => term.uid(),
             CliBuiltins::Handlers(term) => term.uid(),
+            CliBuiltins::GraphQl(term) => term.uid(),
         }
     }
 }
@@ -57,6 +64,9 @@ impl TryFrom<Uuid> for CliBuiltins {
             .or_else(|_| {
                 TryInto::<reflex_handlers::stdlib::Stdlib>::try_into(value).map(Self::Handlers)
             })
+            .or_else(|_| {
+                TryInto::<reflex_graphql::stdlib::Stdlib>::try_into(value).map(Self::GraphQl)
+            })
     }
 }
 impl Builtin for CliBuiltins {
@@ -66,6 +76,7 @@ impl Builtin for CliBuiltins {
             CliBuiltins::Json(term) => term.arity(),
             CliBuiltins::Js(term) => term.arity(),
             CliBuiltins::Handlers(term) => term.arity(),
+            CliBuiltins::GraphQl(term) => term.arity(),
         }
     }
     fn apply<T: Expression<Builtin = Self> + Applicable<T>>(
@@ -80,6 +91,7 @@ impl Builtin for CliBuiltins {
             CliBuiltins::Json(term) => term.apply(args, factory, allocator, cache),
             CliBuiltins::Js(term) => term.apply(args, factory, allocator, cache),
             CliBuiltins::Handlers(term) => term.apply(args, factory, allocator, cache),
+            CliBuiltins::GraphQl(term) => term.apply(args, factory, allocator, cache),
         }
     }
     fn should_parallelize<T: Expression<Builtin = Self> + Applicable<T>>(
@@ -91,6 +103,7 @@ impl Builtin for CliBuiltins {
             CliBuiltins::Json(term) => term.should_parallelize(args),
             CliBuiltins::Js(term) => term.should_parallelize(args),
             CliBuiltins::Handlers(term) => term.should_parallelize(args),
+            CliBuiltins::GraphQl(term) => term.should_parallelize(args),
         }
     }
 }
@@ -101,6 +114,7 @@ impl std::fmt::Display for CliBuiltins {
             Self::Json(target) => std::fmt::Display::fmt(target, f),
             Self::Js(target) => std::fmt::Display::fmt(target, f),
             Self::Handlers(target) => std::fmt::Display::fmt(target, f),
+            Self::GraphQl(target) => std::fmt::Display::fmt(target, f),
         }
     }
 }
@@ -551,5 +565,26 @@ impl From<reflex_handlers::stdlib::IncrementVariable> for CliBuiltins {
 impl From<reflex_handlers::stdlib::DecrementVariable> for CliBuiltins {
     fn from(value: reflex_handlers::stdlib::DecrementVariable) -> Self {
         Self::from(reflex_handlers::stdlib::Stdlib::from(value))
+    }
+}
+
+impl From<reflex_graphql::stdlib::CollectQueryListItems> for CliBuiltins {
+    fn from(value: reflex_graphql::stdlib::CollectQueryListItems) -> Self {
+        Self::from(reflex_graphql::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_graphql::stdlib::DynamicQueryBranch> for CliBuiltins {
+    fn from(value: reflex_graphql::stdlib::DynamicQueryBranch) -> Self {
+        Self::from(reflex_graphql::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_graphql::stdlib::FlattenDeep> for CliBuiltins {
+    fn from(value: reflex_graphql::stdlib::FlattenDeep) -> Self {
+        Self::from(reflex_graphql::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_graphql::stdlib::GraphQlResolver> for CliBuiltins {
+    fn from(value: reflex_graphql::stdlib::GraphQlResolver) -> Self {
+        Self::from(reflex_graphql::stdlib::Stdlib::from(value))
     }
 }

@@ -165,12 +165,18 @@ impl<T> JsImportsBuiltin for T where
 pub fn builtin_imports<T: Expression>(
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
-) -> Vec<(&'static str, T)>
+) -> Vec<(String, T)>
 where
     T::Builtin: JsImportsBuiltin,
 {
     vec![
-        ("reflex::core", import_core(factory, allocator)),
-        ("reflex::utils", import_utils(factory, allocator)),
+        (
+            String::from("reflex::core"),
+            import_core(factory, allocator),
+        ),
+        (
+            String::from("reflex::utils"),
+            import_utils(factory, allocator),
+        ),
     ]
 }

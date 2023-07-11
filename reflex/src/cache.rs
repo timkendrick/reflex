@@ -7,7 +7,7 @@ use std::collections::hash_map::Entry;
 use crate::{
     core::{
         hash_state_values, DynamicState, EvaluationResult, Expression, GraphNode, NodeId,
-        Reducible, Rewritable, StateToken, Substitutions,
+        StateToken, Substitutions,
     },
     hash::{hash_object, HashId, IntMap},
 };
@@ -177,7 +177,7 @@ impl<T: Expression> SubstitutionCache<T> {
         }
     }
 }
-impl<T: Expression + Rewritable<T> + Reducible<T>> EvaluationCache<T> for SubstitutionCache<T> {
+impl<T: Expression> EvaluationCache<T> for SubstitutionCache<T> {
     fn retrieve_reduction(&mut self, expression: &(impl GraphNode + NodeId)) -> Option<Option<T>> {
         let result = self
             .entries
@@ -481,9 +481,7 @@ impl<T: Expression> GenerationalSubstitutionCache<T> {
         }
     }
 }
-impl<T: Expression + Rewritable<T> + Reducible<T>> EvaluationCache<T>
-    for GenerationalSubstitutionCache<T>
-{
+impl<T: Expression> EvaluationCache<T> for GenerationalSubstitutionCache<T> {
     fn retrieve_reduction(&mut self, expression: &(impl GraphNode + NodeId)) -> Option<Option<T>> {
         match self.current.retrieve_reduction(expression) {
             Some(result) => Some(result),

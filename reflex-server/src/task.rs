@@ -2,10 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 // SPDX-FileContributor: Chris Campbell <c.campbell@mwam.com> https://github.com/c-campbell-mwam
-use reflex::core::{Applicable, Expression, Reducible, Rewritable};
 use reflex_dispatcher::{Action, TaskFactory};
-use reflex_grpc::actor::GrpcHandlerAction;
-use reflex_grpc::task::GrpcHandlerConnectionTaskFactory;
+use reflex_grpc::task::{GrpcHandlerConnectionTaskFactory, GrpcHandlerTaskAction};
 use reflex_handlers::task::fetch::FetchHandlerTaskFactory;
 use reflex_handlers::task::graphql::{
     GraphQlHandlerHttpFetchTaskFactory, GraphQlHandlerWebSocketConnectionTaskFactory,
@@ -15,13 +13,8 @@ use reflex_handlers::task::timestamp::TimestampHandlerTaskFactory;
 use reflex_handlers::task::{
     DefaultHandlersTask, DefaultHandlersTaskAction, DefaultHandlersTaskFactory,
 };
-use reflex_interpreter::compiler::Compile;
 use reflex_macros::{blanket_trait, task_factory_enum, Matcher};
-use reflex_runtime::task::bytecode_worker::BytecodeWorkerTaskFactory;
-use reflex_runtime::{
-    task::{RuntimeTask, RuntimeTaskAction, RuntimeTaskFactory},
-    AsyncExpression, AsyncExpressionFactory, AsyncHeapAllocator,
-};
+use reflex_runtime::task::{RuntimeTask, RuntimeTaskAction, RuntimeTaskFactory};
 
 use crate::server::task::websocket_graphql_server::{
     WebSocketGraphQlServerTask, WebSocketGraphQlServerTaskAction,
@@ -29,24 +22,19 @@ use crate::server::task::websocket_graphql_server::{
 };
 
 blanket_trait!(
-    pub trait ServerTaskAction<T: Expression>:
-        RuntimeTaskAction<T>
+    pub trait ServerTaskAction:
+        RuntimeTaskAction
         + DefaultHandlersTaskAction
-        + GrpcHandlerAction<T>
+        + GrpcHandlerTaskAction
         + WebSocketGraphQlServerTaskAction
     {
     }
 );
 
 blanket_trait!(
-    pub trait ServerTask<T, TFactory, TAllocator, TConnect>:
-        RuntimeTask<T, TFactory, TAllocator>
-        + DefaultHandlersTask<TConnect>
-        + WebSocketGraphQlServerTask
+    pub trait ServerTask<TConnect>:
+        RuntimeTask + DefaultHandlersTask<TConnect> + WebSocketGraphQlServerTask
     where
-        T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
-        TFactory: AsyncExpressionFactory<T> + Default,
-        TAllocator: AsyncHeapAllocator<T> + Default,
         TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     {
     }
@@ -54,51 +42,27 @@ blanket_trait!(
 
 task_factory_enum!({
     #[derive(Matcher, Clone)]
-    pub enum ServerTaskFactory<T, TFactory, TAllocator, TConnect>
+    pub enum ServerTaskFactory<TConnect>
     where
-        T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
-        TFactory: AsyncExpressionFactory<T> + Default,
-        TAllocator: AsyncHeapAllocator<T> + Default,
         TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     {
-        Runtime(RuntimeTaskFactory<T, TFactory, TAllocator>),
+        Runtime(RuntimeTaskFactory),
         DefaultHandlers(DefaultHandlersTaskFactory<TConnect>),
         GrpcHandler(GrpcHandlerConnectionTaskFactory),
         WebSocketGraphQlServer(WebSocketGraphQlServerTaskFactory),
     }
 
-    impl<T, TFactory, TAllocator, TConnect, TAction, TTask> TaskFactory<TAction, TTask>
-        for ServerTaskFactory<T, TFactory, TAllocator, TConnect>
+    impl<TConnect, TAction, TTask> TaskFactory<TAction, TTask> for ServerTaskFactory<TConnect>
     where
-        T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
-        TFactory: AsyncExpressionFactory<T> + Default,
-        TAllocator: AsyncHeapAllocator<T> + Default,
         TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
-        TAction: Action + ServerTaskAction<T> + Send + 'static,
-        TTask: TaskFactory<TAction, TTask> + ServerTask<T, TFactory, TAllocator, TConnect>,
+        TAction: Action + ServerTaskAction + Send + 'static,
+        TTask: TaskFactory<TAction, TTask> + ServerTask<TConnect>,
     {
     }
 });
 
-impl<T, TFactory, TAllocator, TConnect> From<BytecodeWorkerTaskFactory<T, TFactory, TAllocator>>
-    for ServerTaskFactory<T, TFactory, TAllocator, TConnect>
+impl<TConnect> From<FetchHandlerTaskFactory<TConnect>> for ServerTaskFactory<TConnect>
 where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
-    TFactory: AsyncExpressionFactory<T> + Default,
-    TAllocator: AsyncHeapAllocator<T> + Default,
-    TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
-{
-    fn from(value: BytecodeWorkerTaskFactory<T, TFactory, TAllocator>) -> Self {
-        RuntimeTaskFactory::from(value).into()
-    }
-}
-
-impl<T, TFactory, TAllocator, TConnect> From<FetchHandlerTaskFactory<TConnect>>
-    for ServerTaskFactory<T, TFactory, TAllocator, TConnect>
-where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
-    TFactory: AsyncExpressionFactory<T> + Default,
-    TAllocator: AsyncHeapAllocator<T> + Default,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
 {
     fn from(value: FetchHandlerTaskFactory<TConnect>) -> Self {
@@ -106,12 +70,8 @@ where
     }
 }
 
-impl<T, TFactory, TAllocator, TConnect> From<GraphQlHandlerHttpFetchTaskFactory<TConnect>>
-    for ServerTaskFactory<T, TFactory, TAllocator, TConnect>
+impl<TConnect> From<GraphQlHandlerHttpFetchTaskFactory<TConnect>> for ServerTaskFactory<TConnect>
 where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
-    TFactory: AsyncExpressionFactory<T> + Default,
-    TAllocator: AsyncHeapAllocator<T> + Default,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
 {
     fn from(value: GraphQlHandlerHttpFetchTaskFactory<TConnect>) -> Self {
@@ -119,12 +79,8 @@ where
     }
 }
 
-impl<T, TFactory, TAllocator, TConnect> From<GraphQlHandlerWebSocketConnectionTaskFactory>
-    for ServerTaskFactory<T, TFactory, TAllocator, TConnect>
+impl<TConnect> From<GraphQlHandlerWebSocketConnectionTaskFactory> for ServerTaskFactory<TConnect>
 where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
-    TFactory: AsyncExpressionFactory<T> + Default,
-    TAllocator: AsyncHeapAllocator<T> + Default,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
 {
     fn from(value: GraphQlHandlerWebSocketConnectionTaskFactory) -> Self {
@@ -132,12 +88,8 @@ where
     }
 }
 
-impl<T, TFactory, TAllocator, TConnect> From<TimeoutHandlerTaskFactory>
-    for ServerTaskFactory<T, TFactory, TAllocator, TConnect>
+impl<TConnect> From<TimeoutHandlerTaskFactory> for ServerTaskFactory<TConnect>
 where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
-    TFactory: AsyncExpressionFactory<T> + Default,
-    TAllocator: AsyncHeapAllocator<T> + Default,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
 {
     fn from(value: TimeoutHandlerTaskFactory) -> Self {
@@ -145,12 +97,8 @@ where
     }
 }
 
-impl<T, TFactory, TAllocator, TConnect> From<TimestampHandlerTaskFactory>
-    for ServerTaskFactory<T, TFactory, TAllocator, TConnect>
+impl<TConnect> From<TimestampHandlerTaskFactory> for ServerTaskFactory<TConnect>
 where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
-    TFactory: AsyncExpressionFactory<T> + Default,
-    TAllocator: AsyncHeapAllocator<T> + Default,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
 {
     fn from(value: TimestampHandlerTaskFactory) -> Self {
@@ -158,12 +106,9 @@ where
     }
 }
 
-impl<T, TFactory, TAllocator, TConnect> From<WebSocketGraphQlServerThrottleTimeoutTaskFactory>
-    for ServerTaskFactory<T, TFactory, TAllocator, TConnect>
+impl<TConnect> From<WebSocketGraphQlServerThrottleTimeoutTaskFactory>
+    for ServerTaskFactory<TConnect>
 where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
-    TFactory: AsyncExpressionFactory<T> + Default,
-    TAllocator: AsyncHeapAllocator<T> + Default,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
 {
     fn from(value: WebSocketGraphQlServerThrottleTimeoutTaskFactory) -> Self {
