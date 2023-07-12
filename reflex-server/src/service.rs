@@ -24,6 +24,9 @@ use reflex_dispatcher::{
     utils::take_until_final_item::TakeUntilFinalItem, Action, Actor, AsyncScheduler, Handler,
     HandlerContext, Matcher, ProcessId, Redispatcher, SchedulerTransition, TaskFactory,
 };
+use reflex_engine::actor::bytecode_interpreter::{
+    BytecodeInterpreterAction, BytecodeInterpreterMetricLabels,
+};
 use reflex_graphql::{
     create_json_error_object,
     subscriptions::{
@@ -36,9 +39,7 @@ use reflex_graphql::{
 use reflex_json::JsonValue;
 use reflex_macros::blanket_trait;
 use reflex_runtime::{
-    actor::bytecode_interpreter::{BytecodeInterpreterAction, BytecodeInterpreterMetricLabels},
-    task::RuntimeTask,
-    AsyncExpression, AsyncExpressionFactory, AsyncHeapAllocator,
+    task::RuntimeTask, AsyncExpression, AsyncExpressionFactory, AsyncHeapAllocator,
 };
 use reflex_scheduler::tokio::{
     TokioInbox, TokioScheduler, TokioSchedulerBuilder, TokioSchedulerInstrumentation,

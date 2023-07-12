@@ -9,7 +9,6 @@ use crate::task::evaluate_handler::{
     EffectThrottleTaskFactory, EvaluateHandlerTask, EvaluateHandlerTaskAction,
 };
 
-pub mod bytecode_worker;
 pub mod evaluate_handler;
 
 blanket_trait!(

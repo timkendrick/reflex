@@ -20,6 +20,7 @@ use reflex_dispatcher::{
     Action, ActorEvents, HandlerContext, MessageData, MessageOffset, NoopDisposeCallback,
     ProcessId, SchedulerCommand, SchedulerMode, SchedulerTransition, TaskFactory, TaskInbox,
 };
+use reflex_engine::actor::bytecode_interpreter::BytecodeInterpreterMetricLabels;
 use reflex_macros::{dispatcher, Named};
 use reflex_runtime::{
     action::{
@@ -32,7 +33,6 @@ use reflex_runtime::{
             EvaluateResultAction, EvaluateStartAction, EvaluateStopAction, EvaluateUpdateAction,
         },
     },
-    actor::bytecode_interpreter::BytecodeInterpreterMetricLabels,
     utils::quantiles::{
         generate_quantile_metric_labels, publish_quantile_bucketed_metric, QuantileBucket,
     },

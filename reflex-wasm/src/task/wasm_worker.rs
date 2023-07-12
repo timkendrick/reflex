@@ -24,6 +24,7 @@ use reflex_dispatcher::{
     Action, ActorEvents, HandlerContext, MessageData, MessageOffset, NoopDisposeCallback,
     ProcessId, SchedulerCommand, SchedulerMode, SchedulerTransition, TaskFactory, TaskInbox,
 };
+use reflex_engine::task::bytecode_worker::BytecodeWorkerAction;
 use reflex_macros::{blanket_trait, dispatcher, Named};
 use reflex_runtime::{
     action::bytecode_interpreter::{
@@ -31,7 +32,6 @@ use reflex_runtime::{
         BytecodeInterpreterInitAction, BytecodeInterpreterResultAction,
     },
     action::bytecode_interpreter::{BytecodeInterpreterGcCompleteAction, BytecodeWorkerStatistics},
-    task::bytecode_worker::BytecodeWorkerAction,
     AsyncExpression, AsyncExpressionFactory, AsyncHeapAllocator, QueryEvaluationMode,
 };
 use serde::{Deserialize, Serialize};

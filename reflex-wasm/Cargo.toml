@@ -13,6 +13,7 @@ path = "src/bin/compile.rs"
 [dependencies]
 reflex = { path = "../reflex" }
 reflex-dispatcher = { path = "../reflex-dispatcher" }
+reflex-engine = { path = "../reflex-engine" }
 reflex-graphql = { path = "../reflex-graphql" }
 reflex-grpc = { path = "../reflex-grpc" }
 reflex-handlers = { path = "../reflex-handlers" }
