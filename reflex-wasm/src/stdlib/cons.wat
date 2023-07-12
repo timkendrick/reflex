@@ -3,7 +3,7 @@
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 (module
   (@builtin $Stdlib_Cons "Cons"
-    (@args (@lazy $head) (@lazy $tail))
+    (@args (@strict $head) (@strict $tail))
 
     (@default
       (func $Stdlib_Cons::impl::default (param $head i32) (param $tail i32) (param $state i32) (result i32 i32)
