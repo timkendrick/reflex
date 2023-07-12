@@ -13,11 +13,11 @@ use strum_macros::EnumIter;
 
 pub use accessor::*;
 pub use construct::*;
-pub use date_constructor::*;
 pub use encode_uri_component::*;
 pub use format_error_message::*;
 pub use is_finite::*;
 pub use log::*;
+pub use parse_date::*;
 pub use parse_float::*;
 pub use parse_int::*;
 pub use throw::*;
@@ -25,11 +25,11 @@ pub use to_string::*;
 
 mod accessor;
 mod construct;
-mod date_constructor;
 mod encode_uri_component;
 mod format_error_message;
 mod is_finite;
 mod log;
+mod parse_date;
 mod parse_float;
 mod parse_int;
 mod throw;
@@ -42,12 +42,12 @@ impl<T> JsStdlibBuiltin for T where T: Builtin + AccessorBuiltin + LogBuiltin {}
 pub enum Stdlib {
     Accessor,
     Construct,
-    DateConstructor,
     EncodeUriComponent,
     FormatErrorMessage,
     IsFinite,
     Log,
     LogArgs,
+    ParseDate,
     ParseFloat,
     ParseInt,
     Throw,
@@ -63,12 +63,12 @@ impl Uid for Stdlib {
         match self {
             Self::Accessor => Uid::uid(&Accessor {}),
             Self::Construct => Uid::uid(&Construct {}),
-            Self::DateConstructor => Uid::uid(&DateConstructor {}),
             Self::EncodeUriComponent => Uid::uid(&EncodeUriComponent {}),
             Self::FormatErrorMessage => Uid::uid(&FormatErrorMessage {}),
             Self::IsFinite => Uid::uid(&IsFinite {}),
             Self::Log => Uid::uid(&Log {}),
             Self::LogArgs => Uid::uid(&LogArgs {}),
+            Self::ParseDate => Uid::uid(&ParseDate {}),
             Self::ParseFloat => Uid::uid(&ParseFloat {}),
             Self::ParseInt => Uid::uid(&ParseInt {}),
             Self::Throw => Uid::uid(&Throw {}),
@@ -82,14 +82,14 @@ impl TryFrom<Uuid> for Stdlib {
         match value {
             Accessor::UUID => Ok(Self::Accessor),
             Construct::UUID => Ok(Self::Construct),
-            DateConstructor::UUID => Ok(Self::DateConstructor),
             EncodeUriComponent::UUID => Ok(Self::EncodeUriComponent),
             FormatErrorMessage::UUID => Ok(Self::FormatErrorMessage),
             IsFinite::UUID => Ok(Self::IsFinite),
             Log::UUID => Ok(Self::Log),
             LogArgs::UUID => Ok(Self::LogArgs),
-            ParseInt::UUID => Ok(Self::ParseInt),
+            ParseDate::UUID => Ok(Self::ParseDate),
             ParseFloat::UUID => Ok(Self::ParseFloat),
+            ParseInt::UUID => Ok(Self::ParseInt),
             Throw::UUID => Ok(Self::Throw),
             ToString::UUID => Ok(Self::ToString),
             _ => Err(()),
@@ -101,12 +101,12 @@ impl Stdlib {
         match self {
             Self::Accessor => Accessor::arity(),
             Self::Construct => Construct::arity(),
-            Self::DateConstructor => DateConstructor::arity(),
             Self::EncodeUriComponent => EncodeUriComponent::arity(),
             Self::FormatErrorMessage => FormatErrorMessage::arity(),
             Self::IsFinite => IsFinite::arity(),
             Self::Log => Log::arity(),
             Self::LogArgs => LogArgs::arity(),
+            Self::ParseDate => ParseDate::arity(),
             Self::ParseFloat => ParseFloat::arity(),
             Self::ParseInt => ParseInt::arity(),
             Self::Throw => Throw::arity(),
@@ -120,7 +120,6 @@ impl Stdlib {
         match self {
             Self::Accessor => Applicable::<T>::should_parallelize(&Accessor, args),
             Self::Construct => Applicable::<T>::should_parallelize(&Construct, args),
-            Self::DateConstructor => Applicable::<T>::should_parallelize(&DateConstructor, args),
             Self::EncodeUriComponent => {
                 Applicable::<T>::should_parallelize(&EncodeUriComponent, args)
             }
@@ -130,6 +129,7 @@ impl Stdlib {
             Self::IsFinite => Applicable::<T>::should_parallelize(&IsFinite, args),
             Self::Log => Applicable::<T>::should_parallelize(&Log, args),
             Self::LogArgs => Applicable::<T>::should_parallelize(&LogArgs, args),
+            Self::ParseDate => Applicable::<T>::should_parallelize(&ParseDate, args),
             Self::ParseFloat => Applicable::<T>::should_parallelize(&ParseFloat, args),
             Self::ParseInt => Applicable::<T>::should_parallelize(&ParseInt, args),
             Self::Throw => Applicable::<T>::should_parallelize(&Throw, args),
@@ -149,9 +149,6 @@ impl Stdlib {
         match self {
             Self::Accessor => Applicable::<T>::apply(&Accessor, args, factory, allocator, cache),
             Self::Construct => Applicable::<T>::apply(&Construct, args, factory, allocator, cache),
-            Self::DateConstructor => {
-                Applicable::<T>::apply(&DateConstructor, args, factory, allocator, cache)
-            }
             Self::EncodeUriComponent => {
                 Applicable::<T>::apply(&EncodeUriComponent, args, factory, allocator, cache)
             }
@@ -161,6 +158,7 @@ impl Stdlib {
             Self::IsFinite => Applicable::<T>::apply(&IsFinite, args, factory, allocator, cache),
             Self::Log => Applicable::<T>::apply(&Log, args, factory, allocator, cache),
             Self::LogArgs => Applicable::<T>::apply(&LogArgs, args, factory, allocator, cache),
+            Self::ParseDate => Applicable::<T>::apply(&ParseDate, args, factory, allocator, cache),
             Self::ParseFloat => {
                 Applicable::<T>::apply(&ParseFloat, args, factory, allocator, cache)
             }
@@ -186,11 +184,6 @@ impl From<Construct> for Stdlib {
         Self::Construct
     }
 }
-impl From<DateConstructor> for Stdlib {
-    fn from(_value: DateConstructor) -> Self {
-        Self::DateConstructor
-    }
-}
 impl From<EncodeUriComponent> for Stdlib {
     fn from(_value: EncodeUriComponent) -> Self {
         Self::EncodeUriComponent
@@ -214,6 +207,11 @@ impl From<Log> for Stdlib {
 impl From<LogArgs> for Stdlib {
     fn from(_value: LogArgs) -> Self {
         Self::LogArgs
+    }
+}
+impl From<ParseDate> for Stdlib {
+    fn from(_value: ParseDate) -> Self {
+        Self::ParseDate
     }
 }
 impl From<ParseFloat> for Stdlib {

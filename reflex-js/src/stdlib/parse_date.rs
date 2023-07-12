@@ -10,8 +10,8 @@ use reflex::core::{
     StringTermType, StringValue, Uid, Uuid,
 };
 
-pub struct DateConstructor;
-impl DateConstructor {
+pub struct ParseDate;
+impl ParseDate {
     pub const UUID: Uuid = uuid!("c63f7c30-b28c-42dd-aabc-3a228cca40e2");
     const ARITY: FunctionArity<1, 0> = FunctionArity {
         required: [ArgType::Strict],
@@ -22,12 +22,12 @@ impl DateConstructor {
         Arity::from(&Self::ARITY)
     }
 }
-impl Uid for DateConstructor {
+impl Uid for ParseDate {
     fn uid(&self) -> Uuid {
         Self::UUID
     }
 }
-impl<T: Expression> Applicable<T> for DateConstructor {
+impl<T: Expression> Applicable<T> for ParseDate {
     fn arity(&self) -> Option<Arity> {
         Some(Self::arity())
     }
