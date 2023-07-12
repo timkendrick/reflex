@@ -1471,8 +1471,19 @@ pub fn match_typed_expression_list<'a, T: Expression + 'a, V, E>(
 pub fn transform_expression_list<T: Expression>(
     expressions: &T::ExpressionList,
     allocator: &impl HeapAllocator<T>,
-    mut transform: impl FnMut(&T) -> Option<T>,
+    transform: impl FnMut(&T) -> Option<T>,
 ) -> Option<T::ExpressionList> {
+    match transform_expression_list_values(expressions, transform, |item| item.as_deref().clone()) {
+        None => None,
+        Some(values) => Some(allocator.create_list(values)),
+    }
+}
+
+pub fn transform_expression_list_values<T: Expression, V>(
+    expressions: &T::ExpressionList,
+    mut transform: impl FnMut(&T) -> Option<V>,
+    mut initialize: impl FnMut(&T) -> V,
+) -> Option<Vec<V>> {
     // Create a lazy iterator that collects transformed values along with their indices
     // Note that we don't pre-emptively collect the iterator because there might be no transformed expressions,
     // in which case we don't need to allocate a vector
@@ -1485,14 +1496,14 @@ pub fn transform_expression_list<T: Expression>(
     let (index, replaced) = iter.next()?;
     let mut results = expressions
         .iter()
-        .map(|item| item.as_deref().clone())
+        .map(|item| initialize(item.as_deref()))
         .collect::<Vec<_>>();
-    results[index] = replaced.clone();
+    results[index] = replaced;
     // Post-fill with the remaining transformed expressions
     for (index, replaced) in iter {
         results[index] = replaced;
     }
-    Some(allocator.create_list(results))
+    Some(results)
 }
 
 pub fn evaluate<T: Expression + Rewritable<T> + Reducible<T> + Evaluate<T>>(
