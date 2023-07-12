@@ -1255,10 +1255,7 @@ where
     Ok(if field_sets.len() >= 2 {
         factory.create_application_term(
             factory.create_builtin_term(Merge),
-            allocator.create_unit_list(factory.create_application_term(
-                factory.create_builtin_term(CollectList),
-                allocator.create_list(field_sets),
-            )),
+            allocator.create_list(field_sets),
         )
     } else {
         field_sets.into_iter().next().unwrap_or_else(|| {
