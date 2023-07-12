@@ -687,8 +687,8 @@
                 <List>
                   {effects.map(({ effect, value }) => (
                     <ListItem key={effect.id}>
-                      <Panel title={getEffectLabel(effect)}>
-                        <EffectOverview effect={effect} />
+                      <Panel title={`${effect.id}: ${getEffectLabel(effect)}`}>
+                        <EffectOverview effect={effect} value={value} />
                       </Panel>
                     </ListItem>
                   ))}
@@ -791,10 +791,10 @@
     }
 
     function EffectOverview(props) {
-      const { effect } = props;
+      const { effect, value } = props;
       return (
         <div className="EffectOverview">
-          <Code>{JSON.stringify(effect, null, 2)}</Code>
+          <Code>{JSON.stringify({ effect, value }, null, 2)}</Code>
         </div>
       );
     }
