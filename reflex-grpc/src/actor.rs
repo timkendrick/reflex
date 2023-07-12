@@ -15,10 +15,13 @@ use metrics::{
     decrement_gauge, describe_counter, describe_gauge, increment_counter, increment_gauge, Unit,
 };
 use prost::Message;
-use reflex::core::{
-    create_record, ConditionType, Expression, ExpressionFactory, ExpressionListType, HeapAllocator,
-    ListTermType, RecordTermType, Reducible, RefType, Rewritable, SignalType, StateToken,
-    StringTermType, StringValue, StructPrototypeType, SymbolId, SymbolTermType,
+use reflex::{
+    core::{
+        create_record, ConditionType, Expression, ExpressionFactory, ExpressionListType,
+        HeapAllocator, ListTermType, RecordTermType, Reducible, RefType, Rewritable, SignalType,
+        StateToken, StringTermType, StringValue, StructPrototypeType, SymbolId, SymbolTermType,
+    },
+    hash::IntMap,
 };
 use reflex_dispatcher::{
     Action, ActorEvents, HandlerContext, MessageData, NoopDisposeCallback, ProcessId,
@@ -221,17 +224,17 @@ where
     }
 }
 
-pub struct GrpcHandlerState {
+pub struct GrpcHandlerState<T: Expression> {
     active_requests: HashMap<StateToken, GrpcConnectionId>,
-    active_connections: HashMap<GrpcConnectionId, GrpcConnectionState>,
+    active_connections: HashMap<GrpcConnectionId, GrpcConnectionState<T>>,
     active_connection_mappings: HashMap<GrpcServiceUrl, HashSet<GrpcConnectionId>>,
 }
-struct GrpcConnectionState {
+struct GrpcConnectionState<T: Expression> {
     task_pid: ProcessId,
     url: GrpcServiceUrl,
     endpoint: Endpoint,
-    operations: HashMap<StateToken, GrpcOperationState>,
-    effects: HashMap<GrpcOperationId, StateToken>,
+    operations: IntMap<StateToken, GrpcOperationState>,
+    effects: HashMap<GrpcOperationId, T::Signal>,
     connection_attempt: usize,
     metric_labels: [(&'static str, String); 1],
 }
@@ -249,7 +252,7 @@ struct GrpcRequest {
     metadata: GrpcMetadata,
     message: Bytes,
 }
-impl Default for GrpcHandlerState {
+impl<T: Expression> Default for GrpcHandlerState<T> {
     fn default() -> Self {
         Self {
             active_requests: Default::default(),
@@ -258,10 +261,10 @@ impl Default for GrpcHandlerState {
         }
     }
 }
-impl GrpcHandlerState {
+impl<T: Expression> GrpcHandlerState<T> {
     fn subscribe_grpc_operation<TAction, TTask>(
         &mut self,
-        effect_id: StateToken,
+        effect: &T::Signal,
         url: GrpcServiceUrl,
         endpoint: Endpoint,
         request: GrpcRequest,
@@ -304,7 +307,7 @@ impl GrpcHandlerState {
                 connection_id
             }
         };
-        self.active_requests.insert(effect_id, connection_id);
+        self.active_requests.insert(effect.id(), connection_id);
         let (connection_state, connect_task) = match self.active_connections.entry(connection_id) {
             Entry::Occupied(entry) => (entry.into_mut(), None),
             Entry::Vacant(entry) => {
@@ -331,7 +334,7 @@ impl GrpcHandlerState {
                 )
             }
         };
-        let subscribe_task = match connection_state.operations.entry(effect_id) {
+        let subscribe_task = match connection_state.operations.entry(effect.id()) {
             Entry::Occupied(_) => None,
             Entry::Vacant(entry) => {
                 let operation_id = GrpcOperationId(Uuid::new_v4());
@@ -357,7 +360,9 @@ impl GrpcHandlerState {
                     request: request.clone(),
                     metric_labels,
                 });
-                connection_state.effects.insert(operation_id, effect_id);
+                connection_state
+                    .effects
+                    .insert(operation_id, effect.clone());
                 let GrpcRequest {
                     service_name,
                     method_name,
@@ -388,7 +393,7 @@ impl GrpcHandlerState {
     }
     fn unsubscribe_grpc_operation<TAction, TTask>(
         &mut self,
-        effect_id: StateToken,
+        effect: &T::Signal,
         metric_names: &GrpcHandlerMetricNames,
     ) -> Option<impl Iterator<Item = SchedulerCommand<TAction, TTask>>>
     where
@@ -397,10 +402,10 @@ impl GrpcHandlerState {
             + From<GrpcHandlerConnectionTerminateAction>,
         TTask: TaskFactory<TAction, TTask>,
     {
-        let connection_id = self.active_requests.remove(&effect_id)?;
+        let connection_id = self.active_requests.remove(&effect.id())?;
         let (operation_state, url, task_pid, is_final_operation_for_connection) = {
             let connection_state = self.active_connections.get_mut(&connection_id)?;
-            let operation_state = connection_state.operations.remove(&effect_id)?;
+            let operation_state = connection_state.operations.remove(&effect.id())?;
             let url = String::from(connection_state.url.as_str());
             let task_pid = connection_state.task_pid;
             let is_final_subscription = connection_state.operations.is_empty();
@@ -472,7 +477,7 @@ impl GrpcHandlerState {
                 .map(move |message| SchedulerCommand::Send(task_pid, message)),
         )
     }
-    fn handle_connection_error<T: Expression, TAction, TTask>(
+    fn handle_connection_error<TAction, TTask>(
         &mut self,
         connection_id: GrpcConnectionId,
         error: T,
@@ -505,8 +510,8 @@ impl GrpcHandlerState {
                         updates: connection_state
                             .effects
                             .values()
-                            .copied()
-                            .map(|effect_id| (effect_id, error.clone()))
+                            .cloned()
+                            .map(|effect| (effect, error.clone()))
                             .collect(),
                     }],
                 }
@@ -632,7 +637,7 @@ dispatcher!({
         TAction: Action + GrpcHandlerConnectionTaskActorAction + Send + 'static,
         TTask: TaskFactory<TAction, TTask> + GrpcHandlerTask<TTranscoder>,
     {
-        type State = GrpcHandlerState;
+        type State = GrpcHandlerState<T>;
         type Events<TInbox: TaskInbox<TAction>> = TInbox;
         type Dispose = NoopDisposeCallback;
 
@@ -800,7 +805,7 @@ where
 {
     fn handle_effect_subscribe<TAction, TTask>(
         &self,
-        state: &mut GrpcHandlerState,
+        state: &mut GrpcHandlerState<T>,
         action: &EffectSubscribeAction<T>,
         _metadata: &MessageData,
         context: &mut impl HandlerContext,
@@ -823,7 +828,6 @@ where
         let (initial_values, tasks): (Vec<_>, Vec<_>) = effects
             .iter()
             .map(|effect| {
-                let state_token = effect.id();
                 match parse_grpc_effect_args(effect, &self.factory)
                     .map_err(|err| (err, None))
                     .and_then(|args| {
@@ -898,7 +902,7 @@ where
                     }) {
                     Ok((endpoint, url, request)) => {
                         let async_actions = state.subscribe_grpc_operation(
-                            effect.id(),
+                            effect,
                             url,
                             endpoint,
                             request,
@@ -908,11 +912,11 @@ where
                         );
                         let initial_value =
                             create_pending_expression(&self.factory, &self.allocator);
-                        ((state_token, initial_value), Some(async_actions))
+                        ((effect.clone(), initial_value), Some(async_actions))
                     }
                     Err((message, error_type)) => (
                         (
-                            state_token,
+                            effect.clone(),
                             create_error_message_expression(
                                 message,
                                 error_type,
@@ -947,7 +951,7 @@ where
     }
     fn handle_effect_unsubscribe<TAction, TTask>(
         &self,
-        state: &mut GrpcHandlerState,
+        state: &mut GrpcHandlerState<T>,
         action: &EffectUnsubscribeAction<T>,
         _metadata: &MessageData,
         _context: &mut impl HandlerContext,
@@ -969,15 +973,14 @@ where
             return None;
         }
         let unsubscribe_actions = effects.iter().flat_map(|effect| {
-            let effect_id = effect.id();
-            let actions = state.unsubscribe_grpc_operation(effect_id, &self.metric_names);
+            let actions = state.unsubscribe_grpc_operation(effect, &self.metric_names);
             actions.into_iter().flatten()
         });
         Some(SchedulerTransition::new(unsubscribe_actions))
     }
     fn handle_grpc_handler_connect_success<TAction, TTask>(
         &self,
-        state: &mut GrpcHandlerState,
+        state: &mut GrpcHandlerState<T>,
         action: &GrpcHandlerConnectSuccessAction,
         _metadata: &MessageData,
         _context: &mut impl HandlerContext,
@@ -994,6 +997,7 @@ where
         let connection_state = state.active_connections.get_mut(&connection_id)?;
         if connection_state.connection_attempt > 0 {
             connection_state.connection_attempt = 0;
+            let pending_value = create_pending_expression(&self.factory, &self.allocator);
             Some(SchedulerTransition::new(once(SchedulerCommand::Send(
                 self.main_pid,
                 EffectEmitAction {
@@ -1002,13 +1006,8 @@ where
                         updates: connection_state
                             .effects
                             .values()
-                            .copied()
-                            .map(|effect_id| {
-                                (
-                                    effect_id,
-                                    create_pending_expression(&self.factory, &self.allocator),
-                                )
-                            })
+                            .cloned()
+                            .map(|effect_id| (effect_id, pending_value.clone()))
                             .collect(),
                     }],
                 }
@@ -1020,7 +1019,7 @@ where
     }
     fn handle_grpc_handler_connect_error<TAction, TTask>(
         &self,
-        state: &mut GrpcHandlerState,
+        state: &mut GrpcHandlerState<T>,
         action: &GrpcHandlerConnectErrorAction,
         _metadata: &MessageData,
         context: &mut impl HandlerContext,
@@ -1061,7 +1060,7 @@ where
     }
     fn handle_grpc_handler_success_response<TAction, TTask>(
         &self,
-        state: &mut GrpcHandlerState,
+        state: &mut GrpcHandlerState<T>,
         action: &GrpcHandlerSuccessResponseAction,
         _metadata: &MessageData,
         _context: &mut impl HandlerContext,
@@ -1078,8 +1077,8 @@ where
         let connection_id = GrpcConnectionId(*connection_id);
         let operation_id = GrpcOperationId(*operation_id);
         let connection_state = state.active_connections.get(&connection_id)?;
-        let effect_id = connection_state.effects.get(&operation_id).copied()?;
-        let operation_state = connection_state.operations.get(&effect_id)?;
+        let effect = connection_state.effects.get(&operation_id)?;
+        let operation_state = connection_state.operations.get(&effect.id())?;
         let request = &operation_state.request;
         let message_type = request.method.descriptor.output();
         let value = DynamicMessage::decode(message_type, &mut data.clone())
@@ -1103,7 +1102,7 @@ where
             EffectEmitAction {
                 effect_types: vec![EffectUpdateBatch {
                     effect_type: create_grpc_effect_type(&self.factory, &self.allocator),
-                    updates: vec![(effect_id, value)],
+                    updates: vec![(effect.clone(), value)],
                 }],
             }
             .into(),
@@ -1111,7 +1110,7 @@ where
     }
     fn handle_grpc_handler_error_response<TAction, TTask>(
         &self,
-        state: &mut GrpcHandlerState,
+        state: &mut GrpcHandlerState<T>,
         action: &GrpcHandlerErrorResponseAction,
         _metadata: &MessageData,
         _context: &mut impl HandlerContext,
@@ -1130,8 +1129,8 @@ where
         let operation_id = GrpcOperationId(*operation_id);
         let status = Status::from(status.clone());
         let connection_state = state.active_connections.get(&connection_id)?;
-        let effect_id = connection_state.effects.get(&operation_id).copied()?;
-        let operation_state = connection_state.operations.get(&effect_id)?;
+        let effect = connection_state.effects.get(&operation_id)?;
+        let operation_state = connection_state.operations.get(&effect.id())?;
         let request = &operation_state.request;
         let value = create_grpc_operation_error_message_expression(
             format!("{}", status),
@@ -1145,7 +1144,7 @@ where
             EffectEmitAction {
                 effect_types: vec![EffectUpdateBatch {
                     effect_type: create_grpc_effect_type(&self.factory, &self.allocator),
-                    updates: vec![(effect_id, value)],
+                    updates: vec![(effect.clone(), value)],
                 }],
             }
             .into(),
@@ -1153,7 +1152,7 @@ where
     }
     fn handle_grpc_handler_transport_error<TAction, TTask>(
         &self,
-        state: &mut GrpcHandlerState,
+        state: &mut GrpcHandlerState<T>,
         action: &GrpcHandlerTransportErrorAction,
         _metadata: &MessageData,
         context: &mut impl HandlerContext,
@@ -1178,8 +1177,8 @@ where
         let operation_id = GrpcOperationId(*operation_id);
         let status = Status::from(status.clone());
         let connection_state = state.active_connections.get(&connection_id)?;
-        let effect_id = connection_state.effects.get(&operation_id).copied()?;
-        let operation_state = connection_state.operations.get(&effect_id)?;
+        let effect = connection_state.effects.get(&operation_id)?;
+        let operation_state = connection_state.operations.get(&effect.id())?;
         let request = &operation_state.request;
         let error = create_grpc_operation_error_message_expression(
             status,

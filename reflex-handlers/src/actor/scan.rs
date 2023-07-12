@@ -126,8 +126,8 @@ where
 
 pub struct ScanHandlerState<T: Expression> {
     effect_state: HashMap<StateToken, ScanHandlerReducerState<T>>,
-    /// Maps the child evaluate effect ID to the parent state effect ID
-    effect_mappings: HashMap<StateToken, StateToken>,
+    /// Maps the child evaluate effect ID to the parent state effect
+    effect_mappings: HashMap<StateToken, T::Signal>,
 }
 impl<T: Expression> Default for ScanHandlerState<T> {
     fn default() -> Self {
@@ -276,7 +276,7 @@ where
                         if let Some(action) = self.subscribe_scan_effect(state, effect, args) {
                             Some((
                                 (
-                                    effect.id(),
+                                    effect.clone(),
                                     create_pending_expression(&self.factory, &self.allocator),
                                 ),
                                 Some(SchedulerCommand::Send(self.main_pid, action)),
@@ -287,7 +287,7 @@ where
                     }
                     Err(err) => Some((
                         (
-                            effect.id(),
+                            effect.clone(),
                             create_error_expression(err, &self.factory, &self.allocator),
                         ),
                         None,
@@ -363,10 +363,10 @@ where
             .iter()
             .filter(|batch| is_evaluate_effect_type(&batch.effect_type, &self.factory))
             .flat_map(|batch| batch.updates.iter())
-            .filter_map(|(updated_state_token, update)| {
-                let scan_effect_id = state.effect_mappings.get(updated_state_token)?;
-                let reducer_state = state.effect_state.get_mut(scan_effect_id)?;
-                let updated_state_token = *updated_state_token;
+            .filter_map(|(updated_effect, update)| {
+                let scan_effect = state.effect_mappings.get(&updated_effect.id())?;
+                let reducer_state = state.effect_state.get_mut(&scan_effect.id())?;
+                let updated_state_token = updated_effect.id();
                 if updated_state_token == reducer_state.source_effect.id() {
                     // The source input has emitted, so trigger the next reducer iteration
                     {
@@ -381,9 +381,9 @@ where
                     reducer_state.source_value.replace(value.clone());
                     // Assign values for both reducer arguments (this will trigger the reducer query to be re-evaluated)
                     Some([
-                        (reducer_state.source_value_effect.id(), value),
+                        (reducer_state.source_value_effect.clone(), value),
                         (
-                            reducer_state.state_value_effect.id(),
+                            reducer_state.state_value_effect.clone(),
                             reducer_state.state_value.clone(),
                         ),
                     ])
@@ -408,10 +408,10 @@ where
                     // when the next source value arrives)
                     Some([
                         (
-                            reducer_state.state_value_effect.id(),
+                            reducer_state.state_value_effect.clone(),
                             create_pending_expression(&self.factory, &self.allocator),
                         ),
-                        (*scan_effect_id, value),
+                        (scan_effect.clone(), value),
                     ])
                 } else {
                     None
@@ -538,10 +538,10 @@ where
         }?;
         state
             .effect_mappings
-            .insert(source_effect.id(), effect.id());
+            .insert(source_effect.id(), effect.clone());
         state
             .effect_mappings
-            .insert(result_effect.id(), effect.id());
+            .insert(result_effect.id(), effect.clone());
         Some(
             EffectSubscribeAction {
                 effect_type: create_evaluate_effect_type(&self.factory, &self.allocator),

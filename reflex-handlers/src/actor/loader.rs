@@ -433,9 +433,7 @@ dispatcher!({
                 .iter()
                 .filter(|batch| is_evaluate_effect_type(&batch.effect_type, &self.factory))
                 .flat_map(|batch| batch.updates.iter())
-                .any(|(state_token, _update)| {
-                    state.loader_effect_mappings.contains_key(state_token)
-                });
+                .any(|(effect, _update)| state.loader_effect_mappings.contains_key(&effect.id()));
             if !has_relevant_updates {
                 return None;
             }
@@ -479,7 +477,7 @@ where
         }
         let (initial_values, effects_by_loader) = effects.iter().fold(
             (
-                Vec::<(StateToken, T)>::with_capacity(effects.len()),
+                Vec::<(T::Signal, T)>::with_capacity(effects.len()),
                 HashMap::<LoaderFactoryHash, (T, String, Vec<LoaderEntitySubscription<T>>)>::default(),
             ),
             |(mut initial_values, mut results), effect| {
@@ -501,13 +499,13 @@ where
                             }
                         }
                         initial_values.push((
-                            effect.id(),
+                            effect.clone(),
                             create_pending_expression(&self.factory, &self.allocator),
                         ))
                     }
                     Err(message) => {
                         initial_values.push((
-                            effect.id(),
+                            effect.clone(),
                             create_error_expression(message, &self.factory, &self.allocator),
                         ));
                     }
@@ -637,10 +635,10 @@ where
             .iter()
             .filter(|batch| is_evaluate_effect_type(&batch.effect_type, &self.factory))
             .flat_map(|batch| batch.updates.iter())
-            .filter_map(|(state_token, update)| {
-                let loader = state.loader_effect_mappings.get(state_token)?;
+            .filter_map(|(effect, update)| {
+                let loader = state.loader_effect_mappings.get(&effect.id())?;
                 let loader_state = state.loaders.get_mut(&LoaderFactoryHash::new(loader))?;
-                let batch_keys = loader_state.batch_effect_mappings.get(state_token)?;
+                let batch_keys = loader_state.batch_effect_mappings.get(&effect.id())?;
                 let batch = loader_state
                     .active_batches
                     .get_mut(&LoaderBatchHash::new(batch_keys))?;
@@ -743,7 +741,7 @@ where
                                 }
                             };
                             match result {
-                                Some(result) => Some((subscription.effect.id(), result)),
+                                Some(result) => Some((subscription.effect.clone(), result)),
                                 None => None,
                             }
                         })

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 // SPDX-FileContributor: Chris Campbell <c.campbell@mwam.com> https://github.com/c-campbell-mwam
-use reflex::core::{EvaluationResult, Expression, StateToken};
+use reflex::core::{ConditionType, EvaluationResult, Expression};
 use reflex_dispatcher::{Action, MessageOffset, Named, SerializableAction, SerializedAction};
 use reflex_json::{JsonMap, JsonValue};
 use reflex_macros::Named;
@@ -14,11 +14,11 @@ pub enum BytecodeInterpreterActions<T: Expression> {
         serialize = "<T as Expression>::Signal: Serialize",
         deserialize = "<T as Expression>::Signal: Deserialize<'de>"
     ))]
-    Init(BytecodeInterpreterInitAction),
+    Init(BytecodeInterpreterInitAction<T>),
     Evaluate(BytecodeInterpreterEvaluateAction<T>),
     Result(BytecodeInterpreterResultAction<T>),
-    Gc(BytecodeInterpreterGcAction),
-    GcComplete(BytecodeInterpreterGcCompleteAction),
+    Gc(BytecodeInterpreterGcAction<T>),
+    GcComplete(BytecodeInterpreterGcCompleteAction<T>),
 }
 impl<T: Expression> Named for BytecodeInterpreterActions<T> {
     fn name(&self) -> &'static str {
@@ -44,12 +44,14 @@ impl<T: Expression> SerializableAction for BytecodeInterpreterActions<T> {
     }
 }
 
-impl<T: Expression> From<BytecodeInterpreterInitAction> for BytecodeInterpreterActions<T> {
-    fn from(value: BytecodeInterpreterInitAction) -> Self {
+impl<T: Expression> From<BytecodeInterpreterInitAction<T>> for BytecodeInterpreterActions<T> {
+    fn from(value: BytecodeInterpreterInitAction<T>) -> Self {
         Self::Init(value)
     }
 }
-impl<T: Expression> From<BytecodeInterpreterActions<T>> for Option<BytecodeInterpreterInitAction> {
+impl<T: Expression> From<BytecodeInterpreterActions<T>>
+    for Option<BytecodeInterpreterInitAction<T>>
+{
     fn from(value: BytecodeInterpreterActions<T>) -> Self {
         match value {
             BytecodeInterpreterActions::Init(value) => Some(value),
@@ -58,7 +60,7 @@ impl<T: Expression> From<BytecodeInterpreterActions<T>> for Option<BytecodeInter
     }
 }
 impl<'a, T: Expression> From<&'a BytecodeInterpreterActions<T>>
-    for Option<&'a BytecodeInterpreterInitAction>
+    for Option<&'a BytecodeInterpreterInitAction<T>>
 {
     fn from(value: &'a BytecodeInterpreterActions<T>) -> Self {
         match value {
@@ -120,12 +122,12 @@ impl<'a, T: Expression> From<&'a BytecodeInterpreterActions<T>>
     }
 }
 
-impl<T: Expression> From<BytecodeInterpreterGcAction> for BytecodeInterpreterActions<T> {
-    fn from(value: BytecodeInterpreterGcAction) -> Self {
+impl<T: Expression> From<BytecodeInterpreterGcAction<T>> for BytecodeInterpreterActions<T> {
+    fn from(value: BytecodeInterpreterGcAction<T>) -> Self {
         Self::Gc(value)
     }
 }
-impl<T: Expression> From<BytecodeInterpreterActions<T>> for Option<BytecodeInterpreterGcAction> {
+impl<T: Expression> From<BytecodeInterpreterActions<T>> for Option<BytecodeInterpreterGcAction<T>> {
     fn from(value: BytecodeInterpreterActions<T>) -> Self {
         match value {
             BytecodeInterpreterActions::Gc(value) => Some(value),
@@ -134,7 +136,7 @@ impl<T: Expression> From<BytecodeInterpreterActions<T>> for Option<BytecodeInter
     }
 }
 impl<'a, T: Expression> From<&'a BytecodeInterpreterActions<T>>
-    for Option<&'a BytecodeInterpreterGcAction>
+    for Option<&'a BytecodeInterpreterGcAction<T>>
 {
     fn from(value: &'a BytecodeInterpreterActions<T>) -> Self {
         match value {
@@ -144,13 +146,13 @@ impl<'a, T: Expression> From<&'a BytecodeInterpreterActions<T>>
     }
 }
 
-impl<T: Expression> From<BytecodeInterpreterGcCompleteAction> for BytecodeInterpreterActions<T> {
-    fn from(value: BytecodeInterpreterGcCompleteAction) -> Self {
+impl<T: Expression> From<BytecodeInterpreterGcCompleteAction<T>> for BytecodeInterpreterActions<T> {
+    fn from(value: BytecodeInterpreterGcCompleteAction<T>) -> Self {
         Self::GcComplete(value)
     }
 }
 impl<T: Expression> From<BytecodeInterpreterActions<T>>
-    for Option<BytecodeInterpreterGcCompleteAction>
+    for Option<BytecodeInterpreterGcCompleteAction<T>>
 {
     fn from(value: BytecodeInterpreterActions<T>) -> Self {
         match value {
@@ -160,7 +162,7 @@ impl<T: Expression> From<BytecodeInterpreterActions<T>>
     }
 }
 impl<'a, T: Expression> From<&'a BytecodeInterpreterActions<T>>
-    for Option<&'a BytecodeInterpreterGcCompleteAction>
+    for Option<&'a BytecodeInterpreterGcCompleteAction<T>>
 {
     fn from(value: &'a BytecodeInterpreterActions<T>) -> Self {
         match value {
@@ -171,21 +173,29 @@ impl<'a, T: Expression> From<&'a BytecodeInterpreterActions<T>>
 }
 
 #[derive(Named, PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
-pub struct BytecodeInterpreterInitAction {
-    pub cache_id: StateToken,
+#[serde(bound(
+    serialize = "<T as Expression>::Signal: Serialize",
+    deserialize = "<T as Expression>::Signal: Deserialize<'de>"
+))]
+pub struct BytecodeInterpreterInitAction<T: Expression> {
+    pub cache_key: T::Signal,
 }
-impl Action for BytecodeInterpreterInitAction {}
-impl SerializableAction for BytecodeInterpreterInitAction {
+impl<T: Expression> Action for BytecodeInterpreterInitAction<T> {}
+impl<T: Expression> SerializableAction for BytecodeInterpreterInitAction<T> {
     fn to_json(&self) -> SerializedAction {
-        SerializedAction::from_iter([("cache_id", JsonValue::from(self.cache_id))])
+        SerializedAction::from_iter([("cache_id", JsonValue::from(self.cache_key.id()))])
     }
 }
 
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+#[serde(bound(
+    serialize = "T: Serialize, <T as Expression>::Signal: Serialize",
+    deserialize = "T: Deserialize<'de>, <T as Expression>::Signal: Deserialize<'de>"
+))]
 pub struct BytecodeInterpreterEvaluateAction<T: Expression> {
-    pub cache_id: StateToken,
+    pub cache_key: T::Signal,
     pub state_index: Option<MessageOffset>,
-    pub state_updates: Vec<(StateToken, T)>,
+    pub state_updates: Vec<(T::Signal, T)>,
 }
 impl<T: Expression> Action for BytecodeInterpreterEvaluateAction<T> {}
 impl<T: Expression> Named for BytecodeInterpreterEvaluateAction<T> {
@@ -196,7 +206,7 @@ impl<T: Expression> Named for BytecodeInterpreterEvaluateAction<T> {
 impl<T: Expression> SerializableAction for BytecodeInterpreterEvaluateAction<T> {
     fn to_json(&self) -> SerializedAction {
         SerializedAction::from_iter([
-            ("cache_id", JsonValue::from(self.cache_id)),
+            ("cache_id", JsonValue::from(self.cache_key.id())),
             (
                 "state_index",
                 match self.state_index {
@@ -213,8 +223,12 @@ impl<T: Expression> SerializableAction for BytecodeInterpreterEvaluateAction<T> 
 }
 
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+#[serde(bound(
+    serialize = "T: Serialize, <T as Expression>::Signal: Serialize",
+    deserialize = "T: Deserialize<'de>, <T as Expression>::Signal: Deserialize<'de>"
+))]
 pub struct BytecodeInterpreterResultAction<T: Expression> {
-    pub cache_id: StateToken,
+    pub cache_key: T::Signal,
     pub state_index: Option<MessageOffset>,
     pub result: EvaluationResult<T>,
     pub statistics: BytecodeWorkerStatistics,
@@ -228,7 +242,7 @@ impl<T: Expression> Named for BytecodeInterpreterResultAction<T> {
 impl<T: Expression> SerializableAction for BytecodeInterpreterResultAction<T> {
     fn to_json(&self) -> SerializedAction {
         SerializedAction::from_iter([
-            ("cache_id", JsonValue::from(self.cache_id)),
+            ("cache_id", JsonValue::from(self.cache_key.id())),
             (
                 "state_index",
                 match self.state_index {
@@ -259,15 +273,19 @@ impl<T: Expression> SerializableAction for BytecodeInterpreterResultAction<T> {
 }
 
 #[derive(Named, PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
-pub struct BytecodeInterpreterGcAction {
-    pub cache_id: StateToken,
+#[serde(bound(
+    serialize = "<T as Expression>::Signal: Serialize",
+    deserialize = "<T as Expression>::Signal: Deserialize<'de>"
+))]
+pub struct BytecodeInterpreterGcAction<T: Expression> {
+    pub cache_key: T::Signal,
     pub state_index: Option<MessageOffset>,
 }
-impl Action for BytecodeInterpreterGcAction {}
-impl SerializableAction for BytecodeInterpreterGcAction {
+impl<T: Expression> Action for BytecodeInterpreterGcAction<T> {}
+impl<T: Expression> SerializableAction for BytecodeInterpreterGcAction<T> {
     fn to_json(&self) -> SerializedAction {
         SerializedAction::from_iter([
-            ("cache_id", JsonValue::from(self.cache_id)),
+            ("cache_id", JsonValue::from(self.cache_key.id())),
             (
                 "state_index",
                 match self.state_index {
@@ -280,15 +298,19 @@ impl SerializableAction for BytecodeInterpreterGcAction {
 }
 
 #[derive(Named, PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
-pub struct BytecodeInterpreterGcCompleteAction {
-    pub cache_id: StateToken,
+#[serde(bound(
+    serialize = "<T as Expression>::Signal: Serialize",
+    deserialize = "<T as Expression>::Signal: Deserialize<'de>"
+))]
+pub struct BytecodeInterpreterGcCompleteAction<T: Expression> {
+    pub cache_key: T::Signal,
     pub statistics: BytecodeWorkerStatistics,
 }
-impl Action for BytecodeInterpreterGcCompleteAction {}
-impl SerializableAction for BytecodeInterpreterGcCompleteAction {
+impl<T: Expression> Action for BytecodeInterpreterGcCompleteAction<T> {}
+impl<T: Expression> SerializableAction for BytecodeInterpreterGcCompleteAction<T> {
     fn to_json(&self) -> SerializedAction {
         SerializedAction::from_iter([
-            ("cache_id", JsonValue::from(self.cache_id)),
+            ("cache_id", JsonValue::from(self.cache_key.id())),
             (
                 "statistics",
                 JsonValue::Object(JsonMap::from_iter([

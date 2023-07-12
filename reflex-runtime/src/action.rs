@@ -191,17 +191,17 @@ impl<'a, T: Expression> From<&'a RuntimeActions<T>> for Option<&'a EvaluateUpdat
     }
 }
 
-impl<T: Expression> From<EvaluateStopAction> for RuntimeActions<T> {
-    fn from(value: EvaluateStopAction) -> Self {
+impl<T: Expression> From<EvaluateStopAction<T>> for RuntimeActions<T> {
+    fn from(value: EvaluateStopAction<T>) -> Self {
         EvaluateActions::from(value).into()
     }
 }
-impl<T: Expression> From<RuntimeActions<T>> for Option<EvaluateStopAction> {
+impl<T: Expression> From<RuntimeActions<T>> for Option<EvaluateStopAction<T>> {
     fn from(value: RuntimeActions<T>) -> Self {
         Option::<EvaluateActions<T>>::from(value).and_then(|value| value.into())
     }
 }
-impl<'a, T: Expression> From<&'a RuntimeActions<T>> for Option<&'a EvaluateStopAction> {
+impl<'a, T: Expression> From<&'a RuntimeActions<T>> for Option<&'a EvaluateStopAction<T>> {
     fn from(value: &'a RuntimeActions<T>) -> Self {
         Option::<&'a EvaluateActions<T>>::from(value).and_then(|value| value.into())
     }

@@ -79,31 +79,38 @@ where
     }
 }
 
-#[derive(Default)]
-pub struct TimestampHandlerState {
+pub struct TimestampHandlerState<T: Expression> {
     active_operations: HashMap<StateToken, (Uuid, ProcessId)>,
-    operation_effect_mappings: HashMap<Uuid, StateToken>,
+    operation_effect_mappings: HashMap<Uuid, T::Signal>,
 }
-impl TimestampHandlerState {
+impl<T: Expression> Default for TimestampHandlerState<T> {
+    fn default() -> Self {
+        Self {
+            active_operations: Default::default(),
+            operation_effect_mappings: Default::default(),
+        }
+    }
+}
+impl<T: Expression> TimestampHandlerState<T> {
     fn subscribe_timestamp_task(
         &mut self,
-        effect_id: StateToken,
+        effect: &T::Signal,
         duration: Duration,
         context: &mut impl HandlerContext,
     ) -> Option<(ProcessId, TimestampHandlerTaskFactory)> {
-        let entry = match self.active_operations.entry(effect_id) {
+        let entry = match self.active_operations.entry(effect.id()) {
             Entry::Occupied(_) => None,
             Entry::Vacant(entry) => Some(entry),
         }?;
         let operation_id = Uuid::new_v4();
         let (task_pid, task) = create_timestamp_task(operation_id, duration, context);
         self.operation_effect_mappings
-            .insert(operation_id, effect_id);
+            .insert(operation_id, effect.clone());
         entry.insert((operation_id, task_pid));
         Some((task_pid, task))
     }
-    fn unsubscribe_timestamp_task(&mut self, effect_id: StateToken) -> Option<ProcessId> {
-        let (operation_id, task_pid) = self.active_operations.remove(&effect_id)?;
+    fn unsubscribe_timestamp_task(&mut self, effect: &T::Signal) -> Option<ProcessId> {
+        let (operation_id, task_pid) = self.active_operations.remove(&effect.id())?;
         let _ = self.operation_effect_mappings.remove(&operation_id)?;
         Some(task_pid)
     }
@@ -127,7 +134,7 @@ dispatcher!({
         TAction: Action,
         TTask: TaskFactory<TAction, TTask> + From<TimestampHandlerTaskFactory>,
     {
-        type State = TimestampHandlerState;
+        type State = TimestampHandlerState<T>;
         type Events<TInbox: TaskInbox<TAction>> = TInbox;
         type Dispose = NoopDisposeCallback;
 
@@ -211,7 +218,7 @@ where
 {
     fn handle_effect_subscribe<TAction, TTask>(
         &self,
-        state: &mut TimestampHandlerState,
+        state: &mut TimestampHandlerState<T>,
         action: &EffectSubscribeAction<T>,
         _metadata: &MessageData,
         context: &mut impl HandlerContext,
@@ -230,18 +237,17 @@ where
         let (initial_values, tasks): (Vec<_>, Vec<_>) =
             effects
                 .iter()
-                .filter_map(|effect| {
-                    let state_token = effect.id();
-                    match parse_timestamp_effect_args(effect, &self.factory) {
+                .filter_map(
+                    |effect| match parse_timestamp_effect_args(effect, &self.factory) {
                         Ok(interval) => {
-                            match state.subscribe_timestamp_task(effect.id(), interval, context) {
+                            match state.subscribe_timestamp_task(effect, interval, context) {
                                 None => None,
                                 Some((task_pid, task)) => {
                                     let initial_value = self.factory.create_float_term(
                                         get_timestamp_millis(SystemTime::now()) as f64,
                                     );
                                     Some((
-                                        (state_token, initial_value),
+                                        (effect.clone(), initial_value),
                                         Some(SchedulerCommand::Task(task_pid, task.into())),
                                     ))
                                 }
@@ -249,13 +255,13 @@ where
                         }
                         Err(err) => Some((
                             (
-                                state_token,
+                                effect.clone(),
                                 create_error_expression(err, &self.factory, &self.allocator),
                             ),
                             None,
                         )),
-                    }
-                })
+                    },
+                )
                 .unzip();
         let initial_values_action = if initial_values.is_empty() {
             None
@@ -279,7 +285,7 @@ where
     }
     fn handle_effect_unsubscribe<TAction, TTask>(
         &self,
-        state: &mut TimestampHandlerState,
+        state: &mut TimestampHandlerState<T>,
         action: &EffectUnsubscribeAction<T>,
         _metadata: &MessageData,
         _context: &mut impl HandlerContext,
@@ -297,14 +303,14 @@ where
         }
         let active_pids = effects
             .iter()
-            .filter_map(|effect| state.unsubscribe_timestamp_task(effect.id()));
+            .filter_map(|effect| state.unsubscribe_timestamp_task(effect));
         Some(SchedulerTransition::new(
             active_pids.map(SchedulerCommand::Kill),
         ))
     }
     fn handle_timestamp_handler_update<TAction, TTask>(
         &self,
-        state: &mut TimestampHandlerState,
+        state: &mut TimestampHandlerState<T>,
         action: &TimestampHandlerUpdateAction,
         _metadata: &MessageData,
         _context: &mut impl HandlerContext,
@@ -317,7 +323,7 @@ where
             operation_id,
             timestamp,
         } = action;
-        let effect_id = state.operation_effect_mappings.get(operation_id).copied()?;
+        let effect = state.operation_effect_mappings.get(operation_id)?;
         let result = self
             .factory
             .create_float_term(get_timestamp_millis(*timestamp) as f64);
@@ -326,7 +332,7 @@ where
             EffectEmitAction {
                 effect_types: vec![EffectUpdateBatch {
                     effect_type: create_timestamp_effect_type(&self.factory, &self.allocator),
-                    updates: vec![(effect_id, result.clone())],
+                    updates: vec![(effect.clone(), result.clone())],
                 }],
             }
             .into(),

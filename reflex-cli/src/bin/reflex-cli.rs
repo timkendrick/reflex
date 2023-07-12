@@ -343,7 +343,7 @@ pub async fn main() -> Result<()> {
                             .iter()
                             .filter(|batch| is_evaluate_effect_type(&batch.effect_type, &factory))
                             .flat_map(|batch| batch.updates.iter())
-                            .filter(|(key, _)| *key == evaluate_effect.id())
+                            .filter(|(key, _)| key.id() == evaluate_effect.id())
                             .filter_map({
                                 let factory = factory.clone();
                                 move |(_, value)| parse_evaluate_effect_result(value, &factory)
@@ -1935,17 +1935,17 @@ impl<'a, T: Expression> From<&'a CliActions<T>> for Option<&'a EvaluateUpdateAct
     }
 }
 
-impl<T: Expression> From<EvaluateStopAction> for CliActions<T> {
-    fn from(value: EvaluateStopAction) -> Self {
+impl<T: Expression> From<EvaluateStopAction<T>> for CliActions<T> {
+    fn from(value: EvaluateStopAction<T>) -> Self {
         EvaluateActions::from(value).into()
     }
 }
-impl<T: Expression> From<CliActions<T>> for Option<EvaluateStopAction> {
+impl<T: Expression> From<CliActions<T>> for Option<EvaluateStopAction<T>> {
     fn from(value: CliActions<T>) -> Self {
         Option::<EvaluateActions<T>>::from(value).and_then(|value| value.into())
     }
 }
-impl<'a, T: Expression> From<&'a CliActions<T>> for Option<&'a EvaluateStopAction> {
+impl<'a, T: Expression> From<&'a CliActions<T>> for Option<&'a EvaluateStopAction<T>> {
     fn from(value: &'a CliActions<T>) -> Self {
         Option::<&'a EvaluateActions<T>>::from(value).and_then(|value| value.into())
     }
@@ -2031,17 +2031,17 @@ impl<'a, T: Expression> From<&'a CliActions<T>> for Option<&'a QueryEmitAction<T
     }
 }
 
-impl<T: Expression> From<BytecodeInterpreterInitAction> for CliActions<T> {
-    fn from(value: BytecodeInterpreterInitAction) -> Self {
+impl<T: Expression> From<BytecodeInterpreterInitAction<T>> for CliActions<T> {
+    fn from(value: BytecodeInterpreterInitAction<T>) -> Self {
         BytecodeInterpreterActions::<T>::from(value).into()
     }
 }
-impl<T: Expression> From<CliActions<T>> for Option<BytecodeInterpreterInitAction> {
+impl<T: Expression> From<CliActions<T>> for Option<BytecodeInterpreterInitAction<T>> {
     fn from(value: CliActions<T>) -> Self {
         Option::<BytecodeInterpreterActions<T>>::from(value).and_then(|value| value.into())
     }
 }
-impl<'a, T: Expression> From<&'a CliActions<T>> for Option<&'a BytecodeInterpreterInitAction> {
+impl<'a, T: Expression> From<&'a CliActions<T>> for Option<&'a BytecodeInterpreterInitAction<T>> {
     fn from(value: &'a CliActions<T>) -> Self {
         Option::<&'a BytecodeInterpreterActions<T>>::from(value).and_then(|value| value.into())
     }
@@ -2065,18 +2065,18 @@ impl<'a, T: Expression> From<&'a CliActions<T>>
     }
 }
 
-impl<T: Expression> From<BytecodeInterpreterGcCompleteAction> for CliActions<T> {
-    fn from(value: BytecodeInterpreterGcCompleteAction) -> Self {
+impl<T: Expression> From<BytecodeInterpreterGcCompleteAction<T>> for CliActions<T> {
+    fn from(value: BytecodeInterpreterGcCompleteAction<T>) -> Self {
         BytecodeInterpreterActions::<T>::from(value).into()
     }
 }
-impl<T: Expression> From<CliActions<T>> for Option<BytecodeInterpreterGcCompleteAction> {
+impl<T: Expression> From<CliActions<T>> for Option<BytecodeInterpreterGcCompleteAction<T>> {
     fn from(value: CliActions<T>) -> Self {
         Option::<BytecodeInterpreterActions<T>>::from(value).and_then(|value| value.into())
     }
 }
 impl<'a, T: Expression> From<&'a CliActions<T>>
-    for Option<&'a BytecodeInterpreterGcCompleteAction>
+    for Option<&'a BytecodeInterpreterGcCompleteAction<T>>
 {
     fn from(value: &'a CliActions<T>) -> Self {
         Option::<&'a BytecodeInterpreterActions<T>>::from(value).and_then(|value| value.into())
@@ -2099,17 +2099,17 @@ impl<'a, T: Expression> From<&'a CliActions<T>> for Option<&'a BytecodeInterpret
     }
 }
 
-impl<T: Expression> From<BytecodeInterpreterGcAction> for CliActions<T> {
-    fn from(value: BytecodeInterpreterGcAction) -> Self {
+impl<T: Expression> From<BytecodeInterpreterGcAction<T>> for CliActions<T> {
+    fn from(value: BytecodeInterpreterGcAction<T>) -> Self {
         BytecodeInterpreterActions::<T>::from(value).into()
     }
 }
-impl<T: Expression> From<CliActions<T>> for Option<BytecodeInterpreterGcAction> {
+impl<T: Expression> From<CliActions<T>> for Option<BytecodeInterpreterGcAction<T>> {
     fn from(value: CliActions<T>) -> Self {
         Option::<BytecodeInterpreterActions<T>>::from(value).and_then(|value| value.into())
     }
 }
-impl<'a, T: Expression> From<&'a CliActions<T>> for Option<&'a BytecodeInterpreterGcAction> {
+impl<'a, T: Expression> From<&'a CliActions<T>> for Option<&'a BytecodeInterpreterGcAction<T>> {
     fn from(value: &'a CliActions<T>) -> Self {
         Option::<&'a BytecodeInterpreterActions<T>>::from(value).and_then(|value| value.into())
     }

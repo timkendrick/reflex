@@ -288,12 +288,12 @@ where
 }
 
 pub enum HandlerActorState<T: Expression> {
-    FetchHandler(FetchHandlerState),
-    GraphQlHandler(GraphQlHandlerState),
+    FetchHandler(FetchHandlerState<T>),
+    GraphQlHandler(GraphQlHandlerState<T>),
     LoaderHandler(LoaderHandlerState<T>),
     ScanHandler(ScanHandlerState<T>),
-    TimeoutHandler(TimeoutHandlerState),
-    TimestampHandler(TimestampHandlerState),
+    TimeoutHandler(TimeoutHandlerState<T>),
+    TimestampHandler(TimestampHandlerState<T>),
     VariableHandler(VariableHandlerState<T>),
 }
 

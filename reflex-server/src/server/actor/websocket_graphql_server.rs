@@ -295,7 +295,7 @@ struct WebSocketGraphQlOperation<T: Expression> {
     operation_id: OperationId,
     subscription_id: Uuid,
     operation_type: GraphQlOperationType,
-    // Only necessary if validating query results against a schema
+    /// Only necessary if validating query results against a schema
     query: Option<GraphQlQuery>,
     /// Previous result payload if this is a diff stream (empty before first result emitted)
     diff_result: Option<Option<T>>,

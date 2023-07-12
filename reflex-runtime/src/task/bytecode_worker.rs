@@ -4,14 +4,14 @@
 use metrics::histogram;
 use reflex::{
     core::{
-        Applicable, DependencyList, EvaluationResult, Expression, ExpressionFactory, HeapAllocator,
-        InstructionPointer, Reducible, Rewritable, SignalType, StateCache, SymbolId,
+        Applicable, ConditionType, DependencyList, EvaluationResult, Expression, ExpressionFactory,
+        HeapAllocator, InstructionPointer, Reducible, Rewritable, SignalType, SymbolId,
     },
     hash::{hash_object, HashId},
 };
 use reflex_dispatcher::{
-    Action, ActorEvents, HandlerContext, MessageData, MessageOffset, NoopDisposeCallback,
-    ProcessId, SchedulerCommand, SchedulerMode, SchedulerTransition, TaskFactory, TaskInbox,
+    Action, ActorEvents, HandlerContext, MessageData, NoopDisposeCallback, ProcessId,
+    SchedulerCommand, SchedulerMode, SchedulerTransition, TaskFactory, TaskInbox,
 };
 use reflex_interpreter::{
     compiler::{
@@ -29,6 +29,7 @@ use crate::{
         BytecodeInterpreterEvaluateAction, BytecodeInterpreterGcAction,
         BytecodeInterpreterInitAction, BytecodeInterpreterResultAction,
     },
+    actor::evaluate_handler::WorkerStateCache,
     AsyncExpression, AsyncExpressionFactory, AsyncHeapAllocator,
 };
 use crate::{
@@ -61,12 +62,16 @@ where
 }
 
 #[derive(Named, Clone, Serialize, Deserialize)]
+#[serde(bound(
+    serialize = "T: Serialize, <T as Expression>::Signal: Serialize",
+    deserialize = "T: Deserialize<'de>, <T as Expression>::Signal: Deserialize<'de>"
+))]
 pub struct BytecodeWorkerTaskFactory<
     T: Expression,
     TFactory: ExpressionFactory<T>,
     TAllocator: HeapAllocator<T>,
 > {
-    pub cache_id: HashId,
+    pub cache_key: T::Signal,
     pub query: T,
     pub evaluation_mode: QueryEvaluationMode,
     pub compiler_options: CompilerOptions,
@@ -90,7 +95,7 @@ where
     type Actor = BytecodeWorker<T, TFactory, TAllocator>;
     fn create(self) -> Self::Actor {
         let Self {
-            cache_id,
+            cache_key,
             query,
             evaluation_mode,
             compiler_options,
@@ -105,7 +110,7 @@ where
         let factory = TFactory::default();
         let allocator = TAllocator::default();
         BytecodeWorker {
-            cache_id,
+            cache_key,
             query,
             evaluation_mode,
             compiler_options,
@@ -126,7 +131,7 @@ where
     TFactory: ExpressionFactory<T>,
     TAllocator: HeapAllocator<T>,
 {
-    cache_id: HashId,
+    cache_key: T::Signal,
     query: T,
     evaluation_mode: QueryEvaluationMode,
     compiler_options: CompilerOptions,
@@ -137,7 +142,6 @@ where
     metric_names: BytecodeWorkerMetricNames,
     caller_pid: ProcessId,
 }
-
 pub enum BytecodeWorkerState<T: Expression> {
     Uninitialized,
     Initialized(BytecodeWorkerInitializedState<T>),
@@ -149,8 +153,7 @@ impl<T: Expression> Default for BytecodeWorkerState<T> {
 }
 pub struct BytecodeWorkerInitializedState<T: Expression> {
     graph_root: (CompiledProgram, InstructionPointer),
-    state_index: Option<MessageOffset>,
-    state_values: StateCache<T>,
+    state_values: WorkerStateCache<T>,
     latest_result: Option<EvaluationResult<T>>,
     cache: DefaultInterpreterCache<T>,
 }
@@ -158,7 +161,6 @@ impl<T: Expression> BytecodeWorkerInitializedState<T> {
     fn new(graph_root: (CompiledProgram, InstructionPointer)) -> Self {
         Self {
             graph_root,
-            state_index: Default::default(),
             state_values: Default::default(),
             latest_result: Default::default(),
             cache: Default::default(),
@@ -181,12 +183,12 @@ impl<T: Expression> BytecodeWorkerInitializedState<T> {
 
 dispatcher!({
     pub enum BytecodeWorkerAction<T: Expression> {
-        Inbox(BytecodeInterpreterInitAction),
+        Inbox(BytecodeInterpreterInitAction<T>),
         Inbox(BytecodeInterpreterEvaluateAction<T>),
-        Inbox(BytecodeInterpreterGcAction),
+        Inbox(BytecodeInterpreterGcAction<T>),
 
         Outbox(BytecodeInterpreterResultAction<T>),
-        Outbox(BytecodeInterpreterGcCompleteAction),
+        Outbox(BytecodeInterpreterGcCompleteAction<T>),
     }
 
     impl<T, TFactory, TAllocator, TAction, TTask> Dispatcher<TAction, TTask>
@@ -212,12 +214,12 @@ dispatcher!({
             ActorEvents::Sync(inbox)
         }
 
-        fn accept(&self, _action: &BytecodeInterpreterInitAction) -> bool {
+        fn accept(&self, _action: &BytecodeInterpreterInitAction<T>) -> bool {
             true
         }
         fn schedule(
             &self,
-            _action: &BytecodeInterpreterInitAction,
+            _action: &BytecodeInterpreterInitAction<T>,
             _state: &Self::State,
         ) -> Option<SchedulerMode> {
             Some(SchedulerMode::Async)
@@ -225,7 +227,7 @@ dispatcher!({
         fn handle(
             &self,
             state: &mut Self::State,
-            action: &BytecodeInterpreterInitAction,
+            action: &BytecodeInterpreterInitAction<T>,
             metadata: &MessageData,
             context: &mut impl HandlerContext,
         ) -> Option<SchedulerTransition<TAction, TTask>> {
@@ -252,12 +254,12 @@ dispatcher!({
             self.handle_bytecode_interpreter_evaluate(state, action, metadata, context)
         }
 
-        fn accept(&self, _action: &BytecodeInterpreterGcAction) -> bool {
+        fn accept(&self, _action: &BytecodeInterpreterGcAction<T>) -> bool {
             true
         }
         fn schedule(
             &self,
-            _action: &BytecodeInterpreterGcAction,
+            _action: &BytecodeInterpreterGcAction<T>,
             _state: &Self::State,
         ) -> Option<SchedulerMode> {
             Some(SchedulerMode::Blocking)
@@ -265,7 +267,7 @@ dispatcher!({
         fn handle(
             &self,
             state: &mut Self::State,
-            action: &BytecodeInterpreterGcAction,
+            action: &BytecodeInterpreterGcAction<T>,
             metadata: &MessageData,
             context: &mut impl HandlerContext,
         ) -> Option<SchedulerTransition<TAction, TTask>> {
@@ -283,17 +285,17 @@ where
     fn handle_bytecode_interpreter_init<TAction, TTask>(
         &self,
         state: &mut BytecodeWorkerState<T>,
-        action: &BytecodeInterpreterInitAction,
+        action: &BytecodeInterpreterInitAction<T>,
         _metadata: &MessageData,
         _context: &mut impl HandlerContext,
     ) -> Option<SchedulerTransition<TAction, TTask>>
     where
         TAction: Action
             + From<BytecodeInterpreterResultAction<T>>
-            + From<BytecodeInterpreterGcCompleteAction>,
+            + From<BytecodeInterpreterGcCompleteAction<T>>,
         TTask: TaskFactory<TAction, TTask>,
     {
-        let BytecodeInterpreterInitAction { cache_id: _ } = action;
+        let BytecodeInterpreterInitAction { cache_key: _ } = action;
         match state {
             BytecodeWorkerState::Uninitialized => {
                 let compiler_start_time = Instant::now();
@@ -336,29 +338,32 @@ where
     where
         TAction: Action
             + From<BytecodeInterpreterResultAction<T>>
-            + From<BytecodeInterpreterGcCompleteAction>,
+            + From<BytecodeInterpreterGcCompleteAction<T>>,
         TTask: TaskFactory<TAction, TTask>,
     {
         let BytecodeInterpreterEvaluateAction {
-            cache_id: _,
+            cache_key: _,
             state_index,
             state_updates,
         } = action;
         match state {
             BytecodeWorkerState::Uninitialized => None,
             BytecodeWorkerState::Initialized(state) => {
-                let state_index = *state_index;
-                state.state_index = state_index;
-                state.state_values.extend(
-                    state_updates
-                        .iter()
-                        .map(|(state_token, value)| (*state_token, value.clone())),
-                );
+                let state_updates = state_index.map(|state_index| (state_index, state_updates));
+                if let Some((state_index, state_updates)) = state_updates {
+                    state.state_values.update_values(
+                        state_index,
+                        state_updates
+                            .iter()
+                            .map(|(key, value)| (key.clone(), value.clone())),
+                    );
+                };
                 let (program, entry_point) = &state.graph_root;
                 let state_id = state_index.map(|value| value.into()).unwrap_or(0);
+                let cache_id = self.cache_key.id();
                 let start_time = Instant::now();
                 let result = execute(
-                    self.cache_id,
+                    cache_id,
                     program,
                     *entry_point,
                     state_id,
@@ -391,8 +396,8 @@ where
                 Some(SchedulerTransition::new(once(SchedulerCommand::Send(
                     self.caller_pid,
                     BytecodeInterpreterResultAction {
-                        cache_id: self.cache_id,
-                        state_index,
+                        cache_key: self.cache_key.clone(),
+                        state_index: *state_index,
                         result: result.clone(),
                         statistics: state.get_statistics(),
                     }
@@ -404,27 +409,28 @@ where
     fn handle_bytecode_interpreter_gc<TAction, TTask>(
         &self,
         state: &mut BytecodeWorkerState<T>,
-        action: &BytecodeInterpreterGcAction,
+        action: &BytecodeInterpreterGcAction<T>,
         _metadata: &MessageData,
         _context: &mut impl HandlerContext,
     ) -> Option<SchedulerTransition<TAction, TTask>>
     where
-        TAction: Action + From<BytecodeInterpreterGcCompleteAction>,
+        TAction: Action + From<BytecodeInterpreterGcCompleteAction<T>>,
         TTask: TaskFactory<TAction, TTask>,
     {
         let BytecodeInterpreterGcAction {
-            cache_id,
+            cache_key,
             state_index,
         } = action;
         match state {
             BytecodeWorkerState::Uninitialized => None,
             BytecodeWorkerState::Initialized(state) => {
-                let latest_state_index = &state.state_index;
-                if state_index < latest_state_index {
+                let latest_state_index = state.state_values.state_index();
+                if *state_index < latest_state_index {
                     return None;
                 }
+                let cache_id = cache_key.id();
                 let start_time = Instant::now();
-                state.cache.gc(once(self.cache_id));
+                state.cache.gc(once(cache_id));
                 let empty_dependencies = DependencyList::default();
                 let retained_keys = state
                     .latest_result
@@ -446,7 +452,7 @@ where
                 Some(SchedulerTransition::new(once(SchedulerCommand::Send(
                     self.caller_pid,
                     BytecodeInterpreterGcCompleteAction {
-                        cache_id: *cache_id,
+                        cache_key: cache_key.clone(),
                         statistics: state.get_statistics(),
                     }
                     .into(),
