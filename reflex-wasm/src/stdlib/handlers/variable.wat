@@ -8,7 +8,7 @@
   (@const-string $Stdlib_Variable::EFFECT_NAME_DECREMENT "reflex::variable::decrement")
 
   (@builtin $Stdlib_GetVariable "GetVariable"
-    (@args (@strict $self) (@lazy $initial_value))
+    (@args (@strict $self) (@strict $initial_value))
 
     (@impl
       (i32.eq (global.get $TermType::Symbol))
