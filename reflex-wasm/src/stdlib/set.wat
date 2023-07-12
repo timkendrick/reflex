@@ -3,7 +3,7 @@
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 (module
   (@builtin $Stdlib_Set "Set"
-    (@args (@strict $self) (@strict $key) (@lazy $value))
+    (@args (@strict $self) (@strict $key) (@strict $value))
 
     (@impl
       (i32.eq (global.get $TermType::List))
