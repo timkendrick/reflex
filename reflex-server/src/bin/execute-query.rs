@@ -13,11 +13,8 @@ use std::{
 use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use opentelemetry::trace::noop::NoopTracer;
-use reflex_cli::{compile_entry_point, syntax::js::default_js_loaders, Syntax};
 use reflex_dispatcher::HandlerContext;
-use reflex_graphql::{
-    imports::graphql_imports, parse_graphql_schema, GraphQlSchema, NoopGraphQlQueryTransform,
-};
+use reflex_graphql::{parse_graphql_schema, GraphQlSchema, NoopGraphQlQueryTransform};
 use reflex_grpc::{
     actor::{GrpcHandler, GrpcHandlerMetricNames},
     load_grpc_services, DefaultGrpcConfig,
@@ -27,8 +24,9 @@ use reflex_handlers::{
     utils::tls::{create_https_client, hyper_rustls},
     DefaultHandlerMetricNames,
 };
-use reflex_interpreter::compiler::CompilerOptions;
+use reflex_interpreter::compiler::{compile_graph_root, CompilerMode, CompilerOptions};
 use reflex_lang::{allocator::DefaultAllocator, CachedSharedTerm, SharedTermFactory};
+use reflex_parser::{create_parser, DefaultModuleLoader, Syntax, SyntaxParser};
 use reflex_protobuf::types::WellKnownTypesTranscoder;
 use reflex_scheduler::threadpool::TokioRuntimeThreadPoolFactory;
 use reflex_server::{
@@ -127,6 +125,7 @@ async fn main() -> Result<()> {
     type T = CachedSharedTerm<TBuiltin>;
     type TFactory = SharedTermFactory<TBuiltin>;
     type TAllocator = DefaultAllocator<T>;
+    type TLoader = DefaultModuleLoader<T>;
     type TConnect = hyper_rustls::HttpsConnector<hyper::client::HttpConnector>;
     type TReconnect = NoopReconnectTimeout;
     type TGrpcConfig = DefaultGrpcConfig;
@@ -187,21 +186,31 @@ async fn main() -> Result<()> {
             PrefixedLogFormatter::new("server", DefaultActionFormatter::new(factory.clone())),
         )),
     });
-    let module_loader = Some(default_js_loaders(
-        graphql_imports(&factory, &allocator),
-        &factory,
-        &allocator,
-    ));
-    let env = Some(std::env::vars());
-    let graph_root = compile_entry_point(
-        args.graph_root.as_path(),
+    let input_path = args.graph_root.as_path();
+    let source = read_file(input_path)?;
+    let parser = create_parser(
         args.syntax,
-        env,
-        module_loader,
-        &compiler_options,
+        Some(input_path),
+        Option::<TLoader>::None,
+        std::env::vars(),
         &factory,
         &allocator,
-    )?;
+    );
+    let expression = parser.parse(&source).map_err(|err| {
+        anyhow!(
+            "Failed to parse source at {}: {}",
+            input_path.display(),
+            err
+        )
+    })?;
+    let graph_root = compile_graph_root(
+        &expression,
+        &factory,
+        &allocator,
+        &compiler_options,
+        CompilerMode::Function,
+    )
+    .map_err(|err| anyhow!("Failed to compile entry point module: {}", err))?;
     cli::<TAction, TTask, T, TFactory, TAllocator, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _>(
         args.into(),
         graph_root,
@@ -266,6 +275,10 @@ async fn main() -> Result<()> {
     )
     .await
     .map(|response| println!("{}", response))
+}
+
+fn read_file(path: &Path) -> Result<String> {
+    fs::read_to_string(path).with_context(|| format!("Failed to read path {}", path.display()))
 }
 
 fn load_graphql_schema(path: &Path) -> Result<GraphQlSchema> {

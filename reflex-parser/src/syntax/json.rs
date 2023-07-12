@@ -2,24 +2,23 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
-use std::{iter::once, path::Path};
+use std::{iter::once, marker::PhantomData, path::Path};
 
-use anyhow::{anyhow, Context, Result};
-use reflex::core::{
-    Applicable, Expression, ExpressionFactory, HeapAllocator, InstructionPointer, Reducible,
-    Rewritable,
-};
-use reflex_interpreter::compiler::{Compile, CompiledProgram, CompilerMode, CompilerOptions};
+use reflex::core::{Expression, ExpressionFactory, HeapAllocator};
 
-use crate::{compile_graph_root, SyntaxParser};
+use crate::SyntaxParser;
 
-pub fn create_json_parser<T: Expression + Rewritable<T> + Reducible<T>>(
-    factory: &(impl ExpressionFactory<T> + Clone + 'static),
-    allocator: &(impl HeapAllocator<T> + Clone + 'static),
-) -> impl SyntaxParser<T> {
+pub fn create_json_parser<
+    T: Expression,
+    TFactory: ExpressionFactory<T> + Clone + 'static,
+    TAllocator: HeapAllocator<T> + Clone + 'static,
+>(
+    factory: &TFactory,
+    allocator: &TAllocator,
+) -> JsonParser<T, TFactory, TAllocator> {
     let factory = factory.clone();
     let allocator = allocator.clone();
-    move |input: &str| reflex_json::parse(input, &factory, &allocator)
+    JsonParser::new(factory, allocator)
 }
 
 pub fn json_loader<T: Expression>(
@@ -68,24 +67,28 @@ fn create_default_module_export<T: Expression>(
     )
 }
 
-pub fn compile_json_entry_point<
-    T: Expression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
->(
-    path: &Path,
-    compiler_options: &CompilerOptions,
-    factory: &impl ExpressionFactory<T>,
-    allocator: &impl HeapAllocator<T>,
-) -> Result<(CompiledProgram, InstructionPointer)> {
-    let input = std::fs::read_to_string(path)
-        .with_context(|| format!("Failed to load JSON graph definition: {}", path.display(),))?;
-    let root = reflex_json::parse(&input, factory, allocator)
-        .map_err(|err| anyhow!("{}", err))
-        .with_context(|| format!("Failed to parse JSON graph definition: {}", path.display(),))?;
-    compile_graph_root(
-        root,
-        factory,
-        allocator,
-        compiler_options,
-        CompilerMode::Function,
-    )
+pub struct JsonParser<T: Expression, TFactory: ExpressionFactory<T>, TAllocator: HeapAllocator<T>> {
+    factory: TFactory,
+    allocator: TAllocator,
+    _expression: PhantomData<T>,
+}
+
+impl<T: Expression, TFactory: ExpressionFactory<T>, TAllocator: HeapAllocator<T>>
+    JsonParser<T, TFactory, TAllocator>
+{
+    pub fn new(factory: TFactory, allocator: TAllocator) -> Self {
+        Self {
+            factory,
+            allocator,
+            _expression: PhantomData,
+        }
+    }
+}
+
+impl<T: Expression, TFactory: ExpressionFactory<T>, TAllocator: HeapAllocator<T>> SyntaxParser<T>
+    for JsonParser<T, TFactory, TAllocator>
+{
+    fn parse(&self, input: &str) -> Result<T, String> {
+        reflex_json::parse(input, &self.factory, &self.allocator)
+    }
 }

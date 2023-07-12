@@ -5,7 +5,7 @@
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use std::{
     fs,
-    iter::once,
+    iter::{empty, once},
     marker::PhantomData,
     ops::Deref,
     path::{Path, PathBuf},
@@ -21,14 +21,11 @@ use pin_project::pin_project;
 use reflex::{
     cache::SubstitutionCache,
     core::{
-        Applicable, ConditionType, Expression, ExpressionFactory, HeapAllocator,
-        InstructionPointer, Reducible, Rewritable, StateCache,
+        Applicable, ConditionType, Expression, ExpressionFactory, HeapAllocator, Reducible,
+        Rewritable, StateCache,
     },
-    env::inject_env_vars,
 };
-use reflex_cli::{
-    builtins::CliBuiltins, create_parser, format_signal_result, repl, Syntax, SyntaxParser,
-};
+use reflex_cli::{builtins::CliBuiltins, format_signal_result, repl};
 use reflex_dispatcher::{
     Action, Actor, ActorEvents, AsyncScheduler, Handler, HandlerContext, Matcher, MessageData,
     Named, ProcessId, Redispatcher, SchedulerMode, SchedulerTransition, SerializableAction,
@@ -36,9 +33,9 @@ use reflex_dispatcher::{
 };
 use reflex_grpc::{
     action::*,
-    actor::{GrpcHandler, GrpcHandlerAction, GrpcHandlerMetricNames, GrpcHandlerTask},
+    actor::{GrpcHandler, GrpcHandlerAction, GrpcHandlerMetricNames},
     load_grpc_services,
-    task::{GrpcHandlerConnectionTaskAction, GrpcHandlerConnectionTaskFactory},
+    task::{GrpcHandlerConnectionTaskAction, GrpcHandlerConnectionTaskFactory, GrpcHandlerTask},
     DefaultGrpcConfig, GrpcConfig,
 };
 use reflex_handlers::{
@@ -65,12 +62,13 @@ use reflex_handlers::{
     DefaultHandlerMetricNames,
 };
 use reflex_interpreter::{
-    compiler::{hash_compiled_program, Compile, Compiler, CompilerMode, CompilerOptions},
+    compiler::{compile_graph_root, hash_compiled_program, Compile, CompilerMode, CompilerOptions},
     execute, DefaultInterpreterCache, InterpreterOptions,
 };
 use reflex_json::{JsonMap, JsonValue};
 use reflex_lang::{allocator::DefaultAllocator, CachedSharedTerm, SharedTermFactory};
 use reflex_macros::{blanket_trait, task_factory_enum, Matcher, Named};
+use reflex_parser::{create_parser, DefaultModuleLoader, Syntax, SyntaxParser};
 use reflex_protobuf::types::WellKnownTypesTranscoder;
 use reflex_runtime::{
     action::{bytecode_interpreter::*, effect::*, evaluate::*, query::*, RuntimeActions},
@@ -87,7 +85,8 @@ use reflex_runtime::{
     },
     runtime_actors,
     task::{
-        bytecode_worker::BytecodeWorkerTaskFactory, evaluate_handler::EffectThrottleTaskFactory,
+        bytecode_worker::{BytecodeWorkerAction, BytecodeWorkerTask, BytecodeWorkerTaskFactory},
+        evaluate_handler::EffectThrottleTaskFactory,
         RuntimeTask, RuntimeTaskAction, RuntimeTaskFactory,
     },
     AsyncExpression, AsyncExpressionFactory, AsyncHeapAllocator, QueryEvaluationMode,
@@ -141,6 +140,7 @@ pub async fn main() -> Result<()> {
     type T = CachedSharedTerm<TBuiltin>;
     type TFactory = SharedTermFactory<TBuiltin>;
     type TAllocator = DefaultAllocator<T>;
+    type TLoader = DefaultModuleLoader<T>;
     type TConnect = hyper_rustls::HttpsConnector<hyper::client::HttpConnector>;
     type TReconnect = NoopReconnectTimeout;
     type TGrpcConfig = DefaultGrpcConfig;
@@ -175,7 +175,14 @@ pub async fn main() -> Result<()> {
         None => {
             let state = StateCache::default();
             let mut cache = SubstitutionCache::new();
-            let parser = create_parser(syntax, None, &factory, &allocator);
+            let parser = create_parser(
+                syntax,
+                None,
+                Option::<TLoader>::None,
+                empty(),
+                &factory,
+                &allocator,
+            );
             repl::run(parser, &state, &factory, &allocator, &mut cache)?;
         }
         Some(input_path) => {
@@ -193,38 +200,38 @@ pub async fn main() -> Result<()> {
                 ..InterpreterOptions::default()
             };
             let source = read_file(&input_path)?;
-            let parser = create_parser(syntax, Some(&input_path), &factory, &allocator);
-            let expression = parser
-                .parse(&source)
-                .map(|expression| {
-                    inject_env_vars(expression, std::env::vars(), &factory, &allocator)
-                })
-                .map_err(|err| {
-                    anyhow!(
-                        "Failed to parse source at {}: {}",
-                        input_path.display(),
-                        err
-                    )
-                })?;
-            let program = Compiler::new(compiler_options, None)
-                .compile(&expression, CompilerMode::Function, &factory, &allocator)
-                .map_err(|err| {
-                    anyhow!(
-                        "Failed to compile source at {}: {}",
-                        input_path.display(),
-                        err
-                    )
-                })?;
-            let entry_point = InstructionPointer::default();
+            let parser = create_parser(
+                syntax,
+                Some(&input_path),
+                Option::<TLoader>::None,
+                std::env::vars(),
+                &factory,
+                &allocator,
+            );
+            let expression = parser.parse(&source).map_err(|err| {
+                anyhow!(
+                    "Failed to parse source at {}: {}",
+                    input_path.display(),
+                    err
+                )
+            })?;
+            let graph_root = compile_graph_root(
+                &expression,
+                &factory,
+                &allocator,
+                &compiler_options,
+                CompilerMode::Function,
+            )
+            .map_err(|err| anyhow!("Failed to compile entry point module: {}", err))?;
             let state = StateCache::default();
             let state_id = 0;
             let mut interpreter_cache = DefaultInterpreterCache::default();
-            let cache_key = hash_compiled_program(&program, &entry_point);
-
+            let (program, entry_point) = &graph_root;
+            let cache_key = hash_compiled_program(program, entry_point);
             let (result, _cache_entries) = execute(
                 cache_key,
-                &program,
-                entry_point,
+                program,
+                *entry_point,
                 state_id,
                 &state,
                 &factory,
@@ -243,7 +250,6 @@ pub async fn main() -> Result<()> {
             if dependencies.is_empty() {
                 println!("{}", output);
             } else {
-                let graph_root = (program, entry_point);
                 let (evaluate_effect, subscribe_action) =
                     create_query(expression, &factory, &allocator);
                 let logger = if debug_actions {
@@ -539,9 +545,10 @@ blanket_trait!(
 
 blanket_trait!(
     trait CliTask<T, TFactory, TAllocator, TConnect>:
-        RuntimeTask<T, TFactory, TAllocator>
+        RuntimeTask
         + HandlerTask<TConnect>
-        + GrpcHandlerTask<T, TFactory, TAllocator, WellKnownTypesTranscoder>
+        + BytecodeWorkerTask<T, TFactory, TAllocator>
+        + GrpcHandlerTask<WellKnownTypesTranscoder>
     where
         T: Expression,
         TFactory: ExpressionFactory<T>,
@@ -1305,7 +1312,11 @@ where
 
 blanket_trait!(
     trait CliTaskAction<T: Expression>:
-        Action + RuntimeTaskAction<T> + DefaultHandlersTaskAction + GrpcHandlerConnectionTaskAction
+        Action
+        + RuntimeTaskAction
+        + BytecodeWorkerAction<T>
+        + DefaultHandlersTaskAction
+        + GrpcHandlerConnectionTaskAction
     {
     }
 );
@@ -1319,7 +1330,8 @@ task_factory_enum!({
         TAllocator: AsyncHeapAllocator<T> + Default,
         TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     {
-        Runtime(RuntimeTaskFactory<T, TFactory, TAllocator>),
+        Runtime(RuntimeTaskFactory),
+        BytecodeWorker(BytecodeWorkerTaskFactory<T, TFactory, TAllocator>),
         WasmWorker(WasmWorkerTaskFactory<T, TFactory, TAllocator>),
         DefaultHandlers(DefaultHandlersTaskFactory<TConnect>),
         GrpcHandler(GrpcHandlerConnectionTaskFactory),
@@ -1360,6 +1372,7 @@ where
     _grpc_config: PhantomData<TGrpcConfig>,
     _metric_labels: PhantomData<TMetricLabels>,
 }
+
 impl<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels>
     From<CliTaskFactory<T, TFactory, TAllocator, TConnect>>
     for CliActorFactory<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels>
@@ -1465,7 +1478,7 @@ where
     TMetricLabels: BytecodeInterpreterMetricLabels + Send + 'static,
 {
     fn from(value: BytecodeWorkerTaskFactory<T, TFactory, TAllocator>) -> Self {
-        Self::from(CliTaskFactory::Runtime(RuntimeTaskFactory::from(value)))
+        Self::from(CliTaskFactory::BytecodeWorker(value))
     }
 }
 

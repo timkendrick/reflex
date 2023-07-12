@@ -33,18 +33,30 @@ blanket_trait!(
 pub fn handler_imports<T: Expression>(
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
-) -> Vec<(&'static str, T)>
+) -> Vec<(String, T)>
 where
     T::Builtin: HandlerImportsBuiltin,
 {
     vec![
-        ("reflex::http", import_http(factory, allocator)),
         (
-            "reflex::invalidation",
+            String::from("reflex::http"),
+            import_http(factory, allocator),
+        ),
+        (
+            String::from("reflex::invalidation"),
             import_invalidation(factory, allocator),
         ),
-        ("reflex::loader", import_loader(factory, allocator)),
-        ("reflex::state", import_state(factory, allocator)),
-        ("reflex::time", import_time(factory, allocator)),
+        (
+            String::from("reflex::loader"),
+            import_loader(factory, allocator),
+        ),
+        (
+            String::from("reflex::state"),
+            import_state(factory, allocator),
+        ),
+        (
+            String::from("reflex::time"),
+            import_time(factory, allocator),
+        ),
     ]
 }

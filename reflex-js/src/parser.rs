@@ -5170,7 +5170,7 @@ mod tests {
         let allocator = DefaultAllocator::default();
         let env = Env::new();
         let path = Path::new("./foo.js");
-        let loader = static_module_loader(vec![("foo", factory.create_nil_term())]);
+        let loader = static_module_loader(vec![(String::from("foo"), factory.create_nil_term())]);
         let expression = parse_module(
             "
             import Foo from 'foo';

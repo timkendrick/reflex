@@ -7,8 +7,9 @@ use reflex::core::{
     DependencyList, DynamicState, Evaluate, EvaluationCache, EvaluationResult, Expression,
     ExpressionFactory, HeapAllocator, Reducible, Rewritable,
 };
+use reflex_parser::SyntaxParser;
 
-use crate::{format_signal_result, SyntaxParser};
+use crate::format_signal_result;
 
 pub fn run<T: Expression + Rewritable<T> + Reducible<T> + Evaluate<T>>(
     parser: impl SyntaxParser<T>,

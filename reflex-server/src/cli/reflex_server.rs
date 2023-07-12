@@ -489,11 +489,12 @@ where
     TBlockingTasks: TokioThreadPoolFactory<TAction, TTask> + 'static,
     TAction: Action + GraphQlWebServerAction<T> + Clone + Send + Sync + 'static,
     TTask: TaskFactory<TAction, TTask>
+        + RuntimeTask
         + GraphQlWebServerTask<T, TFactory, TAllocator>
+        + WebSocketGraphQlServerTask
         + Send
         + Sync
         + 'static,
-    TTask: RuntimeTask<T, TFactory, TAllocator> + WebSocketGraphQlServerTask + Send + 'static,
     TTask::Actor: GraphQlWebServerActor<
             T,
             TFactory,

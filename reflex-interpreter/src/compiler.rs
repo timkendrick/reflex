@@ -532,6 +532,24 @@ fn remap_function_addresses(
         .map(Program::new)
 }
 
+pub fn compile_graph_root<
+    T: Expression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
+>(
+    expression: &T,
+    factory: &impl ExpressionFactory<T>,
+    allocator: &impl HeapAllocator<T>,
+    compiler_options: &CompilerOptions,
+    compiler_mode: CompilerMode,
+) -> Result<(CompiledProgram, InstructionPointer), String> {
+    let program = Compiler::new(*compiler_options, None).compile(
+        expression,
+        compiler_mode,
+        factory,
+        allocator,
+    )?;
+    Ok((program, InstructionPointer::default()))
+}
+
 pub fn hash_compiled_program(
     program: &CompiledProgram,
     entry_point: &InstructionPointer,

@@ -10,7 +10,6 @@ default-run = "reflex-server"
 
 [dependencies]
 reflex = { path = "../reflex" }
-reflex-cli = { path = "../reflex-cli" }
 reflex-dispatcher = { path = "../reflex-dispatcher" }
 reflex-graphql = { path = "../reflex-graphql" }
 reflex-grpc = { path = "../reflex-grpc" }
@@ -20,6 +19,7 @@ reflex-js = { path = "../reflex-js" }
 reflex-json = { path = "../reflex-json" }
 reflex-lang = { path = "../reflex-lang" }
 reflex-macros = { path = "../reflex-macros" }
+reflex-parser = { path = "../reflex-parser" }
 reflex-protobuf = { path = "../reflex-protobuf" }
 reflex-recorder = { path = "../reflex-recorder" }
 reflex-runtime = { path = "../reflex-runtime" }
@@ -30,8 +30,7 @@ reflex-wasm = { path = "../reflex-wasm" }
 anyhow = "1.0"
 bytes = "1.1.0"
 chrono = "0.4"
-clap = "3.0"
-console-subscriber = "0.1"
+clap = { version = "4.0", features = ["derive"] }
 futures = "*"
 http = "0.2.6"
 http-serde = "1.1.0"
@@ -46,14 +45,9 @@ opentelemetry-otlp = { version = "0.10.0", features = ["http-proto", "tls"] }
 pin-project = "1.0.11"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-strum = "0.22"
-strum_macros = "0.22"
 tokio = { version = "1", features = ["full", "tracing"] }
-tokio-stream = { version = "0.1", features = ["sync"] }
 tokio-metrics = "0.1.0"
 tonic = { version = "0.6.2", features = ["tls", "tls-roots"] }
-tracing = { version = "0.1.0", features = ["release_max_level_info"] }
-tracing-subscriber = "0.3"
 uuid = { version = "1.0.0-alpha.1", features = ["v4", "fast-rng"] }
 
 [dev-dependencies]

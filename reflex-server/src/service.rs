@@ -116,7 +116,7 @@ pub struct GraphQlWebServerMetricNames {
 
 blanket_trait!(
     pub trait GraphQlWebServerTask<T, TFactory, TAllocator>:
-        RuntimeTask<T, TFactory, TAllocator> + WebSocketGraphQlServerTask
+        RuntimeTask + WebSocketGraphQlServerTask
     where
         T: Expression,
         TFactory: ExpressionFactory<T>,
@@ -535,7 +535,7 @@ where
         TAsyncTasks: TokioThreadPoolFactory<TAction, TTask> + 'static,
         TBlockingTasks: TokioThreadPoolFactory<TAction, TTask> + 'static,
         TAction: Action + GraphQlWebServerAction<T> + Send + Sync + 'static,
-        TTask: RuntimeTask<T, TFactory, TAllocator> + WebSocketGraphQlServerTask + Send + 'static,
+        TTask: RuntimeTask + WebSocketGraphQlServerTask + Send + 'static,
         TTask::Actor: From<
                 ServerActor<
                     T,

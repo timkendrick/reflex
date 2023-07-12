@@ -24,9 +24,9 @@ pub fn create_env_args_accessor<T: Expression>(
     )
 }
 
-pub fn inject_env_vars<T: Expression + Rewritable<T> + Reducible<T>>(
+pub fn inject_env_vars<'a, T: Expression + Rewritable<T> + Reducible<T>>(
     expression: T,
-    vars: impl IntoIterator<Item = (String, String)>,
+    vars: impl IntoIterator<Item = (impl Into<String>, impl Into<String>)>,
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
 ) -> T {

@@ -84,13 +84,10 @@ where
     move |import_path, module_path| (loader.borrow())(import_path, module_path)
 }
 
-pub fn static_module_loader<'a, T: Expression>(
-    modules: impl IntoIterator<Item = (&'a str, T)>,
-) -> impl Fn(&str, &Path) -> Option<Result<T, String>> {
-    let modules = modules
-        .into_iter()
-        .map(|(key, value)| (String::from(key), value))
-        .collect::<HashMap<_, _>>();
+pub fn static_module_loader<T: Expression + 'static>(
+    modules: impl IntoIterator<Item = (String, T)>,
+) -> impl Fn(&str, &Path) -> Option<Result<T, String>> + 'static {
+    let modules = modules.into_iter().collect::<HashMap<_, _>>();
     move |import_path: &str, _: &Path| match modules.get(import_path) {
         Some(value) => Some(Ok(value.clone())),
         None => None,
@@ -100,7 +97,7 @@ pub fn static_module_loader<'a, T: Expression>(
 pub fn compose_module_loaders<T: Expression>(
     head: impl Fn(&str, &Path) -> Option<Result<T, String>> + 'static,
     tail: impl Fn(&str, &Path) -> Option<Result<T, String>> + 'static,
-) -> impl Fn(&str, &Path) -> Option<Result<T, String>> {
+) -> impl Fn(&str, &Path) -> Option<Result<T, String>> + 'static {
     move |import_path: &str, module_path: &Path| match head(import_path, module_path) {
         Some(result) => Some(result),
         None => tail(import_path, module_path),

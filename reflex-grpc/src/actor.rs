@@ -45,8 +45,8 @@ use crate::{
         GrpcHandlerSuccessResponseAction, GrpcHandlerTransportErrorAction, GrpcMetadata,
     },
     task::{
-        GrpcHandlerConnectionTaskAction, GrpcHandlerConnectionTaskActorAction,
-        GrpcHandlerConnectionTaskFactory,
+        GrpcHandlerConnectionTaskActorAction, GrpcHandlerConnectionTaskFactory, GrpcHandlerTask,
+        GrpcHandlerTaskAction,
     },
     utils::{GrpcMethod, GrpcMethodName, GrpcServiceLibrary, GrpcServiceName, ProtoId},
     GrpcConfig,
@@ -113,19 +113,7 @@ impl Default for GrpcHandlerMetricNames {
 
 blanket_trait!(
     pub trait GrpcHandlerAction<T: Expression>:
-        GrpcHandlerActorAction<T> + GrpcHandlerConnectionTaskAction
-    {
-    }
-);
-
-blanket_trait!(
-    pub trait GrpcHandlerTask<T, TFactory, TAllocator, TTranscoder>:
-        From<GrpcHandlerConnectionTaskFactory>
-    where
-        T: Expression,
-        TFactory: ExpressionFactory<T>,
-        TAllocator: HeapAllocator<T>,
-        TTranscoder: ProtoTranscoder + Send + 'static,
+        GrpcHandlerActorAction<T> + GrpcHandlerTaskAction
     {
     }
 );
@@ -642,7 +630,7 @@ dispatcher!({
         TConfig: GrpcConfig + 'static,
         TReconnect: ReconnectTimeout + Send,
         TAction: Action + GrpcHandlerConnectionTaskActorAction + Send + 'static,
-        TTask: TaskFactory<TAction, TTask> + GrpcHandlerTask<T, TFactory, TAllocator, TTranscoder>,
+        TTask: TaskFactory<TAction, TTask> + GrpcHandlerTask<TTranscoder>,
     {
         type State = GrpcHandlerState;
         type Events<TInbox: TaskInbox<TAction>> = TInbox;
@@ -1225,7 +1213,7 @@ where
     TReconnect: ReconnectTimeout + Send,
     TAction:
         Action + GrpcHandlerActorAction<T> + GrpcHandlerConnectionTaskActorAction + Send + 'static,
-    TTask: TaskFactory<TAction, TTask> + GrpcHandlerTask<T, TFactory, TAllocator, TTranscoder>,
+    TTask: TaskFactory<TAction, TTask> + GrpcHandlerTask<TTranscoder>,
 {
     type Actor = Self;
     fn create(self) -> Self::Actor {

@@ -9,7 +9,7 @@ mod loader;
 pub use loader::{
     compose_module_loaders, create_js_env, create_module_loader, static_module_loader,
 };
-mod parser;
+pub mod parser;
 pub use parser::{parse, parse_module, JsParserBuiltin};
 
 pub mod builtins;

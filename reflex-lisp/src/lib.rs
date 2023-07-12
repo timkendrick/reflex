@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-// SPDX-FileContributor: Chris Campbell <c.campbell@mwam.com> https://github.com/c-campbell-mwam
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use std::{
     collections::HashMap,
@@ -13,7 +12,7 @@ use reflex::{
     cache::SubstitutionCache,
     core::{
         Builtin, EvaluationCache, Expression, ExpressionFactory, ExpressionListType, HeapAllocator,
-        IntValue, Reducible, RefType, Rewritable, Substitutions, SymbolId,
+        IntValue, RefType, Rewritable, Substitutions, SymbolId,
     },
 };
 use reflex_stdlib::*;
@@ -151,7 +150,8 @@ impl<T> LispParserBuiltin for T where
 {
 }
 
-pub fn parse<'src, T: Expression + Rewritable<T> + Reducible<T>>(
+// FIXME: remove Rewritable trait bound on reflex_lisp::parse() function
+pub fn parse<'src, T: Expression + Rewritable<T>>(
     input: &'src str,
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
@@ -179,7 +179,7 @@ where
     )
 }
 
-fn parse_expression<'src, T: Expression + Rewritable<T> + Reducible<T>>(
+fn parse_expression<'src, T: Expression + Rewritable<T>>(
     input: &SyntaxDatum<'src>,
     scope: &LexicalScope<'src>,
     symbol_cache: &mut SymbolCache<'src>,
@@ -227,7 +227,7 @@ where
     }
 }
 
-fn parse_boolean_literal<'src, T: Expression + Rewritable<T> + Reducible<T>>(
+fn parse_boolean_literal<'src, T: Expression + Rewritable<T>>(
     _input: &SyntaxDatum,
     value: bool,
     factory: &impl ExpressionFactory<T>,
@@ -238,7 +238,7 @@ where
     factory.create_boolean_term(value)
 }
 
-fn parse_integer_literal<'src, T: Expression + Rewritable<T> + Reducible<T>>(
+fn parse_integer_literal<'src, T: Expression + Rewritable<T>>(
     _input: &SyntaxDatum,
     value: i64,
     factory: &impl ExpressionFactory<T>,
@@ -249,7 +249,7 @@ where
     factory.create_int_term(value)
 }
 
-fn parse_float_literal<'src, T: Expression + Rewritable<T> + Reducible<T>>(
+fn parse_float_literal<'src, T: Expression + Rewritable<T>>(
     _input: &SyntaxDatum,
     value: f64,
     factory: &impl ExpressionFactory<T>,
@@ -260,7 +260,7 @@ where
     factory.create_float_term(value)
 }
 
-fn parse_string_literal<'src, T: Expression + Rewritable<T> + Reducible<T>>(
+fn parse_string_literal<'src, T: Expression + Rewritable<T>>(
     _input: &SyntaxDatum,
     value: &str,
     factory: &impl ExpressionFactory<T>,
@@ -272,7 +272,7 @@ where
     factory.create_string_term(allocator.create_string(value))
 }
 
-fn parse_symbol_literal<'src, T: Expression + Rewritable<T> + Reducible<T>>(
+fn parse_symbol_literal<'src, T: Expression + Rewritable<T>>(
     _input: &SyntaxDatum<'src>,
     symbol: &'src str,
     symbol_cache: &mut SymbolCache<'src>,
@@ -284,7 +284,7 @@ where
     factory.create_symbol_term(symbol_cache.get(symbol))
 }
 
-fn parse_variable<'src, T: Expression + Rewritable<T> + Reducible<T>>(
+fn parse_variable<'src, T: Expression + Rewritable<T>>(
     input: &SyntaxDatum<'src>,
     identifier: &'src str,
     scope: &LexicalScope<'src>,
@@ -305,7 +305,7 @@ where
     }
 }
 
-fn parse_global<'src, T: Expression + Rewritable<T> + Reducible<T>>(
+fn parse_global<'src, T: Expression + Rewritable<T>>(
     input: &SyntaxDatum<'src>,
     identifier: &'src str,
     factory: &impl ExpressionFactory<T>,
@@ -319,7 +319,7 @@ where
         identifier => parse_builtin_procedure(identifier, factory),
     }
 }
-fn parse_builtin_procedure<T: Expression + Rewritable<T> + Reducible<T>>(
+fn parse_builtin_procedure<T: Expression + Rewritable<T>>(
     name: &str,
     factory: &impl ExpressionFactory<T>,
 ) -> Option<T>
@@ -352,7 +352,7 @@ where
     }
 }
 
-fn parse_special_form<'src, T: Expression + Rewritable<T> + Reducible<T>>(
+fn parse_special_form<'src, T: Expression + Rewritable<T>>(
     input: &SyntaxDatum<'src>,
     target: &SyntaxDatum<'src>,
     args: &[SyntaxDatum<'src>],
@@ -406,7 +406,7 @@ where
     }
 }
 
-fn parse_function_application<'src, T: Expression + Rewritable<T> + Reducible<T>>(
+fn parse_function_application<'src, T: Expression + Rewritable<T>>(
     _input: &SyntaxDatum<'src>,
     target: &SyntaxDatum<'src>,
     args: &[SyntaxDatum<'src>],
@@ -439,7 +439,7 @@ where
     ))
 }
 
-fn parse_function_arguments<'src, T: Expression + Rewritable<T> + Reducible<T>>(
+fn parse_function_arguments<'src, T: Expression + Rewritable<T>>(
     items: &[SyntaxDatum<'src>],
     scope: &LexicalScope<'src>,
     symbol_cache: &mut SymbolCache<'src>,
@@ -467,7 +467,7 @@ where
     ))
 }
 
-fn parse_quote_expression<'src, T: Expression + Rewritable<T> + Reducible<T>>(
+fn parse_quote_expression<'src, T: Expression + Rewritable<T>>(
     input: &SyntaxDatum<'src>,
     args: &[SyntaxDatum<'src>],
     symbol_cache: &mut SymbolCache<'src>,
@@ -488,7 +488,7 @@ where
     Ok(parse_quoted_value(arg, symbol_cache, factory, allocator))
 }
 
-fn parse_quoted_value<'src, T: Expression + Rewritable<T> + Reducible<T>>(
+fn parse_quoted_value<'src, T: Expression + Rewritable<T>>(
     input: &SyntaxDatum<'src>,
     symbol_cache: &mut SymbolCache<'src>,
     factory: &impl ExpressionFactory<T>,
@@ -506,7 +506,7 @@ where
     }
 }
 
-fn parse_quoted_list<'src, T: Expression + Rewritable<T> + Reducible<T>>(
+fn parse_quoted_list<'src, T: Expression + Rewritable<T>>(
     values: &[SyntaxDatum<'src>],
     symbol_cache: &mut SymbolCache<'src>,
     factory: &impl ExpressionFactory<T>,
@@ -533,7 +533,7 @@ where
     }
 }
 
-fn create_enum<'src, T: Expression + Rewritable<T> + Reducible<T>>(
+fn create_enum<'src, T: Expression + Rewritable<T>>(
     discriminant: usize,
     args: impl ExactSizeIterator<Item = T>,
     factory: &impl ExpressionFactory<T>,
@@ -551,7 +551,7 @@ where
     })
 }
 
-fn parse_lambda_expression<'src, T: Expression + Rewritable<T> + Reducible<T>>(
+fn parse_lambda_expression<'src, T: Expression + Rewritable<T>>(
     input: &SyntaxDatum<'src>,
     args: &[SyntaxDatum<'src>],
     scope: &LexicalScope<'src>,
@@ -613,7 +613,7 @@ fn parse_lambda_argument_names<'src>(
         .collect()
 }
 
-fn parse_let_expression<'src, T: Expression + Rewritable<T> + Reducible<T>>(
+fn parse_let_expression<'src, T: Expression + Rewritable<T>>(
     input: &SyntaxDatum<'src>,
     args: &[SyntaxDatum<'src>],
     scope: &LexicalScope<'src>,
@@ -637,7 +637,7 @@ where
     )
 }
 
-fn parse_letrec_expression<'src, T: Expression + Rewritable<T> + Reducible<T>>(
+fn parse_letrec_expression<'src, T: Expression + Rewritable<T>>(
     input: &SyntaxDatum<'src>,
     args: &[SyntaxDatum<'src>],
     scope: &LexicalScope<'src>,
@@ -673,7 +673,7 @@ fn get_binding_type_name(binding_type: &BindingExpressionType) -> &'static str {
     }
 }
 
-fn parse_binding_expression<'src, T: Expression + Rewritable<T> + Reducible<T>>(
+fn parse_binding_expression<'src, T: Expression + Rewritable<T>>(
     binding_type: &BindingExpressionType,
     input: &SyntaxDatum<'src>,
     args: &[SyntaxDatum<'src>],
@@ -817,7 +817,7 @@ where
     }
 }
 
-fn parse_binding_initializers<'src, T: Expression + Rewritable<T> + Reducible<T>>(
+fn parse_binding_initializers<'src, T: Expression + Rewritable<T>>(
     binding_type: &BindingExpressionType,
     binding_definitions: &[(&'src str, &SyntaxDatum<'src>)],
     scope: &LexicalScope<'src>,

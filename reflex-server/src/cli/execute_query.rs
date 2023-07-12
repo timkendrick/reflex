@@ -21,8 +21,8 @@ use reflex_interpreter::{
 };
 use reflex_json::{json, JsonValue};
 use reflex_runtime::{
-    actor::bytecode_interpreter::BytecodeInterpreterMetricLabels, AsyncExpression,
-    AsyncExpressionFactory, AsyncHeapAllocator,
+    actor::bytecode_interpreter::BytecodeInterpreterMetricLabels, task::RuntimeTask,
+    AsyncExpression, AsyncExpressionFactory, AsyncHeapAllocator,
 };
 use reflex_scheduler::tokio::{
     TokioInbox, TokioSchedulerInstrumentation, TokioSchedulerLogger, TokioThreadPoolFactory,
@@ -163,6 +163,7 @@ where
     TAction:
         Action + SerializableAction + GraphQlWebServerAction<T> + Clone + Send + Sync + 'static,
     TTask: TaskFactory<TAction, TTask>
+        + RuntimeTask
         + GraphQlWebServerTask<T, TFactory, TAllocator>
         + Send
         + 'static,
