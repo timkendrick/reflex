@@ -1267,7 +1267,15 @@ impl<T: Expression> Hash for SignalType<T> {
 
 impl<T: Expression> std::fmt::Display for SignalType<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        match self {
+            Self::Error { payload } => write!(f, "error<{}>", payload),
+            Self::Pending => write!(f, "pending"),
+            Self::Custom {
+                effect_type,
+                payload,
+                token,
+            } => write!(f, "custom<{effect_type}:{payload}:{token}>"),
+        }
     }
 }
 
