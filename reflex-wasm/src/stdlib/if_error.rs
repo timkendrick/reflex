@@ -8,7 +8,7 @@ pub struct IfError;
 impl IfError {
     pub const UUID: Uuid = uuid!("ca015984-8f33-49c5-b821-aca8fb122ee8");
     const ARITY: FunctionArity<2, 0> = FunctionArity {
-        required: [ArgType::Eager, ArgType::Lazy],
+        required: [ArgType::Eager, ArgType::Strict],
         optional: [],
         variadic: None,
     };
