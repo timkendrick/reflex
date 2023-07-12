@@ -8,7 +8,6 @@ use reflex::core::{
     ExpressionFactory, ExpressionListType, FloatTermType, FunctionArity, HeapAllocator,
     IntTermType, ListTermType, RecordTermType, RefType, StringTermType, StringValue, Uid, Uuid,
 };
-
 use reflex_stdlib::stdlib;
 
 pub trait AccessorBuiltin:
@@ -24,6 +23,7 @@ pub trait AccessorBuiltin:
     + From<stdlib::Length>
     + From<stdlib::Map>
     + From<stdlib::Multiply>
+    + From<crate::stdlib::ParseInt>
     + From<stdlib::Push>
     + From<stdlib::PushFront>
     + From<stdlib::Reduce>
@@ -50,6 +50,7 @@ impl<T> AccessorBuiltin for T where
         + From<stdlib::Length>
         + From<stdlib::Map>
         + From<stdlib::Multiply>
+        + From<crate::stdlib::ParseInt>
         + From<stdlib::Push>
         + From<stdlib::PushFront>
         + From<stdlib::Reduce>
@@ -112,6 +113,8 @@ where
             get_hashmap_property(term, &target, &key, factory, allocator)
         } else if let Some(term) = factory.match_hashset_term(&target) {
             get_hashset_property(term, &target, &key, factory, allocator)
+        } else if let Some(term) = factory.match_timestamp_term(&target) {
+            get_timestamp_property(term, &target, &key, factory, allocator)
         } else {
             None
         };
@@ -273,6 +276,26 @@ where
         let key = key.as_deref().as_str();
         let key = key.deref();
         get_hashset_field(target, key, factory, allocator)
+    } else {
+        None
+    }
+}
+
+fn get_timestamp_property<T: Expression, TFactory: ExpressionFactory<T>>(
+    _term: &T::TimestampTerm,
+    target: &T,
+    key: &T,
+    factory: &TFactory,
+    allocator: &impl HeapAllocator<T>,
+) -> Option<T>
+where
+    T::Builtin: From<crate::stdlib::ParseInt>,
+{
+    if let Some(key) = factory.match_string_term(key) {
+        let key = key.value();
+        let key = key.as_deref().as_str();
+        let key = key.deref();
+        get_timestamp_field(target, key, factory, allocator)
     } else {
         None
     }
@@ -579,6 +602,24 @@ where
         )),
         "values" => Some(factory.create_partial_application_term(
             factory.create_builtin_term(stdlib::Values),
+            allocator.create_unit_list(target.clone()),
+        )),
+        _ => None,
+    }
+}
+
+fn get_timestamp_field<T: Expression, TFactory: ExpressionFactory<T>>(
+    target: &T,
+    key: &str,
+    factory: &TFactory,
+    allocator: &impl HeapAllocator<T>,
+) -> Option<T>
+where
+    T::Builtin: From<crate::stdlib::ParseInt>,
+{
+    match key {
+        "getTime" => Some(factory.create_partial_application_term(
+            factory.create_builtin_term(crate::stdlib::ParseInt),
             allocator.create_unit_list(target.clone()),
         )),
         _ => None,
