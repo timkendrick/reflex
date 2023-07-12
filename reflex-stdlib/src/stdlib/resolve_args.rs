@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
+// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use crate::{Apply, CollectList, Sequence};
 
 use reflex::core::{
@@ -47,6 +48,9 @@ where
         if let Some(arity) = get_expression_arity(&target, factory)
             .filter(|arity| arity.optional().len() == 0 && arity.variadic().is_none())
         {
+            if target.capture_depth() > 0 {
+                return Err(format!("Expected pure <function>, received {}", target));
+            }
             let num_args = arity.required().len();
             let is_atomic_lambda = factory
                 .match_lambda_term(&target)
