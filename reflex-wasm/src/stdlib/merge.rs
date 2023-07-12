@@ -7,10 +7,10 @@ use reflex::core::{uuid, ArgType, Arity, FunctionArity, Uid, Uuid};
 pub struct Merge;
 impl Merge {
     pub const UUID: Uuid = uuid!("7093b95b-630d-4ad2-8d55-7d1bbaf0968a");
-    const ARITY: FunctionArity<1, 0> = FunctionArity {
-        required: [ArgType::Strict],
+    const ARITY: FunctionArity<0, 0> = FunctionArity {
+        required: [],
         optional: [],
-        variadic: None,
+        variadic: Some(ArgType::Strict),
     };
     pub fn arity(&self) -> Arity {
         Arity::from(&Self::ARITY)

@@ -3,16 +3,15 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 export default (describe) => {
   describe('Stdlib_Merge', (test) => {
-    test('(Iterator)', (assert, {
+    test('(...)', (assert, {
       createApplication,
-      createEmptyIterator,
       createBuiltin,
+      createEmptyList,
       createInt,
       createString,
       createRangeIterator,
       createRecord,
       createTriple,
-      createUnitList,
       createZipIterator,
       evaluate,
       format,
@@ -21,7 +20,6 @@ export default (describe) => {
       getListLength,
       getRecordKeys,
       getRecordValues,
-      getRecordField,
       NULL,
       TRUE,
       Stdlib,
@@ -43,10 +41,7 @@ export default (describe) => {
       }
 
       (() => {
-        const expression = createApplication(
-          createBuiltin(Stdlib.Merge),
-          createUnitList(createEmptyIterator()),
-        );
+        const expression = createApplication(createBuiltin(Stdlib.Merge), createEmptyList());
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '{}');
         assert.strictEqual(format(dependencies), 'NULL');
@@ -54,20 +49,18 @@ export default (describe) => {
       (() => {
         const expression = createApplication(
           createBuiltin(Stdlib.Merge),
-          createUnitList(
-            createTriple(
-              createZipIterator(
-                createTriple(createString('a'), createString('b'), createString('c')),
-                createRangeIterator(3, 3),
-              ),
-              createZipIterator(
-                createTriple(createString('d'), createString('e'), createString('f')),
-                createRangeIterator(6, 3),
-              ),
-              createZipIterator(
-                createTriple(createString('g'), createString('h'), createString('i')),
-                createRangeIterator(9, 3),
-              ),
+          createTriple(
+            createZipIterator(
+              createTriple(createString('a'), createString('b'), createString('c')),
+              createRangeIterator(3, 3),
+            ),
+            createZipIterator(
+              createTriple(createString('d'), createString('e'), createString('f')),
+              createRangeIterator(6, 3),
+            ),
+            createZipIterator(
+              createTriple(createString('g'), createString('h'), createString('i')),
+              createRangeIterator(9, 3),
             ),
           ),
         );
@@ -85,20 +78,18 @@ export default (describe) => {
       (() => {
         const expression = createApplication(
           createBuiltin(Stdlib.Merge),
-          createUnitList(
-            createTriple(
-              createRecord(
-                createTriple(createString('a'), createString('b'), createString('c')),
-                createTriple(createInt(3), createInt(4), createInt(5)),
-              ),
-              createRecord(
-                createTriple(createString('d'), createString('e'), createString('f')),
-                createTriple(createInt(6), createInt(7), createInt(8)),
-              ),
-              createRecord(
-                createTriple(createString('g'), createString('h'), createString('i')),
-                createTriple(createInt(9), createInt(10), createInt(11)),
-              ),
+          createTriple(
+            createRecord(
+              createTriple(createString('a'), createString('b'), createString('c')),
+              createTriple(createInt(3), createInt(4), createInt(5)),
+            ),
+            createRecord(
+              createTriple(createString('d'), createString('e'), createString('f')),
+              createTriple(createInt(6), createInt(7), createInt(8)),
+            ),
+            createRecord(
+              createTriple(createString('g'), createString('h'), createString('i')),
+              createTriple(createInt(9), createInt(10), createInt(11)),
             ),
           ),
         );

@@ -3,11 +3,11 @@
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 (module
   (@builtin $Stdlib_Merge "Merge"
-    (@args (@strict $self))
+    (@args (@variadic (@strict $arg_list)))
 
     (@impl
       (call $TermType::implements::iterate)
-      (func $Stdlib_Merge::impl::<iterate> (param $self i32) (param $state i32) (result i32 i32)
+      (func $Stdlib_Merge::impl::<iterate> (param $arg_list i32) (param $state i32) (result i32 i32)
         (local $entries i32)
         (local $keys i32)
         (local $values i32)
@@ -15,7 +15,7 @@
         (local $dependencies i32)
         ;; Combine all the sets of record entries into a single lookup hashmap
         (call $Term::Hashmap::traits::collect
-          (call $Term::FlattenIterator::new (local.get $self))
+          (call $Term::FlattenIterator::new (local.get $arg_list))
           (local.get $state))
         (local.set $dependencies)
         (local.tee $entries)
@@ -54,9 +54,9 @@
             (local.get $dependencies)))))
 
     (@default
-      (func $Stdlib_Merge::impl::default (param $self i32) (param $state i32) (result i32 i32)
+      (func $Stdlib_Merge::impl::default (param $arg_list i32) (param $state i32) (result i32 i32)
         (call $Term::Signal::of
           (call $Term::Condition::invalid_builtin_function_args
             (global.get $Stdlib_Merge)
-            (call $Term::List::of (local.get $self))))
+            (call $Term::List::of (local.get $arg_list))))
         (global.get $NULL)))))
