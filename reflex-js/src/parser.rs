@@ -3,21 +3,25 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 // SPDX-FileContributor: Chris Campbell <c.campbell@mwam.com> https://github.com/c-campbell-mwam
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
-use std::{iter::once, ops::Deref, path::Path};
+use std::{
+    iter::{empty, once},
+    ops::Deref,
+    path::Path,
+};
 
 use reflex::core::{
     as_integer, create_record, Builtin, Expression, ExpressionFactory, FloatTermType,
     HeapAllocator, IntTermType, IntValue, RefType, StringTermType, StringValue,
 };
 use reflex_stdlib::{
-    Add, And, Apply, Chain, CollectList, Concat, Contains, Divide, Eq, Flatten, Get, Gt, Gte, If,
-    IfError, Lt, Lte, Merge, Multiply, Not, Or, Pow, Push, PushFront, Remainder, ResolveDeep,
-    ResolveList, Subtract,
+    Add, And, Apply, Chain, CollectHashMap, CollectHashSet, CollectList, Concat, Contains, Divide,
+    Eq, Flatten, Get, Gt, Gte, If, IfError, Lt, Lte, Merge, Multiply, Not, Or, Pow, Push,
+    PushFront, Remainder, ResolveDeep, ResolveHashMap, ResolveList, Subtract,
 };
 use swc_common::{source_map::Pos, sync::Lrc, FileName, SourceMap, Span, Spanned};
 use swc_ecma_ast::{
     ArrayLit, ArrowExpr, BinExpr, BinaryOp, BindingIdent, BlockStmt, BlockStmtOrExpr, Bool,
-    CallExpr, Callee, CondExpr, Decl, EsVersion, Expr, ExprStmt, Ident, ImportDecl,
+    CallExpr, Callee, CondExpr, Decl, EsVersion, Expr, ExprOrSpread, ExprStmt, Ident, ImportDecl,
     ImportSpecifier, Lit, MemberExpr, MemberProp, Module, ModuleDecl, ModuleExportName, ModuleItem,
     NewExpr, Null, Number, ObjectLit, ObjectPatProp, Pat, Prop, PropName, PropOrSpread, Stmt, Str,
     TaggedTpl, Tpl, TplElement, UnaryExpr, UnaryOp, VarDeclKind, VarDeclarator,
@@ -40,6 +44,8 @@ pub trait JsParserBuiltin:
     + From<And>
     + From<Apply>
     + From<Chain>
+    + From<CollectHashMap>
+    + From<CollectHashSet>
     + From<CollectList>
     + From<Concat>
     + From<Construct>
@@ -64,6 +70,7 @@ pub trait JsParserBuiltin:
     + From<PushFront>
     + From<Remainder>
     + From<ResolveDeep>
+    + From<ResolveHashMap>
     + From<ResolveList>
     + From<Subtract>
     + From<Throw>
@@ -77,6 +84,8 @@ impl<T> JsParserBuiltin for T where
         + From<And>
         + From<Apply>
         + From<Chain>
+        + From<CollectHashMap>
+        + From<CollectHashSet>
         + From<CollectList>
         + From<Concat>
         + From<Construct>
@@ -101,6 +110,7 @@ impl<T> JsParserBuiltin for T where
         + From<PushFront>
         + From<Remainder>
         + From<ResolveDeep>
+        + From<ResolveHashMap>
         + From<ResolveList>
         + From<Subtract>
         + From<Throw>
@@ -1947,7 +1957,32 @@ where
         Callee::Expr(callee) => parse_expression(callee, scope, env, factory, allocator),
         _ => Err(err_unimplemented(&node.callee)),
     }?;
-    let args = &node.args;
+    let (args, spread) = parse_function_call_args(&node.args, scope, env, factory, allocator)?;
+    if let Some(spread) = spread {
+        let target = if args.is_empty() {
+            target
+        } else {
+            factory.create_partial_application_term(target, allocator.create_list(args))
+        };
+        Ok(factory.create_application_term(
+            factory.create_builtin_term(Apply),
+            allocator.create_pair(target, spread),
+        ))
+    } else {
+        Ok(factory.create_application_term(target, allocator.create_list(args)))
+    }
+}
+
+fn parse_function_call_args<T: Expression>(
+    args: &[ExprOrSpread],
+    scope: &LexicalScope,
+    env: &Env<T>,
+    factory: &impl ExpressionFactory<T>,
+    allocator: &impl HeapAllocator<T>,
+) -> ParserResult<(Vec<T>, Option<T>)>
+where
+    T::Builtin: JsParserBuiltin,
+{
     let num_args = args.len();
     let (args, spread) = args.into_iter().fold(
         (Vec::with_capacity(num_args), None),
@@ -1965,19 +2000,7 @@ where
         Some(spread) => parse_expression(spread, scope, env, factory, allocator).map(Some),
         None => Ok(None),
     }?;
-    if let Some(spread) = spread {
-        let target = if args.is_empty() {
-            target
-        } else {
-            factory.create_partial_application_term(target, allocator.create_list(args))
-        };
-        Ok(factory.create_application_term(
-            factory.create_builtin_term(Apply),
-            allocator.create_pair(target, spread),
-        ))
-    } else {
-        Ok(factory.create_application_term(target, allocator.create_list(args)))
-    }
+    Ok((args, spread))
 }
 
 fn parse_constructor_expression<T: Expression>(
@@ -1990,24 +2013,106 @@ fn parse_constructor_expression<T: Expression>(
 where
     T::Builtin: JsParserBuiltin,
 {
-    let target = parse_expression(&node.callee, scope, env, factory, allocator)?;
-    let args = node
-        .args
-        .iter()
-        .flat_map(|args| {
-            args.iter().map(|arg| {
-                if arg.spread.is_some() {
-                    Err(err_unimplemented(arg))
-                } else {
-                    parse_expression(&arg.expr, scope, env, factory, allocator)
-                }
-            })
-        })
-        .collect::<ParserResult<Vec<_>>>()?;
-    Ok(factory.create_application_term(
-        factory.create_builtin_term(Construct),
-        allocator.create_sized_list(1 + args.len(), once(target).chain(args)),
-    ))
+    let static_constructor = match &*node.callee {
+        Expr::Ident(ident) => {
+            let name = parse_identifier(ident);
+            match scope.get(name) {
+                Some(_) => None,
+                None => match name {
+                    "Map" => Some(parse_map_constructor_expression(
+                        node, scope, env, factory, allocator,
+                    )),
+                    "Set" => Some(parse_set_constructor_expression(
+                        node, scope, env, factory, allocator,
+                    )),
+                    _ => None,
+                },
+            }
+        }
+        _ => None,
+    };
+    static_constructor.unwrap_or_else(|| {
+        let target = parse_expression(&node.callee, scope, env, factory, allocator)?;
+        let (args, spread) = parse_constructor_args(node, scope, env, factory, allocator)?;
+        if let Some(spread) = spread {
+            Err(err_unimplemented(spread))
+        } else {
+            Ok(factory.create_application_term(
+                factory.create_builtin_term(Construct),
+                allocator.create_sized_list(1 + args.len(), once(target).chain(args)),
+            ))
+        }
+    })
+}
+
+fn parse_constructor_args<T: Expression>(
+    node: &NewExpr,
+    scope: &LexicalScope,
+    env: &Env<T>,
+    factory: &impl ExpressionFactory<T>,
+    allocator: &impl HeapAllocator<T>,
+) -> ParserResult<(Vec<T>, Option<T>)>
+where
+    T::Builtin: JsParserBuiltin,
+{
+    let default_args = Vec::new();
+    let args = node.args.as_ref().unwrap_or(&default_args);
+    parse_function_call_args(args, scope, env, factory, allocator)
+}
+
+fn parse_map_constructor_expression<T: Expression>(
+    node: &NewExpr,
+    scope: &LexicalScope,
+    env: &Env<T>,
+    factory: &impl ExpressionFactory<T>,
+    allocator: &impl HeapAllocator<T>,
+) -> ParserResult<T>
+where
+    T::Builtin: JsParserBuiltin,
+{
+    let (args, spread) = parse_constructor_args(node, scope, env, factory, allocator)?;
+    if let Some(spread) = spread {
+        Err(err_unimplemented(spread))
+    } else {
+        let mut args = args.into_iter();
+        match (args.next(), args.next()) {
+            (None, _) => Ok(factory.create_hashmap_term(empty())),
+            (Some(arg), None) => Ok(factory.create_application_term(
+                factory.create_builtin_term(ResolveHashMap),
+                allocator.create_unit_list(factory.create_application_term(
+                    factory.create_builtin_term(Apply),
+                    allocator.create_pair(factory.create_builtin_term(CollectHashMap), arg),
+                )),
+            )),
+            (Some(_), Some(_)) => Err(err("Invalid Map constructor arguments", node)),
+        }
+    }
+}
+
+fn parse_set_constructor_expression<T: Expression>(
+    node: &NewExpr,
+    scope: &LexicalScope,
+    env: &Env<T>,
+    factory: &impl ExpressionFactory<T>,
+    allocator: &impl HeapAllocator<T>,
+) -> ParserResult<T>
+where
+    T::Builtin: JsParserBuiltin,
+{
+    let (args, spread) = parse_constructor_args(node, scope, env, factory, allocator)?;
+    if let Some(spread) = spread {
+        Err(err_unimplemented(spread))
+    } else {
+        let mut args = args.into_iter();
+        match (args.next(), args.next()) {
+            (None, _) => Ok(factory.create_hashmap_term(empty())),
+            (Some(arg), None) => Ok(factory.create_application_term(
+                factory.create_builtin_term(Apply),
+                allocator.create_pair(factory.create_builtin_term(CollectHashSet), arg),
+            )),
+            (Some(_), Some(_)) => Err(err("Invalid Set constructor arguments", node)),
+        }
+    }
 }
 
 #[cfg(test)]
