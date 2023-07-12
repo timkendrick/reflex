@@ -1145,26 +1145,6 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.ResolveList),
-          createUnitList(
-            createApplication(
-              createApplication(
-                createBuiltin(Stdlib.Accessor),
-                createPair(
-                  createTriple(createInt(3), createInt(4), createInt(5)),
-                  createString('push'),
-                ),
-              ),
-              createUnitList(createInt(6)),
-            ),
-          ),
-        );
-        const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), `[3, 4, 5, 6]`);
-        assert.strictEqual(format(dependencies), 'NULL');
-      })();
-      (() => {
-        const expression = createApplication(
           createApplication(
             createBuiltin(Stdlib.Accessor),
             createPair(
@@ -1196,26 +1176,6 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), `[4, 5]`);
-        assert.strictEqual(format(dependencies), 'NULL');
-      })();
-      (() => {
-        const expression = createApplication(
-          createBuiltin(Stdlib.ResolveList),
-          createUnitList(
-            createApplication(
-              createApplication(
-                createBuiltin(Stdlib.Accessor),
-                createPair(
-                  createTriple(createInt(3), createInt(4), createInt(5)),
-                  createString('unshift'),
-                ),
-              ),
-              createUnitList(createInt(6)),
-            ),
-          ),
-        );
-        const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), `[6, 3, 4, 5]`);
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
@@ -1423,23 +1383,6 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.ResolveList),
-          createUnitList(
-            createApplication(
-              createApplication(
-                createBuiltin(Stdlib.Accessor),
-                createPair(createRangeIterator(3, 3), createString('push')),
-              ),
-              createUnitList(createInt(6)),
-            ),
-          ),
-        );
-        const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), `[3, 4, 5, 6]`);
-        assert.strictEqual(format(dependencies), 'NULL');
-      })();
-      (() => {
-        const expression = createApplication(
           createApplication(
             createBuiltin(Stdlib.Accessor),
             createPair(createRangeIterator(3, 3), createString('reduce')),
@@ -1465,23 +1408,6 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), `[4, 5]`);
-        assert.strictEqual(format(dependencies), 'NULL');
-      })();
-      (() => {
-        const expression = createApplication(
-          createBuiltin(Stdlib.ResolveList),
-          createUnitList(
-            createApplication(
-              createApplication(
-                createBuiltin(Stdlib.Accessor),
-                createPair(createRangeIterator(3, 3), createString('unshift')),
-              ),
-              createUnitList(createInt(6)),
-            ),
-          ),
-        );
-        const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), `[6, 3, 4, 5]`);
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {

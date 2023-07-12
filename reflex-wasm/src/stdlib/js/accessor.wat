@@ -13,14 +13,12 @@
   (@const-string $Stdlib_Accessor::KEYS "keys")
   (@const-string $Stdlib_Accessor::LENGTH "length")
   (@const-string $Stdlib_Accessor::MAP "map")
-  (@const-string $Stdlib_Accessor::PUSH "push")
   (@const-string $Stdlib_Accessor::REDUCE "reduce")
   (@const-string $Stdlib_Accessor::REPLACE "replace")
   (@const-string $Stdlib_Accessor::SET "set")
   (@const-string $Stdlib_Accessor::SIZE "size")
   (@const-string $Stdlib_Accessor::SLICE "slice")
   (@const-string $Stdlib_Accessor::SPLIT "split")
-  (@const-string $Stdlib_Accessor::UNSHIFT "unshift")
   (@const-string $Stdlib_Accessor::STARTS_WITH "startsWith")
   (@const-string $Stdlib_Accessor::VALUES "values")
 
@@ -497,13 +495,6 @@
                     (call $Term::Variable::new (i32.const 0))))
                 (global.get $NULL)))
             (@list
-              (call $Term::traits::equals (local.get $key) (global.get $Stdlib_Accessor::PUSH))
-              (return
-                (call $Term::Partial::new
-                  (call $Term::Builtin::new (global.get $Stdlib_Push))
-                  (call $Term::List::of (local.get $self)))
-                (global.get $NULL)))
-            (@list
               (call $Term::traits::equals (local.get $key) (global.get $Stdlib_Accessor::REDUCE))
               (return
                 (call $Term::Partial::new
@@ -515,13 +506,6 @@
               (return
                 (call $Term::Partial::new
                   (call $Term::Builtin::new (global.get $Stdlib_Slice))
-                  (call $Term::List::of (local.get $self)))
-                (global.get $NULL)))
-            (@list
-              (call $Term::traits::equals (local.get $key) (global.get $Stdlib_Accessor::UNSHIFT))
-              (return
-                (call $Term::Partial::new
-                  (call $Term::Builtin::new (global.get $Stdlib_PushFront))
                   (call $Term::List::of (local.get $self)))
                 (global.get $NULL)))
             (@list
