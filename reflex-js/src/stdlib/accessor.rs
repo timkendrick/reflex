@@ -338,6 +338,25 @@ where
         )),
         // TODO: Create stdlib method for Array.prototype.join
         "join" => Some(get_array_join_method(target, factory, allocator)),
+        "flatMap" => Some(factory.create_partial_application_term(
+            factory.create_lambda_term(
+                2,
+                factory.create_application_term(
+                    factory.create_builtin_term(stdlib::Flatten),
+                    allocator.create_unit_list(factory.create_application_term(
+                        factory.create_builtin_term(stdlib::ResolveList),
+                        allocator.create_unit_list(factory.create_application_term(
+                            factory.create_builtin_term(stdlib::Map),
+                            allocator.create_pair(
+                                factory.create_variable_term(1),
+                                factory.create_variable_term(0),
+                            ),
+                        )),
+                    )),
+                ),
+            ),
+            allocator.create_unit_list(target.clone()),
+        )),
         "keys" => Some(factory.create_partial_application_term(
             factory.create_builtin_term(stdlib::Keys),
             allocator.create_unit_list(target.clone()),
