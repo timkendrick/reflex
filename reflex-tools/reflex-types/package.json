@@ -1,0 +1,12 @@
+{
+  "private": true,
+  "name": "@marshallwace/reflex-types",
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "description": "TypeScript library type declarations for ReflexJS",
+  "author": "Marshall Wace LLP <opensource@mwam.com> (https://github.com/MarshallWace)",
+  "contributors": [
+    "Tim Kendrick <t.kendrick@mwam.com> (https://github.com/timkendrickmw)"
+  ],
+  "types": "./index.d.ts"
+}

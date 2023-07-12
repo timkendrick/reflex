@@ -1,0 +1,38 @@
+{
+  "root": true,
+  "plugins": ["@typescript-eslint", "prettier"],
+  "parser": "@typescript-eslint/parser",
+  "extends": [
+    "eslint:recommended",
+    "plugin:eslint-plugin/recommended",
+    "plugin:@typescript-eslint/eslint-recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:node/recommended",
+    "plugin:prettier/recommended"
+  ],
+  "env": {
+    "node": true
+  },
+  "overrides": [
+    {
+      "files": ["tests/**/*.js"],
+      "env": { "jest": true }
+    }
+  ],
+  "rules": {
+    "@typescript-eslint/no-unused-vars": [
+      "warn",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "caughtErrorsIgnorePattern": "^_"
+      }
+    ],
+    "node/no-missing-import": "off",
+    "node/no-unsupported-features/es-syntax": [
+      "error",
+      { "ignores": ["modules"] }
+    ],
+    "prettier/prettier": "warn"
+  }
+}
