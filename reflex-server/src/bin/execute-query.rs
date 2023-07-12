@@ -38,8 +38,8 @@ use reflex_server::{
         task::{ServerCliTaskActor, ServerCliTaskFactory},
     },
     logger::{
-        formatted::FormattedActionLogger, formatter::PrefixedLogFormatter, json::JsonActionLogger,
-        messages::DefaultActionFormatter, EitherLogger,
+        formatted::FormattedActionLogger, formatter::TimestampedLogFormatter,
+        json::JsonActionLogger, messages::DefaultActionFormatter, EitherLogger,
     },
     scheduler_metrics::{
         NoopServerMetricsSchedulerQueueInstrumentation, ServerMetricsInstrumentation,
@@ -186,7 +186,7 @@ async fn main() -> Result<()> {
             EitherLogger::Left(JsonActionLogger::<_, TAction, TTask>::stderr())
         }
         None => EitherLogger::Right(FormattedActionLogger::<_, _, TAction, TTask>::stderr(
-            PrefixedLogFormatter::new("server", DefaultActionFormatter::new(factory.clone())),
+            TimestampedLogFormatter::rfc_3339(DefaultActionFormatter::new(factory.clone())),
         )),
     });
     cli::<TAction, TTask, T, TFactory, TAllocator, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _>(

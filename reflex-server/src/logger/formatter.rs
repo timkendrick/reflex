@@ -261,6 +261,9 @@ impl<T> TimestampedLogFormatter<T> {
             format,
         }
     }
+    pub fn rfc_3339(formatter: T) -> Self {
+        Self::new("[%Y-%m-%dT%H:%M:%S%.3fZ] ", formatter)
+    }
 }
 impl<T> Clone for TimestampedLogFormatter<T>
 where
