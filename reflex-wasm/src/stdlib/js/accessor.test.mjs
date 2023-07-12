@@ -900,6 +900,30 @@ export default (describe) => {
                 createBuiltin(Stdlib.Accessor),
                 createPair(
                   createHashset([createString('foo'), createString('bar'), createString('baz')]),
+                  createString('keys'),
+                ),
+              ),
+              createEmptyList(),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.ok(isList(result));
+        assert.strictEqual(
+          `[${getListItems(result).map(format).sort().join(', ')}]`,
+          '["bar", "baz", "foo"]',
+        );
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.ResolveList),
+          createUnitList(
+            createApplication(
+              createApplication(
+                createBuiltin(Stdlib.Accessor),
+                createPair(
+                  createHashset([createString('foo'), createString('bar'), createString('baz')]),
                   createString('values'),
                 ),
               ),

@@ -363,6 +363,13 @@
                   (call $Term::List::of (local.get $self)))
                 (global.get $NULL)))
             (@list
+              (call $Term::traits::equals (local.get $key) (global.get $Stdlib_Accessor::KEYS))
+              (return
+                (call $Term::Partial::new
+                  (call $Term::Builtin::new (global.get $Stdlib_Keys))
+                  (call $Term::List::of (local.get $self)))
+                (global.get $NULL)))
+            (@list
               (call $Term::traits::equals (local.get $key) (global.get $Stdlib_Accessor::SIZE))
               (return
                 (call $Term::Application::new
