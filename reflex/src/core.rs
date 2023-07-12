@@ -10,6 +10,7 @@ use std::{
     iter::{once, repeat, FromIterator},
     marker::PhantomData,
     ops::Deref,
+    path::Path,
     rc::Rc,
     sync::Arc,
 };
@@ -1648,6 +1649,11 @@ impl<T: Expression> EvaluationResult<T> {
             dependencies: self.dependencies.union(dependencies),
         }
     }
+}
+
+pub trait ModuleLoader {
+    type Output: Expression;
+    fn load(&self, import_path: &str, current_path: &Path) -> Option<Result<Self::Output, String>>;
 }
 
 pub fn validate_function_application_arity<T: Expression>(

@@ -29,7 +29,6 @@ use reflex_handlers::{
     DefaultHandlerMetricNames,
 };
 use reflex_lang::{allocator::DefaultAllocator, CachedSharedTerm, SharedTermFactory};
-use reflex_parser::DefaultModuleLoader;
 use reflex_protobuf::types::WellKnownTypesTranscoder;
 use reflex_scheduler::threadpool::TokioRuntimeThreadPoolFactory;
 use reflex_server::{
@@ -123,7 +122,6 @@ pub async fn main() -> Result<()> {
     type T = CachedSharedTerm<TBuiltin>;
     type TFactory = SharedTermFactory<TBuiltin>;
     type TAllocator = DefaultAllocator<T>;
-    type TLoader = DefaultModuleLoader<T>;
     type TConnect = hyper_rustls::HttpsConnector<hyper::client::HttpConnector>;
     type TReconnect = FibonacciReconnectTimeout;
     type TGrpcConfig = DefaultGrpcConfig;

@@ -7,8 +7,8 @@ use std::{io::Write, iter::empty, path::PathBuf};
 use anyhow::{Context, Result};
 use clap::Parser;
 use reflex_lang::{allocator::DefaultAllocator, SharedTermFactory};
-use reflex_parser::Syntax;
-use reflex_server::cli::compile::{create_loader, parse_and_compile_module};
+use reflex_parser::{syntax::js::default_js_loaders, Syntax};
+use reflex_server::cli::compile::parse_and_compile_module;
 use reflex_wasm::{
     cli::compile::{WasmCompilerOptions, WasmCompilerRuntimeOptions},
     compiler::CompilerOptions,
@@ -87,7 +87,7 @@ fn main() -> Result<()> {
         &source,
         syntax,
         &input_path,
-        create_loader(empty(), &factory, &allocator),
+        default_js_loaders(empty(), &factory, &allocator),
         std::env::vars(),
         &export_name,
         &runtime_bytes,

@@ -4,7 +4,9 @@
 use std::{marker::PhantomData, path::Path, str::FromStr};
 
 use reflex::{
-    core::{Builtin, Expression, ExpressionFactory, HeapAllocator, Reducible, Rewritable},
+    core::{
+        Builtin, Expression, ExpressionFactory, HeapAllocator, ModuleLoader, Reducible, Rewritable,
+    },
     env::inject_env_vars,
 };
 use reflex_graphql::imports::GraphQlImportsBuiltin;
@@ -73,8 +75,6 @@ where
     }
 }
 
-pub type DefaultModuleLoader<T> = Box<dyn Fn(&str, &Path) -> Option<Result<T, String>> + 'static>;
-
 pub fn create_parser<
     T: Expression + 'static,
     TFactory: ExpressionFactory<T> + Clone + 'static,
@@ -82,7 +82,7 @@ pub fn create_parser<
 >(
     syntax: Syntax,
     entry_path: Option<&Path>,
-    module_loader: Option<impl Fn(&str, &Path) -> Option<Result<T, String>> + 'static>,
+    module_loader: impl ModuleLoader<Output = T> + 'static,
     env_vars: impl IntoIterator<Item = (String, String)>,
     factory: &TFactory,
     allocator: &TAllocator,
@@ -165,7 +165,7 @@ where
 
 enum PolyglotSyntaxParser<
     T: Expression,
-    TLoader: Fn(&str, &Path) -> Option<Result<T, String>> + 'static,
+    TLoader: ModuleLoader<Output = T>,
     TFactory: ExpressionFactory<T>,
     TAllocator: HeapAllocator<T>,
 > {
@@ -177,7 +177,7 @@ enum PolyglotSyntaxParser<
 
 impl<
         T: Expression,
-        TLoader: Fn(&str, &Path) -> Option<Result<T, String>> + 'static,
+        TLoader: ModuleLoader<Output = T>,
         TFactory: ExpressionFactory<T>,
         TAllocator: HeapAllocator<T>,
     > SyntaxParser<T> for PolyglotSyntaxParser<T, TLoader, TFactory, TAllocator>

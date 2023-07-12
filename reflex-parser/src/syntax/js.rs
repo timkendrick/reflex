@@ -2,17 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
-use std::{
-    iter::empty,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
-use reflex::core::{Expression, ExpressionFactory, HeapAllocator};
+use reflex::core::{Expression, ExpressionFactory, HeapAllocator, ModuleLoader};
 use reflex_graphql::imports::{graphql_imports, GraphQlImportsBuiltin};
 use reflex_grpc::loader::{create_grpc_loader, GrpcLoaderBuiltin};
 use reflex_handlers::{
     imports::{handler_imports, HandlerImportsBuiltin},
-    loader::graphql_loader,
+    loader::create_graphql_loader,
 };
 use reflex_js::{
     builtin_imports, compose_module_loaders, create_js_env, create_module_loader,
@@ -22,11 +19,11 @@ use reflex_js::{
 
 use crate::{syntax::json::json_loader, ParserBuiltin, SyntaxParser};
 
-pub fn default_js_loaders<'a, T: Expression + 'static>(
+pub fn default_js_loaders<T: Expression + 'static>(
     imports: impl IntoIterator<Item = (String, T)>,
     factory: &(impl ExpressionFactory<T> + Clone + 'static),
     allocator: &(impl HeapAllocator<T> + Clone + 'static),
-) -> impl Fn(&str, &Path) -> Option<Result<T, String>> + 'static
+) -> impl ModuleLoader<Output = T>
 where
     T::Builtin: JsParserBuiltin
         + JsGlobalsBuiltin
@@ -46,7 +43,7 @@ where
         compose_module_loaders(
             json_loader(factory, allocator),
             compose_module_loaders(
-                graphql_loader(factory, allocator),
+                create_graphql_loader(factory, allocator),
                 create_grpc_loader(factory, allocator),
             ),
         ),
@@ -72,38 +69,20 @@ where
 
 pub fn create_js_module_parser<
     T: Expression + 'static,
+    TLoader: ModuleLoader<Output = T> + 'static,
     TFactory: ExpressionFactory<T> + Clone + 'static,
     TAllocator: HeapAllocator<T> + Clone + 'static,
 >(
     path: &Path,
-    module_loader: Option<impl Fn(&str, &Path) -> Option<Result<T, String>> + 'static>,
+    module_loader: TLoader,
     factory: &TFactory,
     allocator: &TAllocator,
-) -> JavaScriptModuleParser<
-    T,
-    impl Fn(&str, &Path) -> Option<Result<T, String>> + 'static,
-    TFactory,
-    TAllocator,
->
+) -> JavaScriptModuleParser<T, impl ModuleLoader<Output = T> + 'static, TFactory, TAllocator>
 where
     T::Builtin: ParserBuiltin,
 {
     let env = create_js_env(factory, allocator);
-    let loader = create_module_loader(
-        env.clone(),
-        Some({
-            let default_loader = default_js_loaders(empty(), factory, allocator);
-            move |input: &str, path: &Path| {
-                if let Some(custom_loader) = module_loader.as_ref() {
-                    custom_loader(input, path)
-                } else {
-                    default_loader(input, path)
-                }
-            }
-        }),
-        factory,
-        allocator,
-    );
+    let loader = create_module_loader(env.clone(), module_loader, factory, allocator);
     let factory = factory.clone();
     let allocator = allocator.clone();
     let path = path.to_owned();
@@ -144,7 +123,7 @@ where
 
 pub struct JavaScriptModuleParser<
     T: Expression,
-    TLoader: Fn(&str, &Path) -> Option<Result<T, String>> + 'static,
+    TLoader: ModuleLoader<Output = T>,
     TFactory: ExpressionFactory<T>,
     TAllocator: HeapAllocator<T>,
 > {
@@ -157,7 +136,7 @@ pub struct JavaScriptModuleParser<
 
 impl<
         T: Expression,
-        TLoader: Fn(&str, &Path) -> Option<Result<T, String>> + 'static,
+        TLoader: ModuleLoader<Output = T>,
         TFactory: ExpressionFactory<T>,
         TAllocator: HeapAllocator<T>,
     > JavaScriptModuleParser<T, TLoader, TFactory, TAllocator>
@@ -181,7 +160,7 @@ impl<
 
 impl<
         T: Expression,
-        TLoader: Fn(&str, &Path) -> Option<Result<T, String>> + 'static,
+        TLoader: ModuleLoader<Output = T>,
         TFactory: ExpressionFactory<T>,
         TAllocator: HeapAllocator<T>,
     > SyntaxParser<T> for JavaScriptModuleParser<T, TLoader, TFactory, TAllocator>

@@ -5,24 +5,21 @@ use std::{
     cell::RefCell,
     convert::Infallible,
     future,
+    iter::empty,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     ops::{Deref, DerefMut},
     path::PathBuf,
     rc::Rc,
-    str::FromStr,
     sync::Arc,
 };
 
 use hyper::{server::conn::AddrStream, service::make_service_fn, Server};
 use reflex::{
     cache::SubstitutionCache,
-    core::{Expression, ExpressionFactory, HeapAllocator, Rewritable},
+    core::{Expression, ExpressionFactory, HeapAllocator, Reducible, Rewritable},
 };
 use reflex_dispatcher::HandlerContext;
-use reflex_graphql::{
-    imports::{graphql_imports, GraphQlImportsBuiltin},
-    NoopGraphQlQueryTransform,
-};
+use reflex_graphql::{imports::GraphQlImportsBuiltin, NoopGraphQlQueryTransform};
 use reflex_grpc::DefaultGrpcConfig;
 use reflex_handlers::actor::graphql::{GraphQlHandler, GraphQlHandlerMetricNames};
 use reflex_handlers::{
@@ -30,12 +27,9 @@ use reflex_handlers::{
     imports::HandlerImportsBuiltin,
     utils::tls::{create_https_client, hyper_rustls},
 };
-use reflex_js::{
-    create_js_env, create_module_loader, globals::JsGlobalsBuiltin, imports::JsImportsBuiltin,
-    parse_module, JsParserBuiltin,
-};
+use reflex_js::{globals::JsGlobalsBuiltin, imports::JsImportsBuiltin, JsParserBuiltin};
 use reflex_lang::{allocator::DefaultAllocator, CachedSharedTerm, SharedTermFactory};
-use reflex_parser::syntax::js::default_js_loaders;
+use reflex_parser::{create_parser, syntax::js::default_js_loaders, Syntax, SyntaxParser};
 use reflex_scheduler::threadpool::TokioRuntimeThreadPoolFactory;
 use reflex_server::{
     action::ServerCliAction, builtins::ServerBuiltins, graphql_service, logger::NoopLogger,
@@ -209,7 +203,7 @@ fn compile_graphql_module<T: Expression + 'static>(
     allocator: &(impl HeapAllocator<T> + Clone + 'static),
 ) -> Result<Vec<u8>, WasmTestError<T>>
 where
-    T: Rewritable<T>,
+    T: Rewritable<T> + Reducible<T>,
     T::Builtin: JsParserBuiltin
         + JsGlobalsBuiltin
         + JsImportsBuiltin
@@ -217,22 +211,17 @@ where
         + GraphQlImportsBuiltin
         + Into<reflex_wasm::stdlib::Stdlib>,
 {
-    let module_loader = Some(default_js_loaders(
-        graphql_imports(factory, allocator),
+    let parser = create_parser(
+        Syntax::JavaScript,
+        Some(PathBuf::from("./index.js").as_path()),
+        default_js_loaders(empty(), factory, allocator),
+        empty(),
         factory,
         allocator,
-    ));
-    let js_env = create_js_env(factory, allocator);
-    let module_loader = create_module_loader(js_env.clone(), module_loader, factory, allocator);
-    let graph_root = parse_module(
-        graph_definition,
-        &js_env,
-        &PathBuf::from_str("<script>").unwrap(),
-        &module_loader,
-        factory,
-        allocator,
-    )
-    .map_err(WasmTestError::Parser)?;
+    );
+    let graph_root = parser
+        .parse(graph_definition)
+        .map_err(WasmTestError::Parser)?;
 
     // Abstract any free variables from any internal lambda functions within the expression
     let graph_root = graph_root

@@ -1,9 +1,12 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use std::path::Path;
+use std::{marker::PhantomData, path::Path};
 
-use reflex::core::{create_record, Builtin, Expression, ExpressionFactory, HeapAllocator};
+use derivative::Derivative;
+use reflex::core::{
+    create_record, Builtin, Expression, ExpressionFactory, HeapAllocator, ModuleLoader,
+};
 use reflex_stdlib::{CollectList, Contains, Effect, Get, If, ResolveDeep};
 
 use crate::{
@@ -33,20 +36,55 @@ impl<T> GrpcLoaderBuiltin for T where
 {
 }
 
-pub fn create_grpc_loader<T: Expression>(
-    factory: &(impl ExpressionFactory<T> + Clone + 'static),
-    allocator: &(impl HeapAllocator<T> + Clone + 'static),
-) -> impl Fn(&str, &Path) -> Option<Result<T, String>>
+pub fn create_grpc_loader<
+    T: Expression,
+    TFactory: ExpressionFactory<T> + Clone + 'static,
+    TAllocator: HeapAllocator<T> + Clone + 'static,
+>(
+    factory: &TFactory,
+    allocator: &TAllocator,
+) -> GrpcModuleLoader<T, TFactory, TAllocator>
 where
     T::Builtin: GrpcLoaderBuiltin,
 {
-    let factory = factory.clone();
-    let allocator = allocator.clone();
-    move |import_path: &str, module_path: &Path| {
+    GrpcModuleLoader::new(factory.clone(), allocator.clone())
+}
+
+#[derive(Derivative)]
+#[derivative(Clone(bound = "TFactory: Clone, TAllocator: Clone"))]
+pub struct GrpcModuleLoader<
+    T: Expression,
+    TFactory: ExpressionFactory<T>,
+    TAllocator: HeapAllocator<T>,
+> {
+    factory: TFactory,
+    allocator: TAllocator,
+    _expression: PhantomData<T>,
+}
+
+impl<T: Expression, TFactory: ExpressionFactory<T>, TAllocator: HeapAllocator<T>>
+    GrpcModuleLoader<T, TFactory, TAllocator>
+{
+    fn new(factory: TFactory, allocator: TAllocator) -> Self {
+        Self {
+            factory,
+            allocator,
+            _expression: PhantomData,
+        }
+    }
+}
+
+impl<T: Expression, TFactory: ExpressionFactory<T>, TAllocator: HeapAllocator<T>> ModuleLoader
+    for GrpcModuleLoader<T, TFactory, TAllocator>
+where
+    T::Builtin: GrpcLoaderBuiltin,
+{
+    type Output = T;
+    fn load(&self, import_path: &str, current_path: &Path) -> Option<Result<Self::Output, String>> {
         if !import_path.ends_with(".proto.bin") {
             return None;
         }
-        let proto_path = module_path
+        let proto_path = current_path
             .parent()
             .map(|parent| parent.join(import_path))
             .unwrap_or_else(|| Path::new(import_path).to_path_buf());
@@ -58,7 +96,10 @@ where
                     let proto_id = get_proto_checksum(&proto);
                     let services = proto.file.iter().flat_map(|file| file.service.iter());
                     Ok(create_grpc_exports(
-                        proto_id, services, &factory, &allocator,
+                        proto_id,
+                        services,
+                        &self.factory,
+                        &self.allocator,
                     ))
                 }),
         })

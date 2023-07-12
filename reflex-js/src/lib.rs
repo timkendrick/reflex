@@ -20,7 +20,7 @@ pub use imports::builtin_imports;
 
 pub mod stdlib;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Env<T: Expression> {
     globals: HashMap<&'static str, T>,
 }

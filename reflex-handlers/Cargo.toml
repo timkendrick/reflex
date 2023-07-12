@@ -18,6 +18,7 @@ reflex-stdlib = { path = "../reflex-stdlib" }
 reflex-utils = { path = "../reflex-utils" }
 async-recursion = "1.0.0"
 bytes = "1.1.0"
+derivative = "2.2.0"
 futures = "*"
 http = "0.2.6"
 hyper = { version = "0.14", features = ["full"] }

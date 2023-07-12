@@ -2,16 +2,20 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 use std::{
-    cell::RefCell,
-    collections::HashMap,
-    fs::{self, Metadata},
-    io,
+    fs::{self},
     iter::once,
-    path::{Path, PathBuf},
-    rc::Rc,
+    marker::PhantomData,
+    path::Path,
 };
 
-use reflex::core::{Expression, ExpressionFactory, HeapAllocator};
+use derivative::Derivative;
+use reflex::{
+    core::{Expression, ExpressionFactory, HeapAllocator, ModuleLoader},
+    loader::{
+        get_module_filesystem_path, ChainedModuleLoader, ErrorFallbackModuleLoader,
+        RecursiveModuleLoader, StaticModuleLoader,
+    },
+};
 
 use crate::{
     globals::{builtin_globals, JsGlobalsBuiltin},
@@ -22,124 +26,106 @@ use crate::{
 
 pub fn create_module_loader<T: Expression + 'static>(
     env: Env<T>,
-    custom_loader: Option<impl Fn(&str, &Path) -> Option<Result<T, String>> + 'static>,
+    custom_loader: impl ModuleLoader<Output = T> + 'static,
     factory: &(impl ExpressionFactory<T> + Clone + 'static),
     allocator: &(impl HeapAllocator<T> + Clone + 'static),
-) -> impl Fn(&str, &Path) -> Option<Result<T, String>>
+) -> RecursiveModuleLoader<T>
 where
     T::Builtin: JsParserBuiltin,
 {
     let factory = factory.clone();
     let allocator = allocator.clone();
-    recursive_module_loader(move |loader| {
-        let js_loader = create_js_loader(env, loader, &factory, &allocator);
-        move |import_path: &str, module_path: &Path| match js_loader(import_path, module_path) {
-            Some(result) => Some(result),
-            None => match custom_loader
-                .as_ref()
-                .and_then(|custom_loader| custom_loader(import_path, module_path))
-            {
-                Some(result) => Some(result),
-                None => error_module_loader(import_path, module_path),
-            },
-        }
+    RecursiveModuleLoader::new(move |loader| {
+        ChainedModuleLoader::new(
+            JavaScriptModuleLoader::new(env, loader, factory, allocator),
+            ChainedModuleLoader::new(custom_loader, ErrorFallbackModuleLoader::default()),
+        )
     })
 }
 
-pub fn error_module_loader<T: Expression>(
-    import_path: &str,
-    module_path: &Path,
-) -> Option<Result<T, String>> {
-    Some(Err(
-        match get_module_path_metadata(import_path, module_path) {
-            Ok(Some(metadata)) => match metadata.is_dir() {
-                true => String::from("Module path is a directory"),
-                false => String::from("No compatible loaders"),
-            },
-            Ok(None) => String::from("Module not found"),
-            Err(error) => error,
-        },
-    ))
-}
-
-fn recursive_module_loader<T: Expression + 'static, TResult>(
-    create_loader: impl FnOnce(Box<dyn Fn(&str, &Path) -> Option<Result<T, String>>>) -> TResult,
-) -> impl Fn(&str, &Path) -> Option<Result<T, String>>
-where
-    TResult: Fn(&str, &Path) -> Option<Result<T, String>> + 'static,
-{
-    fn placeholder_loader<T: Expression>(_: &str, _: &Path) -> Option<Result<T, String>> {
-        Some(Err(String::from("Module loader not yet initialized")))
-    }
-
-    let loader = Rc::new(RefCell::<
-        Box<dyn Fn(&str, &Path) -> Option<Result<T, String>> + 'static>,
-    >::new(Box::new(placeholder_loader)));
-    let inner_loader = loader.clone();
-    let result = create_loader(Box::new(move |import_path, module_path| {
-        let load = inner_loader.borrow();
-        load(import_path, module_path)
-    }));
-    *loader.borrow_mut() = Box::new(result);
-    move |import_path, module_path| (loader.borrow())(import_path, module_path)
+pub fn compose_module_loaders<
+    T: Expression,
+    T1: ModuleLoader<Output = T>,
+    T2: ModuleLoader<Output = T>,
+>(
+    left: T1,
+    right: T2,
+) -> ChainedModuleLoader<T, T1, T2> {
+    ChainedModuleLoader::new(left, right)
 }
 
 pub fn static_module_loader<T: Expression + 'static>(
     modules: impl IntoIterator<Item = (String, T)>,
-) -> impl Fn(&str, &Path) -> Option<Result<T, String>> + 'static {
-    let modules = modules.into_iter().collect::<HashMap<_, _>>();
-    move |import_path: &str, _: &Path| match modules.get(import_path) {
-        Some(value) => Some(Ok(value.clone())),
-        None => None,
-    }
+) -> StaticModuleLoader<T> {
+    StaticModuleLoader::new(modules)
 }
 
-pub fn compose_module_loaders<T: Expression>(
-    head: impl Fn(&str, &Path) -> Option<Result<T, String>> + 'static,
-    tail: impl Fn(&str, &Path) -> Option<Result<T, String>> + 'static,
-) -> impl Fn(&str, &Path) -> Option<Result<T, String>> + 'static {
-    move |import_path: &str, module_path: &Path| match head(import_path, module_path) {
-        Some(result) => Some(result),
-        None => tail(import_path, module_path),
-    }
-}
-
-pub fn create_js_loader<T: Expression>(
+#[derive(Derivative)]
+#[derivative(
+    Clone(bound = "TLoader: Clone, TFactory: Clone, TAllocator: Clone"),
+    Debug(
+        bound = "TLoader: std::fmt::Debug, TFactory: std::fmt::Debug, TAllocator: std::fmt::Debug"
+    )
+)]
+struct JavaScriptModuleLoader<
+    T: Expression,
+    TLoader: ModuleLoader<Output = T>,
+    TFactory: ExpressionFactory<T>,
+    TAllocator: HeapAllocator<T>,
+> {
     env: Env<T>,
-    module_loader: impl Fn(&str, &Path) -> Option<Result<T, String>>,
-    factory: &(impl ExpressionFactory<T> + Clone),
-    allocator: &(impl HeapAllocator<T> + Clone),
-) -> impl Fn(&str, &Path) -> Option<Result<T, String>>
+    loader: TLoader,
+    factory: TFactory,
+    allocator: TAllocator,
+    _expression: PhantomData<T>,
+}
+
+impl<
+        T: Expression,
+        TLoader: ModuleLoader<Output = T>,
+        TFactory: ExpressionFactory<T>,
+        TAllocator: HeapAllocator<T>,
+    > JavaScriptModuleLoader<T, TLoader, TFactory, TAllocator>
+{
+    pub fn new(env: Env<T>, loader: TLoader, factory: TFactory, allocator: TAllocator) -> Self {
+        Self {
+            env,
+            factory,
+            allocator,
+            loader,
+            _expression: PhantomData,
+        }
+    }
+}
+
+impl<
+        T: Expression,
+        TLoader: ModuleLoader<Output = T>,
+        TFactory: ExpressionFactory<T>,
+        TAllocator: HeapAllocator<T>,
+    > ModuleLoader for JavaScriptModuleLoader<T, TLoader, TFactory, TAllocator>
 where
     T::Builtin: JsParserBuiltin,
 {
-    let factory = factory.clone();
-    let allocator = allocator.clone();
-    move |import_path: &str, module_path: &Path| {
+    type Output = T;
+    fn load(&self, import_path: &str, current_path: &Path) -> Option<Result<Self::Output, String>> {
         if !import_path.ends_with(".js") {
             return None;
         }
-        let target_path = get_module_filesystem_path(import_path, module_path);
+        let target_path = get_module_filesystem_path(import_path, current_path);
         Some(match fs::read_to_string(&target_path) {
-            Err(error) => Err(format!("{}", error)),
+            Err(err) => Err(format!("{}", err)),
             Ok(source) => parse_module(
                 &source,
-                &env,
+                &self.env,
                 &target_path,
-                &module_loader,
-                &factory,
-                &allocator,
+                &self.loader,
+                &self.factory,
+                &self.allocator,
             )
-            .map(|result| create_default_module_export(result, &factory, &allocator)),
+            .map(|result| create_default_module_export(result, &self.factory, &self.allocator)),
         })
     }
-}
-
-pub fn get_module_filesystem_path(import_path: &str, module_path: &Path) -> PathBuf {
-    module_path
-        .parent()
-        .map(|parent| parent.join(import_path))
-        .unwrap_or_else(|| Path::new(import_path).to_path_buf())
 }
 
 pub fn create_js_env<T: Expression>(
@@ -152,7 +138,7 @@ where
     Env::new().with_globals(builtin_globals(factory, allocator))
 }
 
-fn create_default_module_export<T: Expression>(
+pub fn create_default_module_export<T: Expression>(
     value: T,
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
@@ -163,17 +149,4 @@ fn create_default_module_export<T: Expression>(
         ))),
         allocator.create_unit_list(value),
     )
-}
-
-fn get_module_path_metadata(
-    import_path: &str,
-    module_path: &Path,
-) -> Result<Option<Metadata>, String> {
-    match fs::metadata(get_module_filesystem_path(import_path, module_path)) {
-        Ok(metadata) => Ok(Some(metadata)),
-        Err(error) => match error.kind() {
-            io::ErrorKind::NotFound => Ok(None),
-            _ => Err(format!("{}", error)),
-        },
-    }
 }

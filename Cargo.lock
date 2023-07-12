@@ -2406,6 +2406,7 @@ dependencies = [
 name = "reflex"
 version = "0.1.0"
 dependencies = [
+ "derivative",
  "fnv",
  "nohash-hasher",
  "serde",
@@ -2501,6 +2502,7 @@ dependencies = [
 name = "reflex-grpc"
 version = "0.1.0"
 dependencies = [
+ "derivative",
  "futures",
  "hyper",
  "metrics",
@@ -2528,6 +2530,7 @@ version = "0.1.0"
 dependencies = [
  "async-recursion",
  "bytes",
+ "derivative",
  "futures",
  "http",
  "hyper",
@@ -2570,6 +2573,7 @@ name = "reflex-js"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "derivative",
  "reflex",
  "reflex-interpreter",
  "reflex-json",
@@ -2638,6 +2642,7 @@ name = "reflex-parser"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "derivative",
  "reflex",
  "reflex-graphql",
  "reflex-grpc",

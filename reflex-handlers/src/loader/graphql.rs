@@ -1,9 +1,12 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use std::{fs, iter::once, path::Path};
+use std::{fs, iter::once, marker::PhantomData, path::Path};
 
-use reflex::core::{create_record, Builtin, Expression, ExpressionFactory, HeapAllocator};
+use derivative::Derivative;
+use reflex::core::{
+    create_record, Builtin, Expression, ExpressionFactory, HeapAllocator, ModuleLoader,
+};
 use reflex_graphql::graphql_parser::{self, schema::Document};
 use reflex_stdlib::{CollectList, Contains, Effect, Get, If, ResolveDeep};
 
@@ -30,24 +33,63 @@ impl<T> GraphQlLoaderBuiltin for T where
 {
 }
 
-pub fn graphql_loader<T: Expression>(
-    factory: &(impl ExpressionFactory<T> + Clone + 'static),
-    allocator: &(impl HeapAllocator<T> + Clone + 'static),
-) -> impl Fn(&str, &Path) -> Option<Result<T, String>>
+pub fn create_graphql_loader<
+    T: Expression,
+    TFactory: ExpressionFactory<T> + Clone + 'static,
+    TAllocator: HeapAllocator<T> + Clone + 'static,
+>(
+    factory: &TFactory,
+    allocator: &TAllocator,
+) -> GraphQlModuleLoader<T, TFactory, TAllocator>
 where
     T::Builtin: GraphQlLoaderBuiltin,
 {
-    let factory = factory.clone();
-    let allocator = allocator.clone();
-    move |import_path: &str, module_path: &Path| {
+    GraphQlModuleLoader::new(factory.clone(), allocator.clone())
+}
+
+#[derive(Derivative)]
+#[derivative(Clone(bound = "TFactory: Clone, TAllocator: Clone"))]
+pub struct GraphQlModuleLoader<
+    T: Expression,
+    TFactory: ExpressionFactory<T>,
+    TAllocator: HeapAllocator<T>,
+> {
+    factory: TFactory,
+    allocator: TAllocator,
+    _expression: PhantomData<T>,
+}
+
+impl<T: Expression, TFactory: ExpressionFactory<T>, TAllocator: HeapAllocator<T>>
+    GraphQlModuleLoader<T, TFactory, TAllocator>
+{
+    fn new(factory: TFactory, allocator: TAllocator) -> Self {
+        Self {
+            factory,
+            allocator,
+            _expression: PhantomData,
+        }
+    }
+}
+
+impl<T: Expression, TFactory: ExpressionFactory<T>, TAllocator: HeapAllocator<T>> ModuleLoader
+    for GraphQlModuleLoader<T, TFactory, TAllocator>
+where
+    T::Builtin: GraphQlLoaderBuiltin,
+{
+    type Output = T;
+    fn load(&self, import_path: &str, current_path: &Path) -> Option<Result<Self::Output, String>> {
         if !import_path.ends_with(".graphql") {
             return None;
         }
-        let schema_path = module_path
+        let schema_path = current_path
             .parent()
             .map(|parent| parent.join(import_path))
             .unwrap_or_else(|| Path::new(import_path).to_path_buf());
-        Some(load_graphql_module(&schema_path, &factory, &allocator))
+        Some(load_graphql_module(
+            &schema_path,
+            &self.factory,
+            &self.allocator,
+        ))
     }
 }
 
