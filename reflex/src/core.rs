@@ -159,6 +159,7 @@ pub trait CompiledFunctionTermType: Clone {
     fn hash(&self) -> HashId;
     fn required_args(&self) -> StackOffset;
     fn optional_args(&self) -> StackOffset;
+    fn variadic_args(&self) -> bool;
 }
 
 pub trait RecordTermType<T: Expression>: Clone {
@@ -1129,6 +1130,7 @@ pub trait ExpressionFactory<T: Expression> {
         hash: HashId,
         required_args: StackOffset,
         optional_args: StackOffset,
+        variadic_args: bool,
     ) -> T;
     fn create_record_term(&self, prototype: T::StructPrototype, fields: T::ExpressionList) -> T;
     fn create_constructor_term(&self, prototype: T::StructPrototype) -> T;

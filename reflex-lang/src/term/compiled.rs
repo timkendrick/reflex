@@ -23,6 +23,7 @@ pub struct CompiledFunctionTerm {
     hash: HashId,
     required_args: StackOffset,
     optional_args: StackOffset,
+    variadic_args: bool,
 }
 impl CompiledFunctionTerm {
     pub fn new(
@@ -30,12 +31,14 @@ impl CompiledFunctionTerm {
         hash: HashId,
         required_args: StackOffset,
         optional_args: StackOffset,
+        variadic_args: bool,
     ) -> Self {
         Self {
             address,
             hash,
             required_args,
             optional_args,
+            variadic_args,
         }
     }
 }
@@ -51,6 +54,9 @@ impl CompiledFunctionTermType for CompiledFunctionTerm {
     }
     fn optional_args(&self) -> StackOffset {
         self.optional_args
+    }
+    fn variadic_args(&self) -> bool {
+        self.variadic_args
     }
 }
 impl GraphNode for CompiledFunctionTerm {
