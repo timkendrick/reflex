@@ -10,7 +10,7 @@ use reflex::core::{Builtin, Expression, ExpressionFactory, HeapAllocator};
 use reflex_json::stdlib::{JsonDeserialize, JsonSerialize};
 use reflex_stdlib::{
     Abs, Apply, Ceil, CollectHashMap, CollectHashSet, ConstructRecord, Floor, Get, If, Keys, Map,
-    Max, Min, ResolveDeep, ResolveHashMap, ResolveList, Round, Unzip, Values, Zip,
+    Max, Min, Pow, ResolveDeep, ResolveHashMap, ResolveList, Round, Unzip, Values, Zip,
 };
 
 pub(crate) mod boolean;
@@ -59,6 +59,7 @@ pub trait JsGlobalsBuiltin:
     + From<Min>
     + From<ParseFloat>
     + From<ParseInt>
+    + From<Pow>
     + From<ResolveDeep>
     + From<ResolveHashMap>
     + From<ResolveList>
@@ -93,6 +94,7 @@ impl<T> JsGlobalsBuiltin for T where
         + From<Min>
         + From<ParseFloat>
         + From<ParseInt>
+        + From<Pow>
         + From<ResolveDeep>
         + From<ResolveHashMap>
         + From<ResolveList>
