@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use reflex::core::{ConditionType, Expression, RefType};
+use reflex::core::{ConditionType, Expression, SignalType};
 use reflex_dispatcher::{Action, Named, SerializableAction, SerializedAction};
 use reflex_json::{JsonMap, JsonValue};
 use reflex_macros::Named;
@@ -147,17 +147,19 @@ impl<T: Expression> SerializableAction for EffectSubscribeAction<T> {
                 JsonValue::from(
                     self.effects
                         .iter()
-                        .map(|signal| {
+                        .filter_map(|effect| match effect.signal_type() {
+                            SignalType::Custom {
+                                effect_type: _,
+                                payload,
+                                token,
+                            } => Some((effect.id(), payload, token)),
+                            _ => None,
+                        })
+                        .map(|(effect_id, payload, token)| {
                             JsonValue::Object(JsonMap::from_iter([
-                                (String::from("id"), JsonValue::from(signal.id())),
-                                (
-                                    String::from("payload"),
-                                    sanitize_expression(signal.payload().as_deref()),
-                                ),
-                                (
-                                    String::from("token"),
-                                    sanitize_expression(signal.token().as_deref()),
-                                ),
+                                (String::from("id"), JsonValue::from(effect_id)),
+                                (String::from("payload"), sanitize_expression(&payload)),
+                                (String::from("token"), sanitize_expression(&token)),
                             ]))
                         })
                         .collect::<Vec<_>>(),
@@ -186,17 +188,19 @@ impl<T: Expression> SerializableAction for EffectUnsubscribeAction<T> {
                 JsonValue::from(
                     self.effects
                         .iter()
-                        .map(|signal| {
+                        .filter_map(|effect| match effect.signal_type() {
+                            SignalType::Custom {
+                                effect_type: _,
+                                payload,
+                                token,
+                            } => Some((effect.id(), payload, token)),
+                            _ => None,
+                        })
+                        .map(|(effect_id, payload, token)| {
                             JsonValue::Object(JsonMap::from_iter([
-                                (String::from("id"), JsonValue::from(signal.id())),
-                                (
-                                    String::from("payload"),
-                                    sanitize_expression(signal.payload().as_deref()),
-                                ),
-                                (
-                                    String::from("token"),
-                                    sanitize_expression(signal.token().as_deref()),
-                                ),
+                                (String::from("id"), JsonValue::from(effect_id)),
+                                (String::from("payload"), sanitize_expression(&payload)),
+                                (String::from("token"), sanitize_expression(&token)),
                             ]))
                         })
                         .collect::<Vec<_>>(),

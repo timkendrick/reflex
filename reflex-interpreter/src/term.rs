@@ -752,22 +752,22 @@ fn compile_signal<T: Expression + Compile<T>>(
     compiler: &mut Compiler,
 ) -> Result<Program, String> {
     match signal.signal_type() {
-        SignalType::Custom(signal_type) => {
-            let payload = signal.payload();
-            let token = signal.token();
-            let payload = payload.as_deref();
-            let token = token.as_deref();
+        SignalType::Custom {
+            effect_type,
+            payload,
+            token,
+        } => {
             let compiled_token =
-                compiler.compile_term(token, Eagerness::Lazy, stack_offset, factory, allocator)?;
+                compiler.compile_term(&token, Eagerness::Lazy, stack_offset, factory, allocator)?;
             let compiled_payload = compiler.compile_term(
-                payload,
+                &payload,
                 Eagerness::Lazy,
                 stack_offset,
                 factory,
                 allocator,
             )?;
-            let compiled_signal_type = compiler.compile_term(
-                &signal_type,
+            let compiled_effect_type = compiler.compile_term(
+                &effect_type,
                 Eagerness::Lazy,
                 stack_offset,
                 factory,
@@ -775,16 +775,14 @@ fn compile_signal<T: Expression + Compile<T>>(
             )?;
             let mut result = compiled_token;
             result.extend(compiled_payload);
-            result.extend(compiled_signal_type);
+            result.extend(compiled_effect_type);
             result.push(Instruction::ConstructCustomCondition);
             Ok(result)
         }
         SignalType::Pending => Ok(Program::new(once(Instruction::ConstructPendingCondition))),
-        SignalType::Error => {
-            let payload = signal.payload();
-            let payload = payload.as_deref();
+        SignalType::Error { payload } => {
             let compiled_payload = compiler.compile_term(
-                payload,
+                &payload,
                 Eagerness::Lazy,
                 stack_offset,
                 factory,

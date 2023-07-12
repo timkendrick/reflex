@@ -953,13 +953,9 @@ fn evaluate_instruction<'a, T: Expression + Rewritable<T> + Reducible<T> + Appli
         }
         Instruction::ConstructPendingCondition => {
             trace!(instruction = "Instruction::ConstructPendingCondition");
-            let signal = factory.create_signal_term(allocator.create_signal_list(once(
-                allocator.create_signal(
-                    SignalType::Pending,
-                    factory.create_nil_term(),
-                    factory.create_nil_term(),
-                ),
-            )));
+            let signal = factory.create_signal_term(
+                allocator.create_signal_list(once(allocator.create_signal(SignalType::Pending))),
+            );
             stack.push(signal);
             Ok((ExecutionResult::Advance, DependencyList::empty()))
         }
@@ -973,9 +969,13 @@ fn evaluate_instruction<'a, T: Expression + Rewritable<T> + Reducible<T> + Appli
                 None => Err(String::from(
                     "Unable to construct custom condition: insufficient arguments on stack",
                 )),
-                Some((signal_type, payload, token)) => {
+                Some((effect_type, payload, token)) => {
                     let signal = factory.create_signal_term(allocator.create_signal_list(once(
-                        allocator.create_signal(SignalType::Custom(signal_type), payload, token),
+                        allocator.create_signal(SignalType::Custom {
+                            effect_type,
+                            payload,
+                            token,
+                        }),
                     )));
                     stack.push(signal);
                     Ok((ExecutionResult::Advance, DependencyList::empty()))
@@ -990,11 +990,7 @@ fn evaluate_instruction<'a, T: Expression + Rewritable<T> + Reducible<T> + Appli
                 )),
                 Some(payload) => {
                     let signal = factory.create_signal_term(allocator.create_signal_list(once(
-                        allocator.create_signal(
-                            SignalType::Error,
-                            payload,
-                            factory.create_nil_term(),
-                        ),
+                        allocator.create_signal(SignalType::Error { payload }),
                     )));
                     stack.push(signal);
                     Ok((ExecutionResult::Advance, DependencyList::empty()))
@@ -1735,11 +1731,11 @@ mod tests {
         let allocator = DefaultAllocator::default();
         let mut cache = DefaultInterpreterCache::default();
         let target = parse("(lambda (foo bar) (+ foo bar))", &factory, &allocator).unwrap();
-        let condition = allocator.create_signal(
-            SignalType::Custom(factory.create_string_term(allocator.create_static_string("foo"))),
-            factory.create_string_term(allocator.create_string("bar")),
-            factory.create_symbol_term(123),
-        );
+        let condition = allocator.create_signal(SignalType::Custom {
+            effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+            payload: factory.create_string_term(allocator.create_string("bar")),
+            token: factory.create_symbol_term(123),
+        });
         let expression = factory.create_application_term(
             target,
             allocator.create_pair(

@@ -232,8 +232,6 @@ pub trait ConditionType<T: Expression>:
 {
     fn id(&self) -> StateToken;
     fn signal_type(&self) -> SignalType<T>;
-    fn payload<'a>(&'a self) -> T::ExpressionRef<'a>;
-    fn token<'a>(&'a self) -> T::ExpressionRef<'a>;
 }
 
 pub type ExpressionListIter<'a, T> =
@@ -1200,7 +1198,7 @@ pub trait HeapAllocator<T: Expression> {
     ) -> T::StructPrototype
     where
         Self: 'a;
-    fn create_signal(&self, signal_type: SignalType<T>, payload: T, token: T) -> T::Signal;
+    fn create_signal(&self, signal_type: SignalType<T>) -> T::Signal;
     fn clone_signal<'a>(&self, signal: T::SignalRef<'a>) -> T::Signal
     where
         Self: 'a;
@@ -1235,16 +1233,34 @@ pub type SignalId = HashId;
 
 #[derive(Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum SignalType<T: Expression> {
-    Error,
+    Error {
+        payload: T,
+    },
     Pending,
-    Custom(T),
+    Custom {
+        effect_type: T,
+        payload: T,
+        token: T,
+    },
 }
 
 impl<T: Expression> Hash for SignalType<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         core::mem::discriminant(self).hash(state);
-        if let Self::Custom(effect_type) = self {
-            effect_type.id().hash(state);
+        match self {
+            Self::Error { payload } => {
+                payload.id().hash(state);
+            }
+            Self::Pending => {}
+            Self::Custom {
+                effect_type,
+                payload,
+                token,
+            } => {
+                effect_type.id().hash(state);
+                payload.id().hash(state);
+                token.id().hash(state);
+            }
         }
     }
 }
@@ -1648,11 +1664,9 @@ pub fn create_pending_expression<T: Expression>(
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
 ) -> T {
-    factory.create_signal_term(allocator.create_signal_list(once(allocator.create_signal(
-        SignalType::Pending,
-        factory.create_nil_term(),
-        factory.create_nil_term(),
-    ))))
+    factory.create_signal_term(
+        allocator.create_signal_list(once(allocator.create_signal(SignalType::Pending))),
+    )
 }
 
 pub fn create_error_expression<T: Expression>(
@@ -1660,11 +1674,9 @@ pub fn create_error_expression<T: Expression>(
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
 ) -> T {
-    factory.create_signal_term(allocator.create_signal_list(once(allocator.create_signal(
-        SignalType::Error,
-        payload,
-        factory.create_nil_term(),
-    ))))
+    factory.create_signal_term(
+        allocator.create_signal_list(once(allocator.create_signal(SignalType::Error { payload }))),
+    )
 }
 
 pub fn get_short_circuit_signal<T: Expression>(

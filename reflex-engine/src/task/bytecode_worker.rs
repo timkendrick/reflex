@@ -465,9 +465,9 @@ fn create_error_expression<T: Expression>(
     allocator: &impl HeapAllocator<T>,
 ) -> T {
     factory.create_signal_term(allocator.create_signal_list(once(allocator.create_signal(
-        SignalType::Error,
-        factory.create_string_term(allocator.create_string(message)),
-        factory.create_nil_term(),
+        SignalType::Error {
+            payload: factory.create_string_term(allocator.create_string(message)),
+        },
     ))))
 }
 

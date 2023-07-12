@@ -37,13 +37,15 @@ impl<T: Expression> Applicable<T> for Effect {
         allocator: &impl HeapAllocator<T>,
         _cache: &mut impl EvaluationCache<T>,
     ) -> Result<T, String> {
-        let signal_type = args.next().unwrap();
+        let effect_type = args.next().unwrap();
         let payload = args.next().unwrap();
         let token = args.next().unwrap();
-        Ok(factory.create_effect_term(allocator.create_signal(
-            SignalType::Custom(signal_type),
-            payload,
-            token,
-        )))
+        Ok(
+            factory.create_effect_term(allocator.create_signal(SignalType::Custom {
+                effect_type,
+                payload,
+                token,
+            })),
+        )
     }
 }

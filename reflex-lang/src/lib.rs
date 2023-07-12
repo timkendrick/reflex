@@ -286,32 +286,34 @@ where
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct Signal<T: Expression> {
     id: HashId,
     signal_type: SignalType<T>,
-    payload: T,
-    token: T,
 }
 impl<T: Expression> Signal<T> {
-    pub fn new(signal_type: SignalType<T>, payload: T, token: T) -> Self {
+    pub fn new(signal_type: SignalType<T>) -> Self {
         let hash = {
             // FIXME: Ensure consistent hashes across alternative Condition implementations
             let mut hasher = FnvHasher::default();
             let enum_discriminant = match &signal_type {
-                SignalType::Custom(_) => 0u8,
+                SignalType::Custom { .. } => 0u8,
                 SignalType::Pending => 1u8,
-                SignalType::Error => 2u8,
+                SignalType::Error { .. } => 2u8,
             };
             hasher.write_u8(enum_discriminant);
             match &signal_type {
-                SignalType::Custom(condition_type) => {
-                    Hash::hash(&condition_type.id(), &mut hasher);
+                SignalType::Custom {
+                    effect_type,
+                    payload,
+                    token,
+                } => {
+                    Hash::hash(&effect_type.id(), &mut hasher);
                     Hash::hash(&payload.id(), &mut hasher);
                     Hash::hash(&token.id(), &mut hasher);
                 }
                 SignalType::Pending => {}
-                SignalType::Error => {
+                SignalType::Error { payload } => {
                     Hash::hash(&payload.id(), &mut hasher);
                 }
             }
@@ -320,8 +322,6 @@ impl<T: Expression> Signal<T> {
         Self {
             id: hash,
             signal_type,
-            payload,
-            token,
         }
     }
     pub fn is_type(&self, signal_type: &SignalType<T>) -> bool {
@@ -351,107 +351,10 @@ impl<T: Expression> ConditionType<T> for Signal<T> {
         // FIXME: Prevent unnecessary cloning of signal type
         self.signal_type.clone()
     }
-    fn payload<'a>(&'a self) -> T::ExpressionRef<'a> {
-        (&self.payload).into()
-    }
-    fn token<'a>(&'a self) -> T::ExpressionRef<'a> {
-        (&self.token).into()
-    }
 }
 impl<T: Expression> std::fmt::Display for Signal<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "<signal:{}:{}:{}>",
-            self.signal_type, self.token, self.payload
-        )
-    }
-}
-impl<T: Expression> serde::Serialize for Signal<T>
-where
-    T: serde::Serialize,
-    T::ExpressionList: serde::Serialize,
-{
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        Into::<SerializedSignal<T>>::into(self).serialize(serializer)
-    }
-}
-impl<'de, T: Expression> serde::Deserialize<'de> for Signal<T>
-where
-    T: serde::Deserialize<'de>,
-    T::ExpressionList: serde::Deserialize<'de>,
-{
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        Ok((SerializedSignal::<T>::deserialize(deserializer)?).into())
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct SerializedSignal<T: Expression> {
-    signal_type: SerializedSignalType,
-    custom_type: Option<T>,
-    payload: T,
-    token: T,
-}
-impl<'a, T: Expression> Into<SerializedSignal<T>> for &'a Signal<T> {
-    fn into(self) -> SerializedSignal<T> {
-        let (signal_type, custom_type) = serialize_signal_type(&self.signal_type);
-        let payload = self.payload.clone();
-        let token = self.token.clone();
-        SerializedSignal {
-            signal_type,
-            custom_type,
-            payload,
-            token,
-        }
-    }
-}
-impl<T: Expression> Into<Signal<T>> for SerializedSignal<T> {
-    fn into(self) -> Signal<T> {
-        let SerializedSignal {
-            signal_type,
-            custom_type,
-            payload,
-            token,
-        } = self;
-        let signal_type = deserialize_signal_type(signal_type, custom_type);
-        Signal::new(signal_type, payload, token)
-    }
-}
-#[derive(Debug, Serialize, Deserialize)]
-enum SerializedSignalType {
-    Error,
-    Pending,
-    Custom,
-}
-fn serialize_signal_type<T: Expression>(
-    signal_type: &SignalType<T>,
-) -> (SerializedSignalType, Option<T>) {
-    match signal_type {
-        SignalType::Pending => (SerializedSignalType::Pending, None),
-        SignalType::Error => (SerializedSignalType::Error, None),
-        SignalType::Custom(custom_type) => {
-            (SerializedSignalType::Custom, Some(custom_type.clone()))
-        }
-    }
-}
-fn deserialize_signal_type<T: Expression>(
-    signal_type: SerializedSignalType,
-    custom_type: Option<T>,
-) -> SignalType<T> {
-    match signal_type {
-        SerializedSignalType::Pending => SignalType::Pending,
-        SerializedSignalType::Error => SignalType::Error,
-        SerializedSignalType::Custom => match custom_type {
-            Some(custom_type) => SignalType::Custom(custom_type),
-            None => SignalType::Error,
-        },
+        write!(f, "<signal:{}>", self.signal_type)
     }
 }
 

@@ -131,15 +131,16 @@ where
         let state_token = args.next().unwrap();
         let initial_value = args.next().unwrap();
         if let Some(_) = factory.match_symbol_term(&state_token) {
-            Ok(factory.create_effect_term(allocator.create_signal(
-                SignalType::Custom(
-                    factory.create_string_term(
+            Ok(
+                factory.create_effect_term(allocator.create_signal(SignalType::Custom {
+                    effect_type: factory.create_string_term(
                         allocator.create_static_string(EFFECT_TYPE_VARIABLE_GET),
                     ),
-                ),
-                factory.create_list_term(allocator.create_pair(state_token, initial_value)),
-                factory.create_nil_term(),
-            )))
+                    payload:
+                        factory.create_list_term(allocator.create_pair(state_token, initial_value)),
+                    token: factory.create_nil_term(),
+                })),
+            )
         } else {
             Err(format!(
                 "Expected (Symbol, <any>), received ({}, {})",
@@ -191,15 +192,15 @@ where
             factory.match_symbol_term(&state_token),
             factory.match_symbol_term(&update_token),
         ) {
-            (Some(_), Some(_)) => {
-                Ok(factory.create_effect_term(allocator.create_signal(
-                    SignalType::Custom(factory.create_string_term(
+            (Some(_), Some(_)) => Ok(factory.create_effect_term(allocator.create_signal(
+                SignalType::Custom {
+                    effect_type: factory.create_string_term(
                         allocator.create_static_string(EFFECT_TYPE_VARIABLE_SET),
-                    )),
-                    factory.create_list_term(allocator.create_pair(state_token, value)),
-                    update_token,
-                )))
-            }
+                    ),
+                    payload: factory.create_list_term(allocator.create_pair(state_token, value)),
+                    token: update_token,
+                },
+            ))),
             _ => Err(format!(
                 "Expected (Symbol, <any>, Symbol), received ({}, {}, {})",
                 state_token, value, update_token
@@ -250,11 +251,13 @@ where
             factory.match_symbol_term(&update_token),
         ) {
             (Some(_), Some(_)) => Ok(factory.create_effect_term(allocator.create_signal(
-                SignalType::Custom(factory.create_string_term(
-                    allocator.create_static_string(EFFECT_TYPE_VARIABLE_INCREMENT),
-                )),
-                factory.create_list_term(allocator.create_unit_list(state_token)),
-                update_token,
+                SignalType::Custom {
+                    effect_type: factory.create_string_term(
+                        allocator.create_static_string(EFFECT_TYPE_VARIABLE_INCREMENT),
+                    ),
+                    payload: factory.create_list_term(allocator.create_unit_list(state_token)),
+                    token: update_token,
+                },
             ))),
             _ => Err(format!(
                 "Expected (Symbol, Symbol), received ({}, {})",
@@ -306,11 +309,13 @@ where
             factory.match_symbol_term(&update_token),
         ) {
             (Some(_), Some(_)) => Ok(factory.create_effect_term(allocator.create_signal(
-                SignalType::Custom(factory.create_string_term(
-                    allocator.create_static_string(EFFECT_TYPE_VARIABLE_DECREMENT),
-                )),
-                factory.create_list_term(allocator.create_unit_list(state_token)),
-                update_token,
+                SignalType::Custom {
+                    effect_type: factory.create_string_term(
+                        allocator.create_static_string(EFFECT_TYPE_VARIABLE_DECREMENT),
+                    ),
+                    payload: factory.create_list_term(allocator.create_unit_list(state_token)),
+                    token: update_token,
+                },
             ))),
             _ => Err(format!(
                 "Expected (Symbol, Symbol), received ({}, {})",

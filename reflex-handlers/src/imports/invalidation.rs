@@ -192,9 +192,8 @@ where
                                                                                                                 1,
                                                                                                                 factory.create_signal_term(
                                                                                                                     allocator.create_signal_list([
-                                                                                                                        allocator.create_signal(
-                                                                                                                            SignalType::Error,
-                                                                                                                            factory.create_record_term(
+                                                                                                                        allocator.create_signal(SignalType::Error {
+                                                                                                                            payload: factory.create_record_term(
                                                                                                                                 allocator.create_struct_prototype(
                                                                                                                                     allocator.create_list([
                                                                                                                                         factory.create_string_term(allocator.create_static_string("name")),
@@ -206,8 +205,7 @@ where
                                                                                                                                     factory.create_string_term(allocator.create_static_string("Timeout exceeded")),
                                                                                                                                 ]),
                                                                                                                             ),
-                                                                                                                            factory.create_nil_term(),
-                                                                                                                        ),
+                                                                                                                        }),
                                                                                                                     ]),
                                                                                                                 ),
                                                                                                             ),
@@ -277,11 +275,7 @@ where
                                                                                     factory.create_boolean_term(true),
                                                                                     factory.create_signal_term(
                                                                                         allocator.create_signal_list( [
-                                                                                            allocator.create_signal(
-                                                                                                SignalType::Pending,
-                                                                                                factory.create_nil_term(),
-                                                                                                factory.create_nil_term(),
-                                                                                            ),
+                                                                                            allocator.create_signal(SignalType::Pending),
                                                                                         ] ),
                                                                                     ),
                                                                                     factory.create_int_term(0),

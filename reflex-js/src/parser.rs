@@ -2045,9 +2045,8 @@ mod tests {
     ) -> Vec<String> {
         let combined_signal = factory.create_signal_term(allocator.create_signal_list(
             messages.into_iter().map(|message| {
-                allocator.create_signal(
-                    SignalType::Error,
-                    create_record(
+                allocator.create_signal(SignalType::Error {
+                    payload: create_record(
                         once((
                             factory.create_string_term(allocator.create_static_string("name")),
                             factory.create_string_term(allocator.create_static_string("Error")),
@@ -2059,21 +2058,23 @@ mod tests {
                         factory,
                         allocator,
                     ),
-                    factory.create_nil_term(),
-                )
+                })
             }),
         ));
-        let signals = factory
+        let conditions = factory
             .match_signal_term(&combined_signal)
             .unwrap()
             .signals();
-        let signals = signals.as_deref();
-        signals
+        let conditions = conditions.as_deref();
+        conditions
             .iter()
-            .map(|signal| {
-                let payload = signal.as_deref().payload();
+            .filter_map(|condition| match condition.as_deref().signal_type() {
+                SignalType::Error { payload } => Some(payload),
+                _ => None,
+            })
+            .map(|payload| {
                 let message = factory
-                    .match_record_term(payload.as_deref())
+                    .match_record_term(&payload)
                     .unwrap()
                     .get(&factory.create_string_term(allocator.create_static_string("message")))
                     .unwrap();
@@ -4517,9 +4518,8 @@ mod tests {
                         vec![String::from("foo"), String::from("bar")]
                             .into_iter()
                             .map(|message| {
-                                allocator.create_signal(
-                                    SignalType::Error,
-                                    create_record(
+                                allocator.create_signal(SignalType::Error {
+                                    payload: create_record(
                                         once((
                                             factory.create_string_term(
                                                 allocator.create_static_string("name"),
@@ -4539,8 +4539,7 @@ mod tests {
                                         &factory,
                                         &allocator,
                                     ),
-                                    factory.create_nil_term(),
-                                )
+                                })
                             }),
                     )
                 ),

@@ -1,13 +1,11 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use std::iter::once;
-
 use reflex::core::{
-    deduplicate_hashmap_entries, deduplicate_hashset_entries, match_typed_expression_list, uuid,
-    Applicable, ArgType, Arity, ConditionListType, EvaluationCache, Expression, ExpressionFactory,
-    ExpressionListType, FunctionArity, HeapAllocator, ListTermType, RefType, SignalTermType,
-    SignalType, Uid, Uuid,
+    create_error_expression, deduplicate_hashmap_entries, deduplicate_hashset_entries,
+    match_typed_expression_list, uuid, Applicable, ArgType, Arity, ConditionListType,
+    EvaluationCache, Expression, ExpressionFactory, ExpressionListType, FunctionArity,
+    HeapAllocator, ListTermType, RefType, SignalTermType, Uid, Uuid,
 };
 
 use crate::Get;
@@ -155,7 +153,7 @@ where
                         ),
                     ),
                     Err(err) => {
-                        let signal = create_error_signal_term(
+                        let signal = create_error_expression(
                             factory.create_string_term(allocator.create_string(err)),
                             factory,
                             allocator,
@@ -224,16 +222,4 @@ impl<T: Expression> Applicable<T> for CollectSignal {
         });
         Ok(factory.create_signal_term(allocator.create_signal_list(signals)))
     }
-}
-
-fn create_error_signal_term<T: Expression>(
-    data: T,
-    factory: &impl ExpressionFactory<T>,
-    allocator: &impl HeapAllocator<T>,
-) -> T {
-    factory.create_signal_term(allocator.create_signal_list(once(allocator.create_signal(
-        SignalType::Error,
-        data,
-        factory.create_nil_term(),
-    ))))
 }

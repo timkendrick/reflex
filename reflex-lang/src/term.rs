@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
-// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
+// SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 // SPDX-FileContributor: Chris Campbell <c.campbell@mwam.com> https://github.com/c-campbell-mwam
 use std::{collections::HashSet, hash::Hash};
 
@@ -799,11 +799,11 @@ mod test {
 
         let input =
             factory.create_signal_term(allocator.create_signal_list([allocator.create_signal(
-                SignalType::Custom(
-                    factory.create_string_term(allocator.create_static_string("foo")),
-                ),
-                factory.create_int_term(3),
-                factory.create_symbol_term(123),
+                SignalType::Custom {
+                    effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+                    payload: factory.create_int_term(3),
+                    token: factory.create_symbol_term(123),
+                },
             )]));
         let serialized = serde_json::to_string(&input).unwrap();
         let deserialized: CachedSharedTerm<Stdlib> = serde_json::from_str(&serialized).unwrap();

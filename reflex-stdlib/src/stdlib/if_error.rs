@@ -41,23 +41,23 @@ impl<T: Expression> Applicable<T> for IfError {
         let target = args.next().unwrap();
         let handler = args.next().unwrap();
         if let Some(signal) = factory.match_signal_term(&target) {
-            let (error_signals, other_signals) = signal
+            let (error_payloads, other_signals) = signal
                 .signals()
                 .as_deref()
                 .iter()
                 .map(|item| item.as_deref().clone())
                 .fold(
                     (Vec::new(), Vec::new()),
-                    |(mut error_signals, mut other_signals), signal| {
-                        if signal.signal_type() == SignalType::Error {
-                            error_signals.push(signal);
+                    |(mut error_payloads, mut other_signals), signal| {
+                        if let SignalType::Error { payload, .. } = signal.signal_type() {
+                            error_payloads.push(payload);
                         } else {
                             other_signals.push(signal);
                         }
-                        (error_signals, other_signals)
+                        (error_payloads, other_signals)
                     },
                 );
-            if error_signals.is_empty() {
+            if error_payloads.is_empty() {
                 Ok(target.clone())
             } else if !other_signals.is_empty() {
                 Ok(factory.create_signal_term(allocator.create_signal_list(other_signals)))
@@ -65,13 +65,7 @@ impl<T: Expression> Applicable<T> for IfError {
                 Ok(factory.create_application_term(
                     handler,
                     allocator.create_unit_list(
-                        factory.create_list_term(
-                            allocator.create_list(
-                                error_signals
-                                    .into_iter()
-                                    .map(|signal| signal.payload().as_deref().clone()),
-                            ),
-                        ),
+                        factory.create_list_term(allocator.create_list(error_payloads)),
                     ),
                 ))
             }

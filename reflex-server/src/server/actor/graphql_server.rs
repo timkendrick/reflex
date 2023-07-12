@@ -293,7 +293,7 @@ fn get_signal_type_label<T: Expression>(
     factory: &impl ExpressionFactory<T>,
 ) -> String {
     match signal_type {
-        SignalType::Custom(effect_type) => {
+        SignalType::Custom { effect_type, .. } => {
             if let Some(effect_type) = factory.match_string_term(effect_type) {
                 format!(
                     "{prefix}:{}",
@@ -303,7 +303,7 @@ fn get_signal_type_label<T: Expression>(
                 format!("{prefix}:{effect_type}")
             }
         }
-        SignalType::Pending | SignalType::Error => format!("{prefix}:{signal_type}",),
+        SignalType::Pending | SignalType::Error { .. } => format!("{prefix}:{signal_type}",),
     }
 }
 
@@ -315,9 +315,11 @@ fn get_effect_span_attributes<T: Expression>(
     once(KeyValue::new(
         Key::from("type"),
         match signal_type {
-            SignalType::Error => Value::from("error"),
+            SignalType::Error { .. } => Value::from("error"),
             SignalType::Pending => Value::from("pending"),
-            SignalType::Custom(_) => Value::from(get_signal_type_label("", signal_type, factory)),
+            SignalType::Custom { .. } => {
+                Value::from(get_signal_type_label("", signal_type, factory))
+            }
         },
     ))
     .chain(attributes)
@@ -1323,8 +1325,8 @@ where
                 &operation_state.metric_labels
             );
         }
-        let error_result = match_error_expression(result.result(), &self.factory);
-        let is_error_result = error_result.is_some();
+        let error_payload = match_error_expression(result.result(), &self.factory);
+        let is_error_result = error_payload.is_some();
         if is_error_result {
             increment_counter!(
                 self.metric_names.graphql_error_payload_count,
@@ -1336,9 +1338,11 @@ where
                 &operation_state.metric_labels
             );
         }
-        let result_status = if let Some(err) = error_result {
-            Err(parse_error_message(&err, &self.factory, &self.allocator)
-                .unwrap_or_else(|| String::from("Error")))
+        let result_status = if let Some(payload) = error_payload {
+            Err(
+                parse_error_message(&payload, &self.factory, &self.allocator)
+                    .unwrap_or_else(|| String::from("Error")),
+            )
         } else {
             Ok(())
         };
@@ -1529,7 +1533,7 @@ where
                     state_update_effect_type
                         .iter()
                         .filter_map(|(effect_type, count)| match effect_type {
-                            SignalType::Custom(effect_type) => Some((effect_type, count)),
+                            SignalType::Custom { effect_type, .. } => Some((effect_type, count)),
                             _ => None,
                         })
                         .map(|(effect_type, count)| {
@@ -1745,10 +1749,9 @@ fn parse_effect_value_status<T: Expression>(
     if let Some(term) = factory.match_signal_term(value) {
         let error_payload = term.signals().as_deref().iter().find_map(|effect| {
             let effect = effect.as_deref();
-            if matches!(effect.signal_type(), SignalType::Error) {
-                Some(effect.payload().as_deref().clone())
-            } else {
-                None
+            match effect.signal_type() {
+                SignalType::Error { payload } => Some(payload),
+                _ => None,
             }
         });
         if let Some(payload) = error_payload {
@@ -1827,7 +1830,7 @@ fn format_effect_status_type_metric_labels<'a, T: Expression + 'a>(
 ) -> impl Iterator<Item = KeyValue> + 'a {
     counts
         .into_iter()
-        .filter(|(effect_type, _)| matches!(effect_type, SignalType::Custom(_)))
+        .filter(|(condition_type, _)| matches!(condition_type, SignalType::Custom { .. }))
         .map(move |(effect_type, count)| {
             KeyValue::new(
                 Key::from(get_signal_type_label(prefix, effect_type, factory)),
@@ -1869,31 +1872,38 @@ fn update_operation_effect_mappings<
     let custom_effects = parse_custom_effects(result.result(), factory);
     active_effects.extend(custom_effects.into_iter().map(|effect| {
         let state_token = effect.id();
-        let effect_type = effect.signal_type();
-        let is_internal_effect = match &effect_type {
-            SignalType::Error | SignalType::Pending => true,
-            SignalType::Custom(effect_type) => is_internal_effect_type(effect_type, factory),
+        let condition_type = effect.signal_type();
+        let is_internal_effect = match &condition_type {
+            SignalType::Error { .. } | SignalType::Pending => true,
+            SignalType::Custom { effect_type, .. } => is_internal_effect_type(effect_type, factory),
         };
         if !is_internal_effect {
             let active_traces = subscriptions
                 .values_mut()
                 .filter_map(|subscription| subscription.trace.as_mut());
+            let (payload, token) = match &condition_type {
+                SignalType::Error { payload } => (Some(payload), None),
+                SignalType::Pending => (None, None),
+                SignalType::Custom { payload, token, .. } => (Some(payload), Some(token)),
+            };
             for trace in active_traces {
                 trace.start_effect_span(
                     state_token,
-                    &effect_type,
+                    &condition_type,
                     [
                         KeyValue::new(
                             Key::from("effect_type"),
-                            get_signal_type_label("", &effect_type, factory),
+                            get_signal_type_label("", &condition_type, factory),
                         ),
                         KeyValue::new(
                             Key::from("payload"),
-                            Value::from(format!("{}", effect.payload().as_deref())),
+                            Value::from(
+                                payload.map(|value| format!("{value}")).unwrap_or_default(),
+                            ),
                         ),
                         KeyValue::new(
                             Key::from("token"),
-                            Value::from(format!("{}", effect.token().as_deref())),
+                            Value::from(token.map(|value| format!("{value}")).unwrap_or_default()),
                         ),
                     ],
                     factory,
@@ -1904,7 +1914,7 @@ fn update_operation_effect_mappings<
         (
             state_token,
             GraphQlOperationEffectState {
-                signal_type: effect_type,
+                signal_type: condition_type,
                 condition: effect,
                 status: EffectStatus::Queued,
                 active_span: Some(state_token),
@@ -1924,7 +1934,7 @@ fn parse_custom_effects<T: Expression>(
             .as_deref()
             .iter()
             .filter_map(|effect| match effect.as_deref().signal_type() {
-                SignalType::Custom(_) => Some(effect.as_deref().clone()),
+                SignalType::Custom { .. } => Some(effect.as_deref().clone()),
                 _ => None,
             })
             .collect::<Vec<_>>(),
@@ -1934,26 +1944,23 @@ fn parse_custom_effects<T: Expression>(
 fn match_error_expression<'a, T: Expression>(
     expression: &'a T,
     factory: &impl ExpressionFactory<T>,
-) -> Option<T::Signal> {
+) -> Option<T> {
     factory.match_signal_term(expression).and_then(|term| {
-        term.signals().as_deref().iter().find_map(|effect| {
-            let effect = effect.as_deref();
-            if matches!(effect.signal_type(), SignalType::Error) {
-                Some(effect.clone())
-            } else {
-                None
-            }
-        })
+        term.signals()
+            .as_deref()
+            .iter()
+            .find_map(|effect| match effect.as_deref().signal_type() {
+                SignalType::Error { payload } => Some(payload),
+                _ => None,
+            })
     })
 }
 
 fn parse_error_message<'a, T: Expression + 'a>(
-    error: &'a T::Signal,
+    payload: &'a T,
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
 ) -> Option<String> {
-    let payload = error.payload();
-    let payload = payload.as_deref();
     if let Some(term) = factory.match_string_term(payload) {
         Some(String::from(term.value().as_deref().as_str().deref()))
     } else if let Some(term) = factory.match_record_term(payload) {
@@ -1992,7 +1999,7 @@ fn is_blocked_result_payload<T: Expression>(
             term.signals()
                 .as_deref()
                 .iter()
-                .any(|effect| matches!(effect.as_deref().signal_type(), SignalType::Custom(_)))
+                .any(|effect| matches!(effect.as_deref().signal_type(), SignalType::Custom { .. }))
         })
         .unwrap_or(false)
 }
@@ -2150,16 +2157,10 @@ mod tests {
         //       error and pending maps to error
         let mixed_result = EvaluationResult::new(
             factory.create_signal_term(allocator.create_signal_list(vec![
-                allocator.create_signal(
-                    SignalType::Pending,
-                    factory.create_nil_term(),
-                    factory.create_nil_term(),
-                ),
-                allocator.create_signal(
-                    SignalType::Error,
-                    factory.create_string_term(allocator.create_static_string("foo")),
-                    factory.create_nil_term(),
-                ),
+                allocator.create_signal(SignalType::Pending),
+                allocator.create_signal(SignalType::Error {
+                    payload: factory.create_string_term(allocator.create_static_string("foo")),
+                }),
             ])),
             DependencyList::empty(),
         );
@@ -3028,11 +3029,9 @@ mod tests {
     ) -> EvaluationResult<CachedSharedTerm<ServerBuiltins>> {
         EvaluationResult::new(
             factory.create_signal_term(allocator.create_signal_list(vec![
-                allocator.create_signal(
-                    SignalType::Error,
-                    factory.create_string_term(allocator.create_static_string("foo")),
-                    factory.create_nil_term(),
-                ),
+                allocator.create_signal(SignalType::Error {
+                    payload: factory.create_string_term(allocator.create_static_string("foo")),
+                }),
             ])),
             DependencyList::empty(),
         )
@@ -3049,13 +3048,9 @@ mod tests {
         allocator: &impl HeapAllocator<CachedSharedTerm<ServerBuiltins>>,
     ) -> EvaluationResult<CachedSharedTerm<ServerBuiltins>> {
         EvaluationResult::new(
-            factory.create_signal_term(allocator.create_signal_list(vec![
-                allocator.create_signal(
-                    SignalType::Pending,
-                    factory.create_nil_term(),
-                    factory.create_nil_term(),
-                ),
-            ])),
+            factory.create_signal_term(
+                allocator.create_signal_list(vec![allocator.create_signal(SignalType::Pending)]),
+            ),
             DependencyList::empty(),
         )
     }
@@ -3066,13 +3061,11 @@ mod tests {
     ) -> EvaluationResult<CachedSharedTerm<ServerBuiltins>> {
         EvaluationResult::new(
             factory.create_signal_term(allocator.create_signal_list(vec![
-                allocator.create_signal(
-                    SignalType::Custom(
-                        factory.create_string_term(allocator.create_static_string("foo")),
-                    ),
-                    factory.create_string_term(allocator.create_static_string("bar")),
-                    factory.create_symbol_term(123),
-                ),
+                allocator.create_signal(SignalType::Custom {
+                    effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+                    payload: factory.create_string_term(allocator.create_static_string("bar")),
+                    token: factory.create_symbol_term(123),
+                }),
             ])),
             DependencyList::empty(),
         )

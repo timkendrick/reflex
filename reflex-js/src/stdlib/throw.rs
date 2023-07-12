@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 // SPDX-FileContributor: Chris Campbell <c.campbell@mwam.com> https://github.com/c-campbell-mwam
-use std::{iter::once, ops::Deref};
+use std::ops::Deref;
 
 use reflex::core::{
-    uuid, Applicable, ArgType, Arity, EvaluationCache, Expression, ExpressionFactory,
-    ExpressionListType, FunctionArity, HeapAllocator, ListTermType, RecordTermType, RefType,
-    SignalType, StringTermType, StringValue, Uid, Uuid,
+    create_error_expression, uuid, Applicable, ArgType, Arity, EvaluationCache, Expression,
+    ExpressionFactory, ExpressionListType, FunctionArity, HeapAllocator, ListTermType,
+    RecordTermType, RefType, SignalType, StringTermType, StringValue, Uid, Uuid,
 };
 
 pub struct Throw;
@@ -48,17 +48,19 @@ impl<T: Expression> Applicable<T> for Throw {
                 "Thrown exceptions cannot contain dynamic values",
             ));
         }
-        let signals = if let Some(errors) = parse_aggregate_error(&error, factory, allocator) {
-            allocator.create_signal_list(
-                errors
-                    .iter()
-                    .map(|item| item.as_deref().clone())
-                    .map(|error| create_error_signal(error, factory, allocator)),
+        let exception = if let Some(errors) = parse_aggregate_error(&error, factory, allocator) {
+            factory.create_signal_term(
+                allocator.create_signal_list(
+                    errors
+                        .iter()
+                        .map(|item| item.as_deref().clone())
+                        .map(|payload| allocator.create_signal(SignalType::Error { payload })),
+                ),
             )
         } else {
-            allocator.create_signal_list(once(create_error_signal(error, factory, allocator)))
+            create_error_expression(error, factory, allocator)
         };
-        Ok(factory.create_signal_term(signals))
+        Ok(exception)
     }
 }
 
@@ -92,12 +94,4 @@ fn parse_aggregate_error<T: Expression>(
                 })
             })
     })
-}
-
-fn create_error_signal<T: Expression>(
-    error: T,
-    factory: &impl ExpressionFactory<T>,
-    allocator: &impl HeapAllocator<T>,
-) -> T::Signal {
-    allocator.create_signal(SignalType::Error, error, factory.create_nil_term())
 }

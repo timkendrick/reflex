@@ -31,13 +31,10 @@ where
                 factory.create_string_term(allocator.create_static_string("pending")),
                 factory.create_lambda_term(
                     0,
-                    factory.create_signal_term(allocator.create_signal_list(once(
-                        allocator.create_signal(
-                            SignalType::Pending,
-                            factory.create_nil_term(),
-                            factory.create_nil_term(),
-                        ),
-                    ))),
+                    factory
+                        .create_signal_term(allocator.create_signal_list(once(
+                            allocator.create_signal(SignalType::Pending),
+                        ))),
                 ),
             ),
         ],
