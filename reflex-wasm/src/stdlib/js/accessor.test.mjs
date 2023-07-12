@@ -503,6 +503,30 @@ export default (describe) => {
     }) => {
       (() => {
         const expression = createApplication(
+          createApplication(
+            createBuiltin(Stdlib.Accessor),
+            createPair(createString('foo'), createString('endsWith')),
+          ),
+          createUnitList(createString('f')),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), 'false');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createApplication(
+            createBuiltin(Stdlib.Accessor),
+            createPair(createString('foo'), createString('endsWith')),
+          ),
+          createUnitList(createString('o')),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), 'true');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
           createBuiltin(Stdlib.Accessor),
           createPair(createString('foo'), createString('length')),
         );
@@ -532,6 +556,30 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '["f", "", ""]');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createApplication(
+            createBuiltin(Stdlib.Accessor),
+            createPair(createString('foo'), createString('startsWith')),
+          ),
+          createUnitList(createString('f')),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), 'true');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createApplication(
+            createBuiltin(Stdlib.Accessor),
+            createPair(createString('foo'), createString('startsWith')),
+          ),
+          createUnitList(createString('o')),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), 'false');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {

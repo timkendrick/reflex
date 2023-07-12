@@ -3,6 +3,7 @@
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 (module
   (@const-string $Stdlib_Accessor::ADD "add")
+  (@const-string $Stdlib_Accessor::ENDS_WITH "endsWith")
   (@const-string $Stdlib_Accessor::ENTRIES "entries")
   (@const-string $Stdlib_Accessor::FILTER "filter")
   (@const-string $Stdlib_Accessor::FLAT_MAP "flatMap")
@@ -20,6 +21,7 @@
   (@const-string $Stdlib_Accessor::SLICE "slice")
   (@const-string $Stdlib_Accessor::SPLIT "split")
   (@const-string $Stdlib_Accessor::UNSHIFT "unshift")
+  (@const-string $Stdlib_Accessor::STARTS_WITH "startsWith")
   (@const-string $Stdlib_Accessor::VALUES "values")
 
   (@const $Stdlib_Accessor::SELECT_FIRST i32
@@ -252,6 +254,13 @@
           ;; Determine the return value based on the provided member name
           (@list
             (@list
+              (call $Term::traits::equals (local.get $key) (global.get $Stdlib_Accessor::ENDS_WITH))
+              (return
+                (call $Term::Partial::new
+                  (call $Term::Builtin::new (global.get $Stdlib_EndsWith))
+                  (call $Term::List::of (local.get $self)))
+                (global.get $NULL)))
+            (@list
               (call $Term::traits::equals (local.get $key) (global.get $Stdlib_Accessor::LENGTH))
               (return
                 (call $Term::Application::new
@@ -270,6 +279,13 @@
               (return
                 (call $Term::Partial::new
                   (call $Term::Builtin::new (global.get $Stdlib_Split))
+                  (call $Term::List::of (local.get $self)))
+                (global.get $NULL)))
+            (@list
+              (call $Term::traits::equals (local.get $key) (global.get $Stdlib_Accessor::STARTS_WITH))
+              (return
+                (call $Term::Partial::new
+                  (call $Term::Builtin::new (global.get $Stdlib_StartsWith))
                   (call $Term::List::of (local.get $self)))
                 (global.get $NULL))))
           ;; Default to returning an error for unrecognized member names
