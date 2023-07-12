@@ -14,7 +14,7 @@ pub struct Push;
 impl Push {
     pub const UUID: Uuid = uuid!("3e426e31-dddb-4732-93a7-216dc6c009dd");
     const ARITY: FunctionArity<2, 0> = FunctionArity {
-        required: [ArgType::Strict, ArgType::Lazy],
+        required: [ArgType::Strict, ArgType::Strict],
         optional: [],
         variadic: None,
     };
