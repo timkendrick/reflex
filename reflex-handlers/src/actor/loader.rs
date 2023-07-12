@@ -13,8 +13,8 @@ use metrics::{decrement_gauge, describe_gauge, increment_gauge, Unit};
 use reflex::{
     core::{
         Applicable, Arity, ConditionListType, ConditionType, Expression, ExpressionFactory,
-        ExpressionListType, HashmapTermType, HeapAllocator, ListTermType, RefType, SignalTermType,
-        SignalType, StateToken, StringTermType, StringValue,
+        ExpressionListType, HeapAllocator, ListTermType, RefType, SignalTermType, SignalType,
+        StateToken, StringTermType, StringValue,
     },
     hash::HashId,
 };
@@ -671,38 +671,6 @@ where
                             })
                             .collect::<HashMap<_, _>>())
                     }
-                } else if let Some(value) = self.factory.match_hashmap_term(&value) {
-                    let results = batch
-                        .subscriptions
-                        .iter()
-                        .filter_map(|subscription| {
-                            value
-                                .get(&subscription.key)
-                                .map(|item| item.as_deref().clone())
-                                .map(|value| (LoaderKeyHash::new(&subscription.key), value))
-                        })
-                        .collect::<HashMap<_, _>>();
-                    if results.len() < batch.subscriptions.len() {
-                        Err(create_error_expression(
-                            format!(
-                                "Invalid {} loader result: missing values for {}",
-                                loader_state.name,
-                                batch
-                                    .subscriptions
-                                    .iter()
-                                    .filter_map(|subscription| match value.get(&subscription.key) {
-                                        Some(_) => None,
-                                        None => Some(format!("{}", subscription.key)),
-                                    })
-                                    .collect::<Vec<_>>()
-                                    .join(", ")
-                            ),
-                            &self.factory,
-                            &self.allocator,
-                        ))
-                    } else {
-                        Ok(results)
-                    }
                 } else if let Some(term) = self.factory.match_signal_term(&value) {
                     Err(if has_error_message_effects(term, &self.factory) {
                         prefix_error_message_effects(
@@ -717,7 +685,7 @@ where
                 } else {
                     Err(create_error_expression(
                         format!(
-                            "Invalid {} loader result: Expected List or HashMap, received {}",
+                            "Invalid {} loader result: Expected List, received {}",
                             loader_state.name, value
                         ),
                         &self.factory,

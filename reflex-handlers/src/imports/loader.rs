@@ -11,7 +11,11 @@ use crate::actor::loader::EFFECT_TYPE_LOADER;
 
 blanket_trait!(
     pub trait LoaderImportBuiltin:
-        Builtin + From<stdlib::CollectList> + From<stdlib::Effect> + From<stdlib::Map>
+        Builtin
+        + From<stdlib::CollectList>
+        + From<stdlib::Effect>
+        + From<stdlib::Map>
+        + From<crate::stdlib::ResolveLoaderResults>
     {
     }
 );
@@ -44,7 +48,31 @@ where
                                             factory.create_builtin_term(stdlib::CollectList),
                                             allocator.create_triple(
                                                 factory.create_variable_term(2),
-                                                factory.create_variable_term(1),
+                                                factory.create_partial_application_term(
+                                                    factory.create_lambda_term(
+                                                        2,
+                                                        factory.create_application_term(
+                                                            factory.create_builtin_term(
+                                                                crate::stdlib::ResolveLoaderResults,
+                                                            ),
+                                                            allocator.create_pair(
+                                                                factory.create_variable_term(0),
+                                                                factory.create_application_term(
+                                                                    factory.create_variable_term(1),
+                                                                    allocator.create_unit_list(
+                                                                        factory
+                                                                            .create_variable_term(
+                                                                                0,
+                                                                            ),
+                                                                    ),
+                                                                ),
+                                                            ),
+                                                        ),
+                                                    ),
+                                                    allocator.create_unit_list(
+                                                        factory.create_variable_term(1),
+                                                    ),
+                                                ),
                                                 factory.create_variable_term(0),
                                             ),
                                         ),
