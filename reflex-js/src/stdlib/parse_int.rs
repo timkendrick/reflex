@@ -3,7 +3,7 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 use reflex::core::{
     uuid, Applicable, ArgType, Arity, EvaluationCache, Expression, ExpressionFactory,
-    FloatTermType, FunctionArity, HeapAllocator, IntValue, Uid, Uuid,
+    FloatTermType, FunctionArity, HeapAllocator, IntValue, TimestampTermType, Uid, Uuid,
 };
 
 pub struct ParseInt;
@@ -39,15 +39,17 @@ impl<T: Expression> Applicable<T> for ParseInt {
     ) -> Result<T, String> {
         let mut args = args.into_iter();
         let value = args.next().unwrap();
-        match factory.match_int_term(&value) {
-            Some(_) => Ok(value),
-            _ => match factory.match_float_term(&value) {
-                Some(term) => Ok(factory.create_int_term(term.value() as IntValue)),
-                _ => Err(format!(
-                    "Invalid integer conversion: Expected Float or Int, received {}",
-                    value,
-                )),
-            },
+        if let Some(_) = factory.match_int_term(&value) {
+            Ok(value)
+        } else if let Some(term) = factory.match_float_term(&value) {
+            Ok(factory.create_int_term(term.value() as IntValue))
+        } else if let Some(term) = factory.match_timestamp_term(&value) {
+            Ok(factory.create_int_term(term.millis() as IntValue))
+        } else {
+            Err(format!(
+                "Invalid integer conversion: Expected Float or Int or Date, received {}",
+                value,
+            ))
         }
     }
 }

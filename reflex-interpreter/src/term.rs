@@ -13,8 +13,8 @@ use reflex::{
         HashmapTermType, HashsetTermType, HeapAllocator, InstructionPointer, IntTermType,
         LambdaTermType, LetTermType, ListTermType, PartialApplicationTermType, RecordTermType,
         RecursiveTermType, Reducible, RefType, Rewritable, SignalTermType, SignalType, StackOffset,
-        StringTermType, StringValue, StructPrototypeType, Substitutions, SymbolTermType, Uid,
-        VariableTermType,
+        StringTermType, StringValue, StructPrototypeType, Substitutions, SymbolTermType,
+        TimestampTermType, Uid, VariableTermType,
     },
     hash::{hash_object, HashId},
 };
@@ -24,7 +24,7 @@ use reflex_lang::{
         ApplicationTerm, BooleanTerm, BuiltinTerm, CompiledFunctionTerm, ConstructorTerm,
         EffectTerm, FloatTerm, HashMapTerm, HashSetTerm, IntTerm, LambdaTerm, LetTerm, ListTerm,
         NilTerm, PartialApplicationTerm, RecordTerm, RecursiveTerm, SignalTerm, StringTerm,
-        SymbolTerm, Term, VariableTerm,
+        SymbolTerm, Term, TimestampTerm, VariableTerm,
     },
     CachedSharedTerm,
 };
@@ -101,6 +101,9 @@ where
             Self::Float(term) => term.compile(eager, stack_offset, factory, allocator, compiler),
             Self::String(term) => term.compile(eager, stack_offset, factory, allocator, compiler),
             Self::Symbol(term) => term.compile(eager, stack_offset, factory, allocator, compiler),
+            Self::Timestamp(term) => {
+                term.compile(eager, stack_offset, factory, allocator, compiler)
+            }
             Self::Variable(term) => term.compile(eager, stack_offset, factory, allocator, compiler),
             Self::Effect(term) => term.compile(eager, stack_offset, factory, allocator, compiler),
             Self::Let(term) => term.compile(eager, stack_offset, factory, allocator, compiler),
@@ -694,6 +697,21 @@ impl<T: Expression + Compile<T>> Compile<T> for SymbolTerm {
     ) -> Result<Program, String> {
         Ok(Program::new(once(Instruction::PushSymbol {
             id: self.id(),
+        })))
+    }
+}
+
+impl<T: Expression + Compile<T>> Compile<T> for TimestampTerm {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        _stack_offset: StackOffset,
+        _factory: &impl ExpressionFactory<T>,
+        _allocator: &impl HeapAllocator<T>,
+        _compiler: &mut Compiler,
+    ) -> Result<Program, String> {
+        Ok(Program::new(once(Instruction::PushTimestamp {
+            millis: self.millis(),
         })))
     }
 }

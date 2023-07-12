@@ -5,9 +5,9 @@ use std::ops::Deref;
 
 use chrono::{DateTime, NaiveDateTime};
 use reflex::core::{
-    create_record, uuid, Applicable, ArgType, Arity, EvaluationCache, Expression,
-    ExpressionFactory, FloatTermType, FunctionArity, HeapAllocator, IntTermType, RefType,
-    StringTermType, StringValue, Uid, Uuid,
+    uuid, Applicable, ArgType, Arity, EvaluationCache, Expression, ExpressionFactory,
+    FloatTermType, FunctionArity, HeapAllocator, IntTermType, RefType, StringTermType, StringValue,
+    Uid, Uuid,
 };
 
 pub struct ParseDate;
@@ -38,34 +38,31 @@ impl<T: Expression> Applicable<T> for ParseDate {
         &self,
         args: impl ExactSizeIterator<Item = T>,
         factory: &impl ExpressionFactory<T>,
-        allocator: &impl HeapAllocator<T>,
+        _allocator: &impl HeapAllocator<T>,
         _cache: &mut impl EvaluationCache<T>,
     ) -> Result<T, String> {
         let mut args = args.into_iter();
         let value = args.next().unwrap();
-        let timestamp = if let Some(term) = factory.match_int_term(&value) {
-            Some(term.value() as i64)
-        } else if let Some(term) = factory.match_float_term(&value) {
-            Some(term.value().trunc() as i64)
-        } else if let Some(term) = factory.match_string_term(&value) {
-            parse_string_timestamp(term.value().as_deref().as_str().deref())
+        if let Some(_) = factory.match_timestamp_term(&value) {
+            Ok(value)
         } else {
-            None
-        };
-        if let Some(timestamp) = timestamp {
-            Ok(create_record(
-                [(
-                    factory.create_string_term(allocator.create_static_string("getTime")),
-                    factory.create_lambda_term(0, factory.create_float_term(timestamp as f64)),
-                )],
-                factory,
-                allocator,
-            ))
-        } else {
-            Err(format!(
-                "Invalid Date constructor: Expected Int or Float or ISO-8601 String, received {}",
-                value
-            ))
+            let millis = if let Some(term) = factory.match_int_term(&value) {
+                Some(term.value())
+            } else if let Some(term) = factory.match_float_term(&value) {
+                Some(term.value().trunc() as i64)
+            } else if let Some(term) = factory.match_string_term(&value) {
+                parse_string_timestamp(term.value().as_deref().as_str().deref())
+            } else {
+                None
+            };
+            if let Some(millis) = millis {
+                Ok(factory.create_timestamp_term(millis))
+            } else {
+                Err(format!(
+                    "Invalid Date constructor: Expected Int or Float or ISO-8601 String, received {}",
+                    value
+                ))
+            }
         }
     }
 }

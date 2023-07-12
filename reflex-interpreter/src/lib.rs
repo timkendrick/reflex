@@ -609,6 +609,11 @@ fn evaluate_instruction<'a, T: Expression + Rewritable<T> + Reducible<T> + Appli
             stack.push(factory.create_symbol_term(*value));
             Ok((ExecutionResult::Advance, DependencyList::empty()))
         }
+        Instruction::PushTimestamp { millis } => {
+            trace!(instruction = "Instruction::PushTimestamp");
+            stack.push(factory.create_timestamp_term(*millis));
+            Ok((ExecutionResult::Advance, DependencyList::empty()))
+        }
         Instruction::PushFunction { target, hash } => {
             trace!(instruction = "Instruction::PushFunction");
             let target_address = *target;
