@@ -5,16 +5,42 @@ set -euo pipefail
 TARGET_NAME=runtime
 OUTPUT_DIR=./build
 
+source_bundle_path="$OUTPUT_DIR/$TARGET_NAME.build.wat"
+intermediate_bytecode_path="$OUTPUT_DIR/$TARGET_NAME.build.wasm"
+output_path="$OUTPUT_DIR/$TARGET_NAME.wasm"
+
+# If the output file already exists, save its size, file modification date and SHA hash
+IFS=":" read -r existing_size existing_mtime < \
+  <(stat --format "%s:%Y" "$output_path" 2>/dev/null || echo -e "0:0")
+existing_sha="$([ "$existing_size" == 0 ] && echo "" || sha1sum "$output_path")"
+
 # Expand macros in .wat source code
-echo "Expanding macros..."
-node ./scripts/compile.mjs "./src/$TARGET_NAME.wat" > "$OUTPUT_DIR/$TARGET_NAME.build.wat"
+echo "Creating source bundle..."
+node ./scripts/compile.mjs "./src/$TARGET_NAME.wat" > "$source_bundle_path"
 
 # Convert to binary .wasm module
 echo "Converting to WebAssembly bytecode..."
-wat2wasm "$OUTPUT_DIR/$TARGET_NAME.build.wat" --debug-names --output "$OUTPUT_DIR/$TARGET_NAME.build.wasm"
+wat2wasm "$source_bundle_path" --debug-names --output "$intermediate_bytecode_path"
 
 # Inline initial heap snapshot into .wasm module
 echo "Inlining heap snapshot..."
-cargo run --quiet --bin snapshot -- --memory-name "memory" --inline-globals --input "$OUTPUT_DIR/$TARGET_NAME.build.wasm" --output "$OUTPUT_DIR/$TARGET_NAME.wasm"
+cargo run --quiet --bin snapshot -- --memory-name "memory" --inline-globals --input "$intermediate_bytecode_path" --output "$output_path"
 
-echo "Compiled $OUTPUT_DIR/$TARGET_NAME.wasm"
+echo "Compiled $output_path"
+
+# If the output file is identical to the existing output file, reset its file modification date
+# (this prevents cargo's change detection from flagging the file as updated)
+if [[ "$existing_size" != 0 ]]
+then
+  IFS=":" read -r updated_size < \
+    <(stat --format "%s" "$output_path" 2>/dev/null || echo -e "0")
+  if [[ "$updated_size" == "$existing_size" ]]
+  then
+    updated_sha="$(sha1sum "$output_path")"
+    if [[ "$updated_sha" == "$existing_sha" ]]
+    then
+      echo "No changes detected in output file"
+      touch -d @"$existing_mtime" "$output_path"
+    fi
+  fi
+fi
