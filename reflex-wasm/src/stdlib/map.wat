@@ -8,7 +8,7 @@
     (@impl
       (call $TermType::implements::iterate)
       (call $TermType::implements::apply)
-      (func $Stdlib_Map::impl::<iterate>::<iterate> (param $self i32) (param $iteratee i32) (param $state i32) (result i32 i32)
+      (func $Stdlib_Map::impl::<iterate>::<apply> (param $self i32) (param $iteratee i32) (param $state i32) (result i32 i32)
         (call $Term::MapIterator::new (local.get $self) (local.get $iteratee))
         (global.get $NULL)))
 
