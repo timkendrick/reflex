@@ -21,7 +21,7 @@ pub use cdr::*;
 pub use ceil::*;
 pub use chain::*;
 pub use collect::*;
-pub use concat::*;
+pub use collect_string::*;
 pub use cons::*;
 pub use construct::*;
 pub use contains::*;
@@ -83,7 +83,7 @@ mod cdr;
 mod ceil;
 mod chain;
 mod collect;
-mod concat;
+mod collect_string;
 mod cons;
 mod construct;
 mod contains;
@@ -184,7 +184,7 @@ pub enum Stdlib {
     CollectHashSet,
     CollectList,
     CollectSignal,
-    Concat,
+    CollectString,
     Cons,
     ConstructHashMap,
     ConstructHashSet,
@@ -264,7 +264,7 @@ impl TryFrom<Uuid> for Stdlib {
             CollectHashSet::UUID => Ok(Self::CollectHashSet),
             CollectList::UUID => Ok(Self::CollectList),
             CollectSignal::UUID => Ok(Self::CollectSignal),
-            Concat::UUID => Ok(Self::Concat),
+            CollectString::UUID => Ok(Self::CollectString),
             Cons::UUID => Ok(Self::Cons),
             ConstructHashMap::UUID => Ok(Self::ConstructHashMap),
             ConstructHashSet::UUID => Ok(Self::ConstructHashSet),
@@ -341,7 +341,7 @@ impl Uid for Stdlib {
             Self::CollectHashSet => Uid::uid(&CollectHashSet {}),
             Self::CollectList => Uid::uid(&CollectList {}),
             Self::CollectSignal => Uid::uid(&CollectSignal {}),
-            Self::Concat => Uid::uid(&Concat {}),
+            Self::CollectString => Uid::uid(&CollectString {}),
             Self::Cons => Uid::uid(&Cons {}),
             Self::ConstructHashMap => Uid::uid(&ConstructHashMap {}),
             Self::ConstructHashSet => Uid::uid(&ConstructHashSet {}),
@@ -417,7 +417,7 @@ impl Stdlib {
             Self::CollectHashSet => CollectHashSet::arity(),
             Self::CollectList => CollectList::arity(),
             Self::CollectSignal => CollectSignal::arity(),
-            Self::Concat => Concat::arity(),
+            Self::CollectString => CollectString::arity(),
             Self::Cons => Cons::arity(),
             Self::ConstructHashMap => ConstructHashMap::arity(),
             Self::ConstructHashSet => ConstructHashSet::arity(),
@@ -508,7 +508,9 @@ impl Stdlib {
             Self::CollectSignal => {
                 Applicable::<T>::apply(&CollectSignal, args, factory, allocator, cache)
             }
-            Self::Concat => Applicable::<T>::apply(&Concat, args, factory, allocator, cache),
+            Self::CollectString => {
+                Applicable::<T>::apply(&CollectString, args, factory, allocator, cache)
+            }
             Self::Cons => Applicable::<T>::apply(&Cons, args, factory, allocator, cache),
             Self::ConstructHashMap => {
                 Applicable::<T>::apply(&ConstructHashMap, args, factory, allocator, cache)
@@ -611,7 +613,7 @@ impl Stdlib {
             Self::CollectHashSet => Applicable::<T>::should_parallelize(&CollectHashSet, args),
             Self::CollectList => Applicable::<T>::should_parallelize(&CollectList, args),
             Self::CollectSignal => Applicable::<T>::should_parallelize(&CollectSignal, args),
-            Self::Concat => Applicable::<T>::should_parallelize(&Concat, args),
+            Self::CollectString => Applicable::<T>::should_parallelize(&CollectString, args),
             Self::Cons => Applicable::<T>::should_parallelize(&Cons, args),
             Self::ConstructHashMap => Applicable::<T>::should_parallelize(&ConstructHashMap, args),
             Self::ConstructHashSet => Applicable::<T>::should_parallelize(&ConstructHashSet, args),
@@ -755,9 +757,9 @@ impl From<CollectSignal> for Stdlib {
         Self::CollectSignal
     }
 }
-impl From<Concat> for Stdlib {
-    fn from(_value: Concat) -> Self {
-        Self::Concat
+impl From<CollectString> for Stdlib {
+    fn from(_value: CollectString) -> Self {
+        Self::CollectString
     }
 }
 impl From<Cons> for Stdlib {

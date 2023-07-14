@@ -14,8 +14,8 @@ use reflex::core::{
     HeapAllocator, IntTermType, IntValue, ModuleLoader, RefType, StringTermType, StringValue,
 };
 use reflex_stdlib::{
-    Add, And, Apply, Chain, CollectHashMap, CollectHashSet, CollectList, Concat, Contains, Divide,
-    Eq, Flatten, Get, Gt, Gte, If, IfError, Lt, Lte, Merge, Multiply, Not, Or, Pow, Push,
+    Add, And, Apply, Chain, CollectHashMap, CollectHashSet, CollectList, CollectString, Contains,
+    Divide, Eq, Flatten, Get, Gt, Gte, If, IfError, Lt, Lte, Merge, Multiply, Not, Or, Pow, Push,
     PushFront, Remainder, ResolveDeep, ResolveHashMap, ResolveList, Subtract,
 };
 use swc_common::{source_map::Pos, sync::Lrc, FileName, SourceMap, Span, Spanned};
@@ -47,7 +47,7 @@ pub trait JsParserBuiltin:
     + From<CollectHashMap>
     + From<CollectHashSet>
     + From<CollectList>
-    + From<Concat>
+    + From<CollectString>
     + From<Construct>
     + From<Contains>
     + From<Divide>
@@ -87,7 +87,7 @@ impl<T> JsParserBuiltin for T where
         + From<CollectHashMap>
         + From<CollectHashSet>
         + From<CollectList>
-        + From<Concat>
+        + From<CollectString>
         + From<Construct>
         + From<Contains>
         + From<Divide>
@@ -1054,7 +1054,7 @@ where
         0 => factory.create_string_term(allocator.create_static_string("")),
         1 => args.into_iter().next().unwrap(),
         _ => factory.create_application_term(
-            factory.create_builtin_term(Concat),
+            factory.create_builtin_term(CollectString),
             allocator.create_list(args),
         ),
     })
@@ -2453,7 +2453,7 @@ mod tests {
         assert_eq!(
             parse("`foo${'bar'}`", &env, &factory, &allocator),
             Ok(factory.create_application_term(
-                factory.create_builtin_term(Concat),
+                factory.create_builtin_term(CollectString),
                 allocator.create_list([
                     factory.create_string_term(allocator.create_static_string("foo")),
                     factory.create_application_term(
@@ -2468,7 +2468,7 @@ mod tests {
         assert_eq!(
             parse("`${'foo'}bar`", &env, &factory, &allocator),
             Ok(factory.create_application_term(
-                factory.create_builtin_term(Concat),
+                factory.create_builtin_term(CollectString),
                 allocator.create_list([
                     factory.create_application_term(
                         factory.create_builtin_term(ToString),
@@ -2483,7 +2483,7 @@ mod tests {
         assert_eq!(
             parse("`${'foo'}${'bar'}`", &env, &factory, &allocator),
             Ok(factory.create_application_term(
-                factory.create_builtin_term(Concat),
+                factory.create_builtin_term(CollectString),
                 allocator.create_list([
                     factory.create_application_term(
                         factory.create_builtin_term(ToString),
@@ -2503,7 +2503,7 @@ mod tests {
         assert_eq!(
             parse("`foo${'bar'}baz`", &env, &factory, &allocator),
             Ok(factory.create_application_term(
-                factory.create_builtin_term(Concat),
+                factory.create_builtin_term(CollectString),
                 allocator.create_list([
                     factory.create_string_term(allocator.create_static_string("foo")),
                     factory.create_application_term(
@@ -2519,7 +2519,7 @@ mod tests {
         assert_eq!(
             parse("`${'foo'}bar${'baz'}`", &env, &factory, &allocator),
             Ok(factory.create_application_term(
-                factory.create_builtin_term(Concat),
+                factory.create_builtin_term(CollectString),
                 allocator.create_list([
                     factory.create_application_term(
                         factory.create_builtin_term(ToString),
@@ -2540,7 +2540,7 @@ mod tests {
         assert_eq!(
             parse("`${'foo'}${'bar'}${'baz'}`", &env, &factory, &allocator),
             Ok(factory.create_application_term(
-                factory.create_builtin_term(Concat),
+                factory.create_builtin_term(CollectString),
                 allocator.create_list([
                     factory.create_application_term(
                         factory.create_builtin_term(ToString),
@@ -2571,7 +2571,7 @@ mod tests {
                 &allocator
             ),
             Ok(factory.create_application_term(
-                factory.create_builtin_term(Concat),
+                factory.create_builtin_term(CollectString),
                 allocator.create_list([
                     factory.create_string_term(allocator.create_static_string("foo")),
                     factory.create_application_term(
@@ -4363,7 +4363,7 @@ mod tests {
                 factory.create_builtin_term(Throw),
                 allocator.create_unit_list(create_error_instance(
                     factory.create_application_term(
-                        factory.create_builtin_term(Concat),
+                        factory.create_builtin_term(CollectString),
                         allocator.create_pair(
                             factory.create_string_term(allocator.create_static_string("foo")),
                             factory.create_application_term(

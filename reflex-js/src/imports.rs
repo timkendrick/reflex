@@ -27,7 +27,7 @@ pub trait JsImportsBuiltin:
     + From<CollectHashSet>
     + From<CollectList>
     + From<CollectSignal>
-    + From<Concat>
+    + From<CollectString>
     + From<Cons>
     + From<ConstructHashMap>
     + From<ConstructHashSet>
@@ -102,7 +102,7 @@ impl<T> JsImportsBuiltin for T where
         + From<CollectHashSet>
         + From<CollectList>
         + From<CollectSignal>
-        + From<Concat>
+        + From<CollectString>
         + From<Cons>
         + From<ConstructHashMap>
         + From<ConstructHashSet>

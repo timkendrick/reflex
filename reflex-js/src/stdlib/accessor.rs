@@ -14,7 +14,7 @@ use reflex_stdlib::stdlib;
 pub trait AccessorBuiltin:
     Builtin
     + From<stdlib::Apply>
-    + From<stdlib::Concat>
+    + From<stdlib::CollectString>
     + From<stdlib::Contains>
     + From<stdlib::Filter>
     + From<stdlib::Flatten>
@@ -43,7 +43,7 @@ pub trait AccessorBuiltin:
 impl<T> AccessorBuiltin for T where
     T: Builtin
         + From<stdlib::Apply>
-        + From<stdlib::Concat>
+        + From<stdlib::CollectString>
         + From<stdlib::Contains>
         + From<stdlib::EndsWith>
         + From<stdlib::Filter>
@@ -162,7 +162,7 @@ fn get_list_property<T: Expression, TFactory: ExpressionFactory<T>>(
 where
     T::Builtin: Builtin
         + From<stdlib::Apply>
-        + From<stdlib::Concat>
+        + From<stdlib::CollectString>
         + From<stdlib::Filter>
         + From<stdlib::Flatten>
         + From<stdlib::Get>
@@ -330,7 +330,7 @@ fn get_list_field<T: Expression, TFactory: ExpressionFactory<T>>(
 where
     T::Builtin: Builtin
         + From<stdlib::Apply>
-        + From<stdlib::Concat>
+        + From<stdlib::CollectString>
         + From<stdlib::Filter>
         + From<stdlib::Flatten>
         + From<stdlib::Get>
@@ -361,7 +361,7 @@ where
                 factory.create_application_term(
                     factory.create_builtin_term(stdlib::Apply),
                     allocator.create_pair(
-                        factory.create_builtin_term(stdlib::Concat),
+                        factory.create_builtin_term(stdlib::CollectString),
                         factory.create_application_term(
                             factory.create_builtin_term(stdlib::Intersperse),
                             allocator.create_pair(

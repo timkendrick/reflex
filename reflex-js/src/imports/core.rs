@@ -22,7 +22,7 @@ where
         + From<CollectHashSet>
         + From<CollectList>
         + From<CollectSignal>
-        + From<Concat>
+        + From<CollectString>
         + From<Cons>
         + From<ConstructHashMap>
         + From<ConstructHashSet>
@@ -133,7 +133,7 @@ where
             ),
             (
                 factory.create_string_term(allocator.create_static_string("concat")),
-                factory.create_builtin_term(Concat),
+                factory.create_builtin_term(CollectString),
             ),
             (
                 factory.create_string_term(allocator.create_static_string("cons")),

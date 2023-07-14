@@ -109,7 +109,7 @@ pub trait LispParserBuiltin:
     + From<And>
     + From<Car>
     + From<Cdr>
-    + From<Concat>
+    + From<CollectString>
     + From<Cons>
     + From<Eq>
     + From<Gt>
@@ -135,7 +135,7 @@ impl<T> LispParserBuiltin for T where
         + From<And>
         + From<Car>
         + From<Cdr>
-        + From<Concat>
+        + From<CollectString>
         + From<Cons>
         + From<Eq>
         + From<Gt>
@@ -336,7 +336,7 @@ where
         "and" => Some(factory.create_builtin_term(And)),
         "car" => Some(factory.create_builtin_term(Car)),
         "cdr" => Some(factory.create_builtin_term(Cdr)),
-        "concat" => Some(factory.create_builtin_term(Concat)),
+        "concat" => Some(factory.create_builtin_term(CollectString)),
         "cons" => Some(factory.create_builtin_term(Cons)),
         "eq" => Some(factory.create_builtin_term(Eq)),
         "gt" => Some(factory.create_builtin_term(Gt)),

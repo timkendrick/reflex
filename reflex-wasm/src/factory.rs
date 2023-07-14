@@ -1473,7 +1473,7 @@ impl From<reflex_stdlib::stdlib::Stdlib> for reflex_wasm::stdlib::Stdlib {
             reflex_stdlib::stdlib::Stdlib::CollectSignal => {
                 reflex_wasm::stdlib::Stdlib::CollectSignal(reflex_wasm::stdlib::CollectSignal)
             }
-            reflex_stdlib::stdlib::Stdlib::Concat => {
+            reflex_stdlib::stdlib::Stdlib::CollectString => {
                 reflex_wasm::stdlib::Stdlib::CollectString(reflex_wasm::stdlib::CollectString)
             }
             reflex_stdlib::stdlib::Stdlib::Cons => {
@@ -1824,8 +1824,8 @@ impl From<reflex_stdlib::stdlib::CollectSignal> for reflex_wasm::stdlib::Stdlib 
         Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
     }
 }
-impl From<reflex_stdlib::stdlib::Concat> for reflex_wasm::stdlib::Stdlib {
-    fn from(value: reflex_stdlib::stdlib::Concat) -> Self {
+impl From<reflex_stdlib::stdlib::CollectString> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::CollectString) -> Self {
         Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
     }
 }
