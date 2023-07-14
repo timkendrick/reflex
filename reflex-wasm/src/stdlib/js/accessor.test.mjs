@@ -1076,6 +1076,21 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
+          createApplication(
+            createBuiltin(Stdlib.Accessor),
+            createPair(
+              createTriple(createString('foo'), createString('bar'), createString('baz')),
+              createString('join'),
+            ),
+          ),
+          createUnitList(createString(', ')),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '"foo, bar, baz"');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
           createBuiltin(Stdlib.ResolveList),
           createUnitList(
             createApplication(

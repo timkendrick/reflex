@@ -10,6 +10,7 @@
   (@const-string $Stdlib_Accessor::GET "get")
   (@const-string $Stdlib_Accessor::GET_TIME "getTime")
   (@const-string $Stdlib_Accessor::HAS "has")
+  (@const-string $Stdlib_Accessor::JOIN "join")
   (@const-string $Stdlib_Accessor::KEYS "keys")
   (@const-string $Stdlib_Accessor::LENGTH "length")
   (@const-string $Stdlib_Accessor::MAP "map")
@@ -477,6 +478,21 @@
                       (call $Term::IntegersIterator::new)
                       (local.get $self))
                     (global.get $Stdlib_Accessor::SELECT_FIRST)))
+                (global.get $NULL)))
+            (@list
+              (call $Term::traits::equals (local.get $key) (global.get $Stdlib_Accessor::JOIN))
+              (return
+                (call $Term::Partial::new
+                  (call $Term::Lambda::new
+                    (i32.const 2)
+                    (call $Term::Application::new
+                      (call $Term::Builtin::new (global.get $Stdlib_Apply))
+                      (call $Term::List::create_pair
+                        (call $Term::Builtin::new (global.get $Stdlib_CollectString))
+                        (call $Term::IntersperseIterator::new
+                          (call $Term::Variable::new (i32.const 1))
+                          (call $Term::Variable::new (i32.const 0))))))
+                  (call $Term::List::of (local.get $self)))
                 (global.get $NULL)))
             (@list
               (call $Term::traits::equals (local.get $key) (global.get $Stdlib_Accessor::LENGTH))
