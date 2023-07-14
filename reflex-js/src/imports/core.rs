@@ -45,6 +45,7 @@ where
         + From<IfError>
         + From<IfPending>
         + From<Insert>
+        + From<Intersperse>
         + From<Keys>
         + From<Length>
         + From<Lt>
@@ -221,6 +222,10 @@ where
             (
                 factory.create_string_term(allocator.create_static_string("insert")),
                 factory.create_builtin_term(Insert),
+            ),
+            (
+                factory.create_string_term(allocator.create_static_string("intersperse")),
+                factory.create_builtin_term(Intersperse),
             ),
             (
                 factory.create_string_term(allocator.create_static_string("keys")),

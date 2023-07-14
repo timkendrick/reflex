@@ -309,6 +309,11 @@ impl From<reflex_stdlib::stdlib::Insert> for ServerBuiltins {
         Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
     }
 }
+impl From<reflex_stdlib::stdlib::Intersperse> for ServerBuiltins {
+    fn from(value: reflex_stdlib::stdlib::Intersperse) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
 impl From<reflex_stdlib::stdlib::Keys> for ServerBuiltins {
     fn from(value: reflex_stdlib::stdlib::Keys) -> Self {
         Self::from(reflex_stdlib::stdlib::Stdlib::from(value))

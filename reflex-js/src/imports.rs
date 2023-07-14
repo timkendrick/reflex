@@ -50,6 +50,7 @@ pub trait JsImportsBuiltin:
     + From<IfError>
     + From<IfPending>
     + From<Insert>
+    + From<Intersperse>
     + From<Keys>
     + From<Length>
     + From<Log>
@@ -124,6 +125,7 @@ impl<T> JsImportsBuiltin for T where
         + From<IfError>
         + From<IfPending>
         + From<Insert>
+        + From<Intersperse>
         + From<Keys>
         + From<Length>
         + From<Log>

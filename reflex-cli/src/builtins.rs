@@ -294,6 +294,11 @@ impl From<stdlib::Insert> for CliBuiltins {
         Self::from(stdlib::Stdlib::from(value))
     }
 }
+impl From<stdlib::Intersperse> for CliBuiltins {
+    fn from(value: stdlib::Intersperse) -> Self {
+        Self::from(stdlib::Stdlib::from(value))
+    }
+}
 impl From<stdlib::Keys> for CliBuiltins {
     fn from(value: stdlib::Keys) -> Self {
         Self::from(stdlib::Stdlib::from(value))
