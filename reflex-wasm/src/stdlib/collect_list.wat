@@ -8,7 +8,8 @@
     (@impl
       (call $TermType::implements::iterate)
       (func $Stdlib_CollectList::impl::<iterate> (param $arg_list i32) (param $state i32) (result i32 i32)
-        (call $Term::List::traits::collect_strict (local.get $arg_list) (local.get $state))))
+        ;; Collect the arguments into a list term
+        (call $Term::List::traits::collect (local.get $arg_list) (local.get $state))))
 
     (@default
       (func $Stdlib_CollectList::impl::default (param $arg_list i32) (param $state i32) (result i32 i32)
