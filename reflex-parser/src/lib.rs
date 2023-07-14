@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use std::{marker::PhantomData, path::Path, str::FromStr};
+use std::{ffi::OsStr, marker::PhantomData, path::Path, str::FromStr};
 
 use reflex::{
     core::{
@@ -50,6 +50,17 @@ pub enum Syntax {
     Json,
     Lisp,
 }
+
+impl Syntax {
+    pub fn infer(file_extension: &OsStr) -> Option<Self> {
+        match file_extension.to_str()? {
+            "js" | "mjs" => Some(Self::JavaScript),
+            "json" => Some(Self::Json),
+            _ => None,
+        }
+    }
+}
+
 impl FromStr for Syntax {
     type Err = anyhow::Error;
     fn from_str(input: &str) -> Result<Self, Self::Err> {

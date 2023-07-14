@@ -5,16 +5,24 @@ use std::{
     cell::RefCell,
     collections::{hash_map::Entry, HashMap, HashSet, VecDeque},
     env::temp_dir,
+    ffi::OsStr,
+    marker::PhantomData,
     ops::{Deref, DerefMut},
-    path::PathBuf,
+    path::{Path, PathBuf},
     rc::Rc,
+    str::FromStr,
 };
 
 use anyhow::Context;
+use derivative::Derivative;
 use reflex::{
     cache::SubstitutionCache,
-    core::{Arity, Expression, ExpressionFactory, HeapAllocator, LambdaTermType, Rewritable, Uuid},
+    core::{
+        Arity, Expression, ExpressionFactory, HeapAllocator, LambdaTermType, ModuleLoader,
+        Reducible, Rewritable, Uuid,
+    },
 };
+use reflex_parser::{create_parser, ParserBuiltin, Syntax, SyntaxParser};
 use strum::IntoEnumIterator;
 use walrus::{
     self,
@@ -49,8 +57,263 @@ use crate::{
 const CACHED_FUNCTION_TEMPLATE: &'static [u8] =
     include_bytes!("../../templates/cached_function.wasm");
 
+#[derive(Eq, PartialEq, Clone, Copy, Debug)]
+pub enum RuntimeEntryPointSyntax {
+    Wasm,
+    PrecompiledWasm,
+    Source(Syntax),
+}
+
+impl RuntimeEntryPointSyntax {
+    pub fn infer(file_extension: &OsStr) -> Option<Self> {
+        match file_extension.to_str()? {
+            "wasm" => Some(Self::Wasm),
+            "cwasm" => Some(Self::PrecompiledWasm),
+            _ => Syntax::infer(file_extension).map(Self::Source),
+        }
+    }
+}
+
+impl FromStr for RuntimeEntryPointSyntax {
+    type Err = anyhow::Error;
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        match input.to_lowercase().as_str() {
+            "wasm" => Ok(Self::Wasm),
+            "cwasm" => Ok(Self::PrecompiledWasm),
+            input => Syntax::from_str(input).map(Self::Source),
+        }
+    }
+}
+
+pub trait CompilerEntryPoint<
+    T: Expression,
+    TFactory: ExpressionFactory<T>,
+    TAllocator: HeapAllocator<T>,
+>
+{
+    fn export_name(&self) -> &ModuleEntryPoint;
+    fn root(&self) -> &CompilerRootConfig;
+    fn transform(&self, expression: &T, factory: &TFactory, allocator: &TAllocator) -> Option<T>;
+}
+
+#[derive(Derivative)]
+#[derivative(Clone(bound = ""))]
+pub struct GraphRootEntryPoint<
+    T: Expression,
+    TFactory: ExpressionFactory<T>,
+    TAllocator: HeapAllocator<T>,
+> {
+    export_name: ModuleEntryPoint,
+    root: CompilerRootConfig,
+    _expression: PhantomData<T>,
+    _factory: PhantomData<TFactory>,
+    _allocator: PhantomData<TAllocator>,
+}
+
+impl<T: Expression, TFactory: ExpressionFactory<T>, TAllocator: HeapAllocator<T>>
+    GraphRootEntryPoint<T, TFactory, TAllocator>
+{
+    pub fn new(export_name: ModuleEntryPoint, root: CompilerRootConfig) -> Self {
+        Self {
+            export_name,
+            root,
+            _expression: PhantomData,
+            _factory: PhantomData,
+            _allocator: PhantomData,
+        }
+    }
+}
+
+impl<T: Expression, TFactory: ExpressionFactory<T>, TAllocator: HeapAllocator<T>>
+    CompilerEntryPoint<T, TFactory, TAllocator> for GraphRootEntryPoint<T, TFactory, TAllocator>
+{
+    fn export_name(&self) -> &ModuleEntryPoint {
+        &self.export_name
+    }
+    fn root(&self) -> &CompilerRootConfig {
+        &self.root
+    }
+    fn transform(
+        &self,
+        _expression: &T,
+        _factory: &TFactory,
+        _allocator: &TAllocator,
+    ) -> Option<T> {
+        None
+    }
+}
+
+#[derive(Derivative)]
+#[derivative(Clone(bound = ""))]
+pub struct ExpressionFactoryEntryPoint<
+    T: Expression,
+    TFactory: ExpressionFactory<T>,
+    TAllocator: HeapAllocator<T>,
+> {
+    export_name: ModuleEntryPoint,
+    root: CompilerRootConfig,
+    _expression: PhantomData<T>,
+    _factory: PhantomData<TFactory>,
+    _allocator: PhantomData<TAllocator>,
+}
+
+impl<T: Expression, TFactory: ExpressionFactory<T>, TAllocator: HeapAllocator<T>>
+    ExpressionFactoryEntryPoint<T, TFactory, TAllocator>
+{
+    pub fn new(export_name: ModuleEntryPoint, root: CompilerRootConfig) -> Self {
+        Self {
+            export_name,
+            root,
+            _expression: PhantomData,
+            _factory: PhantomData,
+            _allocator: PhantomData,
+        }
+    }
+}
+
+impl<T: Expression, TFactory: ExpressionFactory<T>, TAllocator: HeapAllocator<T>>
+    CompilerEntryPoint<T, TFactory, TAllocator>
+    for ExpressionFactoryEntryPoint<T, TFactory, TAllocator>
+{
+    fn export_name(&self) -> &ModuleEntryPoint {
+        &self.export_name
+    }
+    fn root(&self) -> &CompilerRootConfig {
+        &self.root
+    }
+    fn transform(&self, expression: &T, factory: &TFactory, _allocator: &TAllocator) -> Option<T> {
+        Some(factory.create_lambda_term(0, expression.clone()))
+    }
+}
+
+#[derive(PartialEq, Eq, Clone, Hash, Debug)]
+pub struct ModuleEntryPoint(String);
+
+impl ModuleEntryPoint {
+    fn as_str(&self) -> &str {
+        let Self(value) = self;
+        value.as_str()
+    }
+}
+
+impl Default for ModuleEntryPoint {
+    fn default() -> Self {
+        Self::from("main")
+    }
+}
+
+impl<'a> From<&'a str> for ModuleEntryPoint {
+    fn from(value: &'a str) -> Self {
+        Self(String::from(value))
+    }
+}
+
+impl From<String> for ModuleEntryPoint {
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+
+impl From<ModuleEntryPoint> for String {
+    fn from(value: ModuleEntryPoint) -> Self {
+        let ModuleEntryPoint(value) = value;
+        value
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum CompilerRootConfig {
+    Lisp(LispCompilerRootConfig),
+    Json(JsonCompilerRootConfig),
+    JavaScript(JavaScriptCompilerRootConfig),
+}
+
+impl std::str::FromStr for CompilerRootConfig {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match split_at_separator(':', s) {
+            Some((entry_point_format, root)) if entry_point_format != "" => {
+                match entry_point_format.to_lowercase().as_str() {
+                    "sexpr" | "lisp" => LispCompilerRootConfig::from_str(root).map(Self::Lisp),
+                    "javascript" | "js" => {
+                        JavaScriptCompilerRootConfig::from_str(root).map(Self::JavaScript)
+                    }
+                    "json" => JsonCompilerRootConfig::from_str(root).map(Self::Json),
+                    _ => Err(format!(
+                        "Unsupported entry point format: {}",
+                        entry_point_format
+                    )),
+                }
+            }
+            _ => Err(format!("Missing entry point format")),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct LispCompilerRootConfig {
+    pub path: PathBuf,
+}
+
+impl From<PathBuf> for LispCompilerRootConfig {
+    fn from(value: PathBuf) -> Self {
+        Self { path: value }
+    }
+}
+
+impl std::str::FromStr for LispCompilerRootConfig {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self {
+            path: PathBuf::from(s),
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct JsonCompilerRootConfig {
+    pub path: PathBuf,
+}
+
+impl From<PathBuf> for JsonCompilerRootConfig {
+    fn from(value: PathBuf) -> Self {
+        Self { path: value }
+    }
+}
+
+impl std::str::FromStr for JsonCompilerRootConfig {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self {
+            path: PathBuf::from(s),
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct JavaScriptCompilerRootConfig {
+    pub path: PathBuf,
+}
+
+impl From<PathBuf> for JavaScriptCompilerRootConfig {
+    fn from(value: PathBuf) -> Self {
+        Self { path: value }
+    }
+}
+
+impl std::str::FromStr for JavaScriptCompilerRootConfig {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self {
+            path: PathBuf::from(s),
+        })
+    }
+}
+
 #[derive(Debug)]
 pub enum WasmCompilerError {
+    ReadError(PathBuf, std::io::Error),
+    ParseError(PathBuf, String),
     ModuleLoadError(anyhow::Error),
     TableNotFound,
     MultipleTables,
@@ -59,7 +322,6 @@ pub enum WasmCompilerError {
     InvalidDataSection,
     MemoryNotFound,
     MultipleMemories,
-    ParseError(PathBuf, String),
     InvalidFunctionTable,
     IndirectFunctionCallArityLookupNotFound,
     InvalidIndirectFunctionCallArityLookup,
@@ -80,6 +342,16 @@ impl std::error::Error for WasmCompilerError {}
 impl std::fmt::Display for WasmCompilerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::ReadError(input_path, err) => write!(
+                f,
+                "Failed to read input file {}: {err}",
+                input_path.display()
+            ),
+            Self::ParseError(input_path, err) => write!(
+                f,
+                "Failed to parse input file {}: {err}",
+                input_path.display()
+            ),
             Self::ModuleLoadError(err) => write!(f, "Failed to load WASM module: {err:?}"),
             Self::TableNotFound => write!(f, "Indirect function call table definition not found"),
             Self::MultipleTables => write!(f, "Multiple indirect function call table definitions"),
@@ -97,11 +369,6 @@ impl std::fmt::Display for WasmCompilerError {
             Self::MemoryNotFound => write!(f, "Memory definition not found"),
             Self::MultipleMemories => write!(f, "Multiple memory definitions"),
             Self::InvalidDataSection => write!(f, "Invalid data section definition"),
-            Self::ParseError(input_path, err) => write!(
-                f,
-                "Failed to parse input file {}: {err}",
-                input_path.display()
-            ),
             Self::StackError(err) => write!(f, "Stack error: {err}"),
             Self::CompilerError(err) => write!(f, "Failed to compile WASM output: {err:?}"),
             Self::TemplateError(err) => write!(f, "Failed to generate WASM template: {err:?}"),
@@ -124,8 +391,143 @@ impl std::fmt::Display for WasmCompilerError {
     }
 }
 
-pub fn compile_wasm_module<T: Expression + 'static>(
-    entry_points: impl IntoIterator<Item = (impl Into<String>, T)>,
+pub fn parse_and_compile_module<
+    'a,
+    T: Expression + 'static,
+    TFactory: ExpressionFactory<T> + Clone + 'static,
+    TAllocator: HeapAllocator<T> + Clone + 'static,
+>(
+    entry_points: impl IntoIterator<Item = &'a (impl CompilerEntryPoint<T, TFactory, TAllocator> + 'a)>,
+    module_loader: (impl ModuleLoader<Output = T> + Clone + 'static),
+    env_vars: impl IntoIterator<Item = (String, String)>,
+    runtime: &[u8],
+    factory: &TFactory,
+    allocator: &TAllocator,
+    compiler_options: &WasmCompilerOptions,
+    unoptimized: bool,
+) -> Result<Vec<u8>, WasmCompilerError>
+where
+    T::Builtin: ParserBuiltin + Into<crate::stdlib::Stdlib>,
+    // TODO: Remove unnecessary trait bounds
+    T: Rewritable<T> + Reducible<T>,
+{
+    let env = env_vars.into_iter().collect::<HashMap<_, _>>();
+    let entry_points = entry_points
+        .into_iter()
+        .map({
+            |entry_point| {
+                compile_module_entry_point(
+                    entry_point,
+                    &env,
+                    module_loader.clone(),
+                    factory,
+                    allocator,
+                )
+                .map(|expression| (entry_point.export_name(), expression))
+            }
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    // Compile the expression into a WASM module
+    compile_wasm_module(
+        entry_points,
+        runtime,
+        factory,
+        allocator,
+        compiler_options,
+        unoptimized,
+    )
+}
+
+fn compile_module_entry_point<
+    T: Expression + 'static,
+    TFactory: ExpressionFactory<T> + Clone + 'static,
+    TAllocator: HeapAllocator<T> + Clone + 'static,
+>(
+    entry_point: &impl CompilerEntryPoint<T, TFactory, TAllocator>,
+    env_vars: &HashMap<String, String>,
+    module_loader: impl ModuleLoader<Output = T> + 'static,
+    factory: &TFactory,
+    allocator: &TAllocator,
+) -> Result<T, WasmCompilerError>
+where
+    T::Builtin: ParserBuiltin + Into<crate::stdlib::Stdlib>,
+    // TODO: Remove unnecessary trait bounds
+    T: Rewritable<T> + Reducible<T>,
+{
+    let env_vars = env_vars
+        .iter()
+        .map(|(key, value)| (key.clone(), value.clone()));
+    match entry_point.root() {
+        CompilerRootConfig::Lisp(LispCompilerRootConfig { path }) => {
+            compile_generic_module_entry_point(
+                path,
+                Syntax::Lisp,
+                env_vars,
+                module_loader,
+                factory,
+                allocator,
+            )
+        }
+        CompilerRootConfig::Json(JsonCompilerRootConfig { path }) => {
+            compile_generic_module_entry_point(
+                path,
+                Syntax::Json,
+                env_vars,
+                module_loader,
+                factory,
+                allocator,
+            )
+        }
+        CompilerRootConfig::JavaScript(JavaScriptCompilerRootConfig { path }) => {
+            compile_generic_module_entry_point(
+                path,
+                Syntax::JavaScript,
+                env_vars,
+                module_loader,
+                factory,
+                allocator,
+            )
+        }
+    }
+    .map(|expression| {
+        entry_point
+            .transform(&expression, factory, allocator)
+            .unwrap_or(expression)
+    })
+}
+
+fn compile_generic_module_entry_point<T: Expression + 'static>(
+    input_path: &Path,
+    syntax: Syntax,
+    env_vars: impl IntoIterator<Item = (String, String)>,
+    module_loader: impl ModuleLoader<Output = T> + 'static,
+    factory: &(impl ExpressionFactory<T> + Clone + 'static),
+    allocator: &(impl HeapAllocator<T> + Clone + 'static),
+) -> Result<T, WasmCompilerError>
+where
+    T::Builtin: ParserBuiltin + Into<crate::stdlib::Stdlib>,
+    // TODO: Remove unnecessary trait bounds
+    T: Rewritable<T> + Reducible<T>,
+{
+    // Parse the input file into an expression
+    let source = std::fs::read_to_string(input_path)
+        .map_err(|err| WasmCompilerError::ReadError(input_path.into(), err))?;
+    let parser = create_parser(
+        syntax,
+        Some(input_path),
+        module_loader,
+        env_vars,
+        factory,
+        allocator,
+    );
+    let expression = parser
+        .parse(&source)
+        .map_err(|err| WasmCompilerError::ParseError(input_path.into(), err))?;
+    Ok(expression)
+}
+
+fn compile_wasm_module<'a, T: Expression + 'static>(
+    entry_points: impl IntoIterator<Item = (&'a ModuleEntryPoint, T)>,
     runtime: &[u8],
     factory: &(impl ExpressionFactory<T> + Clone + 'static),
     allocator: &(impl HeapAllocator<T> + Clone + 'static),
@@ -177,7 +579,7 @@ where
                 ArenaRef::<TypedTerm<LambdaTerm>, _>::new(Rc::clone(&shared_arena), factory_pointer)
             };
 
-            Ok((export_name.into(), entry_point_function))
+            Ok((export_name, entry_point_function))
         })
         .collect::<Result<Vec<_>, _>>()?;
 
@@ -203,9 +605,12 @@ pub struct WasmCompilerRuntimeOptions {
     pub memoize_lambdas: bool,
 }
 
-pub fn compile_module(
+pub fn compile_module<'a>(
     entry_points: impl IntoIterator<
-        Item = (String, ArenaRef<TypedTerm<LambdaTerm>, impl Arena + Clone>),
+        Item = (
+            &'a ModuleEntryPoint,
+            ArenaRef<TypedTerm<LambdaTerm>, impl Arena + Clone>,
+        ),
     >,
     runtime_wasm: &[u8],
     heap_snapshot: Option<&[u8]>,
@@ -266,7 +671,7 @@ pub fn compile_module(
     // Compile the entry points, allocating any static expressions into the compiler state linear memory
     // (this will additionally compile all inner lambdas and thunks encountered along the way)
     let mut compiled_entry_points = entry_points.into_iter().fold(
-        Ok(HashMap::<CompiledFunctionId, Vec<String>>::new()),
+        Ok(HashMap::<CompiledFunctionId, Vec<&ModuleEntryPoint>>::new()),
         |results, (export_name, lambda_term)| {
             let mut export_names = results?;
             let compiled_function_id = CompiledFunctionId::from(&lambda_term.as_inner());
@@ -464,7 +869,7 @@ pub fn compile_module(
             .ok_or_else(|| WasmCompilerError::InvalidFunctionId(compiled_function_id))?;
         for export_name in export_names {
             // Add a WASM module export for the entry-point function
-            ast.exports.add(&export_name, function_id);
+            ast.exports.add(export_name.as_str(), function_id);
         }
     }
 
@@ -1509,7 +1914,7 @@ mod tests {
             .unwrap();
 
         let wasm_bytes = compile_module(
-            [("foo".into(), entry_point)],
+            [(&ModuleEntryPoint::from("foo"), entry_point)],
             RUNTIME_BYTES,
             None,
             &WasmCompilerOptions::default(),
@@ -1584,7 +1989,7 @@ mod tests {
             .unwrap();
 
         let wasm_bytes = compile_module(
-            [("foo".into(), entry_point)],
+            [(&ModuleEntryPoint::from("foo"), entry_point)],
             RUNTIME_BYTES,
             None,
             &WasmCompilerOptions::default(),
@@ -1618,4 +2023,10 @@ mod tests {
         assert_eq!(result.result(), expected_result);
         assert!(result.dependencies().is_none());
     }
+}
+
+fn split_at_separator(separator: char, value: &str) -> Option<(&str, &str)> {
+    let separator_index = value.find(separator)?;
+    let (left, right) = value.split_at(separator_index);
+    Some((left, &right[1..]))
 }

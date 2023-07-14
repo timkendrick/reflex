@@ -50,7 +50,7 @@ use reflex_server::{
 use reflex_utils::reconnect::NoopReconnectTimeout;
 use reflex_wasm::{
     allocator::ArenaAllocator,
-    cli::compile::WasmCompilerOptions,
+    cli::compile::{ModuleEntryPoint, WasmCompilerOptions},
     interpreter::WasmProgram,
     term_type::{LambdaTerm, TermType, TypedTerm},
     ArenaRef, Term,
@@ -256,7 +256,7 @@ where
     };
 
     let wasm_module = compile_module(
-        [(String::from(export_name), graph_factory)],
+        [(&ModuleEntryPoint::from(export_name), graph_factory)],
         RUNTIME_BYTES,
         None,
         &WasmCompilerOptions::default(),

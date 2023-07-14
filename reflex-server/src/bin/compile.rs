@@ -8,9 +8,11 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use reflex_lang::{allocator::DefaultAllocator, SharedTermFactory};
 use reflex_parser::syntax::js::default_js_loaders;
-use reflex_server::cli::compile::{parse_and_compile_module, CompileEntryPointArg};
 use reflex_wasm::{
-    cli::compile::{WasmCompilerOptions, WasmCompilerRuntimeOptions},
+    cli::compile::{
+        parse_and_compile_module, CompilerRootConfig, GraphRootEntryPoint, ModuleEntryPoint,
+        WasmCompilerOptions, WasmCompilerRuntimeOptions,
+    },
     compiler::CompilerOptions,
 };
 
@@ -20,7 +22,7 @@ use reflex_wasm::{
 struct Args {
     /// Named program entry points
     #[arg(short, long)]
-    entry_point: Vec<CompileEntryPointArg>,
+    entry_point: Vec<CompilerEntryPointArg>,
     /// Path to runtime library module
     #[arg(short, long)]
     runtime: PathBuf,
@@ -39,6 +41,28 @@ struct Args {
     /// Wrap compiled lambdas in argument memoization wrappers
     #[arg(long)]
     memoize_lambdas: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct CompilerEntryPointArg {
+    /// Name of the exported WASM function
+    pub export_name: ModuleEntryPoint,
+    /// Entry point definition
+    pub root: CompilerRootConfig,
+}
+
+impl std::str::FromStr for CompilerEntryPointArg {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match split_at_separator(':', s) {
+            Some((export_name, root)) if export_name != "" => CompilerRootConfig::from_str(root)
+                .map(|root| Self {
+                    export_name: ModuleEntryPoint::from(export_name),
+                    root,
+                }),
+            _ => Err(format!("Missing entry point definition")),
+        }
+    }
 }
 
 fn main() -> Result<()> {
@@ -65,9 +89,17 @@ fn main() -> Result<()> {
         ..Default::default()
     };
 
+    let entry_points = entry_points
+        .into_iter()
+        .map(|arg| {
+            let CompilerEntryPointArg { export_name, root } = arg;
+            GraphRootEntryPoint::new(export_name, root)
+        })
+        .collect::<Vec<_>>();
+
     // Parse the input file and compile to WASM
     let wasm_module = parse_and_compile_module(
-        entry_points,
+        entry_points.iter(),
         default_js_loaders(empty(), &factory, &allocator),
         std::env::vars(),
         &runtime_bytes,
@@ -84,4 +116,10 @@ fn main() -> Result<()> {
         None => std::io::stdout().write(&wasm_module).map(|_| ()),
     }
     .with_context(|| "Failed to write output file")
+}
+
+fn split_at_separator(separator: char, value: &str) -> Option<(&str, &str)> {
+    let separator_index = value.find(separator)?;
+    let (left, right) = value.split_at(separator_index);
+    Some((left, &right[1..]))
 }

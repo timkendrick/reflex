@@ -4,7 +4,6 @@
 // SPDX-FileContributor: Chris Campbell <c.campbell@mwam.com> https://github.com/c-campbell-mwam
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use std::{
-    fs,
     iter::{empty, once},
     marker::PhantomData,
     ops::Deref,
@@ -32,13 +31,12 @@ use reflex_dispatcher::{
     SerializedAction, TaskFactory, TaskInbox, Worker,
 };
 use reflex_engine::{
-    actor::bytecode_interpreter::{
-        BytecodeInterpreter, BytecodeInterpreterAction, BytecodeInterpreterMetricLabels,
-        BytecodeInterpreterMetricNames,
+    actor::{
+        bytecode_interpreter::BytecodeInterpreterMetricLabels,
+        wasm_interpreter::{WasmInterpreter, WasmInterpreterAction, WasmInterpreterMetricNames},
     },
-    task::{
-        bytecode_worker::{BytecodeWorkerAction, BytecodeWorkerTask, BytecodeWorkerTaskFactory},
-        wasm_worker::WasmWorkerTaskFactory,
+    task::wasm_worker::{
+        WasmHeapDumpMode, WasmWorkerAction, WasmWorkerTask, WasmWorkerTaskFactory,
     },
 };
 use reflex_grpc::{
@@ -71,14 +69,10 @@ use reflex_handlers::{
     utils::tls::{create_https_client, hyper_rustls},
     DefaultHandlerMetricNames,
 };
-use reflex_interpreter::{
-    compiler::{compile_graph_root, hash_compiled_program, Compile, CompilerMode, CompilerOptions},
-    execute, DefaultInterpreterCache, InterpreterOptions,
-};
 use reflex_json::{JsonMap, JsonValue};
 use reflex_lang::{allocator::DefaultAllocator, CachedSharedTerm, SharedTermFactory};
 use reflex_macros::{blanket_trait, task_factory_enum, Matcher, Named};
-use reflex_parser::{create_parser, syntax::js::default_js_loaders, Syntax, SyntaxParser};
+use reflex_parser::{create_parser, syntax::js::default_js_loaders, Syntax};
 use reflex_protobuf::types::WellKnownTypesTranscoder;
 use reflex_runtime::{
     action::{bytecode_interpreter::*, effect::*, evaluate::*, query::*, RuntimeActions},
@@ -103,15 +97,28 @@ use reflex_scheduler::tokio::{
     TokioSchedulerLogger,
 };
 use reflex_utils::reconnect::{NoopReconnectTimeout, ReconnectTimeout};
+use reflex_wasm::{
+    cli::compile::{
+        parse_and_compile_module, CompilerRootConfig, ExpressionFactoryEntryPoint,
+        JavaScriptCompilerRootConfig, JsonCompilerRootConfig, LispCompilerRootConfig,
+        ModuleEntryPoint, RuntimeEntryPointSyntax, WasmCompilerOptions,
+    },
+    interpreter::WasmProgram,
+};
+
+const RUNTIME_BYTES: &'static [u8] = include_bytes!("../../../reflex-wasm/build/runtime.wasm");
 
 /// Reflex runtime evaluator
 #[derive(Parser)]
 struct Args {
     /// Optional entry point module to evaluate (defaults to REPL)
-    entry_point: Option<PathBuf>,
-    /// Entry point syntax
-    #[clap(long, default_value = "javascript")]
-    syntax: Syntax,
+    input_path: Option<PathBuf>,
+    /// Entry point module syntax (defaults to inferring based on entry point module file extension)
+    #[clap(long)]
+    syntax: Option<RuntimeEntryPointSyntax>,
+    /// Name of entry point function within WebAssembly module (only valid for WASM entry points)
+    #[clap(long)]
+    entry_point: Option<ModuleEntryPoint>,
     /// Path to custom TLS certificate
     #[clap(long)]
     tls_cert: Option<PathBuf>,
@@ -124,18 +131,12 @@ struct Args {
     /// Log runtime actions
     #[clap(long)]
     log: bool,
-    /// Prevent static optimizations
+    /// Skip compiler optimizations
     #[clap(long)]
     unoptimized: bool,
-    /// Add debug printing of bytecode output from compiler
+    /// Dump heap snapshots for any queries that return error results
     #[clap(long)]
-    debug_compiler: bool,
-    /// Add debug printing of bytecode execution
-    #[clap(long)]
-    debug_interpreter: bool,
-    /// Add debug printing of stack during execution
-    #[clap(long)]
-    debug_stack: bool,
+    dump_heap_snapshot: Option<WasmHeapDumpMode>,
 }
 
 #[tokio::main]
@@ -154,15 +155,11 @@ pub async fn main() -> Result<()> {
     type TInstrumentation = NoopTokioSchedulerInstrumentation<TAction, TTask>;
     let args = Args::parse();
     let unoptimized = args.unoptimized;
-    let debug_actions = args.log;
-    let debug_compiler = args.debug_compiler;
-    let debug_interpreter = args.debug_interpreter;
-    let debug_stack = args.debug_stack;
+    let dump_heap_snapshot = args.dump_heap_snapshot;
     let effect_throttle = args.effect_throttle_ms.map(Duration::from_millis);
+    let input_path = &args.input_path;
     let factory: TFactory = SharedTermFactory::<TBuiltin>::default();
     let allocator: TAllocator = DefaultAllocator::default();
-    let input_path = args.entry_point;
-    let syntax = args.syntax;
     let https_client: hyper::Client<TConnect> = create_https_client(None)?;
     let grpc_services = load_grpc_services(args.grpc_service.iter())
         .with_context(|| "Failed to load gRPC service descriptor")?;
@@ -176,6 +173,13 @@ pub async fn main() -> Result<()> {
         }?;
     match input_path {
         None => {
+            let syntax = args
+                .syntax
+                .ok_or_else(|| anyhow!("If no input file is specified, syntax must be specified"))
+                .and_then(|syntax| match syntax {
+                    RuntimeEntryPointSyntax::Source(syntax) => Ok(syntax),
+                    _ => Err(anyhow!("Invalid REPL input syntax")),
+                })?;
             let state = StateCache::default();
             let mut cache = SubstitutionCache::new();
             let parser = create_parser(
@@ -189,200 +193,185 @@ pub async fn main() -> Result<()> {
             repl::run(parser, &state, &factory, &allocator, &mut cache)?;
         }
         Some(input_path) => {
-            let compiler_options = CompilerOptions {
-                debug: debug_compiler,
-                ..if unoptimized {
-                    CompilerOptions::unoptimized()
-                } else {
-                    CompilerOptions::default()
+            let syntax = match args.syntax {
+                Some(syntax) => Ok(syntax),
+                None => {
+                    let file_extension = input_path.extension().ok_or_else(|| {
+                        anyhow!("Unable to determine entry point filename extension")
+                    })?;
+                    RuntimeEntryPointSyntax::infer(file_extension).ok_or_else(|| {
+                        anyhow!("Unable to infer entry point syntax based on filename")
+                    })
                 }
-            };
-            let interpreter_options = InterpreterOptions {
-                debug_instructions: debug_interpreter || debug_stack,
-                debug_stack,
-                ..InterpreterOptions::default()
-            };
-            let source = read_file(&input_path)?;
-            let parser = create_parser(
-                syntax,
-                Some(&input_path),
-                default_js_loaders(empty(), &factory, &allocator),
-                std::env::vars(),
-                &factory,
-                &allocator,
-            );
-            let expression = parser.parse(&source).map_err(|err| {
-                anyhow!(
-                    "Failed to parse source at {}: {}",
-                    input_path.display(),
-                    err
-                )
-            })?;
-            let graph_root = compile_graph_root(
-                &expression,
-                &factory,
-                &allocator,
-                &compiler_options,
-                CompilerMode::Function,
-            )
-            .map_err(|err| anyhow!("Failed to compile entry point module: {}", err))?;
-            let state = StateCache::default();
-            let state_id = 0;
-            let mut interpreter_cache = DefaultInterpreterCache::default();
-            let (program, entry_point) = &graph_root;
-            let cache_key = hash_compiled_program(program, entry_point);
-            let (result, _cache_entries) = execute(
-                cache_key,
-                program,
-                *entry_point,
-                state_id,
-                &state,
-                &factory,
-                &allocator,
-                &interpreter_options,
-                &mut interpreter_cache,
-            )
-            .map_err(|err| {
-                anyhow!(
-                    "Failed to execute program at {}: {}",
-                    input_path.display(),
-                    err
-                )
-            })?;
-            let (output, dependencies) = result.into_parts();
-            if dependencies.is_empty() {
-                println!("{}", output);
-            } else {
-                let (evaluate_effect, subscribe_action) =
-                    create_query(expression, &factory, &allocator);
-                let logger = if debug_actions {
-                    Some(CliActionLogger::stderr())
-                } else {
-                    None
-                };
-                let instrumentation = NoopTokioSchedulerInstrumentation::default();
-                let async_tasks =
-                    TokioRuntimeThreadPoolFactory::new(tokio::runtime::Handle::current());
-                let blocking_tasks =
-                    TokioRuntimeThreadPoolFactory::new(tokio::runtime::Handle::current());
-                let (scheduler, main_pid) = {
-                    let mut builder = TokioSchedulerBuilder::<TAction, TTask, _, _, _, _>::new(
-                        logger,
-                        instrumentation,
-                        async_tasks,
-                        blocking_tasks,
-                    );
-                    let main_pid = builder.generate_pid();
-                    let actors = {
-                        runtime_actors(
-                            factory.clone(),
-                            allocator.clone(),
-                            effect_throttle,
-                            RuntimeMetricNames::default(),
-                            main_pid,
-                        )
-                        .into_iter()
-                        .map(CliActor::Runtime)
-                    }
-                    .chain(once(CliActor::BytecodeInterpreter(
-                        BytecodeInterpreter::new(
-                            graph_root,
-                            compiler_options,
-                            interpreter_options,
-                            factory.clone(),
-                            allocator.clone(),
-                            BytecodeInterpreterMetricNames::default(),
-                            CliMetricLabels,
-                            main_pid,
+            }?;
+            let (wasm_module, entry_point_name) = match syntax {
+                RuntimeEntryPointSyntax::Wasm => {
+                    let entry_point_name = args.entry_point.as_ref().cloned().unwrap_or_default();
+                    read_wasm_module(input_path)
+                        .map(WasmProgram::from_wasm)
+                        .map(|module| (module, entry_point_name))
+                }
+                RuntimeEntryPointSyntax::PrecompiledWasm => {
+                    let entry_point_name = args.entry_point.as_ref().cloned().unwrap_or_default();
+                    read_wasm_module(input_path)
+                        .map(WasmProgram::from_cwasm)
+                        .map(|module| (module, entry_point_name))
+                }
+                RuntimeEntryPointSyntax::Source(syntax) => {
+                    let entry_point_name = ModuleEntryPoint::default();
+                    let root = match syntax {
+                        Syntax::Lisp => CompilerRootConfig::Lisp(LispCompilerRootConfig::from(
+                            input_path.to_owned(),
+                        )),
+                        Syntax::Json => CompilerRootConfig::Json(JsonCompilerRootConfig::from(
+                            input_path.to_owned(),
+                        )),
+                        Syntax::JavaScript => CompilerRootConfig::JavaScript(
+                            JavaScriptCompilerRootConfig::from(input_path.to_owned()),
                         ),
-                    )))
-                    .chain(
-                        default_handler_actors::<
-                            TAction,
-                            TTask,
-                            T,
-                            TFactory,
-                            TAllocator,
-                            TConnect,
-                            TReconnect,
-                        >(
-                            https_client,
-                            &factory,
-                            &allocator,
-                            NoopReconnectTimeout,
-                            DefaultHandlerMetricNames::default(),
-                            main_pid,
-                        )
-                        .into_iter()
-                        .map(|actor| CliActor::Handler(actor)),
+                    };
+                    let entry_point =
+                        ExpressionFactoryEntryPoint::new(entry_point_name.clone(), root);
+                    parse_and_compile_module(
+                        [&entry_point],
+                        default_js_loaders(empty(), &factory, &allocator),
+                        std::env::vars(),
+                        RUNTIME_BYTES,
+                        &factory,
+                        &allocator,
+                        &WasmCompilerOptions::default(),
+                        unoptimized,
                     )
-                    .chain(once(CliActor::Grpc(GrpcHandler::new(
-                        grpc_services,
-                        WellKnownTypesTranscoder,
+                    .with_context(|| "Failed to compile entry point: {input_path}")
+                    .map(WasmProgram::from_wasm)
+                    .map(move |module| (module, entry_point_name))
+                }
+            }?;
+            let logger = if args.log {
+                Some(CliActionLogger::stderr())
+            } else {
+                None
+            };
+            let instrumentation = NoopTokioSchedulerInstrumentation::default();
+            let async_tasks = TokioRuntimeThreadPoolFactory::new(tokio::runtime::Handle::current());
+            let blocking_tasks =
+                TokioRuntimeThreadPoolFactory::new(tokio::runtime::Handle::current());
+            let (evaluate_effect, subscribe_action) = create_root_query(&factory, &allocator);
+            let (scheduler, main_pid) = {
+                let mut builder = TokioSchedulerBuilder::<TAction, TTask, _, _, _, _>::new(
+                    logger,
+                    instrumentation,
+                    async_tasks,
+                    blocking_tasks,
+                );
+                let main_pid = builder.generate_pid();
+                let actors = {
+                    runtime_actors(
                         factory.clone(),
                         allocator.clone(),
-                        NoopReconnectTimeout,
-                        grpc_max_operations_per_connection,
-                        grpc_config,
-                        GrpcHandlerMetricNames::default(),
+                        effect_throttle,
+                        RuntimeMetricNames::default(),
                         main_pid,
-                    ))))
-                    .map(|actor| (builder.generate_pid(), actor))
-                    .collect::<Vec<_>>();
-                    let actor_pids = actors.iter().map(|(pid, _)| *pid);
-                    builder.worker(main_pid, CliActor::Main(Redispatcher::new(actor_pids)));
-                    for (pid, actor) in actors {
-                        builder.worker(pid, actor);
-                    }
-                    builder.send(main_pid, TAction::from(subscribe_action));
-                    let runtime = builder.build();
-                    (runtime, main_pid)
-                };
-                let mut results_stream = tokio::spawn(scheduler.subscribe(main_pid, {
-                    let factory = factory.clone();
-                    move |action: &CliActions<CachedSharedTerm<CliBuiltins>>| {
-                        let EffectEmitAction { effect_types } = action.match_type()?;
-                        let update = effect_types
-                            .iter()
-                            .filter(|batch| is_evaluate_effect_type(&batch.effect_type, &factory))
-                            .flat_map(|batch| batch.updates.iter())
-                            .filter(|(key, _)| key.id() == evaluate_effect.id())
-                            .filter_map({
-                                let factory = factory.clone();
-                                move |(_, value)| parse_evaluate_effect_result(value, &factory)
-                            })
-                            .next()?;
-                        Some(update.result().clone())
-                    }
-                }))
-                .await
-                .unwrap();
-                while let Some(value) = results_stream.next().await {
-                    let output = match factory.match_signal_term(&value) {
-                        None => format!("{}", value),
-                        Some(signal) => format_signal_result(signal),
-                    };
-                    println!("{}{}", clear_escape_sequence(), output);
+                    )
+                    .into_iter()
+                    .map(CliActor::Runtime)
                 }
+                .chain(once(CliActor::WasmInterpreter(WasmInterpreter::new(
+                    wasm_module,
+                    entry_point_name,
+                    factory.clone(),
+                    allocator.clone(),
+                    WasmInterpreterMetricNames::default(),
+                    CliMetricLabels,
+                    main_pid,
+                    dump_heap_snapshot,
+                ))))
+                .chain(
+                    default_handler_actors::<
+                        TAction,
+                        TTask,
+                        T,
+                        TFactory,
+                        TAllocator,
+                        TConnect,
+                        TReconnect,
+                    >(
+                        https_client,
+                        &factory,
+                        &allocator,
+                        NoopReconnectTimeout,
+                        DefaultHandlerMetricNames::default(),
+                        main_pid,
+                    )
+                    .into_iter()
+                    .map(|actor| CliActor::Handler(actor)),
+                )
+                .chain(once(CliActor::Grpc(GrpcHandler::new(
+                    grpc_services,
+                    WellKnownTypesTranscoder,
+                    factory.clone(),
+                    allocator.clone(),
+                    NoopReconnectTimeout,
+                    grpc_max_operations_per_connection,
+                    grpc_config,
+                    GrpcHandlerMetricNames::default(),
+                    main_pid,
+                ))))
+                .map(|actor| (builder.generate_pid(), actor))
+                .collect::<Vec<_>>();
+                let actor_pids = actors.iter().map(|(pid, _)| *pid);
+                builder.worker(main_pid, CliActor::Main(Redispatcher::new(actor_pids)));
+                for (pid, actor) in actors {
+                    builder.worker(pid, actor);
+                }
+                builder.send(main_pid, TAction::from(subscribe_action));
+                let runtime = builder.build();
+                (runtime, main_pid)
+            };
+            let mut results_stream = tokio::spawn(scheduler.subscribe(main_pid, {
+                let factory = factory.clone();
+                move |action: &CliActions<CachedSharedTerm<CliBuiltins>>| {
+                    let EffectEmitAction { effect_types } = action.match_type()?;
+                    let update = effect_types
+                        .iter()
+                        .filter(|batch| is_evaluate_effect_type(&batch.effect_type, &factory))
+                        .flat_map(|batch| batch.updates.iter())
+                        .filter(|(key, _)| key.id() == evaluate_effect.id())
+                        .filter_map({
+                            let factory = factory.clone();
+                            move |(_, value)| parse_evaluate_effect_result(value, &factory)
+                        })
+                        .next()?;
+                    Some(update.result().clone())
+                }
+            }))
+            .await
+            .unwrap();
+            while let Some(value) = results_stream.next().await {
+                let output = match factory.match_signal_term(&value) {
+                    None => format!("{}", value),
+                    Some(signal) => format_signal_result(signal),
+                };
+                println!("{}{}", clear_escape_sequence(), output);
             }
         }
     }
     Ok(())
 }
 
-fn create_query<
+fn create_root_query<
     T: AsyncExpression,
     TFactory: AsyncExpressionFactory<T>,
     TAllocator: AsyncHeapAllocator<T>,
 >(
-    query: T,
     factory: &TFactory,
     allocator: &TAllocator,
 ) -> (T::Signal, EffectSubscribeAction<T>) {
+    let query = factory.create_lambda_term(1, factory.create_variable_term(0));
     let evaluate_effect = create_evaluate_effect(
         String::from("<anonymous>"),
         query,
-        QueryEvaluationMode::Standalone,
+        QueryEvaluationMode::Query,
         QueryInvalidationStrategy::Exact,
         factory,
         allocator,
@@ -392,6 +381,15 @@ fn create_query<
         effects: vec![evaluate_effect.clone()],
     };
     (evaluate_effect, subscribe_action)
+}
+
+fn read_wasm_module(path: &Path) -> Result<Vec<u8>> {
+    std::fs::read(path).with_context(|| {
+        format!(
+            "Failed to load WebAssemby module: {}",
+            path.to_string_lossy()
+        )
+    })
 }
 
 struct CliMetricLabels;
@@ -488,10 +486,6 @@ where
     fn log_task_message(&mut self, _message: &AsyncMessage<Self::Action>, _pid: ProcessId) {}
 }
 
-fn read_file(path: &Path) -> Result<String> {
-    fs::read_to_string(path).with_context(|| format!("Failed to read path {}", path.display()))
-}
-
 fn clear_escape_sequence() -> &'static str {
     "\x1b[2J\x1b[H"
 }
@@ -499,7 +493,7 @@ fn clear_escape_sequence() -> &'static str {
 #[derive(PartialEq, Eq, Clone, Debug)]
 enum CliActions<T: Expression> {
     Runtime(RuntimeActions<T>),
-    BytecodeInterpreter(BytecodeInterpreterActions<T>),
+    WasmInterpreter(BytecodeInterpreterActions<T>),
     FetchHandler(FetchHandlerActions),
     GraphQlHandler(GraphQlHandlerActions),
     TimeoutHandler(TimeoutHandlerActions),
@@ -510,7 +504,7 @@ impl<T: Expression> Named for CliActions<T> {
     fn name(&self) -> &'static str {
         match self {
             Self::Runtime(action) => action.name(),
-            Self::BytecodeInterpreter(action) => action.name(),
+            Self::WasmInterpreter(action) => action.name(),
             Self::FetchHandler(action) => action.name(),
             Self::GraphQlHandler(action) => action.name(),
             Self::TimeoutHandler(action) => action.name(),
@@ -524,7 +518,7 @@ impl<T: Expression> SerializableAction for CliActions<T> {
     fn to_json(&self) -> SerializedAction {
         match self {
             Self::Runtime(action) => action.to_json(),
-            Self::BytecodeInterpreter(action) => action.to_json(),
+            Self::WasmInterpreter(action) => action.to_json(),
             Self::FetchHandler(action) => action.to_json(),
             Self::GraphQlHandler(action) => action.to_json(),
             Self::TimeoutHandler(action) => action.to_json(),
@@ -540,7 +534,7 @@ blanket_trait!(
         + RuntimeAction<T>
         + HandlerAction<T>
         + GrpcHandlerAction<T>
-        + BytecodeInterpreterAction<T>
+        + WasmInterpreterAction<T>
         + CliTaskAction<T>
     {
     }
@@ -550,7 +544,7 @@ blanket_trait!(
     trait CliTask<T, TFactory, TAllocator, TConnect>:
         RuntimeTask
         + HandlerTask<TConnect>
-        + BytecodeWorkerTask<T, TFactory, TAllocator>
+        + WasmWorkerTask<T, TFactory, TAllocator>
         + GrpcHandlerTask<WellKnownTypesTranscoder>
     where
         T: Expression,
@@ -572,7 +566,7 @@ enum CliActor<
     TAction,
     TTask,
 > where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
+    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T>,
     T::String: Send,
     T::Builtin: Send,
     T::Signal: Send,
@@ -592,7 +586,7 @@ enum CliActor<
     Runtime(RuntimeActor<T, TFactory, TAllocator>),
     Handler(HandlerActor<T, TFactory, TAllocator, TConnect, TReconnect>),
     Grpc(GrpcHandler<T, TFactory, TAllocator, WellKnownTypesTranscoder, TGrpcConfig, TReconnect>),
-    BytecodeInterpreter(BytecodeInterpreter<T, TFactory, TAllocator, TMetricLabels>),
+    WasmInterpreter(WasmInterpreter<T, TFactory, TAllocator, TMetricLabels>),
     Main(Redispatcher),
     Task(CliTaskActor<T, TFactory, TAllocator, TConnect, TAction, TTask>),
 }
@@ -610,7 +604,7 @@ impl<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels, 
         TTask,
     >
 where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
+    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T>,
     T::String: Send,
     T::Builtin: Send,
     T::Signal: Send,
@@ -632,7 +626,7 @@ where
             Self::Runtime(inner) => inner.name(),
             Self::Handler(inner) => inner.name(),
             Self::Grpc(inner) => inner.name(),
-            Self::BytecodeInterpreter(inner) => inner.name(),
+            Self::WasmInterpreter(inner) => inner.name(),
             Self::Main(inner) => inner.name(),
             Self::Task(inner) => inner.name(),
         }
@@ -653,7 +647,7 @@ impl<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels, 
         TTask,
     >
 where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
+    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T>,
     T::String: Send,
     T::Builtin: Send,
     T::Signal: Send,
@@ -720,8 +714,8 @@ where
                     TReconnect,
                 > as Actor<TAction, TTask>>::init(actor))
             }
-            Self::BytecodeInterpreter(actor) => {
-                CliActorState::BytecodeInterpreter(<BytecodeInterpreter<
+            Self::WasmInterpreter(actor) => {
+                CliActorState::WasmInterpreter(<WasmInterpreter<
                     T,
                     TFactory,
                     TAllocator,
@@ -775,15 +769,15 @@ where
                 TReconnect,
             > as Actor<TAction, TTask>>::events(actor, inbox)
             .map(|(events, dispose)| (CliEvents::Grpc(events), dispose.map(CliDispose::Grpc))),
-            Self::BytecodeInterpreter(actor) => {
-                <BytecodeInterpreter<T, TFactory, TAllocator, TMetricLabels> as Actor<
+            Self::WasmInterpreter(actor) => {
+                <WasmInterpreter<T, TFactory, TAllocator, TMetricLabels> as Actor<
                     TAction,
                     TTask,
                 >>::events(actor, inbox)
                 .map(|(events, dispose)| {
                     (
-                        CliEvents::BytecodeInterpreter(events),
-                        dispose.map(CliDispose::BytecodeInterpreter),
+                        CliEvents::WasmInterpreter(events),
+                        dispose.map(CliDispose::WasmInterpreter),
                     )
                 })
             }
@@ -814,7 +808,7 @@ impl<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels, 
         TTask,
     >
 where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
+    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T>,
     T::String: Send,
     T::Builtin: Send,
     T::Signal: Send,
@@ -854,8 +848,8 @@ where
             > as Worker<TAction, SchedulerTransition<TAction, TTask>>>::accept(
                 actor, message
             ),
-            Self::BytecodeInterpreter(actor) => {
-                <BytecodeInterpreter<T, TFactory, TAllocator, TMetricLabels> as Worker<
+            Self::WasmInterpreter(actor) => {
+                <WasmInterpreter<T, TFactory, TAllocator, TMetricLabels> as Worker<
                     TAction,
                     SchedulerTransition<TAction, TTask>,
                 >>::accept(actor, message)
@@ -898,8 +892,8 @@ where
                     actor, message, state,
                 )
             }
-            (Self::BytecodeInterpreter(actor), CliActorState::BytecodeInterpreter(state)) => {
-                <BytecodeInterpreter<T, TFactory, TAllocator, TMetricLabels> as Worker<
+            (Self::WasmInterpreter(actor), CliActorState::WasmInterpreter(state)) => {
+                <WasmInterpreter<T, TFactory, TAllocator, TMetricLabels> as Worker<
                     TAction,
                     SchedulerTransition<TAction, TTask>,
                 >>::schedule(actor, message, state)
@@ -934,7 +928,7 @@ impl<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels, 
         TTask,
     >
 where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
+    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T>,
     T::String: Send,
     T::Builtin: Send,
     T::Signal: Send,
@@ -995,8 +989,8 @@ where
                     actor, state, action, metadata, context,
                 )
             }
-            (Self::BytecodeInterpreter(actor), CliActorState::BytecodeInterpreter(state)) => {
-                <BytecodeInterpreter<T, TFactory, TAllocator, TMetricLabels> as Handler<
+            (Self::WasmInterpreter(actor), CliActorState::WasmInterpreter(state)) => {
+                <WasmInterpreter<T, TFactory, TAllocator, TMetricLabels> as Handler<
                     TAction,
                     SchedulerTransition<TAction, TTask>,
                 >>::handle(actor, state, action, metadata, context)
@@ -1028,7 +1022,7 @@ enum CliActorState<
     TAction,
     TTask,
 > where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
+    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T>,
     T::String: Send,
     T::Builtin: Send,
     T::Signal: Send,
@@ -1064,8 +1058,8 @@ enum CliActorState<
             SchedulerTransition<TAction, TTask>,
         >>::State,
     ),
-    BytecodeInterpreter(
-        <BytecodeInterpreter<T, TFactory, TAllocator, TMetricLabels> as Handler<
+    WasmInterpreter(
+        <WasmInterpreter<T, TFactory, TAllocator, TMetricLabels> as Handler<
             TAction,
             SchedulerTransition<TAction, TTask>,
         >>::State,
@@ -1092,7 +1086,7 @@ enum CliEvents<
     TAction,
     TTask,
 > where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
+    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T>,
     T::String: Send,
     T::Builtin: Send,
     T::Signal: Send,
@@ -1128,9 +1122,9 @@ enum CliEvents<
                 TTask,
             >>::Events<TInbox>,
     ),
-    BytecodeInterpreter(
+    WasmInterpreter(
         #[pin]
-        <BytecodeInterpreter<T, TFactory, TAllocator, TMetricLabels> as Actor<
+        <WasmInterpreter<T, TFactory, TAllocator, TMetricLabels> as Actor<
                 TAction,
                 TTask,
             >>::Events<TInbox>,
@@ -1169,7 +1163,7 @@ impl<
         TTask,
     >
 where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
+    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T>,
     T::String: Send,
     T::Builtin: Send,
     T::Signal: Send,
@@ -1197,7 +1191,7 @@ where
             CliEventsVariant::Runtime(inner) => inner.poll_next(cx),
             CliEventsVariant::Handler(inner) => inner.poll_next(cx),
             CliEventsVariant::Grpc(inner) => inner.poll_next(cx),
-            CliEventsVariant::BytecodeInterpreter(inner) => inner.poll_next(cx),
+            CliEventsVariant::WasmInterpreter(inner) => inner.poll_next(cx),
             CliEventsVariant::Main(inner) => inner.poll_next(cx),
             CliEventsVariant::Task(inner) => inner.poll_next(cx),
         }
@@ -1207,7 +1201,7 @@ where
             Self::Runtime(inner) => inner.size_hint(),
             Self::Handler(inner) => inner.size_hint(),
             Self::Grpc(inner) => inner.size_hint(),
-            Self::BytecodeInterpreter(inner) => inner.size_hint(),
+            Self::WasmInterpreter(inner) => inner.size_hint(),
             Self::Main(inner) => inner.size_hint(),
             Self::Task(inner) => inner.size_hint(),
         }
@@ -1226,7 +1220,7 @@ enum CliDispose<
     TAction,
     TTask,
 > where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
+    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T>,
     T::String: Send,
     T::Builtin: Send,
     T::Signal: Send,
@@ -1259,9 +1253,9 @@ enum CliDispose<
                 TTask,
             >>::Dispose,
     ),
-    BytecodeInterpreter(
+    WasmInterpreter(
         #[pin]
-        <BytecodeInterpreter<T, TFactory, TAllocator, TMetricLabels> as Actor<
+        <WasmInterpreter<T, TFactory, TAllocator, TMetricLabels> as Actor<
                 TAction,
                 TTask,
             >>::Dispose,
@@ -1289,7 +1283,7 @@ impl<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels, 
         TTask,
     >
 where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
+    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T>,
     T::String: Send,
     T::Builtin: Send,
     T::Signal: Send,
@@ -1316,7 +1310,7 @@ where
             CliDisposeVariant::Runtime(inner) => inner.poll(cx),
             CliDisposeVariant::Handler(inner) => inner.poll(cx),
             CliDisposeVariant::Grpc(inner) => inner.poll(cx),
-            CliDisposeVariant::BytecodeInterpreter(inner) => inner.poll(cx),
+            CliDisposeVariant::WasmInterpreter(inner) => inner.poll(cx),
             CliDisposeVariant::Main(inner) => inner.poll(cx),
             CliDisposeVariant::Task(inner) => inner.poll(cx),
         }
@@ -1327,7 +1321,7 @@ blanket_trait!(
     trait CliTaskAction<T: Expression>:
         Action
         + RuntimeTaskAction
-        + BytecodeWorkerAction<T>
+        + WasmWorkerAction<T>
         + DefaultHandlersTaskAction
         + GrpcHandlerConnectionTaskAction
     {
@@ -1338,14 +1332,13 @@ task_factory_enum!({
     #[derive(Matcher, Clone)]
     enum CliTaskFactory<T, TFactory, TAllocator, TConnect>
     where
-        T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
+        T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T>,
         TFactory: AsyncExpressionFactory<T> + Default,
         TAllocator: AsyncHeapAllocator<T> + Default,
         T::Builtin: Into<reflex_wasm::stdlib::Stdlib>,
         TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     {
         Runtime(RuntimeTaskFactory),
-        BytecodeWorker(BytecodeWorkerTaskFactory<T, TFactory, TAllocator>),
         WasmWorker(WasmWorkerTaskFactory<T, TFactory, TAllocator>),
         DefaultHandlers(DefaultHandlersTaskFactory<TConnect>),
         GrpcHandler(GrpcHandlerConnectionTaskFactory),
@@ -1354,7 +1347,7 @@ task_factory_enum!({
     impl<T, TFactory, TAllocator, TConnect, TAction, TTask> TaskFactory<TAction, TTask>
         for CliTaskFactory<T, TFactory, TAllocator, TConnect>
     where
-        T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
+        T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T>,
         TFactory: AsyncExpressionFactory<T> + Default,
         TAllocator: AsyncHeapAllocator<T> + Default,
         T::Builtin: Into<reflex_wasm::stdlib::Stdlib>,
@@ -1368,7 +1361,7 @@ task_factory_enum!({
 #[derive(Named, Clone)]
 struct CliActorFactory<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels>
 where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
+    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T>,
     T::String: Send,
     T::Builtin: Send,
     T::Signal: Send,
@@ -1393,7 +1386,7 @@ impl<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels>
     From<CliTaskFactory<T, TFactory, TAllocator, TConnect>>
     for CliActorFactory<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels>
 where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
+    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T>,
     T::String: Send,
     T::Builtin: Send,
     T::Signal: Send,
@@ -1422,7 +1415,7 @@ impl<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels, 
     TaskFactory<TAction, Self>
     for CliActorFactory<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels>
 where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
+    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T>,
     T::String: Send,
     T::Builtin: Send,
     T::Signal: Send,
@@ -1455,10 +1448,10 @@ where
 }
 
 impl<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels>
-    From<BytecodeWorkerTaskFactory<T, TFactory, TAllocator>>
+    From<WasmWorkerTaskFactory<T, TFactory, TAllocator>>
     for CliActorFactory<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels>
 where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
+    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T>,
     T::String: Send,
     T::Builtin: Send,
     T::Signal: Send,
@@ -1473,8 +1466,8 @@ where
     TGrpcConfig: GrpcConfig + Send + Clone + 'static,
     TMetricLabels: BytecodeInterpreterMetricLabels + Send + 'static,
 {
-    fn from(value: BytecodeWorkerTaskFactory<T, TFactory, TAllocator>) -> Self {
-        Self::from(CliTaskFactory::BytecodeWorker(value))
+    fn from(value: WasmWorkerTaskFactory<T, TFactory, TAllocator>) -> Self {
+        Self::from(CliTaskFactory::WasmWorker(value))
     }
 }
 
@@ -1482,7 +1475,7 @@ impl<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels>
     From<EffectThrottleTaskFactory>
     for CliActorFactory<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels>
 where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
+    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T>,
     T::String: Send,
     T::Builtin: Send,
     T::Signal: Send,
@@ -1506,7 +1499,7 @@ impl<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels>
     From<FetchHandlerTaskFactory<TConnect>>
     for CliActorFactory<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels>
 where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
+    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T>,
     T::String: Send,
     T::Builtin: Send,
     T::Signal: Send,
@@ -1532,7 +1525,7 @@ impl<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels>
     From<GraphQlHandlerHttpFetchTaskFactory<TConnect>>
     for CliActorFactory<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels>
 where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
+    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T>,
     T::String: Send,
     T::Builtin: Send,
     T::Signal: Send,
@@ -1558,7 +1551,7 @@ impl<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels>
     From<GraphQlHandlerWebSocketConnectionTaskFactory>
     for CliActorFactory<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels>
 where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
+    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T>,
     T::String: Send,
     T::Builtin: Send,
     T::Signal: Send,
@@ -1584,7 +1577,7 @@ impl<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels>
     From<TimeoutHandlerTaskFactory>
     for CliActorFactory<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels>
 where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
+    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T>,
     T::String: Send,
     T::Builtin: Send,
     T::Signal: Send,
@@ -1610,7 +1603,7 @@ impl<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels>
     From<TimestampHandlerTaskFactory>
     for CliActorFactory<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels>
 where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
+    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T>,
     T::String: Send,
     T::Builtin: Send,
     T::Signal: Send,
@@ -1636,7 +1629,7 @@ impl<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels>
     From<GrpcHandlerConnectionTaskFactory>
     for CliActorFactory<T, TFactory, TAllocator, TConnect, TReconnect, TGrpcConfig, TMetricLabels>
 where
-    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T> + Compile<T>,
+    T: AsyncExpression + Rewritable<T> + Reducible<T> + Applicable<T>,
     T::String: Send,
     T::Builtin: Send,
     T::Signal: Send,
@@ -1680,13 +1673,13 @@ impl<'a, T: Expression> From<&'a CliActions<T>> for Option<&'a RuntimeActions<T>
 
 impl<T: Expression> From<BytecodeInterpreterActions<T>> for CliActions<T> {
     fn from(value: BytecodeInterpreterActions<T>) -> Self {
-        Self::BytecodeInterpreter(value)
+        Self::WasmInterpreter(value)
     }
 }
 impl<T: Expression> From<CliActions<T>> for Option<BytecodeInterpreterActions<T>> {
     fn from(value: CliActions<T>) -> Self {
         match value {
-            CliActions::BytecodeInterpreter(value) => Some(value),
+            CliActions::WasmInterpreter(value) => Some(value),
             _ => None,
         }
     }
@@ -1694,7 +1687,7 @@ impl<T: Expression> From<CliActions<T>> for Option<BytecodeInterpreterActions<T>
 impl<'a, T: Expression> From<&'a CliActions<T>> for Option<&'a BytecodeInterpreterActions<T>> {
     fn from(value: &'a CliActions<T>) -> Self {
         match value {
-            CliActions::BytecodeInterpreter(value) => Some(value),
+            CliActions::WasmInterpreter(value) => Some(value),
             _ => None,
         }
     }

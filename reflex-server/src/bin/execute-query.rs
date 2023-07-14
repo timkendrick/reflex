@@ -4,7 +4,7 @@
 // SPDX-FileContributor: Chris Campbell <c.campbell@mwam.com> https://github.com/c-campbell-mwam
 use std::{
     fs,
-    iter::once,
+    iter::{empty, once},
     path::{Path, PathBuf},
     str::FromStr,
     time::Duration,
@@ -26,6 +26,7 @@ use reflex_handlers::{
     DefaultHandlerMetricNames,
 };
 use reflex_lang::{allocator::DefaultAllocator, CachedSharedTerm, SharedTermFactory};
+use reflex_parser::{syntax::js::default_js_loaders, Syntax};
 use reflex_protobuf::types::WellKnownTypesTranscoder;
 use reflex_scheduler::threadpool::TokioRuntimeThreadPoolFactory;
 use reflex_server::{
@@ -52,20 +53,28 @@ use reflex_server::{
     tokio_runtime_metrics_export::TokioRuntimeMonitorMetricNames,
 };
 use reflex_utils::reconnect::NoopReconnectTimeout;
-use reflex_wasm::interpreter::WasmProgram;
+use reflex_wasm::{
+    cli::compile::{
+        parse_and_compile_module, CompilerRootConfig, GraphRootEntryPoint,
+        JavaScriptCompilerRootConfig, JsonCompilerRootConfig, LispCompilerRootConfig,
+        ModuleEntryPoint, RuntimeEntryPointSyntax, WasmCompilerOptions,
+    },
+    interpreter::WasmProgram,
+};
+
+const RUNTIME_BYTES: &'static [u8] = include_bytes!("../../../reflex-wasm/build/runtime.wasm");
 
 /// Execute a GraphQL query against the provided graph root
 #[derive(Parser)]
 pub struct Args {
-    /// Path to runtime WebAssembly module
+    /// Path to graph definition entry point
+    input_path: PathBuf,
+    /// Graph definition syntax (defaults to inferring based on graph definition file extension)
     #[clap(long)]
-    module: PathBuf,
-    /// Whether the provided WebAssembly module has been precompiled via Cranelift
+    syntax: Option<RuntimeEntryPointSyntax>,
+    /// Name of graph root entry point function within WebAssembly module (only valid for WASM entry points)
     #[clap(long)]
-    precompiled: bool,
-    /// Name of graph root entry point function within runtime WebAssembly module
-    #[clap(long)]
-    entry_point: String,
+    entry_point: Option<ModuleEntryPoint>,
     /// Path to GraphQL schema SDL
     #[clap(long)]
     schema: Option<PathBuf>,
@@ -84,6 +93,9 @@ pub struct Args {
     /// Log runtime actions
     #[clap(long)]
     log: Option<Option<LogFormat>>,
+    /// Skip compiler optimizations
+    #[clap(long)]
+    unoptimized: bool,
     /// Dump heap snapshots for any queries that return error results
     #[clap(long)]
     dump_heap_snapshot: Option<WasmHeapDumpMode>,
@@ -145,18 +157,61 @@ async fn main() -> Result<()> {
     >;
 
     let args = Args::parse();
-    let wasm_module = fs::read(&args.module).with_context(|| {
-        format!(
-            "Failed to load WebAssemby module: {}",
-            args.module.to_string_lossy()
-        )
-    })?;
-    let wasm_module = if args.precompiled {
-        WasmProgram::from_cwasm(wasm_module)
-    } else {
-        WasmProgram::from_wasm(wasm_module)
-    };
-    let graph_root_factory_export_name = args.entry_point.clone();
+    let input_path = &args.input_path;
+    let factory: TFactory = SharedTermFactory::<TBuiltin>::default();
+    let allocator: TAllocator = DefaultAllocator::default();
+    let syntax = match args.syntax {
+        Some(syntax) => Ok(syntax),
+        None => {
+            let file_extension = input_path
+                .extension()
+                .ok_or_else(|| anyhow!("Unable to determine entry point filename extension"))?;
+            RuntimeEntryPointSyntax::infer(file_extension)
+                .ok_or_else(|| anyhow!("Unable to infer entry point syntax based on filename"))
+        }
+    }?;
+    let (wasm_module, entry_point_name) = match syntax {
+        RuntimeEntryPointSyntax::Wasm => {
+            let entry_point_name = args.entry_point.as_ref().cloned().unwrap_or_default();
+            read_wasm_module(input_path)
+                .map(WasmProgram::from_wasm)
+                .map(|module| (module, entry_point_name))
+        }
+        RuntimeEntryPointSyntax::PrecompiledWasm => {
+            let entry_point_name = args.entry_point.as_ref().cloned().unwrap_or_default();
+            read_wasm_module(input_path)
+                .map(WasmProgram::from_cwasm)
+                .map(|module| (module, entry_point_name))
+        }
+        RuntimeEntryPointSyntax::Source(syntax) => {
+            let entry_point_name = ModuleEntryPoint::default();
+            let root = match syntax {
+                Syntax::Lisp => {
+                    CompilerRootConfig::Lisp(LispCompilerRootConfig::from(input_path.to_owned()))
+                }
+                Syntax::Json => {
+                    CompilerRootConfig::Json(JsonCompilerRootConfig::from(input_path.to_owned()))
+                }
+                Syntax::JavaScript => CompilerRootConfig::JavaScript(
+                    JavaScriptCompilerRootConfig::from(input_path.to_owned()),
+                ),
+            };
+            let entry_point = GraphRootEntryPoint::new(entry_point_name.clone(), root);
+            parse_and_compile_module(
+                [&entry_point],
+                default_js_loaders(empty(), &factory, &allocator),
+                std::env::vars(),
+                RUNTIME_BYTES,
+                &factory,
+                &allocator,
+                &WasmCompilerOptions::default(),
+                args.unoptimized,
+            )
+            .with_context(|| "Failed to compile entry point: {input_path}")
+            .map(WasmProgram::from_wasm)
+            .map(move |module| (module, entry_point_name))
+        }
+    }?;
     let schema = if let Some(schema_path) = &args.schema {
         Some(load_graphql_schema(schema_path.as_path())?)
     } else {
@@ -174,8 +229,6 @@ async fn main() -> Result<()> {
             _ => Ok(None),
         }?;
     let dump_heap_snapshot = args.dump_heap_snapshot;
-    let factory: TFactory = SharedTermFactory::<TBuiltin>::default();
-    let allocator: TAllocator = DefaultAllocator::default();
     let tracer = match OpenTelemetryConfig::parse_env(std::env::vars())? {
         None => None,
         Some(config) => Some(config.into_tracer()?),
@@ -191,7 +244,7 @@ async fn main() -> Result<()> {
     cli::<TAction, TTask, T, TFactory, TAllocator, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _>(
         args.into(),
         wasm_module,
-        graph_root_factory_export_name,
+        entry_point_name,
         schema,
         GraphQlWebServerActorFactory::new(|context| {
             let reconnect_timeout = NoopReconnectTimeout;
@@ -261,4 +314,13 @@ fn load_graphql_schema(path: &Path) -> Result<GraphQlSchema> {
         .with_context(|| format!("Failed to load GraphQL schema: {}", path.to_string_lossy()))?;
     parse_graphql_schema(&source)
         .with_context(|| format!("Failed to load GraphQL schema: {}", path.to_string_lossy()))
+}
+
+fn read_wasm_module(path: &Path) -> Result<Vec<u8>> {
+    std::fs::read(path).with_context(|| {
+        format!(
+            "Failed to load WebAssemby module: {}",
+            path.to_string_lossy()
+        )
+    })
 }

@@ -2830,6 +2830,7 @@ dependencies = [
  "reflex-json",
  "reflex-lang",
  "reflex-macros",
+ "reflex-parser",
  "reflex-stdlib",
  "reflex-utils",
  "serde",

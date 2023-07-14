@@ -17,7 +17,8 @@ use reflex_lang::{allocator::DefaultAllocator, CachedSharedTerm, SharedTermFacto
 use reflex_wasm::{
     allocator::{Arena, ArenaAllocator, VecAllocator},
     cli::compile::{
-        compile_module, parse_inline_memory_snapshot, WasmCompilerError, WasmCompilerOptions,
+        compile_module, parse_inline_memory_snapshot, ModuleEntryPoint, WasmCompilerError,
+        WasmCompilerOptions,
     },
     compiler::{
         error::TypedStackError, CompileWasm, CompilerOptions, CompilerStack, CompilerState,
@@ -378,7 +379,7 @@ where
     };
     let linear_memory = Vec::from(arena.deref().borrow().deref().deref().as_bytes());
     let wasm_module = compile_module(
-        [(String::from(export_name), entry_point)],
+        [(&ModuleEntryPoint::from(export_name), entry_point)],
         &RUNTIME_BYTES,
         Some(&linear_memory),
         compiler_options,

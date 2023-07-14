@@ -14,6 +14,7 @@ reflex-js = { path = "../reflex-js" }
 reflex-json = { path = "../reflex-json" }
 reflex-lang = { path = "../reflex-lang" }
 reflex-macros = { path = "../reflex-macros" }
+reflex-parser = { path = "../reflex-parser" }
 reflex-stdlib = { path = "../reflex-stdlib" }
 reflex-utils = { path = "../reflex-utils" }
 anyhow = "1.0"
