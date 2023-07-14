@@ -226,5 +226,30 @@ export default (describe) => {
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });
+
+    test('(String, Int, String)', (assert, {
+      createApplication,
+      createBuiltin,
+      createInt,
+      createString,
+      createTriple,
+      evaluate,
+      format,
+      NULL,
+      Stdlib,
+    }) => {
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.CollectString),
+          createTriple(createString('foo'), createInt(3), createString('baz')),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(
+          format(result),
+          '{<InvalidFunctionArgsCondition:CollectString(["foo", 3, "baz"])>}',
+        );
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+    });
   });
 };
