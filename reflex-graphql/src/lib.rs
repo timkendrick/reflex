@@ -1305,6 +1305,11 @@ mod tests {
             Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
         }
     }
+    impl From<reflex_stdlib::stdlib::Intersperse> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::Intersperse) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
     impl From<reflex_stdlib::stdlib::Keys> for GraphQlTestBuiltins {
         fn from(value: reflex_stdlib::stdlib::Keys) -> Self {
             Self::from(reflex_stdlib::stdlib::Stdlib::from(value))

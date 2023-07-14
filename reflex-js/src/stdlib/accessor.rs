@@ -21,6 +21,7 @@ pub trait AccessorBuiltin:
     + From<stdlib::EndsWith>
     + From<stdlib::Get>
     + From<stdlib::Insert>
+    + From<stdlib::Intersperse>
     + From<stdlib::Keys>
     + From<stdlib::Length>
     + From<stdlib::Map>
@@ -49,6 +50,7 @@ impl<T> AccessorBuiltin for T where
         + From<stdlib::Flatten>
         + From<stdlib::Get>
         + From<stdlib::Insert>
+        + From<stdlib::Intersperse>
         + From<stdlib::Keys>
         + From<stdlib::Length>
         + From<stdlib::Map>
@@ -164,6 +166,7 @@ where
         + From<stdlib::Filter>
         + From<stdlib::Flatten>
         + From<stdlib::Get>
+        + From<stdlib::Intersperse>
         + From<stdlib::Keys>
         + From<stdlib::Length>
         + From<stdlib::Map>
@@ -331,6 +334,7 @@ where
         + From<stdlib::Filter>
         + From<stdlib::Flatten>
         + From<stdlib::Get>
+        + From<stdlib::Intersperse>
         + From<stdlib::Keys>
         + From<stdlib::Length>
         + From<stdlib::Map>
@@ -351,8 +355,25 @@ where
             factory.create_builtin_term(stdlib::Filter),
             allocator.create_unit_list(target.clone()),
         )),
-        // TODO: Create stdlib method for Array.prototype.join
-        "join" => Some(get_array_join_method(target, factory, allocator)),
+        "join" => Some(factory.create_partial_application_term(
+            factory.create_lambda_term(
+                2,
+                factory.create_application_term(
+                    factory.create_builtin_term(stdlib::Apply),
+                    allocator.create_pair(
+                        factory.create_builtin_term(stdlib::Concat),
+                        factory.create_application_term(
+                            factory.create_builtin_term(stdlib::Intersperse),
+                            allocator.create_pair(
+                                factory.create_variable_term(1),
+                                factory.create_variable_term(0),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            allocator.create_unit_list(target.clone()),
+        )),
         "flatMap" => Some(factory.create_partial_application_term(
             factory.create_lambda_term(
                 2,
@@ -398,96 +419,6 @@ where
         )),
         _ => None,
     }
-}
-
-fn get_array_join_method<T: Expression, TFactory: ExpressionFactory<T>>(
-    target: &T,
-    factory: &TFactory,
-    allocator: &impl HeapAllocator<T>,
-) -> T
-where
-    T::Builtin: Builtin
-        + From<stdlib::Apply>
-        + From<stdlib::Concat>
-        + From<stdlib::Flatten>
-        + From<stdlib::Length>
-        + From<stdlib::Map>
-        + From<stdlib::Multiply>
-        + From<stdlib::ResolveList>
-        + From<stdlib::Slice>
-        + From<stdlib::Subtract>
-        + From<crate::stdlib::ToString>,
-{
-    factory.create_partial_application_term(
-        factory.create_lambda_term(
-            2,
-            factory.create_application_term(
-                factory.create_builtin_term(stdlib::Apply),
-                allocator.create_pair(
-                    factory.create_builtin_term(stdlib::Concat),
-                    factory.create_application_term(
-                        factory.create_builtin_term(stdlib::Slice),
-                        allocator.create_triple(
-                            factory.create_application_term(
-                                factory.create_builtin_term(stdlib::Flatten),
-                                allocator.create_unit_list(factory.create_application_term(
-                                    factory.create_builtin_term(stdlib::ResolveList),
-                                    allocator.create_unit_list(factory.create_application_term(
-                                        factory.create_builtin_term(stdlib::Map),
-                                        allocator.create_pair(
-                                            factory.create_variable_term(1),
-                                            factory.create_partial_application_term(
-                                                factory.create_lambda_term(
-                                                    2,
-                                                    factory.create_list_term(
-                                                        allocator.create_pair(
-                                                            factory.create_application_term(
-                                                                factory.create_builtin_term(
-                                                                    crate::stdlib::ToString,
-                                                                ),
-                                                                allocator.create_unit_list(
-                                                                    factory.create_variable_term(0),
-                                                                ),
-                                                            ),
-                                                            factory.create_variable_term(1),
-                                                        ),
-                                                    ),
-                                                ),
-                                                allocator.create_unit_list(
-                                                    factory.create_variable_term(0),
-                                                ),
-                                            ),
-                                        ),
-                                    )),
-                                )),
-                            ),
-                            factory.create_int_term(0),
-                            factory.create_application_term(
-                                factory.create_builtin_term(stdlib::Subtract),
-                                allocator.create_pair(
-                                    factory.create_application_term(
-                                        factory.create_builtin_term(stdlib::Multiply),
-                                        allocator.create_pair(
-                                            factory.create_application_term(
-                                                factory.create_builtin_term(stdlib::Length),
-                                                allocator.create_pair(
-                                                    factory.create_variable_term(1),
-                                                    factory.create_int_term(2),
-                                                ),
-                                            ),
-                                            factory.create_int_term(2),
-                                        ),
-                                    ),
-                                    factory.create_int_term(1),
-                                ),
-                            ),
-                        ),
-                    ),
-                ),
-            ),
-        ),
-        allocator.create_unit_list(target.clone()),
-    )
 }
 
 fn get_string_field<T: Expression, TFactory: ExpressionFactory<T>>(

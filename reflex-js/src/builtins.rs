@@ -277,6 +277,11 @@ impl From<stdlib::Insert> for JsBuiltins {
         Self::from(stdlib::Stdlib::from(value))
     }
 }
+impl From<stdlib::Intersperse> for JsBuiltins {
+    fn from(value: stdlib::Intersperse) -> Self {
+        Self::from(stdlib::Stdlib::from(value))
+    }
+}
 impl From<stdlib::Keys> for JsBuiltins {
     fn from(value: stdlib::Keys) -> Self {
         Self::from(stdlib::Stdlib::from(value))

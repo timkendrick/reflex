@@ -40,6 +40,7 @@ pub use hash::*;
 pub use if_error::*;
 pub use if_pending::*;
 pub use insert::*;
+pub use intersperse::*;
 pub use keys::*;
 pub use length::*;
 pub use lt::*;
@@ -102,6 +103,7 @@ mod r#if;
 mod if_error;
 mod if_pending;
 mod insert;
+mod intersperse;
 mod keys;
 mod length;
 mod lt;
@@ -205,6 +207,7 @@ pub enum Stdlib {
     IfError,
     IfPending,
     Insert,
+    Intersperse,
     Keys,
     Length,
     Lt,
@@ -284,6 +287,7 @@ impl TryFrom<Uuid> for Stdlib {
             IfError::UUID => Ok(Self::IfError),
             IfPending::UUID => Ok(Self::IfPending),
             Insert::UUID => Ok(Self::Insert),
+            Intersperse::UUID => Ok(Self::Intersperse),
             Keys::UUID => Ok(Self::Keys),
             Length::UUID => Ok(Self::Length),
             Lt::UUID => Ok(Self::Lt),
@@ -360,6 +364,7 @@ impl Uid for Stdlib {
             Self::IfError => Uid::uid(&IfError {}),
             Self::IfPending => Uid::uid(&IfPending {}),
             Self::Insert => Uid::uid(&Insert {}),
+            Self::Intersperse => Uid::uid(&Intersperse {}),
             Self::Keys => Uid::uid(&Keys {}),
             Self::Length => Uid::uid(&Length {}),
             Self::Lt => Uid::uid(&Lt {}),
@@ -435,6 +440,7 @@ impl Stdlib {
             Self::IfError => IfError::arity(),
             Self::IfPending => IfPending::arity(),
             Self::Insert => Insert::arity(),
+            Self::Intersperse => Intersperse::arity(),
             Self::Keys => Keys::arity(),
             Self::Length => Length::arity(),
             Self::Lt => Lt::arity(),
@@ -533,6 +539,9 @@ impl Stdlib {
             Self::IfError => Applicable::<T>::apply(&IfError, args, factory, allocator, cache),
             Self::IfPending => Applicable::<T>::apply(&IfPending, args, factory, allocator, cache),
             Self::Insert => Applicable::<T>::apply(&Insert, args, factory, allocator, cache),
+            Self::Intersperse => {
+                Applicable::<T>::apply(&Intersperse, args, factory, allocator, cache)
+            }
             Self::Keys => Applicable::<T>::apply(&Keys, args, factory, allocator, cache),
             Self::Length => Applicable::<T>::apply(&Length, args, factory, allocator, cache),
             Self::Lt => Applicable::<T>::apply(&Lt, args, factory, allocator, cache),
@@ -625,6 +634,7 @@ impl Stdlib {
             Self::IfError => Applicable::<T>::should_parallelize(&IfError, args),
             Self::IfPending => Applicable::<T>::should_parallelize(&IfPending, args),
             Self::Insert => Applicable::<T>::should_parallelize(&Insert, args),
+            Self::Intersperse => Applicable::<T>::should_parallelize(&Intersperse, args),
             Self::Keys => Applicable::<T>::should_parallelize(&Keys, args),
             Self::Length => Applicable::<T>::should_parallelize(&Length, args),
             Self::Lt => Applicable::<T>::should_parallelize(&Lt, args),
@@ -858,6 +868,11 @@ impl From<IfPending> for Stdlib {
 impl From<Insert> for Stdlib {
     fn from(_value: Insert) -> Self {
         Self::Insert
+    }
+}
+impl From<Intersperse> for Stdlib {
+    fn from(_value: Intersperse) -> Self {
+        Self::Intersperse
     }
 }
 impl From<Keys> for Stdlib {
