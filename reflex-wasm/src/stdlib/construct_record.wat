@@ -6,6 +6,22 @@
     (@args (@strict $keys) (@strict $values))
 
     (@impl
+      (i32.eq (global.get $TermType::List))
+      (i32.eq (global.get $TermType::List))
+      (func $Stdlib_ConstructRecord::impl::List::List (param $keys i32) (param $values i32) (param $state i32) (result i32 i32)
+        ;; If the key and value lists differ in length, return an error
+        (if (result i32 i32)
+          (i32.ne
+            (call $Term::List::get_length (local.get $keys))
+            (call $Term::List::get_length (local.get $values)))
+          (then
+            (call $Stdlib_ConstructRecord::impl::default (local.get $keys) (local.get $values) (local.get $state)))
+          (else
+            ;; Otherwise instantiate a new record term composed of the key and value lists
+            (call $Term::Record::new (local.get $keys) (local.get $values))
+            (global.get $NULL)))))
+
+    (@impl
       (call $TermType::implements::iterate)
       (call $TermType::implements::iterate)
       (func $Stdlib_ConstructRecord::impl::<iterate>::<iterate> (param $keys i32) (param $values i32) (param $state i32) (result i32 i32)
