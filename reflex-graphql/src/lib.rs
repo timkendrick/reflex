@@ -1190,8 +1190,8 @@ mod tests {
             Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
         }
     }
-    impl From<reflex_stdlib::stdlib::Concat> for GraphQlTestBuiltins {
-        fn from(value: reflex_stdlib::stdlib::Concat) -> Self {
+    impl From<reflex_stdlib::stdlib::CollectString> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::CollectString) -> Self {
             Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
         }
     }

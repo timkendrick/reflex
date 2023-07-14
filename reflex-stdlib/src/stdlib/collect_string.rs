@@ -9,8 +9,8 @@ use reflex::core::{
     Uuid,
 };
 
-pub struct Concat;
-impl Concat {
+pub struct CollectString;
+impl CollectString {
     pub const UUID: Uuid = uuid!("46e03082-2c5f-41c7-af49-fc09516e2dfe");
     const ARITY: FunctionArity<0, 0> = FunctionArity {
         required: [],
@@ -21,12 +21,12 @@ impl Concat {
         Arity::from(&Self::ARITY)
     }
 }
-impl Uid for Concat {
+impl Uid for CollectString {
     fn uid(&self) -> Uuid {
         Self::UUID
     }
 }
-impl<T: Expression> Applicable<T> for Concat {
+impl<T: Expression> Applicable<T> for CollectString {
     fn arity(&self) -> Option<Arity> {
         Some(Self::arity())
     }

@@ -162,8 +162,8 @@ impl From<stdlib::CollectSignal> for JsBuiltins {
         Self::from(stdlib::Stdlib::from(value))
     }
 }
-impl From<stdlib::Concat> for JsBuiltins {
-    fn from(value: stdlib::Concat) -> Self {
+impl From<stdlib::CollectString> for JsBuiltins {
+    fn from(value: stdlib::CollectString) -> Self {
         Self::from(stdlib::Stdlib::from(value))
     }
 }

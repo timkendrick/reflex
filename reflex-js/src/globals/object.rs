@@ -102,7 +102,7 @@ mod tests {
         core::{evaluate, DependencyList, EvaluationResult, StateCache},
     };
     use reflex_lang::{allocator::DefaultAllocator, SharedTermFactory};
-    use reflex_stdlib::{Abs, Concat};
+    use reflex_stdlib::{Abs, CollectString};
 
     use crate::builtins::JsBuiltins;
 
@@ -382,7 +382,7 @@ mod tests {
                 allocator.create_unit_list(factory.create_list_term(allocator.create_triple(
                     factory.create_list_term(allocator.create_pair(
                         factory.create_application_term(
-                            factory.create_builtin_term(Concat),
+                            factory.create_builtin_term(CollectString),
                             allocator.create_pair(
                                 factory.create_string_term(allocator.create_static_string("key:")),
                                 factory.create_string_term(allocator.create_static_string("foo")),
@@ -395,7 +395,7 @@ mod tests {
                     )),
                     factory.create_list_term(allocator.create_pair(
                         factory.create_application_term(
-                            factory.create_builtin_term(Concat),
+                            factory.create_builtin_term(CollectString),
                             allocator.create_pair(
                                 factory.create_string_term(allocator.create_static_string("key:")),
                                 factory.create_string_term(allocator.create_static_string("bar")),
@@ -408,7 +408,7 @@ mod tests {
                     )),
                     factory.create_list_term(allocator.create_pair(
                         factory.create_application_term(
-                            factory.create_builtin_term(Concat),
+                            factory.create_builtin_term(CollectString),
                             allocator.create_pair(
                                 factory.create_string_term(allocator.create_static_string("key:")),
                                 factory.create_string_term(allocator.create_static_string("baz")),

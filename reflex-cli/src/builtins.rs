@@ -179,8 +179,8 @@ impl From<stdlib::CollectSignal> for CliBuiltins {
         Self::from(stdlib::Stdlib::from(value))
     }
 }
-impl From<stdlib::Concat> for CliBuiltins {
-    fn from(value: stdlib::Concat) -> Self {
+impl From<stdlib::CollectString> for CliBuiltins {
+    fn from(value: stdlib::CollectString) -> Self {
         Self::from(stdlib::Stdlib::from(value))
     }
 }
