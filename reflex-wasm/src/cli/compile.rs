@@ -1248,6 +1248,7 @@ fn parse_runtime_exports(module: &Module) -> Result<RuntimeExportMappings, WasmC
                 &exported_functions,
                 stdlib::IncrementVariable.into(),
             )?,
+            intersperse: get_stdlib_function(&exported_functions, stdlib::Intersperse.into())?,
             is_finite: get_stdlib_function(&exported_functions, stdlib::IsFinite.into())?,
             iterate: get_stdlib_function(&exported_functions, stdlib::Iterate.into())?,
             keys: get_stdlib_function(&exported_functions, stdlib::Keys.into())?,

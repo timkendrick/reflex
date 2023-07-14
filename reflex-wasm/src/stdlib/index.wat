@@ -46,6 +46,7 @@
   (@include "./if.wat")
   (@include "./if_error.wat")
   (@include "./if_pending.wat")
+  (@include "./intersperse.wat")
   (@include "./iterate.wat")
   (@include "./js/accessor.wat")
   (@include "./js/construct.wat")
@@ -146,6 +147,7 @@
       $Stdlib_IfError
       $Stdlib_IfPending
       $Stdlib_IncrementVariable
+      $Stdlib_Intersperse
       $Stdlib_IsFinite
       $Stdlib_Iterate
       $Stdlib_Keys

@@ -46,7 +46,6 @@ export default (describe) => {
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
-        debugger;
         const expression = createApplication(
           createBuiltin(Stdlib.ResolveList),
           createUnitList(
@@ -58,7 +57,6 @@ export default (describe) => {
             ),
           ),
         );
-        debugger;
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '[3, "foo", 4]');
         assert.strictEqual(format(dependencies), 'NULL');

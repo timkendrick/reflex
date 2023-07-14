@@ -118,6 +118,7 @@ function createStdlib(runtime) {
     IfError: runtime.__Stdlib_IfError.value,
     IfPending: runtime.__Stdlib_IfPending.value,
     IncrementVariable: runtime.__Stdlib_IncrementVariable.value,
+    Intersperse: runtime.__Stdlib_Intersperse.value,
     IsFinite: runtime.__Stdlib_IsFinite.value,
     Iterate: runtime.__Stdlib_Iterate.value,
     Keys: runtime.__Stdlib_Keys.value,

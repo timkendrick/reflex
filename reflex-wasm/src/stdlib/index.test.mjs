@@ -35,6 +35,7 @@ import gte from './gte.test.mjs';
 import has from './has.test.mjs';
 import hash from './hash.test.mjs';
 import identity from './identity.test.mjs';
+import intersperse from './intersperse.test.mjs';
 import _if from './if.test.mjs';
 import ifError from './if_error.test.mjs';
 import ifPending from './if_pending.test.mjs';
@@ -138,6 +139,7 @@ export default (describe) => {
   has(describe);
   hash(describe);
   identity(describe);
+  intersperse(describe);
   _if(describe);
   ifError(describe);
   ifPending(describe);

@@ -47,6 +47,7 @@ pub mod identity;
 pub mod r#if;
 pub mod if_error;
 pub mod if_pending;
+pub mod intersperse;
 pub mod iterate;
 pub mod js;
 pub mod json;
@@ -127,6 +128,7 @@ pub use hash::*;
 pub use identity::*;
 pub use if_error::*;
 pub use if_pending::*;
+pub use intersperse::*;
 pub use iterate::*;
 pub use js::*;
 pub use json::*;
@@ -216,6 +218,7 @@ pub enum Stdlib {
     IfError(IfError),
     IfPending(IfPending),
     IncrementVariable(IncrementVariable),
+    Intersperse(Intersperse),
     IsFinite(IsFinite),
     Iterate(Iterate),
     Keys(Keys),
@@ -326,6 +329,7 @@ impl From<Stdlib> for u32 {
             Stdlib::IfError(_) => StdlibDiscriminants::IfError as u32,
             Stdlib::IfPending(_) => StdlibDiscriminants::IfPending as u32,
             Stdlib::IncrementVariable(_) => StdlibDiscriminants::IncrementVariable as u32,
+            Stdlib::Intersperse(_) => StdlibDiscriminants::Intersperse as u32,
             Stdlib::IsFinite(_) => StdlibDiscriminants::IsFinite as u32,
             Stdlib::Iterate(_) => StdlibDiscriminants::Iterate as u32,
             Stdlib::Keys(_) => StdlibDiscriminants::Keys as u32,
@@ -465,6 +469,9 @@ impl TryFrom<u32> for Stdlib {
             }
             value if value == StdlibDiscriminants::IncrementVariable as u32 => {
                 Ok(Self::IncrementVariable(IncrementVariable))
+            }
+            value if value == StdlibDiscriminants::Intersperse as u32 => {
+                Ok(Self::Intersperse(Intersperse))
             }
             value if value == StdlibDiscriminants::IsFinite as u32 => Ok(Self::IsFinite(IsFinite)),
             value if value == StdlibDiscriminants::Iterate as u32 => Ok(Self::Iterate(Iterate)),
@@ -615,6 +622,7 @@ impl Stdlib {
             Self::IfError(_) => "Stdlib_IfError",
             Self::IfPending(_) => "Stdlib_IfPending",
             Self::IncrementVariable(_) => "Stdlib_IncrementVariable",
+            Self::Intersperse(_) => "Stdlib_Intersperse",
             Self::IsFinite(_) => "Stdlib_IsFinite",
             Self::Iterate(_) => "Stdlib_Iterate",
             Self::Keys(_) => "Stdlib_Keys",
@@ -718,6 +726,7 @@ impl Stdlib {
             Self::IfError(inner) => inner.arity(),
             Self::IfPending(inner) => inner.arity(),
             Self::IncrementVariable(inner) => inner.arity(),
+            Self::Intersperse(inner) => inner.arity(),
             Self::IsFinite(inner) => inner.arity(),
             Self::Iterate(inner) => inner.arity(),
             Self::Keys(inner) => inner.arity(),
@@ -821,6 +830,7 @@ impl Stdlib {
             Self::IfError(inner) => inner.uid(),
             Self::IfPending(inner) => inner.uid(),
             Self::IncrementVariable(inner) => inner.uid(),
+            Self::Intersperse(inner) => inner.uid(),
             Self::IsFinite(inner) => inner.uid(),
             Self::Iterate(inner) => inner.uid(),
             Self::Keys(inner) => inner.uid(),
@@ -962,6 +972,7 @@ impl TryFrom<Uuid> for Stdlib {
             IfError::UUID => Ok(Self::IfError(IfError)),
             IfPending::UUID => Ok(Self::IfPending(IfPending)),
             IncrementVariable::UUID => Ok(Self::IncrementVariable(IncrementVariable)),
+            Intersperse::UUID => Ok(Self::Intersperse(Intersperse)),
             IsFinite::UUID => Ok(Self::IsFinite(IsFinite)),
             Iterate::UUID => Ok(Self::Iterate(Iterate)),
             Keys::UUID => Ok(Self::Keys(Keys)),
@@ -1077,59 +1088,60 @@ mod tests {
         assert_eq!(StdlibDiscriminants::IfError as u32, 41);
         assert_eq!(StdlibDiscriminants::IfPending as u32, 42);
         assert_eq!(StdlibDiscriminants::IncrementVariable as u32, 43);
-        assert_eq!(StdlibDiscriminants::IsFinite as u32, 44);
-        assert_eq!(StdlibDiscriminants::Iterate as u32, 45);
-        assert_eq!(StdlibDiscriminants::Keys as u32, 46);
-        assert_eq!(StdlibDiscriminants::Length as u32, 47);
-        assert_eq!(StdlibDiscriminants::Log as u32, 48);
-        assert_eq!(StdlibDiscriminants::Lt as u32, 49);
-        assert_eq!(StdlibDiscriminants::Lte as u32, 50);
-        assert_eq!(StdlibDiscriminants::Map as u32, 51);
-        assert_eq!(StdlibDiscriminants::Max as u32, 52);
-        assert_eq!(StdlibDiscriminants::Merge as u32, 53);
-        assert_eq!(StdlibDiscriminants::Min as u32, 54);
-        assert_eq!(StdlibDiscriminants::Multiply as u32, 55);
-        assert_eq!(StdlibDiscriminants::Not as u32, 56);
-        assert_eq!(StdlibDiscriminants::Or as u32, 57);
-        assert_eq!(StdlibDiscriminants::ParseDate as u32, 58);
-        assert_eq!(StdlibDiscriminants::ParseFloat as u32, 59);
-        assert_eq!(StdlibDiscriminants::ParseInt as u32, 60);
-        assert_eq!(StdlibDiscriminants::ParseJson as u32, 61);
-        assert_eq!(StdlibDiscriminants::Pow as u32, 62);
-        assert_eq!(StdlibDiscriminants::Push as u32, 63);
-        assert_eq!(StdlibDiscriminants::PushFront as u32, 64);
-        assert_eq!(StdlibDiscriminants::Raise as u32, 65);
-        assert_eq!(StdlibDiscriminants::Remainder as u32, 66);
-        assert_eq!(StdlibDiscriminants::Replace as u32, 67);
-        assert_eq!(StdlibDiscriminants::ResolveArgs as u32, 68);
-        assert_eq!(StdlibDiscriminants::ResolveDeep as u32, 69);
-        assert_eq!(StdlibDiscriminants::ResolveHashmap as u32, 70);
-        assert_eq!(StdlibDiscriminants::ResolveHashset as u32, 71);
-        assert_eq!(StdlibDiscriminants::ResolveList as u32, 72);
-        assert_eq!(StdlibDiscriminants::ResolveLoaderResults as u32, 73);
-        assert_eq!(StdlibDiscriminants::ResolveQueryBranch as u32, 74);
-        assert_eq!(StdlibDiscriminants::ResolveQueryLeaf as u32, 75);
-        assert_eq!(StdlibDiscriminants::ResolveRecord as u32, 76);
-        assert_eq!(StdlibDiscriminants::ResolveShallow as u32, 77);
-        assert_eq!(StdlibDiscriminants::ResolveTree as u32, 78);
-        assert_eq!(StdlibDiscriminants::Round as u32, 79);
-        assert_eq!(StdlibDiscriminants::Scan as u32, 80);
-        assert_eq!(StdlibDiscriminants::Sequence as u32, 81);
-        assert_eq!(StdlibDiscriminants::Set as u32, 82);
-        assert_eq!(StdlibDiscriminants::SetVariable as u32, 83);
-        assert_eq!(StdlibDiscriminants::Skip as u32, 84);
-        assert_eq!(StdlibDiscriminants::Slice as u32, 85);
-        assert_eq!(StdlibDiscriminants::Split as u32, 86);
-        assert_eq!(StdlibDiscriminants::StartsWith as u32, 87);
-        assert_eq!(StdlibDiscriminants::StringifyJson as u32, 88);
-        assert_eq!(StdlibDiscriminants::Subtract as u32, 89);
-        assert_eq!(StdlibDiscriminants::Take as u32, 90);
-        assert_eq!(StdlibDiscriminants::Throw as u32, 91);
-        assert_eq!(StdlibDiscriminants::ToRequest as u32, 92);
-        assert_eq!(StdlibDiscriminants::ToString as u32, 93);
-        assert_eq!(StdlibDiscriminants::Urlencode as u32, 94);
-        assert_eq!(StdlibDiscriminants::Unzip as u32, 95);
-        assert_eq!(StdlibDiscriminants::Values as u32, 96);
-        assert_eq!(StdlibDiscriminants::Zip as u32, 97);
+        assert_eq!(StdlibDiscriminants::Intersperse as u32, 44);
+        assert_eq!(StdlibDiscriminants::IsFinite as u32, 45);
+        assert_eq!(StdlibDiscriminants::Iterate as u32, 46);
+        assert_eq!(StdlibDiscriminants::Keys as u32, 47);
+        assert_eq!(StdlibDiscriminants::Length as u32, 48);
+        assert_eq!(StdlibDiscriminants::Log as u32, 49);
+        assert_eq!(StdlibDiscriminants::Lt as u32, 50);
+        assert_eq!(StdlibDiscriminants::Lte as u32, 51);
+        assert_eq!(StdlibDiscriminants::Map as u32, 52);
+        assert_eq!(StdlibDiscriminants::Max as u32, 53);
+        assert_eq!(StdlibDiscriminants::Merge as u32, 54);
+        assert_eq!(StdlibDiscriminants::Min as u32, 55);
+        assert_eq!(StdlibDiscriminants::Multiply as u32, 56);
+        assert_eq!(StdlibDiscriminants::Not as u32, 57);
+        assert_eq!(StdlibDiscriminants::Or as u32, 58);
+        assert_eq!(StdlibDiscriminants::ParseDate as u32, 59);
+        assert_eq!(StdlibDiscriminants::ParseFloat as u32, 60);
+        assert_eq!(StdlibDiscriminants::ParseInt as u32, 61);
+        assert_eq!(StdlibDiscriminants::ParseJson as u32, 62);
+        assert_eq!(StdlibDiscriminants::Pow as u32, 63);
+        assert_eq!(StdlibDiscriminants::Push as u32, 64);
+        assert_eq!(StdlibDiscriminants::PushFront as u32, 65);
+        assert_eq!(StdlibDiscriminants::Raise as u32, 66);
+        assert_eq!(StdlibDiscriminants::Remainder as u32, 67);
+        assert_eq!(StdlibDiscriminants::Replace as u32, 68);
+        assert_eq!(StdlibDiscriminants::ResolveArgs as u32, 69);
+        assert_eq!(StdlibDiscriminants::ResolveDeep as u32, 70);
+        assert_eq!(StdlibDiscriminants::ResolveHashmap as u32, 71);
+        assert_eq!(StdlibDiscriminants::ResolveHashset as u32, 72);
+        assert_eq!(StdlibDiscriminants::ResolveList as u32, 73);
+        assert_eq!(StdlibDiscriminants::ResolveLoaderResults as u32, 74);
+        assert_eq!(StdlibDiscriminants::ResolveQueryBranch as u32, 75);
+        assert_eq!(StdlibDiscriminants::ResolveQueryLeaf as u32, 76);
+        assert_eq!(StdlibDiscriminants::ResolveRecord as u32, 77);
+        assert_eq!(StdlibDiscriminants::ResolveShallow as u32, 78);
+        assert_eq!(StdlibDiscriminants::ResolveTree as u32, 79);
+        assert_eq!(StdlibDiscriminants::Round as u32, 80);
+        assert_eq!(StdlibDiscriminants::Scan as u32, 81);
+        assert_eq!(StdlibDiscriminants::Sequence as u32, 82);
+        assert_eq!(StdlibDiscriminants::Set as u32, 83);
+        assert_eq!(StdlibDiscriminants::SetVariable as u32, 84);
+        assert_eq!(StdlibDiscriminants::Skip as u32, 85);
+        assert_eq!(StdlibDiscriminants::Slice as u32, 86);
+        assert_eq!(StdlibDiscriminants::Split as u32, 87);
+        assert_eq!(StdlibDiscriminants::StartsWith as u32, 88);
+        assert_eq!(StdlibDiscriminants::StringifyJson as u32, 89);
+        assert_eq!(StdlibDiscriminants::Subtract as u32, 90);
+        assert_eq!(StdlibDiscriminants::Take as u32, 91);
+        assert_eq!(StdlibDiscriminants::Throw as u32, 92);
+        assert_eq!(StdlibDiscriminants::ToRequest as u32, 93);
+        assert_eq!(StdlibDiscriminants::ToString as u32, 94);
+        assert_eq!(StdlibDiscriminants::Urlencode as u32, 95);
+        assert_eq!(StdlibDiscriminants::Unzip as u32, 96);
+        assert_eq!(StdlibDiscriminants::Values as u32, 97);
+        assert_eq!(StdlibDiscriminants::Zip as u32, 98);
     }
 }

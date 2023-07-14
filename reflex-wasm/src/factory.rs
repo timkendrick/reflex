@@ -1542,6 +1542,9 @@ impl From<reflex_stdlib::stdlib::Stdlib> for reflex_wasm::stdlib::Stdlib {
             reflex_stdlib::stdlib::Stdlib::Insert => {
                 reflex_wasm::stdlib::Stdlib::Set(reflex_wasm::stdlib::Set)
             }
+            reflex_stdlib::stdlib::Stdlib::Intersperse => {
+                reflex_wasm::stdlib::Stdlib::Intersperse(reflex_wasm::stdlib::Intersperse)
+            }
             reflex_stdlib::stdlib::Stdlib::Keys => {
                 reflex_wasm::stdlib::Stdlib::Keys(reflex_wasm::stdlib::Keys)
             }
@@ -1933,6 +1936,11 @@ impl From<reflex_stdlib::stdlib::IfPending> for reflex_wasm::stdlib::Stdlib {
 }
 impl From<reflex_stdlib::stdlib::Insert> for reflex_wasm::stdlib::Stdlib {
     fn from(value: reflex_stdlib::stdlib::Insert) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_stdlib::stdlib::Intersperse> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Intersperse) -> Self {
         Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
     }
 }
