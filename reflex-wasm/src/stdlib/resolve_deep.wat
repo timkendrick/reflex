@@ -8,6 +8,7 @@
     (@impl
       (i32.eq (global.get $TermType::List))
       (func $Stdlib_ResolveDeep::impl::List (param $self i32) (param $state i32) (result i32 i32)
+        (local $iterator i32)
         (if (result i32 i32)
           ;; If the list is already fully resolved, return it as-is
           (call $Stdlib_ResolveDeep::is_fully_resolved::List (local.get $self))
@@ -16,12 +17,14 @@
             (global.get $NULL))
           (else
             ;; Otherwise resolve all the items and collect them into a new list, short-circuiting any signals
-            (call $Term::List::traits::collect_strict
-              ;; TODO: Avoid unnecessary heap allocations for intermediate values
+            ;; TODO: Avoid unnecessary heap allocations for intermediate values
+            (local.tee $iterator
               (call $Term::MapIterator::new
                 (local.get $self)
-                (call $Term::Builtin::new (global.get $Stdlib_ResolveDeep)))
-              (local.get $state))))))
+                (call $Term::Builtin::new (global.get $Stdlib_ResolveDeep))))
+            (call $Term::List::traits::collect_strict (local.get $state))
+            ;; Dispose the temporary iterator instance
+            (call $Term::drop (local.get $iterator))))))
 
     (@impl
       (i32.eq (global.get $TermType::Record))
@@ -69,6 +72,7 @@
     (@impl
       (i32.eq (global.get $TermType::Hashmap))
       (func $Stdlib_ResolveDeep::impl::Hashmap (param $self i32) (param $state i32) (result i32 i32)
+        (local $iterator i32)
         (if (result i32 i32)
           ;; If the hashmap is already fully resolved, return it as-is
           (call $Stdlib_ResolveDeep::is_fully_resolved::Hashmap (local.get $self))
@@ -77,16 +81,19 @@
             (global.get $NULL))
           (else
             ;; Otherwise resolve all the entries and collect them into a new hashmap, short-circuiting any signals
-            (call $Term::Hashmap::traits::collect_strict
-              ;; TODO: Avoid unnecessary heap allocations for intermediate values
+            ;; TODO: Avoid unnecessary heap allocations for intermediate values
+            (local.tee $iterator
               (call $Term::MapIterator::new
                 (local.get $self)
-                (call $Term::Builtin::new (global.get $Stdlib_ResolveDeep)))
-              (local.get $state))))))
+                (call $Term::Builtin::new (global.get $Stdlib_ResolveDeep))))
+            (call $Term::Hashmap::traits::collect_strict (local.get $state))
+            ;; Dispose the temporary iterator instance
+            (call $Term::drop (local.get $iterator))))))
 
     (@impl
       (i32.eq (global.get $TermType::Hashset))
       (func $Stdlib_ResolveDeep::impl::Hashset (param $self i32) (param $state i32) (result i32 i32)
+        (local $iterator i32)
         (if (result i32 i32)
           ;; If the hashset is already fully resolved, return it as-is
           (call $Stdlib_ResolveDeep::is_fully_resolved::Hashset (local.get $self))
@@ -95,12 +102,14 @@
             (global.get $NULL))
           (else
             ;; Otherwise resolve all the values and collect them into a new hashset, short-circuiting any signals
-            (call $Term::Hashset::traits::collect_strict
-              ;; TODO: Avoid unnecessary heap allocations for intermediate values
+            ;; TODO: Avoid unnecessary heap allocations for intermediate values
+            (local.tee $iterator
               (call $Term::MapIterator::new
                 (local.get $self)
-                (call $Term::Builtin::new (global.get $Stdlib_ResolveDeep)))
-              (local.get $state))))))
+                (call $Term::Builtin::new (global.get $Stdlib_ResolveDeep))))
+            (call $Term::Hashset::traits::collect_strict (local.get $state))
+            ;; Dispose the temporary iterator instance
+            (call $Term::drop (local.get $iterator))))))
 
     (@impl
       (i32.eq (global.get $TermType::Tree))
@@ -162,15 +171,17 @@
     (@impl
       (call $TermType::implements::iterate)
       (func $Stdlib_ResolveDeep::impl::<iterate> (param $self i32) (param $state i32) (result i32 i32)
-        (local $items i32)
+        (local $iterator i32)
         (local $dependencies i32)
         ;; Resolve all the items and collect them into a new list, short-circuiting any signals
-        (call $Term::List::traits::collect_strict
-          ;; TODO: Avoid unnecessary heap allocations for intermediate values
+        ;; TODO: Avoid unnecessary heap allocations for intermediate values
+        (local.tee $iterator
           (call $Term::MapIterator::new
             (local.get $self)
-            (call $Term::Builtin::new (global.get $Stdlib_ResolveDeep)))
-          (local.get $state))))
+            (call $Term::Builtin::new (global.get $Stdlib_ResolveDeep))))
+        (call $Term::List::traits::collect_strict (local.get $state))
+        ;; Dispose the temporary iterator instance
+        (call $Term::drop (local.get $iterator))))
 
     (@default
       (func $Stdlib_ResolveDeep::impl::default (param $self i32) (param $state i32) (result i32 i32)

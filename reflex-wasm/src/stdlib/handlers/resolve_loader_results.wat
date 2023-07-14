@@ -36,6 +36,7 @@
         (local $key i32)
         (local $value i32)
         (local $index i32)
+        (local $keys_list i32)
         (local $expected_keys i32)
         ;; Copy the result values from the results hashmap into a list with the same order as the keys list
         (local.set $values
@@ -86,9 +87,9 @@
               (call $Term::HashmapKeysIterator::new (local.get $results))
               (global.get $NULL))
             (call $Dependencies::assert_empty)
-            (local.set $keys)
+            (local.set $keys_list)
             ;; Iterate over the received keys until an unexpected key is encountered
-            (local.set $num_keys (call $Term::List::get_length (local.get $keys)))
+            (local.set $num_keys (call $Term::List::get_length (local.get $keys_list)))
             (local.set $index (i32.const 0))
             (loop $LOOP
               ;; If the key was not present in the results hashmap, return an error result
@@ -96,8 +97,11 @@
                 (call $Utils::bool::not
                   (call $Term::Hashmap::traits::has
                     (local.get $expected_keys)
-                    (local.tee $key (call $Term::List::get_item (local.get $keys) (local.get $index)))))
+                    (local.tee $key (call $Term::List::get_item (local.get $keys_list) (local.get $index)))))
                 (then
+                  (call $Term::List::drop (local.get $keys_list))
+                  (call $Term::Hashmap::drop (local.get $expected_keys))
+                  (call $Term::List::drop (local.get $values))
                   (return
                     (call $Stdlib_ResolveLoaderResults::error::unexpected_key (local.get $key))
                     (global.get $NULL))))
@@ -105,7 +109,10 @@
               (br_if $LOOP
                 (i32.lt_u
                   (local.tee $index (i32.add (local.get $index) (i32.const 1)))
-                  (local.get $num_keys))))))
+                  (local.get $num_keys))))
+            ;; Dispose the temporary lookup instances
+            (call $Term::List::drop (local.get $keys_list))
+            (call $Term::Hashmap::drop (local.get $expected_keys))))
         ;; Return the list of values
         (local.get $values)
         (global.get $NULL)))
@@ -119,6 +126,7 @@
         (local $key i32)
         (local $value i32)
         (local $index i32)
+        (local $keys_list i32)
         (local $expected_keys i32)
         ;; Copy the result values from the results record into a list with the same order as the keys list
         (local.set $values
@@ -165,9 +173,9 @@
             (call $Dependencies::assert_empty)
             (local.set $expected_keys)
             ;; Get the list of provided keys
-            (local.set $keys (call $Term::Record::get::keys (local.get $results)))
+            (local.set $keys_list (call $Term::Record::get::keys (local.get $results)))
             ;; Iterate over the received keys until an unexpected key is encountered
-            (local.set $num_keys (call $Term::List::get_length (local.get $keys)))
+            (local.set $num_keys (call $Term::List::get_length (local.get $keys_list)))
             (local.set $index (i32.const 0))
             (loop $LOOP
               ;; If the key was not present in the results record, return an error result
@@ -175,8 +183,11 @@
                 (call $Utils::bool::not
                   (call $Term::Hashmap::traits::has
                     (local.get $expected_keys)
-                    (local.tee $key (call $Term::List::get_item (local.get $keys) (local.get $index)))))
+                    (local.tee $key (call $Term::List::get_item (local.get $keys_list) (local.get $index)))))
                 (then
+                  (call $Term::List::drop (local.get $keys_list))
+                  (call $Term::Hashmap::drop (local.get $expected_keys))
+                  (call $Term::List::drop (local.get $values))
                   (return
                     (call $Stdlib_ResolveLoaderResults::error::unexpected_key (local.get $key))
                     (global.get $NULL))))
@@ -184,7 +195,10 @@
               (br_if $LOOP
                 (i32.lt_u
                   (local.tee $index (i32.add (local.get $index) (i32.const 1)))
-                  (local.get $num_keys))))))
+                  (local.get $num_keys))))
+            ;; Dispose the temporary lookup instances
+            (call $Term::List::drop (local.get $keys_list))
+            (call $Term::Hashmap::drop (local.get $expected_keys))))
         ;; Return the list of values
         (local.get $values)
         (global.get $NULL)))

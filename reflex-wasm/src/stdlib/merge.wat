@@ -13,7 +13,7 @@
         (local $values i32)
         (local $num_entries i32)
         (local $dependencies i32)
-        ;; Combine all the sets of record entries into a single lookup hashmap
+        ;; Combine all the sets of record entries into a temporary lookup hashmap instance
         (call $Term::Hashmap::traits::collect
           (call $Term::FlattenIterator::new (local.get $arg_list))
           (local.get $state))
@@ -23,6 +23,8 @@
           (i32.eqz (local.tee $num_entries (call $Term::Hashmap::get::num_entries)))
           (then
             ;; If no entries were produced, return the pre-allocated singleton instance
+            ;; Dispose of the temporary lookup hashmap (this is effectively a no-op as the empty hashmap cannot be dropped)
+            (call $Term::Hashmap::drop (local.get $entries))
             (return
               (call $Term::Record::empty)
               (global.get $NULL)))
@@ -30,13 +32,13 @@
             ;; Otherwise collect lists for keys and values
             (call $Term::List::traits::collect
               (call $Term::HashmapKeysIterator::new (local.get $entries))
-              (local.get $state))
-            (local.set $dependencies (call $Dependencies::traits::union (local.get $dependencies)))
+              (global.get $NULL))
+            (call $Dependencies::assert_empty)
             (local.set $keys)
             (call $Term::List::traits::collect
               (call $Term::HashmapValuesIterator::new (local.get $entries))
-              (local.get $state))
-            (local.set $dependencies (call $Dependencies::traits::union (local.get $dependencies)))
+              (global.get $NULL))
+            (call $Dependencies::assert_empty)
             (local.set $values)
             ;; Construct the record object
             (call $Term::TermType::Record::new

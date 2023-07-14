@@ -25,30 +25,36 @@
       (call $TermType::implements::iterate)
       (call $TermType::implements::iterate)
       (func $Stdlib_ConstructRecord::impl::<iterate>::<iterate> (param $keys i32) (param $values i32) (param $state i32) (result i32 i32)
+        (local $keys_list i32)
+        (local $values_list i32)
         (local $dependencies i32)
-        ;; Collect the keys into a list
+        ;; Collect the keys into a new list term
         (call $Term::List::traits::collect (local.get $keys) (local.get $state))
         ;; Update the accumulated dependencies
         (local.set $dependencies)
         ;; Pop the list of keys off the stack and store as a local variable
-        (local.set $keys)
-        ;; Collect the values into a list
-        (call $Term::List::traits::collect (local.get $values) (local.get $state))
+        (local.set $keys_list)
+        ;; Collect the values into a new list term
+        (call $Term::List::traits::collect (local.get $values_list) (local.get $state))
         ;; Update the accumulated dependencies, leaving the list of values on the stack
         (local.set $dependencies (call $Dependencies::traits::union (local.get $dependencies)))
         ;; Pop the list of values off the stack and store as a local variable
-        (local.set $values)
+        (local.set $values_list)
         ;; If the key and value lists differ in length, return an error
         (if (result i32 i32)
           (i32.ne
-            (call $Term::List::get_length (local.get $keys))
-            (call $Term::List::get_length (local.get $values)))
+            (call $Term::List::get_length (local.get $keys_list))
+            (call $Term::List::get_length (local.get $values_list)))
           (then
+            ;; Dispose the unused list terms
+            (call $Term::List::drop (local.get $values_list))
+            (call $Term::List::drop (local.get $keys_list))
+            ;; Return an error
             (call $Stdlib_ConstructRecord::impl::default (local.get $keys) (local.get $values) (local.get $state))
             (call $Dependencies::traits::union (local.get $dependencies)))
           (else
             ;; Otherwise instantiate a new record term composed of the key and value lists
-            (call $Term::Record::new (local.get $keys) (local.get $values))
+            (call $Term::Record::new (local.get $keys_list) (local.get $values_list))
             (local.get $dependencies)))))
 
     (@default

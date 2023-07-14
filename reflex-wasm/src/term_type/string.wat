@@ -276,19 +276,29 @@
     (call $Term::String::get_length (local.get $self)))
 
   (func $Term::String::traits::collect (param $iterator i32) (param $state i32) (result i32 i32)
+    (local $values i32)
     (local $dependencies i32)
+    ;; Collect the iterator into a temporary list instance
     ;; TODO: Avoid unnecessary heap allocations for intermediate values
     (call $Term::List::traits::collect (local.get $iterator) (local.get $state))
     (local.set $dependencies)
+    (local.tee $values)
     (call $Term::String::collect_string_list)
+    ;; Dispose the temporary list instance
+    (call $Term::drop (local.get $values))
     (local.get $dependencies))
 
   (func $Term::String::traits::collect_strict (param $iterator i32) (param $state i32) (result i32 i32)
+    (local $values i32)
     (local $dependencies i32)
+    ;; Collect the iterator into a temporary list instance
     ;; TODO: Avoid unnecessary heap allocations for intermediate values
     (call $Term::List::traits::collect_strict (local.get $iterator) (local.get $state))
     (local.set $dependencies)
+    (local.tee $values)
     (call $Term::String::collect_string_list)
+    ;; Dispose the temporary list instance
+    (call $Term::drop (local.get $values))
     (local.get $dependencies))
 
   (func $Term::String::collect_string_list (param $sources i32) (result i32)
