@@ -286,41 +286,36 @@ where
                                                                                 factory.create_application_term(
                                                                                     factory.create_builtin_term(reflex_stdlib::stdlib::Merge),
                                                                                     allocator.create_list([
-                                                                                        factory.create_application_term(
-                                                                                            factory.create_builtin_term(reflex_stdlib::stdlib::CollectList),
+                                                                                        factory.create_variable_term(0),
+                                                                                        factory.create_record_term(
+                                                                                            allocator.create_struct_prototype(
+                                                                                                allocator.create_list([
+                                                                                                    factory.create_string_term(allocator.create_static_string("latestSuccessIndex")),
+                                                                                                ]),
+                                                                                            ),
                                                                                             allocator.create_list([
-                                                                                                factory.create_variable_term(0),
-                                                                                                factory.create_record_term(
-                                                                                                    allocator.create_struct_prototype(
-                                                                                                        allocator.create_list([
-                                                                                                            factory.create_string_term(allocator.create_static_string("latestSuccessIndex")),
-                                                                                                        ]),
-                                                                                                    ),
+                                                                                                factory.create_application_term(
+                                                                                                    factory.create_builtin_term(reflex_stdlib::stdlib::If),
                                                                                                     allocator.create_list([
                                                                                                         factory.create_application_term(
-                                                                                                            factory.create_builtin_term(reflex_stdlib::stdlib::If),
+                                                                                                            factory.create_builtin_term(reflex_stdlib::stdlib::Get),
                                                                                                             allocator.create_list([
-                                                                                                                factory.create_application_term(
-                                                                                                                    factory.create_builtin_term(reflex_stdlib::stdlib::Get),
-                                                                                                                    allocator.create_list([
-                                                                                                                        factory.create_variable_term(0),
-                                                                                                                        factory.create_string_term(allocator.create_static_string("success")),
-                                                                                                                    ]),
-                                                                                                                ),
-                                                                                                                factory.create_application_term(
-                                                                                                                    factory.create_builtin_term(reflex_stdlib::stdlib::Get),
-                                                                                                                    allocator.create_list([
-                                                                                                                        factory.create_variable_term(0),
-                                                                                                                        factory.create_string_term(allocator.create_static_string("retryIndex")),
-                                                                                                                    ]),
-                                                                                                                ),
-                                                                                                                factory.create_application_term(
-                                                                                                                    factory.create_builtin_term(reflex_stdlib::stdlib::Get),
-                                                                                                                    allocator.create_list([
-                                                                                                                        factory.create_variable_term(1),
-                                                                                                                        factory.create_string_term(allocator.create_static_string("latestSuccessIndex")),
-                                                                                                                    ]),
-                                                                                                                ),
+                                                                                                                factory.create_variable_term(0),
+                                                                                                                factory.create_string_term(allocator.create_static_string("success")),
+                                                                                                            ]),
+                                                                                                        ),
+                                                                                                        factory.create_application_term(
+                                                                                                            factory.create_builtin_term(reflex_stdlib::stdlib::Get),
+                                                                                                            allocator.create_list([
+                                                                                                                factory.create_variable_term(0),
+                                                                                                                factory.create_string_term(allocator.create_static_string("retryIndex")),
+                                                                                                            ]),
+                                                                                                        ),
+                                                                                                        factory.create_application_term(
+                                                                                                            factory.create_builtin_term(reflex_stdlib::stdlib::Get),
+                                                                                                            allocator.create_list([
+                                                                                                                factory.create_variable_term(1),
+                                                                                                                factory.create_string_term(allocator.create_static_string("latestSuccessIndex")),
                                                                                                             ]),
                                                                                                         ),
                                                                                                     ]),
