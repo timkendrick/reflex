@@ -20,7 +20,7 @@ export default (describe) => {
       const [result, dependencies] = evaluate(expression, NULL);
       assert.strictEqual(
         format(result),
-        '{ "url": "http://example.com/", "method": "GET", "headers": {}, "body": null }',
+        '{ "url": "http://example.com/", "method": "GET", "headers": {}, "body": null, "token": null }',
       );
       assert.strictEqual(format(dependencies), 'NULL');
     });
@@ -31,6 +31,7 @@ export default (describe) => {
       createList,
       createRecord,
       createString,
+      createSymbol,
       createUnitList,
       evaluate,
       format,
@@ -47,6 +48,7 @@ export default (describe) => {
                 createString('method'),
                 createString('headers'),
                 createString('body'),
+                createString('token'),
               ]),
               createList([
                 createString('http://example.com/'),
@@ -56,6 +58,7 @@ export default (describe) => {
                   createUnitList(createString('bar')),
                 ),
                 createString('baz'),
+                createSymbol(123),
               ]),
             ),
           ),
@@ -63,7 +66,7 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(
           format(result),
-          '{ "url": "http://example.com/", "method": "POST", "headers": { "foo": "bar" }, "body": "baz" }',
+          '{ "url": "http://example.com/", "method": "POST", "headers": { "foo": "bar" }, "body": "baz", "token": Symbol(123) }',
         );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
@@ -73,12 +76,14 @@ export default (describe) => {
           createUnitList(
             createRecord(
               createList([
+                createString('token'),
                 createString('body'),
                 createString('headers'),
                 createString('method'),
                 createString('url'),
               ]),
               createList([
+                createSymbol(123),
                 createString('baz'),
                 createRecord(
                   createUnitList(createString('foo')),
@@ -93,7 +98,7 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(
           format(result),
-          '{ "url": "http://example.com/", "method": "POST", "headers": { "foo": "bar" }, "body": "baz" }',
+          '{ "url": "http://example.com/", "method": "POST", "headers": { "foo": "bar" }, "body": "baz", "token": Symbol(123) }',
         );
         assert.strictEqual(format(dependencies), 'NULL');
       })();

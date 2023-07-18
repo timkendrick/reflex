@@ -6,20 +6,23 @@
   (@const-string $Stdlib_ToRequest::FIELD_METHOD "method")
   (@const-string $Stdlib_ToRequest::FIELD_HEADERS "headers")
   (@const-string $Stdlib_ToRequest::FIELD_BODY "body")
+  (@const-string $Stdlib_ToRequest::FIELD_TOKEN "token")
 
   (@const $Stdlib_ToRequest::FIELDS i32
     (@depends-on $Stdlib_ToRequest::FIELD_URL)
     (@depends-on $Stdlib_ToRequest::FIELD_METHOD)
     (@depends-on $Stdlib_ToRequest::FIELD_HEADERS)
     (@depends-on $Stdlib_ToRequest::FIELD_BODY)
+    (@depends-on $Stdlib_ToRequest::FIELD_TOKEN)
     (func (result i32)
       (local $instance i32)
-      (local.tee $instance (call $Term::List::allocate (i32.const 4)))
+      (local.tee $instance (call $Term::List::allocate (i32.const 5)))
       (call $Term::List::set_item (local.get $instance) (i32.const 0) (global.get $Stdlib_ToRequest::FIELD_URL))
       (call $Term::List::set_item (local.get $instance) (i32.const 1) (global.get $Stdlib_ToRequest::FIELD_METHOD))
       (call $Term::List::set_item (local.get $instance) (i32.const 2) (global.get $Stdlib_ToRequest::FIELD_HEADERS))
       (call $Term::List::set_item (local.get $instance) (i32.const 3) (global.get $Stdlib_ToRequest::FIELD_BODY))
-      (call $Term::List::init (i32.const 4))))
+      (call $Term::List::set_item (local.get $instance) (i32.const 4) (global.get $Stdlib_ToRequest::FIELD_TOKEN))
+      (call $Term::List::init (i32.const 5))))
 
   (@const-string $Stdlib_ToRequest::METHOD_GET "GET")
 
@@ -37,7 +40,7 @@
         ;; Push the constructor keys onto the stack (used to construct the record later)
         (global.get $Stdlib_ToRequest::FIELDS)
         ;; Allocate a new list to hold the record values
-        (local.tee $values (call $Term::List::allocate (i32.const 4)))
+        (local.tee $values (call $Term::List::allocate (i32.const 5)))
         ;; Store the provided URL in the url field
         (call $Term::List::set_item (local.get $values) (i32.const 0) (local.get $self))
         ;; Store the default method string (GET) in the method field
@@ -46,8 +49,10 @@
         (call $Term::List::set_item (local.get $values) (i32.const 2) (call $Term::Record::empty))
         ;; Store an empty value in the body field
         (call $Term::List::set_item (local.get $values) (i32.const 3) (call $Term::Nil::new))
+        ;; Store an empty value in the token field
+        (call $Term::List::set_item (local.get $values) (i32.const 4) (call $Term::Nil::new))
         ;; Instantiate the list of record values
-        (call $Term::List::init (i32.const 4))
+        (call $Term::List::init (i32.const 5))
         ;; Create a record from the keys and values lists currently at the top of the stack
         (call $Term::Record::new)
         (global.get $NULL)))
