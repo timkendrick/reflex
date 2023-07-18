@@ -9,6 +9,7 @@ use clap::Parser;
 use reflex_lang::{allocator::DefaultAllocator, SharedTermFactory};
 use reflex_parser::syntax::js::default_js_loaders;
 use reflex_wasm::{
+    builtins::WasmCompilerBuiltins,
     cli::compile::{
         parse_and_compile_module, CompilerRootConfig, GraphRootEntryPoint, ModuleEntryPoint,
         WasmCompilerOptions, WasmCompilerRuntimeOptions,
@@ -71,7 +72,7 @@ fn main() -> Result<()> {
     let runtime_path = &args.runtime;
     let entry_points = args.entry_point;
     let unoptimized = args.unoptimized;
-    let factory = SharedTermFactory::<reflex_server::builtins::ServerBuiltins>::default();
+    let factory = SharedTermFactory::<WasmCompilerBuiltins>::default();
     let allocator = DefaultAllocator::default();
 
     // Load the runtime library module
