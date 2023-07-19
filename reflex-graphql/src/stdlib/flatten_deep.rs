@@ -44,7 +44,7 @@ where
     ) -> Result<T, String> {
         let mut args = args.into_iter();
         let target = args.next().unwrap();
-        if let Some(_) = factory.match_nil_term(&target) {
+        if is_scalar_value(&target, factory) {
             Ok(target)
         } else if let Some(list) = factory.match_list_term(&target) {
             Ok(factory.create_application_term(
@@ -63,7 +63,20 @@ where
                 ),
             ))
         } else {
-            Ok(target)
+            // Assume the leaf definition is a lazy thunk
+            let leaf = factory.create_application_term(target, allocator.create_empty_list());
+            Ok(factory.create_application_term(
+                factory.create_builtin_term(FlattenDeep),
+                allocator.create_unit_list(leaf),
+            ))
         }
     }
+}
+
+fn is_scalar_value<T: Expression>(expression: &T, factory: &impl ExpressionFactory<T>) -> bool {
+    factory.match_nil_term(expression).is_some()
+        || factory.match_boolean_term(expression).is_some()
+        || factory.match_int_term(expression).is_some()
+        || factory.match_float_term(expression).is_some()
+        || factory.match_string_term(expression).is_some()
 }

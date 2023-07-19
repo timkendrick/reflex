@@ -64,8 +64,15 @@ where
                         }),
                 ),
             ))
-        } else {
+        } else if let Some(_branch) = factory.match_record_term(&target) {
             Ok(factory.create_application_term(shape, allocator.create_unit_list(target)))
+        } else {
+            // Assume the branch definition is a lazy thunk
+            let branch = factory.create_application_term(target, allocator.create_empty_list());
+            Ok(factory.create_application_term(
+                factory.create_builtin_term(DynamicQueryBranch),
+                allocator.create_pair(shape, branch),
+            ))
         }
     }
 }
