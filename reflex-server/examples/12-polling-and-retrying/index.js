@@ -8,26 +8,27 @@ const REQUEST_TIMEOUT = 30 * 1000; // Retry any requests that take longer than 3
 
 const API_URL = 'https://worldtimeapi.org/api/timezone/Etc/UTC';
 
-const { unixtime } = retryErrors(
-  { delay: backoff, timeout: REQUEST_TIMEOUT },
-  (retryToken) =>
-    poll(POLL_INTERVAL, (pollToken) =>
-      fetch(
-        new Request({
-          method: 'GET',
-          url: API_URL,
-          headers: {},
-          body: null,
-          token: hash(pollToken, retryToken),
-        }),
-      ).json(),
-    ),
-);
-
 export default new Resolver({
   query: null,
   mutation: null,
   subscription: {
-    now: `Current UNIX time: ${unixtime}`,
+    now: () => {
+      const { unixtime } = retryErrors(
+        { delay: backoff, timeout: REQUEST_TIMEOUT },
+        (retryToken) =>
+          poll(POLL_INTERVAL, (pollToken) =>
+            fetch(
+              new Request({
+                method: 'GET',
+                url: API_URL,
+                headers: {},
+                body: null,
+                token: hash(pollToken, retryToken),
+              }),
+            ).json(),
+          ),
+      );
+      return `Current UNIX time: ${unixtime}`;
+    },
   },
 });

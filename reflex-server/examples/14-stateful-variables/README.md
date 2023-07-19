@@ -21,9 +21,8 @@ The methods that mutate the state variable all accept a `token` argument: this i
 
 The example also demonstrates how to use the `sequence(expression, callback)` helper for expressions that must be evaluated in a specific order. The standard Reflex behavior is to attempt to execute side-effects concurrently where possible - this is usually desirable, however there are certain occasions where the application logic needs to enforce a linear sequence of stateful events. The `sequence` helper is provided to deal with these situations.
 
-The `sequence(expression, callback)` function accepts an expression to evaluate as its first argument, and the second argument is a callback function whose argument will be the evaluated expression. The overall return value of the `sequence()` call will be the value returned by the callback function.
+The `sequence(expression, callback)` function accepts an expression to evaluate as its first argument, and the second argument is a callback function whose argument will be the evaluated expression value. In this example, the callback arguments will be the intermediate operation results. The overall return value of the `sequence()` call will be the value returned by the callback function.
 
-The `log(expression, ...args)` helper is used to log debug messages to the console. This will log a line to `stdout` containing the `expression` argument followed by each of the `args`, and will return the `expression`. Every time the `expression` (or one of the other arguments) changes, a new line will be logged, which can be helpful for observing how an expression's value changes over time. Note that the `expression` is logged *before* having any of its effect dependencies resolved, which can be useful in debugging side-effects - in this example however, a `sequence()` operation is used to ensure the expression that is logged has had its effects fully resolved before the resulting value is logged.
 
 ## Source files
 
@@ -40,8 +39,7 @@ $ reflex-server --port 8080 ./index.js
 
 ```
 mutation {
-  operation1: reset(value: 3)
-  operation2: increment
+  resetThenIncrement(value: 3)
 }
 ```
 
@@ -50,8 +48,7 @@ mutation {
 ```
 {
   "data": {
-    "operation1": 3,
-    "operation2": 4
+    "resetThenIncrement": 4,
   }
 }
 ```

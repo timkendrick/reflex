@@ -1,13 +1,18 @@
 import { Resolver } from 'reflex::graphql';
 import { now } from 'reflex::time';
 
-// Current timestamp in milliseconds (sampled every 1000 milliseconds)
-const timestamp = now({ interval: 1000 });
-
 // The same graph root will be used for both query and subscription operation roots
 const root = {
-  now: `Current UNIX time: ${Math.floor(timestamp / 1000)}`,
-  millis: timestamp,
+  now: () => {
+    // Current timestamp in milliseconds (sampled every 1000 milliseconds)
+    const timestamp = now({ interval: 1000 });
+    return `Current UNIX time: ${Math.floor(timestamp / 1000)}`;
+  },
+  millis: () => {
+    // Current timestamp in milliseconds (sampled every 1000 milliseconds)
+    const timestamp = now({ interval: 1000 });
+    return timestamp;
+  },
   sampled: ({ interval }) => {
     // Emits a new result every `interval` milliseconds
     const sampled = now({ interval });
