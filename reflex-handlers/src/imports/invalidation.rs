@@ -163,105 +163,108 @@ where
                                                                     factory.create_application_term(
                                                                         factory.create_builtin_term(crate::stdlib::Scan),
                                                                         allocator.create_list([
-                                                                            factory.create_application_term(
-                                                                                factory.create_builtin_term(reflex_stdlib::stdlib::IfError),
-                                                                                allocator.create_list([
-                                                                                    factory.create_application_term(
-                                                                                        factory.create_builtin_term(reflex_stdlib::stdlib::Sequence),
-                                                                                        allocator.create_list([
-                                                                                            factory.create_application_term(
-                                                                                                factory.create_builtin_term(reflex_stdlib::stdlib::IfPending),
-                                                                                                allocator.create_list([
-                                                                                                    factory.create_application_term(
-                                                                                                        factory.create_variable_term(6),
-                                                                                                        allocator.create_list([
-                                                                                                            factory.create_variable_term(0),
-                                                                                                        ]),
-                                                                                                    ),
-                                                                                                    factory.create_application_term(
-                                                                                                        factory.create_builtin_term(reflex_stdlib::stdlib::Sequence),
-                                                                                                        allocator.create_list([
-                                                                                                            factory.create_application_term(
-                                                                                                                factory.create_variable_term(8),
-                                                                                                                allocator.create_list([
-                                                                                                                    factory.create_variable_term(4),
-                                                                                                                    factory.create_variable_term(0),
-                                                                                                                ]),
-                                                                                                            ),
-                                                                                                            factory.create_lambda_term(
-                                                                                                                1,
-                                                                                                                factory.create_signal_term(
-                                                                                                                    allocator.create_signal_list([
-                                                                                                                        allocator.create_signal(SignalType::Error {
-                                                                                                                            payload: factory.create_record_term(
-                                                                                                                                allocator.create_struct_prototype(
-                                                                                                                                    allocator.create_list([
-                                                                                                                                        factory.create_string_term(allocator.create_static_string("name")),
-                                                                                                                                        factory.create_string_term(allocator.create_static_string("message")),
-                                                                                                                                    ]),
-                                                                                                                                ),
-                                                                                                                                allocator.create_list([
-                                                                                                                                    factory.create_string_term(allocator.create_static_string("TimeoutError")),
-                                                                                                                                    factory.create_string_term(allocator.create_static_string("Timeout exceeded")),
-                                                                                                                                ]),
-                                                                                                                            ),
-                                                                                                                        }),
+                                                                            factory.create_lambda_term(
+                                                                                0,
+                                                                                factory.create_application_term(
+                                                                                    factory.create_builtin_term(reflex_stdlib::stdlib::IfError),
+                                                                                    allocator.create_list([
+                                                                                        factory.create_application_term(
+                                                                                            factory.create_builtin_term(reflex_stdlib::stdlib::Sequence),
+                                                                                            allocator.create_list([
+                                                                                                factory.create_application_term(
+                                                                                                    factory.create_builtin_term(reflex_stdlib::stdlib::IfPending),
+                                                                                                    allocator.create_list([
+                                                                                                        factory.create_application_term(
+                                                                                                            factory.create_variable_term(6),
+                                                                                                            allocator.create_list([
+                                                                                                                factory.create_variable_term(0),
+                                                                                                            ]),
+                                                                                                        ),
+                                                                                                        factory.create_application_term(
+                                                                                                            factory.create_builtin_term(reflex_stdlib::stdlib::Sequence),
+                                                                                                            allocator.create_list([
+                                                                                                                factory.create_application_term(
+                                                                                                                    factory.create_variable_term(8),
+                                                                                                                    allocator.create_list([
+                                                                                                                        factory.create_variable_term(4),
+                                                                                                                        factory.create_variable_term(0),
                                                                                                                     ]),
                                                                                                                 ),
-                                                                                                            ),
-                                                                                                        ]),
-                                                                                                    ),
-                                                                                                ]),
-                                                                                            ),
-                                                                                            factory.create_lambda_term(
-                                                                                                1,
-                                                                                                factory.create_record_term(
-                                                                                                    allocator.create_struct_prototype(
-                                                                                                        allocator.create_list([
-                                                                                                            factory.create_string_term(allocator.create_static_string("success")),
-                                                                                                            factory.create_string_term(allocator.create_static_string("payload")),
-                                                                                                            factory.create_string_term(allocator.create_static_string("retryIndex")),
-                                                                                                        ]),
-                                                                                                    ),
-                                                                                                    allocator.create_list([
-                                                                                                        factory.create_boolean_term(true),
-                                                                                                        factory.create_variable_term(0),
-                                                                                                        factory.create_variable_term(2),
+                                                                                                                factory.create_lambda_term(
+                                                                                                                    1,
+                                                                                                                    factory.create_signal_term(
+                                                                                                                        allocator.create_signal_list([
+                                                                                                                            allocator.create_signal(SignalType::Error {
+                                                                                                                                payload: factory.create_record_term(
+                                                                                                                                    allocator.create_struct_prototype(
+                                                                                                                                        allocator.create_list([
+                                                                                                                                            factory.create_string_term(allocator.create_static_string("name")),
+                                                                                                                                            factory.create_string_term(allocator.create_static_string("message")),
+                                                                                                                                        ]),
+                                                                                                                                    ),
+                                                                                                                                    allocator.create_list([
+                                                                                                                                        factory.create_string_term(allocator.create_static_string("TimeoutError")),
+                                                                                                                                        factory.create_string_term(allocator.create_static_string("Timeout exceeded")),
+                                                                                                                                    ]),
+                                                                                                                                ),
+                                                                                                                            }),
+                                                                                                                        ]),
+                                                                                                                    ),
+                                                                                                                ),
+                                                                                                            ]),
+                                                                                                        ),
                                                                                                     ]),
                                                                                                 ),
-                                                                                            ),
-                                                                                        ]),
-                                                                                    ),
-                                                                                    factory.create_lambda_term(
-                                                                                        1,
-                                                                                        factory.create_record_term(
-                                                                                            allocator.create_struct_prototype(
+                                                                                                factory.create_lambda_term(
+                                                                                                    1,
+                                                                                                    factory.create_record_term(
+                                                                                                        allocator.create_struct_prototype(
+                                                                                                            allocator.create_list([
+                                                                                                                factory.create_string_term(allocator.create_static_string("success")),
+                                                                                                                factory.create_string_term(allocator.create_static_string("payload")),
+                                                                                                                factory.create_string_term(allocator.create_static_string("retryIndex")),
+                                                                                                            ]),
+                                                                                                        ),
+                                                                                                        allocator.create_list([
+                                                                                                            factory.create_boolean_term(true),
+                                                                                                            factory.create_variable_term(0),
+                                                                                                            factory.create_variable_term(2),
+                                                                                                        ]),
+                                                                                                    ),
+                                                                                                ),
+                                                                                            ]),
+                                                                                        ),
+                                                                                        factory.create_lambda_term(
+                                                                                            1,
+                                                                                            factory.create_record_term(
+                                                                                                allocator.create_struct_prototype(
+                                                                                                    allocator.create_list([
+                                                                                                        factory.create_string_term(allocator.create_static_string("success")),
+                                                                                                        factory.create_string_term(allocator.create_static_string("payload")),
+                                                                                                        factory.create_string_term(allocator.create_static_string("retryIndex")),
+                                                                                                    ]),
+                                                                                                ),
                                                                                                 allocator.create_list([
-                                                                                                    factory.create_string_term(allocator.create_static_string("success")),
-                                                                                                    factory.create_string_term(allocator.create_static_string("payload")),
-                                                                                                    factory.create_string_term(allocator.create_static_string("retryIndex")),
-                                                                                                ]),
-                                                                                            ),
-                                                                                            allocator.create_list([
-                                                                                                factory.create_boolean_term(false),
-                                                                                                factory.create_application_term(
-                                                                                                    factory.create_builtin_term(reflex_stdlib::stdlib::Apply),
-                                                                                                    allocator.create_pair(
-                                                                                                        factory.create_builtin_term(reflex_stdlib::stdlib::CollectSignal),
-                                                                                                        factory.create_application_term(
-                                                                                                            factory.create_builtin_term(reflex_stdlib::stdlib::Map),
-                                                                                                            allocator.create_pair(
-                                                                                                                factory.create_variable_term(0),
-                                                                                                                factory.create_builtin_term(reflex_stdlib::stdlib::Raise),
+                                                                                                    factory.create_boolean_term(false),
+                                                                                                    factory.create_application_term(
+                                                                                                        factory.create_builtin_term(reflex_stdlib::stdlib::Apply),
+                                                                                                        allocator.create_pair(
+                                                                                                            factory.create_builtin_term(reflex_stdlib::stdlib::CollectSignal),
+                                                                                                            factory.create_application_term(
+                                                                                                                factory.create_builtin_term(reflex_stdlib::stdlib::Map),
+                                                                                                                allocator.create_pair(
+                                                                                                                    factory.create_variable_term(0),
+                                                                                                                    factory.create_builtin_term(reflex_stdlib::stdlib::Raise),
+                                                                                                                ),
                                                                                                             ),
                                                                                                         ),
                                                                                                     ),
-                                                                                                ),
-                                                                                                factory.create_variable_term(2),
-                                                                                            ]),
+                                                                                                    factory.create_variable_term(2),
+                                                                                                ]),
+                                                                                            ),
                                                                                         ),
-                                                                                    ),
-                                                                                ]),
+                                                                                    ]),
+                                                                                ),
                                                                             ),
                                                                             factory.create_record_term(
                                                                                 allocator.create_struct_prototype(

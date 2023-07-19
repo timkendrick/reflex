@@ -11,6 +11,7 @@ use reflex_dispatcher::{
 };
 use reflex_macros::blanket_trait;
 use reflex_runtime::{AsyncExpression, AsyncExpressionFactory, AsyncHeapAllocator};
+use reflex_stdlib::ResolveDeep;
 use reflex_utils::reconnect::ReconnectTimeout;
 
 use crate::task::{
@@ -22,7 +23,7 @@ use self::{
     fetch::{FetchHandler, FetchHandlerAction, FetchHandlerState},
     graphql::{GraphQlHandler, GraphQlHandlerAction, GraphQlHandlerState},
     loader::{LoaderHandler, LoaderHandlerAction, LoaderHandlerState},
-    scan::{ScanHandler, ScanHandlerAction, ScanHandlerState},
+    scan::{ScanHandler, ScanHandlerAction, ScanHandlerBuiltin, ScanHandlerState},
     timeout::{TimeoutHandler, TimeoutHandlerAction, TimeoutHandlerState},
     timestamp::{TimestampHandler, TimestampHandlerAction, TimestampHandlerState},
     variable::{VariableHandler, VariableHandlerAction, VariableHandlerState},
@@ -35,6 +36,10 @@ pub mod scan;
 pub mod timeout;
 pub mod timestamp;
 pub mod variable;
+
+blanket_trait!(
+    pub trait HandlerActorBuiltin: ScanHandlerBuiltin {}
+);
 
 blanket_trait!(
     pub trait HandlerAction<T: Expression>:
@@ -73,6 +78,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T>,
     TAllocator: AsyncHeapAllocator<T>,
+    T::Builtin: From<ResolveDeep>,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
 {
@@ -96,6 +102,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T>,
     TAllocator: AsyncHeapAllocator<T>,
+    T::Builtin: From<ResolveDeep>,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
 {
@@ -124,6 +131,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T>,
     TAllocator: AsyncHeapAllocator<T>,
+    T::Builtin: From<ResolveDeep>,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TAction: Action + HandlerAction<T> + Send + 'static,
@@ -275,6 +283,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T>,
     TAllocator: AsyncHeapAllocator<T>,
+    T::Builtin: From<ResolveDeep>,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TAction: Action + HandlerAction<T> + Send + 'static,
@@ -309,6 +318,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T>,
     TAllocator: AsyncHeapAllocator<T>,
+    T::Builtin: From<ResolveDeep>,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TInbox: TaskInbox<TAction>,
@@ -354,6 +364,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T>,
     TAllocator: AsyncHeapAllocator<T>,
+    T::Builtin: From<ResolveDeep>,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TInbox: TaskInbox<TAction>,
@@ -400,6 +411,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T>,
     TAllocator: AsyncHeapAllocator<T>,
+    T::Builtin: From<ResolveDeep>,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TAction: Action + HandlerAction<T> + Send + 'static,
@@ -441,6 +453,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T>,
     TAllocator: AsyncHeapAllocator<T>,
+    T::Builtin: From<ResolveDeep>,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TAction: Action + HandlerAction<T> + Send + 'static,
@@ -476,6 +489,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T>,
     TAllocator: AsyncHeapAllocator<T>,
+    T::Builtin: From<ResolveDeep>,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TAction: Action + HandlerAction<T> + Send + 'static,
@@ -581,6 +595,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T>,
     TAllocator: AsyncHeapAllocator<T>,
+    T::Builtin: From<ResolveDeep>,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TAction: Action + HandlerAction<T> + Send + 'static,

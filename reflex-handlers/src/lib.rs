@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 // SPDX-FileContributor: Chris Campbell <c.campbell@mwam.com> https://github.com/c-campbell-mwam
-use actor::HandlerActor;
+use actor::{HandlerActor, HandlerActorBuiltin};
 use hyper::Body;
 use reflex::core::{Applicable, Expression};
 use reflex_dispatcher::{Action, ProcessId, TaskFactory};
@@ -95,6 +95,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T>,
     TAllocator: AsyncHeapAllocator<T>,
+    T::Builtin: HandlerActorBuiltin,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TAction: Action + DefaultHandlerAction<T> + Send + 'static,
