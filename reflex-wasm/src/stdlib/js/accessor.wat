@@ -490,7 +490,9 @@
                       (call $Term::List::create_pair
                         (call $Term::Builtin::new (global.get $Stdlib_CollectString))
                         (call $Term::IntersperseIterator::new
-                          (call $Term::Variable::new (i32.const 1))
+                          (call $Term::MapIterator::new
+                            (call $Term::Variable::new (i32.const 1))
+                            (call $Term::Builtin::new (global.get $Stdlib_ToString)))
                           (call $Term::Variable::new (i32.const 0))))))
                   (call $Term::List::of (local.get $self)))
                 (global.get $NULL)))
