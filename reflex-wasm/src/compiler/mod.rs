@@ -345,6 +345,7 @@ impl std::fmt::Display for ValueType {
 
 #[derive(Default, Copy, Clone, Debug)]
 pub struct CompilerOptions {
+    pub lazy_record_values: bool,
     pub lazy_list_items: bool,
     pub lazy_variable_initializers: bool,
 }
@@ -361,9 +362,6 @@ impl CompiledBlockBuilder {
             stack,
             result: Ok(CompiledBlock::default()),
         }
-    }
-    pub fn stack(&self) -> &CompilerStack {
-        &self.stack
     }
 }
 
@@ -1061,6 +1059,73 @@ impl<'a, A: Arena + Clone> Iterator for CompiledFunctionCallArgsIter<'a, A> {
 
 impl<'a, A: Arena + Clone> ExactSizeIterator for CompiledFunctionCallArgsIter<'a, A> {}
 
+impl<A: Arena + Clone> CompileWasm<A> for CompiledFunctionCallArgs<A> {
+    fn compile(
+        &self,
+        stack: CompilerStack,
+        state: &mut CompilerState,
+        options: &CompilerOptions,
+    ) -> CompilerResult<A> {
+        if self.partial_args.is_empty() {
+            // If there are no partially-applied arguments, delegate to the existing argument list compilation
+            // (this can make use of static term inlining)
+            self.args.compile(stack, state, options)
+        } else {
+            // Otherwise if there are partially-applied arguments, compile the combined argument sequence into a list
+            // TODO: Investigate chained iterators for partially-applied arguments
+            let num_items = self.len();
+            let block = CompiledBlockBuilder::new(stack);
+            // Push the list capacity onto the stack
+            // => [capacity]
+            let block = block.push(instruction::core::Const {
+                value: ConstValue::U32(num_items as u32),
+            });
+            // Allocate the list term
+            // => [ListTerm]
+            let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+                target: RuntimeBuiltin::AllocateList,
+            });
+            // Assign the list items
+            let block = self.iter().enumerate().fold(
+                Result::<_, CompilerError<_>>::Ok(block),
+                |results, (index, arg)| {
+                    let block = results?;
+                    // Duplicate the list term pointer onto the stack
+                    // => [ListTerm, ListTerm]
+                    let block = block.push(instruction::core::Duplicate {
+                        value_type: ValueType::HeapPointer,
+                    });
+                    // Push the item index onto the stack
+                    // => [ListTerm, ListTerm, index]
+                    let block = block.push(instruction::core::Const {
+                        value: ConstValue::U32(index as u32),
+                    });
+                    // Yield the child item onto the stack
+                    // => [ListTerm, ListTerm, index, Term]
+                    let block = block.append_inner(|stack| arg.compile(stack, state, options))?;
+                    // Set the list term's value at the given index to the child item
+                    // => [ListTerm]
+                    let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+                        target: RuntimeBuiltin::SetListItem,
+                    });
+                    Ok(block)
+                },
+            )?;
+            // Now that all the items have been added, push the list length onto the stack
+            // => [ListTerm, length]
+            let block = block.push(instruction::core::Const {
+                value: ConstValue::U32(num_items as u32),
+            });
+            // Initialize the list term with the length that is on the stack
+            // => [ListTerm]
+            let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+                target: RuntimeBuiltin::InitList,
+            });
+            block.finish()
+        }
+    }
+}
+
 pub(crate) fn intern_static_value<A: Arena + Clone>(
     value: &WasmExpression<A>,
     state: &mut CompilerState,
@@ -1412,10 +1477,6 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<Term, A> {
                 .compile(stack, state, options),
             TermTypeDiscriminants::Lambda => self
                 .as_typed_term::<LambdaTerm>()
-                .as_inner()
-                .compile(stack, state, options),
-            TermTypeDiscriminants::LazyRecord => self
-                .as_typed_term::<LazyRecordTerm>()
                 .as_inner()
                 .compile(stack, state, options),
             TermTypeDiscriminants::Let => self

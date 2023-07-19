@@ -10,7 +10,7 @@ use std::{
 };
 
 use reflex::core::{
-    as_integer, create_record, ArgType, Builtin, Expression, ExpressionFactory, FloatTermType,
+    as_integer, create_record, Builtin, Expression, ExpressionFactory, FloatTermType,
     HeapAllocator, IntTermType, IntValue, ModuleLoader, RefType, StringTermType, StringValue,
 };
 use reflex_stdlib::{
@@ -126,8 +126,8 @@ fn err_unimplemented<T: std::fmt::Debug>(node: T) -> String {
     err("Unsupported syntax", node)
 }
 
-fn err_unexpected<T: std::fmt::Debug>(node: T) -> String {
-    err("Unexpected syntax", node)
+fn err_unreachable<T: std::fmt::Debug>(node: T) -> String {
+    err("Unreachable code", node)
 }
 
 #[derive(Clone)]
@@ -281,7 +281,7 @@ where
             _ => Err(err_unimplemented(node)),
         })
         .collect::<ParserResult<Vec<_>>>()?;
-    match parse_block_statements(&body, &LexicalScope::new(), &env, factory, allocator)? {
+    match parse_block(&body, &LexicalScope::new(), &env, factory, allocator)? {
         None => Err(String::from("No expression to evaluate")),
         Some(expression) => Ok(expression),
     }
@@ -333,7 +333,7 @@ where
     )?;
     let (import_keys, import_initializers): (Vec<_>, Vec<_>) = import_bindings.into_iter().unzip();
     let scope = LexicalScope::from(import_keys.into_iter().map(Some));
-    match parse_block_statements(&body, &scope, &env, factory, allocator)? {
+    match parse_block(&body, &scope, &env, factory, allocator)? {
         None => Err(String::from("Missing default module export")),
         Some(expression) => Ok(if import_initializers.is_empty() {
             expression
@@ -399,7 +399,7 @@ where
 }
 
 fn parse_block<'a, T: Expression>(
-    block: &BlockStmt,
+    body: impl IntoIterator<Item = &'a Stmt>,
     scope: &LexicalScope,
     env: &Env<T>,
     factory: &impl ExpressionFactory<T>,
@@ -408,11 +408,12 @@ fn parse_block<'a, T: Expression>(
 where
     T::Builtin: JsParserBuiltin,
 {
-    parse_block_statements(block.stmts.iter(), scope, env, factory, allocator)
+    parse_block_statements(body, None, scope, env, factory, allocator)
 }
 
 fn parse_block_statements<'a, T: Expression>(
-    statements: impl IntoIterator<Item = &'a Stmt>,
+    remaining: impl IntoIterator<Item = &'a Stmt>,
+    result: Option<T>,
     scope: &LexicalScope,
     env: &Env<T>,
     factory: &impl ExpressionFactory<T>,
@@ -421,11 +422,14 @@ fn parse_block_statements<'a, T: Expression>(
 where
     T::Builtin: JsParserBuiltin,
 {
-    let mut remaining = statements.into_iter();
+    let mut remaining = remaining.into_iter();
     let node = remaining.next();
     match node {
-        None => Ok(None),
+        None => Ok(result),
         Some(statement) => {
+            if result.is_some() {
+                return Err(err_unreachable(statement));
+            }
             match statement {
                 Stmt::Decl(node) => match node {
                     Decl::Var(node) => match node.kind {
@@ -439,7 +443,7 @@ where
                             )?;
                             let body_scope = child_scope.as_ref().unwrap_or(scope);
                             let body = parse_block_statements(
-                                remaining, body_scope, env, factory, allocator,
+                                remaining, result, body_scope, env, factory, allocator,
                             )?;
                             match body {
                                 None => Ok(None),
@@ -456,28 +460,22 @@ where
                 },
                 Stmt::Expr(node) => {
                     let expression = parse_expression(&node.expr, &scope, env, factory, allocator)?;
-                    match remaining.next() {
-                        Some(node) => Err(err_unexpected(node)),
-                        None => Ok(Some(expression)),
-                    }
+                    let result = Some(expression);
+                    parse_block_statements(remaining, result, scope, env, factory, allocator)
                 }
                 Stmt::Return(node) => match &node.arg {
                     None => Err(err("Missing return value", node)),
                     Some(node) => {
                         let expression = parse_expression(node, &scope, env, factory, allocator)?;
-                        match remaining.next() {
-                            Some(node) => Err(err_unexpected(node)),
-                            None => Ok(Some(expression)),
-                        }
+                        let result = Some(expression);
+                        parse_block_statements(remaining, result, scope, env, factory, allocator)
                     }
                 },
                 Stmt::Throw(node) => {
                     let expression =
                         parse_throw_statement(&node.arg, &scope, env, factory, allocator)?;
-                    match remaining.next() {
-                        Some(node) => Err(err_unexpected(node)),
-                        None => Ok(Some(expression)),
-                    }
+                    let result = Some(expression);
+                    parse_block_statements(remaining, result, scope, env, factory, allocator)
                 }
                 Stmt::If(node) => {
                     let condition = parse_expression(&node.test, scope, env, factory, allocator)?;
@@ -488,19 +486,19 @@ where
                             let expression = create_if_expression(
                                 condition, consequent, alternate, factory, allocator,
                             );
-                            match remaining.next() {
-                                Some(node) => Err(err_unexpected(node)),
-                                None => Ok(Some(expression)),
-                            }
+                            let result = Some(expression);
+                            parse_block_statements(
+                                remaining, result, scope, env, factory, allocator,
+                            )
                         }
                         None => {
                             let alternate = parse_branch(
                                 &statement, remaining, scope, env, factory, allocator,
                             )?;
-                            let expression = create_if_expression(
+                            let result = create_if_expression(
                                 condition, consequent, alternate, factory, allocator,
                             );
-                            Ok(Some(expression))
+                            Ok(Some(result))
                         }
                     }
                 }
@@ -528,16 +526,16 @@ where
                             factory,
                             allocator,
                         )?;
-                        match remaining.next() {
-                            Some(node) => Err(err_unexpected(node)),
-                            None => Ok(Some(expression)),
-                        }
+                        let result = Some(expression);
+                        parse_block_statements(remaining, result, scope, env, factory, allocator)
                     } else {
                         Err(err_unimplemented(node))
                     }
                 }
                 Stmt::Switch(_) => Err(err_unimplemented(statement)),
-                Stmt::Empty(_) => parse_block_statements(remaining, scope, env, factory, allocator),
+                Stmt::Empty(_) => {
+                    parse_block_statements(remaining, result, scope, env, factory, allocator)
+                }
                 _ => Err(err_unimplemented(statement)),
             }
         }
@@ -876,7 +874,7 @@ fn parse_branch<'a, T: Expression>(
 where
     T::Builtin: JsParserBuiltin,
 {
-    let expression = parse_block_statements(body, scope, env, factory, allocator)?;
+    let expression = parse_block(body, scope, env, factory, allocator)?;
     match expression {
         None => Err(err("Unterminated branch", node)),
         Some(expression) => Ok(expression),
@@ -1094,11 +1092,7 @@ where
     T::Builtin: JsParserBuiltin,
 {
     enum ObjectLiteralField<T> {
-        Property {
-            key: String,
-            value: T,
-            strictness: ArgType,
-        },
+        Property(String, T),
         Spread(T),
     }
     let elements =
@@ -1112,52 +1106,17 @@ where
                             let key = parse_prop_name(&prop.key, scope, env, factory, allocator)?;
                             let value =
                                 parse_expression(&prop.value, scope, env, factory, allocator)?;
-                            elements.push(ObjectLiteralField::Property {
-                                key,
-                                value,
-                                strictness: ArgType::Strict,
-                            });
+                            elements.push(ObjectLiteralField::Property(key, value));
                             Ok(elements)
                         }
                         Prop::Shorthand(prop) => {
-                            let key = String::from(parse_identifier(prop));
-                            let value = parse_variable_reference(prop, scope, env, factory)?;
-                            elements.push(ObjectLiteralField::Property {
-                                key,
-                                value,
-                                strictness: ArgType::Strict,
-                            });
+                            let key = String::from(parse_identifier(&prop));
+                            let value = parse_variable_reference(&prop, scope, env, factory)?;
+                            elements.push(ObjectLiteralField::Property(key, value));
                             Ok(elements)
                         }
                         Prop::Method(_) => Err(err_unimplemented(prop)),
-                        Prop::Getter(prop) => match prop.body.as_ref() {
-                            None => Err(err_unimplemented(prop)),
-                            Some(body) => {
-                                let key =
-                                    parse_prop_name(&prop.key, scope, env, factory, allocator)?;
-                                let value = prop
-                                    .body
-                                    .as_ref()
-                                    .and_then(|body| {
-                                        parse_block(body, scope, env, factory, allocator)
-                                            .transpose()
-                                    })
-                                    .transpose()?;
-                                match value {
-                                    None => {
-                                        Err(err("Missing property accessor return value", body))
-                                    }
-                                    Some(value) => {
-                                        elements.push(ObjectLiteralField::Property {
-                                            key,
-                                            value,
-                                            strictness: ArgType::Lazy,
-                                        });
-                                        Ok(elements)
-                                    }
-                                }
-                            }
-                        },
+                        Prop::Getter(_) => Err(err_unimplemented(prop)),
                         Prop::Setter(_) => Err(err_unimplemented(prop)),
                         _ => Err(err_unimplemented(prop)),
                     },
@@ -1169,11 +1128,9 @@ where
                 }
             })?;
 
-    let (field_sets, _) = elements
+    let field_sets = elements
         .into_iter()
         .flat_map(|element| {
-            // If this is a spread element, insert a 'None' marker before the current element to collect up the
-            // preceding fields into a field set
             let spread_delimiter: Option<Option<ObjectLiteralField<T>>> =
                 if matches!(&element, ObjectLiteralField::Spread(_)) {
                     Some(None)
@@ -1182,7 +1139,6 @@ where
                 };
             spread_delimiter.into_iter().chain(once(Some(element)))
         })
-        // Append a 'None' marker to collect up the pending fields once all properties have been iterated
         .chain(once(None))
         .fold((Vec::new(), Vec::new()), |results, property| {
             let (mut field_sets, mut current_set) = results;
@@ -1191,67 +1147,22 @@ where
                     field_sets.push(value);
                     (field_sets, Vec::new())
                 }
-                Some(ObjectLiteralField::Property {
-                    key,
-                    value,
-                    strictness,
-                }) => {
+                Some(ObjectLiteralField::Property(key, value)) => {
                     current_set.push((
                         factory.create_string_term(allocator.create_string(key)),
                         value,
-                        strictness,
                     ));
                     (field_sets, current_set)
                 }
                 None => {
                     if !current_set.is_empty() {
-                        let has_lazy_fields =
-                            current_set
-                                .iter()
-                                .any(|(_, value, eagerness)| match eagerness {
-                                    ArgType::Strict => {
-                                        let is_static_value = value.is_static()
-                                            && factory.match_signal_term(value).is_none();
-                                        !is_static_value
-                                    }
-                                    ArgType::Eager => !value.is_static(),
-                                    ArgType::Lazy => true,
-                                });
-                        let field_set = if has_lazy_fields {
-                            let num_fields = current_set.len();
-                            let (keys, values, eagerness) = current_set.into_iter().fold(
-                                (
-                                    Vec::with_capacity(num_fields),
-                                    Vec::with_capacity(num_fields),
-                                    Vec::with_capacity(num_fields),
-                                ),
-                                |(mut keys, mut values, mut eagernesses),
-                                 (key, value, eagerness)| {
-                                    keys.push(key);
-                                    values.push(value);
-                                    eagernesses.push(eagerness);
-                                    (keys, values, eagernesses)
-                                },
-                            );
-                            factory.create_lazy_record_term(
-                                allocator.create_struct_prototype(allocator.create_list(keys)),
-                                allocator.create_list(values),
-                                eagerness,
-                            )
-                        } else {
-                            create_record(
-                                current_set.into_iter().map(|(key, value, _)| (key, value)),
-                                factory,
-                                allocator,
-                            )
-                        };
-                        field_sets.push(field_set);
+                        field_sets.push(create_record(current_set, factory, allocator));
                     }
                     (field_sets, Vec::new())
                 }
             }
-        });
-
+        })
+        .0;
     Ok(if field_sets.len() >= 2 {
         factory.create_application_term(
             factory.create_builtin_term(Merge),
@@ -1941,10 +1852,10 @@ where
                     span: node.span,
                     expr: expression.clone(),
                 })];
-                parse_block_statements(&body, &body_scope, env, factory, allocator)
+                parse_block(&body, &body_scope, env, factory, allocator)
             }
             BlockStmtOrExpr::BlockStmt(node) => {
-                parse_block_statements(&node.stmts, &body_scope, env, factory, allocator)
+                parse_block(&node.stmts, &body_scope, env, factory, allocator)
             }
         }?;
         match body {

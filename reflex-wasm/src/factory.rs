@@ -11,14 +11,14 @@ use std::{
 
 use reflex::{
     core::{
-        ApplicationTermType, ArgType, Arity, BooleanTermType, BuiltinTermType,
-        CompiledFunctionTermType, ConditionListType, ConditionType, ConstructorTermType,
-        EffectTermType, Expression, ExpressionFactory, ExpressionListType, FloatTermType,
-        FloatValue, HashmapTermType, HashsetTermType, HeapAllocator, InstructionPointer,
-        IntTermType, IntValue, LambdaTermType, LazyRecordTermType, LetTermType, ListTermType,
-        PartialApplicationTermType, RecordTermType, RecursiveTermType, RefType, SignalTermType,
-        SignalType, StackOffset, StringTermType, StringValue, StructPrototypeType, SymbolId,
-        SymbolTermType, TimestampTermType, TimestampValue, VariableTermType,
+        ApplicationTermType, Arity, BooleanTermType, BuiltinTermType, CompiledFunctionTermType,
+        ConditionListType, ConditionType, ConstructorTermType, EffectTermType, Expression,
+        ExpressionFactory, ExpressionListType, FloatTermType, FloatValue, HashmapTermType,
+        HashsetTermType, HeapAllocator, InstructionPointer, IntTermType, IntValue, LambdaTermType,
+        LetTermType, ListTermType, PartialApplicationTermType, RecordTermType, RecursiveTermType,
+        RefType, SignalTermType, SignalType, StackOffset, StringTermType, StringValue,
+        StructPrototypeType, SymbolId, SymbolTermType, TimestampTermType, TimestampValue,
+        VariableTermType,
     },
     hash::HashId,
 };
@@ -31,11 +31,11 @@ use crate::{
     term_type::{
         ApplicationTerm, BooleanTerm, BuiltinTerm, ConditionTerm, ConstructorTerm, CustomCondition,
         EffectTerm, ErrorCondition, FloatTerm, HashmapTerm, HashsetTerm, IntTerm, LambdaTerm,
-        LazyRecordTerm, LetTerm, ListTerm, NilTerm, PartialTerm, PendingCondition, RecordTerm,
-        SignalTerm, StringTerm, SymbolTerm, TermType, TermTypeDiscriminants, TimestampTerm,
-        TreeTerm, TypedTerm, VariableTerm, WasmExpression,
+        LetTerm, ListTerm, NilTerm, PartialTerm, PendingCondition, RecordTerm, SignalTerm,
+        StringTerm, SymbolTerm, TermType, TermTypeDiscriminants, TimestampTerm, TreeTerm,
+        TypedTerm, VariableTerm, WasmExpression,
     },
-    ArenaPointer, ArenaRef, Array, FunctionIndex, Term,
+    ArenaPointer, ArenaRef, FunctionIndex, Term,
 };
 
 #[derive(Debug)]
@@ -148,26 +148,6 @@ where
                 .collect::<Result<Vec<_>, _>>()?;
             let values = self.create_list(values);
             Ok(self.create_record_term(prototype, values))
-        } else if let Some(term) = factory.match_lazy_record_term(expression) {
-            let keys = term
-                .prototype()
-                .as_deref()
-                .keys()
-                .as_deref()
-                .iter()
-                .map(|item| self.import(item.as_deref(), factory))
-                .collect::<Result<Vec<_>, _>>()?;
-            let keys = self.create_list(keys);
-            let prototype = self.create_struct_prototype(keys);
-            let values = term
-                .values()
-                .as_deref()
-                .iter()
-                .map(|item| self.import(item.as_deref(), factory))
-                .collect::<Result<Vec<_>, _>>()?;
-            let values = self.create_list(values);
-            let eagerness = term.eagerness();
-            Ok(self.create_lazy_record_term(prototype, values, eagerness))
         } else if let Some(term) = factory.match_constructor_term(expression) {
             let keys = term
                 .prototype()
@@ -362,27 +342,6 @@ where
                 .collect::<Result<Vec<_>, _>>()?;
             let values = allocator.create_list(values);
             Ok(factory.create_record_term(prototype, values))
-        } else if let Some(term) = expression.as_lazy_record_term() {
-            let term = term.as_inner();
-            let keys = term
-                .prototype()
-                .as_deref()
-                .keys()
-                .as_deref()
-                .iter()
-                .map(|key| self.export(key.as_deref(), factory, allocator, indirect_call_arity))
-                .collect::<Result<Vec<_>, _>>()?;
-            let keys = allocator.create_list(keys);
-            let prototype = allocator.create_struct_prototype(keys);
-            let values = term
-                .values()
-                .as_deref()
-                .iter()
-                .map(|key| self.export(key.as_deref(), factory, allocator, indirect_call_arity))
-                .collect::<Result<Vec<_>, _>>()?;
-            let values = allocator.create_list(values);
-            let eagerness = term.eagerness();
-            Ok(factory.create_lazy_record_term(prototype, values, eagerness))
         } else if let Some(term) = expression.as_constructor_term() {
             let term = term.as_inner();
             let keys = term
@@ -1084,39 +1043,6 @@ where
         ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
-    fn create_lazy_record_term(
-        &self,
-        prototype: <ArenaRef<Term, Self> as Expression>::StructPrototype,
-        fields: <ArenaRef<Term, Self> as Expression>::ExpressionList,
-        eagerness: impl IntoIterator<Item = ArgType, IntoIter = impl ExactSizeIterator<Item = ArgType>>,
-    ) -> ArenaRef<Term, Self> {
-        let fields = self.create_record_term(prototype, fields);
-        let term = Term::new(
-            TermType::LazyRecord(LazyRecordTerm {
-                fields: fields.as_pointer(),
-                eagerness: Array::default(),
-            }),
-            &*self.arena.borrow(),
-        );
-        let pointer = self.arena.borrow_mut().deref_mut().allocate(term);
-        let instance = ArenaRef::<Term, Self>::new(self.clone(), pointer);
-        let eagerness_pointer = instance
-            .as_lazy_record_term()
-            .map(|expression| expression.as_inner().inner_pointer(|term| &term.eagerness));
-        if let Some(eagerness_pointer) = eagerness_pointer {
-            Array::<u32>::extend(
-                eagerness_pointer,
-                eagerness.into_iter().map(|eagerness| match eagerness {
-                    ArgType::Lazy => 0,
-                    ArgType::Eager => 1,
-                    ArgType::Strict => 2,
-                }),
-                self.arena.borrow_mut().deref_mut(),
-            );
-        }
-        instance
-    }
-
     fn create_constructor_term(
         &self,
         prototype: <ArenaRef<Term, Self> as Expression>::StructPrototype,
@@ -1367,16 +1293,6 @@ where
     ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::RecordTerm> {
         match expression.read_value(|term| term.type_id()) {
             TermTypeDiscriminants::Record => Some(expression.as_typed_term::<RecordTerm>()),
-            _ => None,
-        }
-    }
-
-    fn match_lazy_record_term<'a>(
-        &self,
-        expression: &'a ArenaRef<Term, Self>,
-    ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::LazyRecordTerm> {
-        match expression.read_value(|term| term.type_id()) {
-            TermTypeDiscriminants::LazyRecord => Some(expression.as_typed_term::<LazyRecordTerm>()),
             _ => None,
         }
     }

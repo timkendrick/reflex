@@ -16,15 +16,12 @@ use crate::{
     compiler::{
         error::CompilerError, instruction, runtime::builtin::RuntimeBuiltin, CompileWasm,
         CompiledBlockBuilder, CompiledFunctionCall, CompiledFunctionCallArgs, CompiledFunctionId,
-        CompilerOptions, CompilerResult, CompilerStack, CompilerState, ConstValue, LazyExpression,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState, ConstValue,
         MaybeLazyExpression, ParamsSignature, Strictness, TypeSignature, ValueType,
     },
     hash::{TermHash, TermHasher, TermSize},
     stdlib::Stdlib,
-    term_type::{
-        list::compile_list, BuiltinTerm, ConstructorTerm, LambdaTerm, ListTerm, TypedTerm,
-        WasmExpression,
-    },
+    term_type::{BuiltinTerm, ConstructorTerm, LambdaTerm, ListTerm, TypedTerm, WasmExpression},
     ArenaPointer, ArenaRef, Term,
 };
 
@@ -317,21 +314,7 @@ impl<A: Arena + Clone> CompileWasm<A> for GenericCompiledFunctionCall<A> {
         let block = block.push(instruction::runtime::BreakOnSignal { target_block: 0 });
         // Yield the argument list onto the stack
         // => [Term, ListTerm]
-        let block = block.append_inner(|stack| {
-            if args.partial_args.is_empty() && args.iter().all(|arg| arg.is_static()) {
-                // If there are no partially-applied arguments, and all the arguments are already fully evaluated,
-                // delegate to the list term compilation (this can make use of static term inlining)
-                args.args.compile(stack, state, options)
-            } else {
-                compile_list(
-                    args.iter()
-                        .map(|arg| (LazyExpression::new(arg), Strictness::NonStrict)),
-                    stack,
-                    state,
-                    options,
-                )
-            }
-        })?;
+        let block = block.append_inner(|stack| args.compile(stack, state, options))?;
         // Apply the target to the arguments
         // => [Term]
         let block = block.push(instruction::runtime::Apply);
@@ -421,14 +404,7 @@ impl<A: Arena + Clone> CompileWasm<A> for ConstructorCompiledFunctionCall<A> {
         let block = block.append_inner(|stack| keys.compile(stack, state, options))?;
         // Yield the value list onto the stack
         // => [ListTerm, ListTerm]
-        let block = block.append_inner(|stack| {
-            compile_list(
-                args.iter().map(|arg| (arg, Strictness::Strict)),
-                stack,
-                state,
-                options,
-            )
-        })?;
+        let block = block.append_inner(|stack| args.compile(stack, state, options))?;
         // Invoke the term constructor
         // => [RecordTerm]
         let block = block.push(instruction::runtime::CallRuntimeBuiltin {

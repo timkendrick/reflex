@@ -14,7 +14,7 @@ impl Construct {
     const ARITY: FunctionArity<1, 0> = FunctionArity {
         required: [ArgType::Strict],
         optional: [],
-        variadic: Some(ArgType::Strict),
+        variadic: Some(ArgType::Lazy),
     };
     pub fn arity() -> Arity {
         Arity::from(&Self::ARITY)

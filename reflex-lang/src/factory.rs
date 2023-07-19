@@ -7,7 +7,7 @@ use std::{collections::HashSet, marker::PhantomData};
 
 use reflex::{
     core::{
-        Applicable, ArgType, Arity, Builtin, CompoundNode, DependencyList, DynamicState, Eagerness,
+        Applicable, Arity, Builtin, CompoundNode, DependencyList, DynamicState, Eagerness,
         Evaluate, EvaluationCache, EvaluationResult, Expression, ExpressionFactory, FloatValue,
         GraphNode, HeapAllocator, InstructionPointer, IntValue, Internable, NodeId, Reducible,
         Rewritable, SerializeJson, StackOffset, Substitutions, SymbolId, TimestampValue,
@@ -140,16 +140,6 @@ impl<TBuiltin: Builtin> ExpressionFactory<CachedSharedTerm<TBuiltin>>
         fields: ExpressionList<CachedSharedTerm<TBuiltin>>,
     ) -> CachedSharedTerm<TBuiltin> {
         self.create_expression(Term::Record(RecordTerm::new(prototype, fields)))
-    }
-    fn create_lazy_record_term(
-        &self,
-        prototype: StructPrototype<CachedSharedTerm<TBuiltin>>,
-        fields: ExpressionList<CachedSharedTerm<TBuiltin>>,
-        eagerness: impl IntoIterator<Item = ArgType, IntoIter = impl ExactSizeIterator<Item = ArgType>>,
-    ) -> CachedSharedTerm<TBuiltin> {
-        self.create_expression(Term::LazyRecord(LazyRecordTerm::new(
-            prototype, fields, eagerness,
-        )))
     }
     fn create_constructor_term(
         &self,
@@ -346,15 +336,6 @@ impl<TBuiltin: Builtin> ExpressionFactory<CachedSharedTerm<TBuiltin>>
             _ => None,
         }
     }
-    fn match_lazy_record_term<'a>(
-        &self,
-        expression: &'a CachedSharedTerm<TBuiltin>,
-    ) -> Option<&'a LazyRecordTerm<CachedSharedTerm<TBuiltin>>> {
-        match expression.inner_term() {
-            Term::LazyRecord(term) => Some(term),
-            _ => None,
-        }
-    }
     fn match_constructor_term<'a>(
         &self,
         expression: &'a CachedSharedTerm<TBuiltin>,
@@ -445,7 +426,6 @@ impl<TBuiltin: Builtin> Expression for CachedSharedTerm<TBuiltin> {
     type BuiltinTerm = BuiltinTerm<Self>;
     type CompiledFunctionTerm = CompiledFunctionTerm;
     type RecordTerm = RecordTerm<Self>;
-    type LazyRecordTerm = LazyRecordTerm<Self>;
     type ConstructorTerm = ConstructorTerm<Self>;
     type ListTerm = ListTerm<Self>;
     type HashmapTerm = HashMapTerm<Self>;

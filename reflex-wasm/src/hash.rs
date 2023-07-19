@@ -119,11 +119,6 @@ impl From<u64> for TermHashState {
         Self(value)
     }
 }
-impl TermHash for TermHashState {
-    fn hash(&self, hasher: TermHasher, arena: &impl Arena) -> TermHasher {
-        hasher.hash(&u64::from(*self), arena)
-    }
-}
 
 #[derive(Clone, Copy)]
 pub struct TermHasher {

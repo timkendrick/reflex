@@ -250,9 +250,10 @@ impl RuntimeBuiltin {
             RuntimeBuiltin::GetStringCharOffset => {
                 TypeSignature::new((ValueType::HeapPointer, ValueType::U32), ValueType::U32)
             }
-            RuntimeBuiltin::InitHashmap => {
-                TypeSignature::new(ValueType::HeapPointer, ValueType::HeapPointer)
-            }
+            RuntimeBuiltin::InitHashmap => TypeSignature::new(
+                (ValueType::HeapPointer, ValueType::U32),
+                ValueType::HeapPointer,
+            ),
             RuntimeBuiltin::InitList => TypeSignature::new(
                 (ValueType::HeapPointer, ValueType::U32),
                 ValueType::HeapPointer,

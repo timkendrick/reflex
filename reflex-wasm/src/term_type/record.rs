@@ -15,7 +15,7 @@ use crate::{
     allocator::Arena,
     compiler::{
         instruction, runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder,
-        CompilerOptions, CompilerResult, CompilerStack, CompilerState, Strictness,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState, LazyExpression, Strictness,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{hashmap::HashmapTerm, list::compile_list, ListTerm, TypedTerm, WasmExpression},
@@ -300,7 +300,8 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<RecordTerm, A> {
     ) -> CompilerResult<A> {
         let keys = self.keys();
         let values = self.values();
-        let values = values.as_inner();
+        let values_list = values.as_inner();
+        let values = values_list.iter();
         let block = CompiledBlockBuilder::new(stack);
         // Push the keys argument onto the stack
         // => [ListTerm]
@@ -308,20 +309,29 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<RecordTerm, A> {
         // Push the property values list argument onto the stack
         // => [ListTerm]
         let block = block.append_inner(|stack| {
-            compile_list(
-                values.iter().map(|item| {
-                    // Skip signal-testing for record field values that are already fully evaluated to a non-signal value
-                    let strictness = if item.is_static() && item.as_signal_term().is_none() {
-                        Strictness::NonStrict
-                    } else {
-                        Strictness::Strict
-                    };
-                    (item, strictness)
-                }),
-                stack,
-                state,
-                options,
-            )
+            if options.lazy_record_values {
+                compile_list(
+                    values.map(|item| (LazyExpression::new(item), Strictness::NonStrict)),
+                    stack,
+                    state,
+                    options,
+                )
+            } else {
+                compile_list(
+                    values.map(|item| {
+                        // Skip signal-testing for record field values that are already fully evaluated to a non-signal value
+                        let strictness = if item.is_static() && item.as_signal_term().is_none() {
+                            Strictness::NonStrict
+                        } else {
+                            Strictness::Strict
+                        };
+                        (item, strictness)
+                    }),
+                    stack,
+                    state,
+                    options,
+                )
+            }
         })?;
         // Invoke the term constructor
         // => [RecordTerm]

@@ -22,7 +22,6 @@ mod hashmap;
 mod hashset;
 mod int;
 mod lambda;
-mod lazy_record;
 mod r#let;
 mod list;
 mod nil;
@@ -46,7 +45,6 @@ pub use hashmap::*;
 pub use hashset::*;
 pub use int::*;
 pub use lambda::*;
-pub use lazy_record::*;
 pub use list::*;
 pub use nil::*;
 pub use partial::*;
@@ -95,7 +93,6 @@ where
     Builtin(BuiltinTerm<T>),
     CompiledFunction(CompiledFunctionTerm),
     Record(RecordTerm<T>),
-    LazyRecord(LazyRecordTerm<T>),
     Constructor(ConstructorTerm<T>),
     List(ListTerm<T>),
     HashMap(HashMapTerm<T>),
@@ -131,7 +128,6 @@ where
     type BuiltinTerm = BuiltinTerm<Self>;
     type CompiledFunctionTerm = CompiledFunctionTerm;
     type RecordTerm = RecordTerm<Self>;
-    type LazyRecordTerm = LazyRecordTerm<Self>;
     type ConstructorTerm = ConstructorTerm<Self>;
     type ListTerm = ListTerm<Self>;
     type HashmapTerm = HashMapTerm<Self>;
@@ -199,7 +195,6 @@ where
             Self::Builtin(term) => term.size(),
             Self::CompiledFunction(term) => term.size(),
             Self::Record(term) => term.size(),
-            Self::LazyRecord(term) => term.size(),
             Self::Constructor(term) => term.size(),
             Self::List(term) => term.size(),
             Self::HashMap(term) => term.size(),
@@ -226,7 +221,6 @@ where
             Self::Builtin(term) => term.capture_depth(),
             Self::CompiledFunction(term) => term.capture_depth(),
             Self::Record(term) => term.capture_depth(),
-            Self::LazyRecord(term) => term.capture_depth(),
             Self::Constructor(term) => term.capture_depth(),
             Self::List(term) => term.capture_depth(),
             Self::HashMap(term) => term.capture_depth(),
@@ -253,7 +247,6 @@ where
             Self::Builtin(term) => term.free_variables(),
             Self::CompiledFunction(term) => term.free_variables(),
             Self::Record(term) => term.free_variables(),
-            Self::LazyRecord(term) => term.free_variables(),
             Self::Constructor(term) => term.free_variables(),
             Self::List(term) => term.free_variables(),
             Self::HashMap(term) => term.free_variables(),
@@ -280,7 +273,6 @@ where
             Self::Builtin(term) => term.count_variable_usages(offset),
             Self::CompiledFunction(term) => term.count_variable_usages(offset),
             Self::Record(term) => term.count_variable_usages(offset),
-            Self::LazyRecord(term) => term.count_variable_usages(offset),
             Self::Constructor(term) => term.count_variable_usages(offset),
             Self::List(term) => term.count_variable_usages(offset),
             Self::HashMap(term) => term.count_variable_usages(offset),
@@ -307,7 +299,6 @@ where
             Self::Builtin(term) => term.dynamic_dependencies(deep),
             Self::CompiledFunction(term) => term.dynamic_dependencies(deep),
             Self::Record(term) => term.dynamic_dependencies(deep),
-            Self::LazyRecord(term) => term.dynamic_dependencies(deep),
             Self::Constructor(term) => term.dynamic_dependencies(deep),
             Self::List(term) => term.dynamic_dependencies(deep),
             Self::HashMap(term) => term.dynamic_dependencies(deep),
@@ -334,7 +325,6 @@ where
             Self::Builtin(term) => term.has_dynamic_dependencies(deep),
             Self::CompiledFunction(term) => term.has_dynamic_dependencies(deep),
             Self::Record(term) => term.has_dynamic_dependencies(deep),
-            Self::LazyRecord(term) => term.has_dynamic_dependencies(deep),
             Self::Constructor(term) => term.has_dynamic_dependencies(deep),
             Self::List(term) => term.has_dynamic_dependencies(deep),
             Self::HashMap(term) => term.has_dynamic_dependencies(deep),
@@ -361,7 +351,6 @@ where
             Self::Builtin(term) => term.is_static(),
             Self::CompiledFunction(term) => term.is_static(),
             Self::Record(term) => term.is_static(),
-            Self::LazyRecord(term) => term.is_static(),
             Self::Constructor(term) => term.is_static(),
             Self::List(term) => term.is_static(),
             Self::HashMap(term) => term.is_static(),
@@ -388,7 +377,6 @@ where
             Self::Builtin(term) => term.is_atomic(),
             Self::CompiledFunction(term) => term.is_atomic(),
             Self::Record(term) => term.is_atomic(),
-            Self::LazyRecord(term) => term.is_atomic(),
             Self::Constructor(term) => term.is_atomic(),
             Self::List(term) => term.is_atomic(),
             Self::HashMap(term) => term.is_atomic(),
@@ -415,7 +403,6 @@ where
             Self::Builtin(term) => term.is_complex(),
             Self::CompiledFunction(term) => term.is_complex(),
             Self::Record(term) => term.is_complex(),
-            Self::LazyRecord(term) => term.is_complex(),
             Self::Constructor(term) => term.is_complex(),
             Self::List(term) => term.is_complex(),
             Self::HashMap(term) => term.is_complex(),
@@ -431,7 +418,6 @@ pub enum TermChildren<'a, T: Expression + 'a> {
     PartialApplication(<PartialApplicationTerm<T> as CompoundNode<T>>::Children<'a>),
     Recursive(<RecursiveTerm<T> as CompoundNode<T>>::Children<'a>),
     Record(<RecordTerm<T> as CompoundNode<T>>::Children<'a>),
-    LazyRecord(<LazyRecordTerm<T> as CompoundNode<T>>::Children<'a>),
     List(<ListTerm<T> as CompoundNode<T>>::Children<'a>),
     HashMap(<HashMapTerm<T> as CompoundNode<T>>::Children<'a>),
     HashSet(<HashSetTerm<T> as CompoundNode<T>>::Children<'a>),
@@ -447,7 +433,6 @@ impl<'a, T: Expression + 'a> Iterator for TermChildren<'a, T> {
             Self::PartialApplication(iter) => iter.next(),
             Self::Recursive(iter) => iter.next(),
             Self::Record(iter) => iter.next(),
-            Self::LazyRecord(iter) => iter.next(),
             Self::List(iter) => iter.next(),
             Self::HashMap(iter) => iter.next(),
             Self::HashSet(iter) => iter.next(),
@@ -475,7 +460,6 @@ where
             Self::PartialApplication(term) => TermChildren::PartialApplication(term.children()),
             Self::Recursive(term) => TermChildren::Recursive(term.children()),
             Self::Record(term) => TermChildren::Record(term.children()),
-            Self::LazyRecord(term) => TermChildren::LazyRecord(term.children()),
             Self::List(term) => TermChildren::List(term.children()),
             Self::HashMap(term) => TermChildren::HashMap(term.children()),
             Self::HashSet(term) => TermChildren::HashSet(term.children()),
@@ -512,9 +496,6 @@ where
                 term.substitute_static(substitutions, factory, allocator, cache)
             }
             Self::Record(term) => term.substitute_static(substitutions, factory, allocator, cache),
-            Self::LazyRecord(term) => {
-                term.substitute_static(substitutions, factory, allocator, cache)
-            }
             Self::List(term) => term.substitute_static(substitutions, factory, allocator, cache),
             Self::HashMap(term) => term.substitute_static(substitutions, factory, allocator, cache),
             Self::HashSet(term) => term.substitute_static(substitutions, factory, allocator, cache),
@@ -544,9 +525,6 @@ where
                 term.substitute_dynamic(deep, state, factory, allocator, cache)
             }
             Self::Record(term) => term.substitute_dynamic(deep, state, factory, allocator, cache),
-            Self::LazyRecord(term) => {
-                term.substitute_dynamic(deep, state, factory, allocator, cache)
-            }
             Self::List(term) => term.substitute_dynamic(deep, state, factory, allocator, cache),
             Self::HashMap(term) => term.substitute_dynamic(deep, state, factory, allocator, cache),
             Self::HashSet(term) => term.substitute_dynamic(deep, state, factory, allocator, cache),
@@ -568,7 +546,6 @@ where
             Self::PartialApplication(term) => term.normalize(factory, allocator, cache),
             Self::Recursive(term) => term.normalize(factory, allocator, cache),
             Self::Record(term) => term.normalize(factory, allocator, cache),
-            Self::LazyRecord(term) => term.normalize(factory, allocator, cache),
             Self::List(term) => term.normalize(factory, allocator, cache),
             Self::HashMap(term) => term.normalize(factory, allocator, cache),
             Self::HashSet(term) => term.normalize(factory, allocator, cache),
@@ -589,7 +566,6 @@ where
             Self::PartialApplication(term) => term.hoist_free_variables(factory, allocator),
             Self::Recursive(term) => term.hoist_free_variables(factory, allocator),
             Self::Record(term) => term.hoist_free_variables(factory, allocator),
-            Self::LazyRecord(term) => term.hoist_free_variables(factory, allocator),
             Self::List(term) => term.hoist_free_variables(factory, allocator),
             Self::HashMap(term) => term.hoist_free_variables(factory, allocator),
             Self::HashSet(term) => term.hoist_free_variables(factory, allocator),
@@ -607,7 +583,6 @@ where
         match self {
             Self::Let(term) => term.is_reducible(),
             Self::Application(term) => term.is_reducible(),
-            Self::LazyRecord(term) => term.is_reducible(),
             Self::Recursive(term) => term.is_reducible(),
             _ => false,
         }
@@ -621,7 +596,6 @@ where
         match self {
             Self::Let(term) => term.reduce(factory, allocator, cache),
             Self::Application(term) => term.reduce(factory, allocator, cache),
-            Self::LazyRecord(term) => term.reduce(factory, allocator, cache),
             Self::Recursive(term) => term.reduce(factory, allocator, cache),
             _ => None,
         }
@@ -683,7 +657,6 @@ where
         match self {
             Self::Effect(term) => term.evaluate(state, factory, allocator, cache),
             Self::Application(term) => term.evaluate(state, factory, allocator, cache),
-            Self::LazyRecord(term) => term.evaluate(state, factory, allocator, cache),
             _ => {
                 if self.is_reducible() {
                     self.reduce(factory, allocator, cache).map(|result| {
@@ -724,7 +697,6 @@ where
             Self::CompiledFunction(term) => term.should_intern(eager),
             Self::Builtin(term) => term.should_intern(eager),
             Self::Record(term) => term.should_intern(eager),
-            Self::LazyRecord(term) => term.should_intern(eager),
             Self::Constructor(term) => term.should_intern(eager),
             Self::List(term) => term.should_intern(eager),
             Self::HashMap(term) => term.should_intern(eager),
@@ -756,7 +728,6 @@ where
             Self::CompiledFunction(term) => std::fmt::Display::fmt(term, f),
             Self::Builtin(term) => std::fmt::Display::fmt(term, f),
             Self::Record(term) => std::fmt::Display::fmt(term, f),
-            Self::LazyRecord(term) => std::fmt::Display::fmt(term, f),
             Self::Constructor(term) => std::fmt::Display::fmt(term, f),
             Self::List(term) => std::fmt::Display::fmt(term, f),
             Self::HashMap(term) => std::fmt::Display::fmt(term, f),
@@ -789,7 +760,6 @@ where
             Self::CompiledFunction(term) => term.to_json(),
             Self::Builtin(term) => term.to_json(),
             Self::Record(term) => term.to_json(),
-            Self::LazyRecord(term) => term.to_json(),
             Self::Constructor(term) => term.to_json(),
             Self::List(term) => term.to_json(),
             Self::HashMap(term) => term.to_json(),
@@ -817,7 +787,6 @@ where
             (Self::CompiledFunction(term), Self::CompiledFunction(other)) => term.patch(other),
             (Self::Builtin(term), Self::Builtin(other)) => term.patch(other),
             (Self::Record(term), Self::Record(other)) => term.patch(other),
-            (Self::LazyRecord(term), Self::LazyRecord(other)) => term.patch(other),
             (Self::Constructor(term), Self::Constructor(other)) => term.patch(other),
             (Self::List(term), Self::List(other)) => term.patch(other),
             (Self::HashMap(term), Self::HashMap(other)) => term.patch(other),

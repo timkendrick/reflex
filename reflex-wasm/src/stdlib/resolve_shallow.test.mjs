@@ -230,7 +230,11 @@ export default (describe) => {
           createBuiltin(Stdlib.ResolveShallow),
           createUnitList(
             createRecord(
-              createTriple(createString('foo'), createString('bar'), createString('baz')),
+              createTriple(
+                createApplication(createLambda(0, createString('foo')), createEmptyList()),
+                createApplication(createLambda(0, createString('bar')), createEmptyList()),
+                createApplication(createLambda(0, createString('baz')), createEmptyList()),
+              ),
               createTriple(
                 createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-3))),
                 createApplication(createBuiltin(Stdlib.Abs), createUnitList(createInt(-4))),
@@ -248,7 +252,11 @@ export default (describe) => {
           createBuiltin(Stdlib.ResolveShallow),
           createUnitList(
             createRecord(
-              createTriple(createString('foo'), createString('bar'), createString('baz')),
+              createTriple(
+                createApplication(createLambda(0, createString('foo')), createEmptyList()),
+                createApplication(createLambda(0, createString('bar')), createEmptyList()),
+                createApplication(createLambda(0, createString('baz')), createEmptyList()),
+              ),
               createTriple(
                 createApplication(
                   createLambda(

@@ -18,21 +18,34 @@
             (local.get $self)
             (global.get $NULL))
           (else
-            ;; Otherwise resolve the field values and create a new record, short-circuiting any signals
+            ;; Otherwise resolve the keys and values and create a new record, short-circuiting any signals
+            (call $Stdlib_ResolveList::impl::List
+              (call $Term::Record::get::keys (local.get $self))
+              (local.get $state))
+            (local.set $dependencies)
+            (local.set $keys)
             (call $Stdlib_ResolveList::impl::List
               (call $Term::Record::get::values (local.get $self))
               (local.get $state))
-            (local.set $dependencies)
+            (local.set $dependencies (call $Dependencies::traits::union (local.get $dependencies)))
             (local.set $values)
             (if (result i32 i32)
-              (call $Term::Signal::is (local.get $values))
+              (i32.or
+                (call $Term::Signal::is (local.get $values))
+                (call $Term::Signal::is (local.get $keys)))
               (then
-                (local.get $values)
+                (call $Term::Signal::traits::union
+                  (select
+                    (local.get $keys)
+                    (global.get $NULL)
+                    (call $Term::Signal::is (local.get $keys)))
+                  (select
+                    (local.get $values)
+                    (global.get $NULL)
+                    (call $Term::Signal::is (local.get $values))))
                 (local.get $dependencies))
               (else
-                (call $Term::Record::new
-                  (call $Term::Record::get::keys (local.get $self))
-                  (local.get $values))
+                (call $Term::Record::new (local.get $keys) (local.get $values))
                 (local.get $dependencies)))))))
 
     (@default

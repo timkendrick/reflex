@@ -373,15 +373,6 @@ where
 }
 
 impl<T: Sized> Array<T> {
-    pub fn allocate(
-        values: impl IntoIterator<Item = T, IntoIter = impl ExactSizeIterator<Item = T>>,
-        arena: &mut impl ArenaAllocator,
-    ) -> ArenaPointer {
-        let values = values.into_iter();
-        let instance = arena.allocate(Self::default());
-        Self::extend(instance, values, arena);
-        instance
-    }
     pub fn len(&self) -> usize {
         self.length as usize
     }

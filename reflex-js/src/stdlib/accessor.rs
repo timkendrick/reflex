@@ -6,8 +6,7 @@ use std::ops::Deref;
 use reflex::core::{
     as_integer, uuid, Applicable, ArgType, Arity, Builtin, EvaluationCache, Expression,
     ExpressionFactory, ExpressionListType, FloatTermType, FunctionArity, HeapAllocator,
-    IntTermType, LazyRecordTermType, ListTermType, RecordTermType, RefType, StringTermType,
-    StringValue, Uid, Uuid,
+    IntTermType, ListTermType, RecordTermType, RefType, StringTermType, StringValue, Uid, Uuid,
 };
 use reflex_stdlib::stdlib;
 
@@ -110,8 +109,6 @@ where
         let key = args.next().unwrap();
         let result = if let Some(term) = factory.match_record_term(&target) {
             get_record_property(term, &target, &key, factory, allocator)
-        } else if let Some(term) = factory.match_lazy_record_term(&target) {
-            get_lazy_record_property(term, &target, &key, factory, allocator)
         } else if let Some(term) = factory.match_list_term(&target) {
             get_list_property(term, &target, &key, factory, allocator)
         } else if let Some(term) = factory.match_string_term(&target) {
@@ -134,16 +131,6 @@ where
 
 fn get_record_property<T: Expression, TFactory: ExpressionFactory<T>>(
     term: &T::RecordTerm,
-    _target: &T,
-    key: &T,
-    _factory: &TFactory,
-    _allocator: &impl HeapAllocator<T>,
-) -> Option<T> {
-    term.get(key).map(|value| value.as_deref().clone())
-}
-
-fn get_lazy_record_property<T: Expression, TFactory: ExpressionFactory<T>>(
-    term: &T::LazyRecordTerm,
     _target: &T,
     key: &T,
     _factory: &TFactory,
