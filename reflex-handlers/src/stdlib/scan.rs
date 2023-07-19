@@ -12,7 +12,7 @@ pub struct Scan;
 impl Scan {
     pub const UUID: Uuid = uuid!("9c9f5a15-45a7-484d-a910-c6f114a8bced");
     const ARITY: FunctionArity<3, 0> = FunctionArity {
-        required: [ArgType::Lazy, ArgType::Strict, ArgType::Strict],
+        required: [ArgType::Strict, ArgType::Strict, ArgType::Strict],
         optional: [],
         variadic: None,
     };
@@ -40,10 +40,12 @@ impl<T: Expression> Applicable<T> for Scan {
         _cache: &mut impl EvaluationCache<T>,
     ) -> Result<T, String> {
         let mut args = args.into_iter();
-        let target = args.next().unwrap();
+        let input = args.next().unwrap();
         let seed = args.next().unwrap();
         let iteratee = args.next().unwrap();
-        if !is_pure_expression(&seed) {
+        if !is_pure_expression(&input) {
+            Err(format!("Scan input must be a pure expression"))
+        } else if !is_pure_expression(&seed) {
             Err(format!("Scan seed must be a pure expression"))
         } else if !is_pure_expression(&iteratee) {
             Err(format!("Scan iteratee must be a pure expression"))
@@ -54,7 +56,7 @@ impl<T: Expression> Applicable<T> for Scan {
                         effect_type: factory
                             .create_string_term(allocator.create_static_string(EFFECT_TYPE_SCAN)),
                         payload: factory
-                            .create_list_term(allocator.create_list([target, seed, iteratee])),
+                            .create_list_term(allocator.create_list([input, seed, iteratee])),
                         token: factory.create_nil_term(),
                     }),
                 ),

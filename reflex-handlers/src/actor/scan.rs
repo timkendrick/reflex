@@ -18,7 +18,7 @@ use reflex_dispatcher::{
     Action, ActorEvents, HandlerContext, MessageData, NoopDisposeCallback, ProcessId,
     SchedulerCommand, SchedulerMode, SchedulerTransition, TaskFactory, TaskInbox,
 };
-use reflex_macros::{dispatcher, Named};
+use reflex_macros::{blanket_trait, dispatcher, Named};
 use reflex_runtime::{
     action::effect::{
         EffectEmitAction, EffectSubscribeAction, EffectUnsubscribeAction, EffectUpdateBatch,
@@ -30,8 +30,13 @@ use reflex_runtime::{
     AsyncExpression, AsyncExpressionFactory, AsyncHeapAllocator, QueryEvaluationMode,
     QueryInvalidationStrategy,
 };
+use reflex_stdlib::ResolveDeep;
 
 pub const EFFECT_TYPE_SCAN: &'static str = "reflex::scan";
+
+blanket_trait!(
+    pub trait ScanHandlerBuiltin: From<ResolveDeep> {}
+);
 
 pub fn is_scan_effect_type<T: Expression>(
     effect_type: &T,
@@ -165,6 +170,7 @@ dispatcher!({
         T: AsyncExpression,
         TFactory: AsyncExpressionFactory<T>,
         TAllocator: AsyncHeapAllocator<T>,
+        T::Builtin: ScanHandlerBuiltin,
         TAction: Action,
         TTask: TaskFactory<TAction, TTask>,
     {
@@ -249,6 +255,7 @@ where
     T: AsyncExpression,
     TFactory: AsyncExpressionFactory<T>,
     TAllocator: AsyncHeapAllocator<T>,
+    T::Builtin: ScanHandlerBuiltin,
 {
     fn handle_effect_subscribe<TAction, TTask>(
         &self,
@@ -488,7 +495,8 @@ where
                 ];
                 let source_effect = create_evaluate_effect(
                     source_label,
-                    target,
+                    self.factory
+                        .create_application_term(target, self.allocator.create_empty_list()),
                     QueryEvaluationMode::Standalone,
                     QueryInvalidationStrategy::Exact,
                     &self.factory,
@@ -497,11 +505,15 @@ where
                 let result_effect = create_evaluate_effect(
                     reducer_label,
                     self.factory.create_application_term(
-                        iteratee,
-                        self.allocator.create_pair(
-                            self.factory.create_effect_term(state_value_effect.clone()),
-                            self.factory.create_effect_term(source_value_effect.clone()),
-                        ),
+                        self.factory.create_builtin_term(ResolveDeep),
+                        self.allocator
+                            .create_unit_list(self.factory.create_application_term(
+                                iteratee,
+                                self.allocator.create_pair(
+                                    self.factory.create_effect_term(state_value_effect.clone()),
+                                    self.factory.create_effect_term(source_value_effect.clone()),
+                                ),
+                            )),
                     ),
                     QueryEvaluationMode::Standalone,
                     QueryInvalidationStrategy::Exact,
