@@ -30,7 +30,7 @@ pub fn create_variable_get_effect_type<T: Expression>(
     factory.create_string_term(allocator.create_static_string(EFFECT_TYPE_VARIABLE_GET))
 }
 
-pub const EFFECT_TYPE_VARIABLE_SET: &'static str = "reflex::state::set";
+pub const EFFECT_TYPE_VARIABLE_SET: &'static str = "reflex::variable::set";
 
 pub fn is_variable_set_effect_type<T: Expression>(
     effect_type: &T,
@@ -51,7 +51,7 @@ pub fn create_variable_set_effect_type<T: Expression>(
     factory.create_string_term(allocator.create_static_string(EFFECT_TYPE_VARIABLE_SET))
 }
 
-pub const EFFECT_TYPE_VARIABLE_INCREMENT: &'static str = "reflex::state::increment";
+pub const EFFECT_TYPE_VARIABLE_INCREMENT: &'static str = "reflex::variable::increment";
 
 pub fn is_variable_increment_effect_type<T: Expression>(
     effect_type: &T,
@@ -72,7 +72,7 @@ pub fn create_variable_increment_effect_type<T: Expression>(
     factory.create_string_term(allocator.create_static_string(EFFECT_TYPE_VARIABLE_INCREMENT))
 }
 
-pub const EFFECT_TYPE_VARIABLE_DECREMENT: &'static str = "reflex::state::decrement";
+pub const EFFECT_TYPE_VARIABLE_DECREMENT: &'static str = "reflex::variable::decrement";
 
 pub fn is_variable_decrement_effect_type<T: Expression>(
     effect_type: &T,
