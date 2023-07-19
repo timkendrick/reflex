@@ -33,7 +33,7 @@ $ reflex-server --port 8080 ./index.js
 ## Example query
 
 ```
-query {
+subscription {
   buckets
 }
 ```
