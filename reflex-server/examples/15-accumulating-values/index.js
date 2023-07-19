@@ -2,13 +2,10 @@ import { Resolver } from 'reflex::graphql';
 import { scan } from 'reflex::state';
 import { now } from 'reflex::time';
 
-// Current timestamp in milliseconds (sampled every 1000 milliseconds)
-const timestamp = now({ interval: 1000 });
-
 // Calculate the distribution of the final digits of each emitted timestamp
 const buckets = scan(
-  // Input expression
-  timestamp,
+  // Input expression: current timestamp in milliseconds (sampled every 1000 milliseconds)
+  () => now({ interval: 1000 }),
   // Seed value
   [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
   // Reducer function
