@@ -352,7 +352,13 @@ where
                         factory.create_application_term(
                             factory.create_builtin_term(stdlib::Intersperse),
                             allocator.create_pair(
-                                factory.create_variable_term(1),
+                                factory.create_application_term(
+                                    factory.create_builtin_term(stdlib::Map),
+                                    allocator.create_pair(
+                                        factory.create_variable_term(1),
+                                        factory.create_builtin_term(crate::stdlib::ToString),
+                                    ),
+                                ),
                                 factory.create_variable_term(0),
                             ),
                         ),
