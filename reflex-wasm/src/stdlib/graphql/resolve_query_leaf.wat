@@ -8,7 +8,32 @@
     (@impl
       (i32.eq (global.get $TermType::Nil))
       (func $Stdlib_ResolveQueryLeaf::impl::Nil (param $self i32) (param $state i32) (result i32 i32)
-        (call $Stdlib_ResolveQueryLeaf::impl::default (local.get $self) (local.get $state))))
+        (local.get $self)
+        (global.get $NULL)))
+
+    (@impl
+      (i32.eq (global.get $TermType::Boolean))
+      (func $Stdlib_ResolveQueryLeaf::impl::Boolean (param $self i32) (param $state i32) (result i32 i32)
+        (local.get $self)
+        (global.get $NULL)))
+
+    (@impl
+      (i32.eq (global.get $TermType::Int))
+      (func $Stdlib_ResolveQueryLeaf::impl::Int (param $self i32) (param $state i32) (result i32 i32)
+        (local.get $self)
+        (global.get $NULL)))
+
+    (@impl
+      (i32.eq (global.get $TermType::Float))
+      (func $Stdlib_ResolveQueryLeaf::impl::Float (param $self i32) (param $state i32) (result i32 i32)
+        (local.get $self)
+        (global.get $NULL)))
+
+    (@impl
+      (i32.eq (global.get $TermType::String))
+      (func $Stdlib_ResolveQueryLeaf::impl::String (param $self i32) (param $state i32) (result i32 i32)
+        (local.get $self)
+        (global.get $NULL)))
 
     (@impl
       (i32.eq (global.get $TermType::Record))
@@ -51,7 +76,21 @@
         ;; Combine the accumulated iteration dependencies with the evaluation dependencies
         (call $Dependencies::traits::union (local.get $dependencies))))
 
+    (@impl
+      (call $TermType::implements::apply)
+      (func $Stdlib_ResolveQueryLeaf::impl::<apply> (param $self i32) (param $state i32) (result i32 i32)
+        (local $dependencies i32)
+        ;; Invoke the lazy thunk function
+        (call $Term::traits::apply (local.get $self) (call $Term::List::empty) (local.get $state))
+        (local.set $dependencies)
+        ;; Continue resolving the leaf with the thunk function return value
+        (call $Stdlib_ResolveQueryLeaf (local.get $state))
+        (call $Dependencies::traits::union (local.get $dependencies))))
+
     (@default
       (func $Stdlib_ResolveQueryLeaf::impl::default (param $self i32) (param $state i32) (result i32 i32)
-        (local.get $self)
+        (call $Term::Signal::of
+          (call $Term::Condition::invalid_builtin_function_args
+            (global.get $Stdlib_ResolveQueryLeaf)
+            (call $Term::List::of (local.get $self))))
         (global.get $NULL)))))

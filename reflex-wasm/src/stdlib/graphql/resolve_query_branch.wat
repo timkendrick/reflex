@@ -69,6 +69,18 @@
         ;; Combine the accumulated iteration dependencies with the evaluation dependencies
         (call $Dependencies::traits::union (local.get $dependencies))))
 
+    (@impl
+      (call $TermType::implements::apply)
+      (i32.or (i32.const 0xFFFFFFFF))
+      (func $Stdlib_ResolveQueryBranch::impl::<apply>::any (param $self i32) (param $shape i32) (param $state i32) (result i32 i32)
+        (local $dependencies i32)
+        ;; Invoke the lazy thunk function
+        (call $Term::traits::apply (local.get $self) (call $Term::List::empty) (local.get $state))
+        (local.set $dependencies)
+        ;; Continue resolving the branch with the thunk function return value
+        (call $Stdlib_ResolveQueryBranch (local.get $shape) (local.get $state))
+        (call $Dependencies::traits::union (local.get $dependencies))))
+
     (@default
       (func $Stdlib_ResolveQueryBranch::impl::default (param $self i32) (param $shape i32) (param $state i32) (result i32 i32)
         (call $Term::Signal::of

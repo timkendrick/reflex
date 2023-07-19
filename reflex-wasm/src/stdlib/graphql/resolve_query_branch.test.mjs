@@ -64,7 +64,7 @@ export default (describe) => {
           createPair(
             createConstructor(createPair(createString('first'), createString('second'))),
             createApplication(
-              createBuiltin(Stdlib.ResolveShallow),
+              createBuiltin(Stdlib.ResolveList),
               createUnitList(
                 createPair(
                   createApplication(
@@ -143,7 +143,7 @@ export default (describe) => {
           createPair(
             createConstructor(createPair(createString('first'), createString('second'))),
             createApplication(
-              createBuiltin(Stdlib.ResolveShallow),
+              createBuiltin(Stdlib.ResolveList),
               createUnitList(
                 createPair(
                   createApplication(
@@ -502,7 +502,7 @@ export default (describe) => {
           createPair(
             createConstructor(createPair(createString('first'), createString('second'))),
             createApplication(
-              createBuiltin(Stdlib.ResolveShallow),
+              createBuiltin(Stdlib.ResolveList),
               createUnitList(
                 createPair(
                   createApplication(
@@ -558,7 +558,7 @@ export default (describe) => {
                       createTriple(createString('foo'), createString('bar'), createString('baz')),
                     ),
                     createApplication(
-                      createBuiltin(Stdlib.ResolveShallow),
+                      createBuiltin(Stdlib.ResolveList),
                       createUnitList(
                         createTriple(
                           createApplication(
@@ -631,7 +631,7 @@ export default (describe) => {
                           ),
                         ),
                         createApplication(
-                          createBuiltin(Stdlib.ResolveShallow),
+                          createBuiltin(Stdlib.ResolveList),
                           createUnitList(
                             createTriple(
                               createApplication(
@@ -710,6 +710,253 @@ export default (describe) => {
         );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
+    });
+
+    test('(Lambda)', (assert, {
+      createApplication,
+      createBuiltin,
+      createConstructor,
+      createInt,
+      createLambda,
+      createPair,
+      createRecord,
+      createString,
+      createTriple,
+      createUnitList,
+      createVariable,
+      evaluate,
+      format,
+      NULL,
+      Stdlib,
+    }) => {
+      const shape = createLambda(
+        1,
+        createApplication(
+          createBuiltin(Stdlib.Apply),
+          createPair(
+            createConstructor(createPair(createString('first'), createString('second'))),
+            createApplication(
+              createBuiltin(Stdlib.ResolveList),
+              createUnitList(
+                createPair(
+                  createApplication(
+                    createBuiltin(Stdlib.Get),
+                    createPair(createVariable(0), createString('foo')),
+                  ),
+                  createApplication(
+                    createBuiltin(Stdlib.Get),
+                    createPair(createVariable(0), createString('baz')),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.ResolveQueryBranch),
+          createPair(
+            createLambda(
+              0,
+              createRecord(
+                createTriple(createString('foo'), createString('bar'), createString('baz')),
+                createTriple(createInt(3), createInt(4), createInt(5)),
+              ),
+            ),
+            shape,
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '{ "first": 3, "second": 5 }');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.ResolveQueryBranch),
+          createPair(
+            createApplication(
+              createBuiltin(Stdlib.Identity),
+              createUnitList(
+                createLambda(
+                  0,
+                  createRecord(
+                    createTriple(createString('foo'), createString('bar'), createString('baz')),
+                    createTriple(createInt(3), createInt(4), createInt(5)),
+                  ),
+                ),
+              ),
+            ),
+            createApplication(createBuiltin(Stdlib.Identity), createUnitList(shape)),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '{ "first": 3, "second": 5 }');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+    });
+
+    test('(Hashmap)', (assert, {
+      createApplication,
+      createBuiltin,
+      createConstructor,
+      createHashmap,
+      createLambda,
+      createInt,
+      createPair,
+      createString,
+      createUnitList,
+      createVariable,
+      evaluate,
+      format,
+      NULL,
+      Stdlib,
+    }) => {
+      const shape = createLambda(
+        1,
+        createApplication(
+          createBuiltin(Stdlib.Apply),
+          createPair(
+            createConstructor(createPair(createString('first'), createString('second'))),
+            createApplication(
+              createBuiltin(Stdlib.ResolveList),
+              createUnitList(
+                createPair(
+                  createApplication(
+                    createBuiltin(Stdlib.Get),
+                    createPair(createVariable(0), createString('foo')),
+                  ),
+                  createApplication(
+                    createBuiltin(Stdlib.Get),
+                    createPair(createVariable(0), createString('baz')),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      const expression = createApplication(
+        createBuiltin(Stdlib.ResolveQueryBranch),
+        createPair(
+          createHashmap([
+            [createString('foo'), createInt(3)],
+            [createString('bar'), createInt(4)],
+            [createString('baz'), createInt(5)],
+          ]),
+          shape,
+        ),
+      );
+      const [result, dependencies] = evaluate(expression, NULL);
+      assert.strictEqual(
+        format(result),
+        `{<InvalidFunctionArgsCondition:ResolveQueryBranch(Map(3), ${format(shape)})>}`,
+      );
+      assert.strictEqual(format(dependencies), 'NULL');
+    });
+
+    test('(Hashset)', (assert, {
+      createApplication,
+      createBuiltin,
+      createConstructor,
+      createHashset,
+      createInt,
+      createLambda,
+      createPair,
+      createString,
+      createUnitList,
+      createVariable,
+      evaluate,
+      format,
+      NULL,
+      Stdlib,
+    }) => {
+      const shape = createLambda(
+        1,
+        createApplication(
+          createBuiltin(Stdlib.Apply),
+          createPair(
+            createConstructor(createPair(createString('first'), createString('second'))),
+            createApplication(
+              createBuiltin(Stdlib.ResolveList),
+              createUnitList(
+                createPair(
+                  createApplication(
+                    createBuiltin(Stdlib.Get),
+                    createPair(createVariable(0), createString('foo')),
+                  ),
+                  createApplication(
+                    createBuiltin(Stdlib.Get),
+                    createPair(createVariable(0), createString('baz')),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      const expression = createApplication(
+        createBuiltin(Stdlib.ResolveQueryBranch),
+        createPair(createHashset([createInt(3), createInt(4), createInt(5)]), shape),
+      );
+      const [result, dependencies] = evaluate(expression, NULL);
+      assert.strictEqual(
+        format(result),
+        `{<InvalidFunctionArgsCondition:ResolveQueryBranch(Set(3), ${format(shape)})>}`,
+      );
+      assert.strictEqual(format(dependencies), 'NULL');
+    });
+
+    test('(Tree)', (assert, {
+      createApplication,
+      createBuiltin,
+      createConstructor,
+      createLambda,
+      createPair,
+      createString,
+      createTree,
+      createInt,
+      createUnitList,
+      createVariable,
+      evaluate,
+      format,
+      NULL,
+      Stdlib,
+    }) => {
+      const shape = createLambda(
+        1,
+        createApplication(
+          createBuiltin(Stdlib.Apply),
+          createPair(
+            createConstructor(createPair(createString('first'), createString('second'))),
+            createApplication(
+              createBuiltin(Stdlib.ResolveList),
+              createUnitList(
+                createPair(
+                  createApplication(
+                    createBuiltin(Stdlib.Get),
+                    createPair(createVariable(0), createString('foo')),
+                  ),
+                  createApplication(
+                    createBuiltin(Stdlib.Get),
+                    createPair(createVariable(0), createString('baz')),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      const expression = createApplication(
+        createBuiltin(Stdlib.ResolveQueryBranch),
+        createPair(createTree(createInt(3), createInt(4)), shape),
+      );
+      const [result, dependencies] = evaluate(expression, NULL);
+      assert.strictEqual(
+        format(result),
+        `{<InvalidFunctionArgsCondition:ResolveQueryBranch((3 . 4), ${format(shape)})>}`,
+      );
+      assert.strictEqual(format(dependencies), 'NULL');
     });
   });
 };

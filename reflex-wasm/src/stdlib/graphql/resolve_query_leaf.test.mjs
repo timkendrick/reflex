@@ -163,54 +163,6 @@ export default (describe) => {
       })();
     });
 
-    test('(Record)', (assert, {
-      createApplication,
-      createBuiltin,
-      createInt,
-      createRecord,
-      createString,
-      createTriple,
-      createUnitList,
-      evaluate,
-      format,
-      NULL,
-      Stdlib,
-    }) => {
-      (() => {
-        const expression = createApplication(
-          createBuiltin(Stdlib.ResolveQueryLeaf),
-          createUnitList(
-            createRecord(
-              createTriple(createString('foo'), createString('bar'), createString('baz')),
-              createTriple(createInt(3), createInt(4), createInt(5)),
-            ),
-          ),
-        );
-        const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{ "foo": 3, "bar": 4, "baz": 5 }');
-        assert.strictEqual(format(dependencies), 'NULL');
-      })();
-      (() => {
-        const expression = createApplication(
-          createBuiltin(Stdlib.ResolveQueryLeaf),
-          createUnitList(
-            createApplication(
-              createBuiltin(Stdlib.Identity),
-              createUnitList(
-                createRecord(
-                  createTriple(createString('foo'), createString('bar'), createString('baz')),
-                  createTriple(createInt(3), createInt(4), createInt(5)),
-                ),
-              ),
-            ),
-          ),
-        );
-        const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{ "foo": 3, "bar": 4, "baz": 5 }');
-        assert.strictEqual(format(dependencies), 'NULL');
-      })();
-    });
-
     test('(List)', (assert, {
       createApplication,
       createBuiltin,
@@ -472,6 +424,180 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '[[1, 2, 3], [4, 5, 6], [7, 8, 9]]');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+    });
+
+    test('(Lambda)', (assert, {
+      createApplication,
+      createBuiltin,
+      createInt,
+      createLambda,
+      createString,
+      createTriple,
+      createUnitList,
+      evaluate,
+      format,
+      NULL,
+      Stdlib,
+    }) => {
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.ResolveQueryLeaf),
+          createUnitList(createLambda(0, createString('foo'))),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '"foo"');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.ResolveQueryLeaf),
+          createUnitList(createLambda(0, createInt(3))),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '3');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.ResolveQueryLeaf),
+          createUnitList(createLambda(0, createTriple(createInt(3), createInt(4), createInt(5)))),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '[3, 4, 5]');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.ResolveQueryLeaf),
+          createUnitList(
+            createLambda(
+              0,
+              createTriple(
+                createLambda(0, createInt(3)),
+                createLambda(0, createInt(4)),
+                createLambda(0, createInt(5)),
+              ),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '[3, 4, 5]');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+    });
+
+    test('(Record)', (assert, {
+      createApplication,
+      createBuiltin,
+      createInt,
+      createRecord,
+      createString,
+      createTriple,
+      createUnitList,
+      evaluate,
+      format,
+      NULL,
+      Stdlib,
+    }) => {
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.ResolveQueryLeaf),
+          createUnitList(
+            createRecord(
+              createTriple(createString('foo'), createString('bar'), createString('baz')),
+              createTriple(createInt(3), createInt(4), createInt(5)),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(
+          format(result),
+          '{<InvalidFunctionArgsCondition:ResolveQueryLeaf({ "foo": 3, "bar": 4, "baz": 5 })>}',
+        );
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+    });
+
+    test('(Hashmap)', (assert, {
+      createApplication,
+      createBuiltin,
+      createHashmap,
+      createInt,
+      createString,
+      createUnitList,
+      evaluate,
+      format,
+      NULL,
+      Stdlib,
+    }) => {
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.ResolveQueryLeaf),
+          createUnitList(
+            createHashmap([
+              [createString('foo'), createInt(3)],
+              [createString('bar'), createInt(4)],
+              [createString('baz'), createInt(5)],
+            ]),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(
+          format(result),
+          '{<InvalidFunctionArgsCondition:ResolveQueryLeaf(Map(3))>}',
+        );
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+    });
+
+    test('(Hashset)', (assert, {
+      createApplication,
+      createBuiltin,
+      createHashset,
+      createInt,
+      createUnitList,
+      evaluate,
+      format,
+      NULL,
+      Stdlib,
+    }) => {
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.ResolveQueryLeaf),
+          createUnitList(createHashset([createInt(3), createInt(4), createInt(5)])),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(
+          format(result),
+          '{<InvalidFunctionArgsCondition:ResolveQueryLeaf(Set(3))>}',
+        );
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+    });
+
+    test('(Tree)', (assert, {
+      createApplication,
+      createBuiltin,
+      createTree,
+      createInt,
+      createUnitList,
+      evaluate,
+      format,
+      NULL,
+      Stdlib,
+    }) => {
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.ResolveQueryLeaf),
+          createUnitList(createTree(createInt(3), createInt(4))),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(
+          format(result),
+          '{<InvalidFunctionArgsCondition:ResolveQueryLeaf((3 . 4))>}',
+        );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });
