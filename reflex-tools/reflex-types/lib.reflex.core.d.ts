@@ -64,7 +64,7 @@ declare module 'reflex::core' {
   export function gte(left: number, right: number): boolean;
   export function hash(...args: Array<any>): symbol;
   export function ifError<T, V>(target: T, handler: (error: Error) => V): T | V;
-  export function ifPending<T, V>(target: T, placeholder: V): T | V;
+  export function ifPending<T, V>(target: () => T, placeholder: () => V): T | V;
   export function insert<K, V>(target: Map<K, V>, key: K, value: V): Map<K, V>;
   export function keys<K>(target: Map<K, any>): Array<K>;
   export function keys<K extends PropertyKey>(target: Record<K, any>): Array<K>;
