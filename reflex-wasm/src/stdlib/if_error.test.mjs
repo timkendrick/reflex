@@ -24,23 +24,24 @@ export default (describe) => {
       })();
     });
 
-    test('(Effect, Builtin)', (assert, {
-      createApplication,
-      createBuiltin,
-      createCustomCondition,
-      createEffect,
-      createErrorCondition,
-      createHashmap,
-      createInt,
-      createPair,
-      createSignal,
-      createString,
-      createSymbol,
-      evaluate,
-      format,
-      NULL,
-      Stdlib,
-    }) => {
+    test('(Effect, Builtin)', (assert, runtime) => {
+      const {
+        createApplication,
+        createBuiltin,
+        createCustomCondition,
+        createEffect,
+        createErrorCondition,
+        createHashmap,
+        createInt,
+        createPair,
+        createSignal,
+        createString,
+        createSymbol,
+        evaluate,
+        format,
+        NULL,
+        Stdlib,
+      } = runtime;
       (() => {
         const expression = createApplication(
           createBuiltin(Stdlib.IfError),
@@ -64,6 +65,7 @@ export default (describe) => {
             createBuiltin(Stdlib.Identity),
           ),
         );
+        debugger;
         const [result, dependencies] = evaluate(
           expression,
           createHashmap([
@@ -73,7 +75,7 @@ export default (describe) => {
             ],
           ]),
         );
-        assert.strictEqual(format(result), '[<ErrorCondition:"foo">]');
+        assert.strictEqual(format(result), '["foo"]');
         assert.strictEqual(
           format(dependencies),
           '(<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)',
@@ -306,10 +308,7 @@ export default (describe) => {
             ],
           ]),
         );
-        assert.strictEqual(
-          format(result),
-          '[<ErrorCondition:"foo">, <ErrorCondition:"bar">, <ErrorCondition:"baz">, <ErrorCondition:"qux">]',
-        );
+        assert.strictEqual(format(result), '["foo", "bar", "baz", "qux"]');
         assert.strictEqual(
           format(dependencies),
           '(((<CustomCondition:Symbol(456):6:Symbol(0)> . NULL) . (<CustomCondition:Symbol(345):5:Symbol(0)> . NULL)) . ((<CustomCondition:Symbol(234):4:Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)))',
