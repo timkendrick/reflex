@@ -5,6 +5,7 @@
   (@const $Stdlib_FormatErrorMessage::MAX_MESSAGES i32 (i32.const 10))
   (@const $Stdlib_FormatErrorMessage::NEWLINE i32 (call $Term::String::from_char (@char "\n")))
   (@const-string $Stdlib_FormatErrorMessage::MESSAGE "message")
+  (@const-string $Stdlib_FormatErrorMessage::NAME "name")
 
   (@builtin $Stdlib_FormatErrorMessage "FormatErrorMessage"
     (@args (@strict $self))
@@ -18,7 +19,12 @@
     (@impl
       (i32.eq (global.get $TermType::Record))
       (func $Stdlib_FormatErrorMessage::impl::Record (param $self i32) (param $state i32) (result i32 i32)
+        (local $name i32)
         (local $message i32)
+        (local $name_length i32)
+        (local $message_length i32)
+        (local $offset i32)
+        (local $result i32)
         (local $dependencies i32)
         (if (result i32 i32)
           ;; If the error object does not have a "message" field, format the error object as a string
@@ -29,12 +35,48 @@
             (call $Term::String::from(local.get $self))
             (global.get $NULL))
           (else
-            ;; Otherwise evaluate the "message" field
+            ;; Otherwise evaluate the "message" field and convert the result to a string
             (call $Term::traits::evaluate (local.get $message) (local.get $state))
             (local.set $dependencies)
-            ;; Convert the result to a string
-            (call $Term::String::from)
-            (local.get $dependencies)))))
+            (local.set $message (call $Term::String::from))
+            ;; Determine whether the error object has a "name" field
+            (if (result i32 i32)
+              (i32.eq
+                (local.tee $name (call $Stdlib_FormatErrorMessage::get_error_name (local.get $self)))
+                (global.get $NULL))
+              (then
+                ;; If the error object does not have a "name" field, return the message as-is
+                (local.get $message)
+                (local.get $dependencies))
+              (else
+                ;; Otherwise if the error object has a "name" field, use it to prefix the "message field"
+                (local.tee $result
+                  (call $Term::String::allocate
+                    (i32.add
+                      (i32.add
+                        (local.tee $name_length (call $Term::String::get_length (local.get $name)))
+                        (i32.const 2))
+                      (local.tee $message_length (call $Term::String::get_length (local.get $message))))))
+                ;; Write the name to the output
+                (local.set $offset (call $Term::String::get_char_offset (local.get $result) (i32.const 0)))
+                (memory.copy
+                  (local.get $offset)
+                  (call $Term::String::get_char_offset (local.get $name) (i32.const 0))
+                  (local.get $name_length))
+                (local.set $offset (i32.add (local.get $offset) (local.get $name_length)))
+                ;; Write a colon separator to the output
+                (i32.store8 (local.get $offset) (@char ":"))
+                (local.set $offset (i32.add (local.get $offset) (i32.const 1)))
+                (i32.store8 (local.get $offset) (@char " "))
+                (local.set $offset (i32.add (local.get $offset) (i32.const 1)))
+                ;; Write the message to the output
+                (memory.copy
+                  (local.get $offset)
+                  (call $Term::String::get_char_offset (local.get $message) (i32.const 0))
+                  (local.get $message_length))
+                ;; Initialize the string term
+                (call $Term::String::init)
+                (local.get $dependencies)))))))
 
     (@impl
       (call $TermType::implements::iterate)
@@ -95,35 +137,11 @@
         (call $Term::String::from (local.get $self))
         (global.get $NULL))))
 
+  (func $Stdlib_FormatErrorMessage::get_error_name (param $error i32) (result i32)
+    (call $Term::Record::traits::get (local.get $error) (global.get $Stdlib_FormatErrorMessage::NAME)))
+
   (func $Stdlib_FormatErrorMessage::get_error_message (param $error i32) (result i32)
     (call $Term::Record::traits::get (local.get $error) (global.get $Stdlib_FormatErrorMessage::MESSAGE)))
-
-  (func $Stdlib_FormatErrorMessage::display_error (param $error i32) (param $offset i32) (param $state i32) (result i32 i32)
-    (local $message i32)
-    (local $length i32)
-    (local $dependencies i32)
-    (if (result i32 i32)
-      (call $Term::Record::is (local.get $message))
-      (then
-        (if (result i32 i32)
-          ;; If the error object does not have a "message" field, write the error to the output
-          (i32.eq
-            (local.tee $message (call $Stdlib_FormatErrorMessage::get_error_message (local.get $error)))
-            (global.get $NULL))
-          (then
-            (call $Term::traits::display (local.get $error) (local.get $offset))
-            (global.get $NULL))
-          (else
-            ;; Otherwise evaluate the "message" field
-            (call $Term::traits::evaluate (local.get $message) (local.get $state))
-            (local.set $dependencies)
-            ;; Write the message to the output
-            (call $Term::traits::display (local.get $offset))
-            (local.get $dependencies))))
-      (else
-        ;; Write the error to the output
-        (call $Term::traits::display (local.get $error) (local.get $offset))
-        (global.get $NULL))))
 
   (func $Stdlib_FormatErrorMessage::get_remaining_items_label (param $num_items i32) (result i32)
     ;; Generate a "...X more errors" label string

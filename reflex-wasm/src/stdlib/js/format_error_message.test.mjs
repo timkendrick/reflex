@@ -57,15 +57,28 @@ export default (describe) => {
         const expression = createApplication(
           createBuiltin(Stdlib.FormatErrorMessage),
           createUnitList(
+            createRecord(createPair(createString('message')), createPair(createString('foo'))),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.ok(isString(result));
+        assert.strictEqual(getStringValue(result), 'foo');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.FormatErrorMessage),
+          createUnitList(
             createRecord(
               createPair(createString('name'), createString('message')),
               createPair(createString('Error'), createString('foo')),
             ),
           ),
         );
+        debugger;
         const [result, dependencies] = evaluate(expression, NULL);
         assert.ok(isString(result));
-        assert.strictEqual(getStringValue(result), 'foo');
+        assert.strictEqual(getStringValue(result), 'Error: foo');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
@@ -80,7 +93,7 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.ok(isString(result));
-        assert.strictEqual(getStringValue(result), '3');
+        assert.strictEqual(getStringValue(result), 'Error: 3');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
@@ -140,7 +153,7 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.ok(isString(result));
-        assert.strictEqual(getStringValue(result), 'foo');
+        assert.strictEqual(getStringValue(result), 'Error: foo');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
@@ -161,7 +174,7 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.ok(isString(result));
-        assert.strictEqual(getStringValue(result), 'foo\nbar');
+        assert.strictEqual(getStringValue(result), 'Error: foo\nError: bar');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
@@ -182,7 +195,7 @@ export default (describe) => {
         assert.ok(isString(result));
         assert.strictEqual(
           getStringValue(result),
-          'Item 1\nItem 2\nItem 3\nItem 4\nItem 5\nItem 6\nItem 7\nItem 8\nItem 9',
+          'Error: Item 1\nError: Item 2\nError: Item 3\nError: Item 4\nError: Item 5\nError: Item 6\nError: Item 7\nError: Item 8\nError: Item 9',
         );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
@@ -204,7 +217,7 @@ export default (describe) => {
         assert.ok(isString(result));
         assert.strictEqual(
           getStringValue(result),
-          'Item 1\nItem 2\nItem 3\nItem 4\nItem 5\nItem 6\nItem 7\nItem 8\nItem 9\nItem 10',
+          'Error: Item 1\nError: Item 2\nError: Item 3\nError: Item 4\nError: Item 5\nError: Item 6\nError: Item 7\nError: Item 8\nError: Item 9\nError: Item 10',
         );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
@@ -226,7 +239,7 @@ export default (describe) => {
         assert.ok(isString(result));
         assert.strictEqual(
           getStringValue(result),
-          'Item 1\nItem 2\nItem 3\nItem 4\nItem 5\nItem 6\nItem 7\nItem 8\nItem 9\n...2 more errors',
+          'Error: Item 1\nError: Item 2\nError: Item 3\nError: Item 4\nError: Item 5\nError: Item 6\nError: Item 7\nError: Item 8\nError: Item 9\n...2 more errors',
         );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
@@ -248,7 +261,7 @@ export default (describe) => {
         assert.ok(isString(result));
         assert.strictEqual(
           getStringValue(result),
-          'Item 1\nItem 2\nItem 3\nItem 4\nItem 5\nItem 6\nItem 7\nItem 8\nItem 9\n...3 more errors',
+          'Error: Item 1\nError: Item 2\nError: Item 3\nError: Item 4\nError: Item 5\nError: Item 6\nError: Item 7\nError: Item 8\nError: Item 9\n...3 more errors',
         );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
@@ -294,7 +307,7 @@ export default (describe) => {
         assert.ok(isString(result));
         assert.strictEqual(
           getStringValue(result),
-          'Item 1\nItem 2\nItem 3\nItem 4\nItem 5\nItem 6\nItem 7\nItem 8\nItem 9\n...3 more errors',
+          'Error: Item 1\nError: Item 2\nError: Item 3\nError: Item 4\nError: Item 5\nError: Item 6\nError: Item 7\nError: Item 8\nError: Item 9\n...3 more errors',
         );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
@@ -319,7 +332,7 @@ export default (describe) => {
         assert.ok(isString(result));
         assert.strictEqual(
           getStringValue(result),
-          'Item 1\nItem 2\nItem 3\nItem 4\nItem 5\nItem 6\nItem 7\nItem 8\nItem 9\n...3 more errors',
+          'Error: Item 1\nError: Item 2\nError: Item 3\nError: Item 4\nError: Item 5\nError: Item 6\nError: Item 7\nError: Item 8\nError: Item 9\n...3 more errors',
         );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
