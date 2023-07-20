@@ -11,7 +11,7 @@ pub struct IfPending;
 impl IfPending {
     pub const UUID: Uuid = uuid!("ae41033f-ae13-4e46-810b-1a90d62aa306");
     const ARITY: FunctionArity<2, 0> = FunctionArity {
-        required: [ArgType::Eager, ArgType::Lazy],
+        required: [ArgType::Eager, ArgType::Strict],
         optional: [],
         variadic: None,
     };
@@ -53,7 +53,7 @@ impl<T: Expression> Applicable<T> for IfPending {
             } else if !non_pending_signals.is_empty() {
                 Ok(factory.create_signal_term(allocator.create_signal_list(non_pending_signals)))
             } else {
-                Ok(fallback)
+                Ok(factory.create_application_term(fallback, allocator.create_empty_list()))
             }
         } else {
             Ok(target)
