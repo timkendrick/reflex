@@ -94,15 +94,32 @@ fn parse_error_message<T: Expression>(
 ) -> Option<String> {
     if let Some(value) = format_value(target, factory) {
         Some(value)
-    } else if let Some(value) = factory.match_record_term(&target) {
-        value
+    } else if let Some(error) = factory.match_record_term(&target) {
+        error
             .as_deref()
             .get(&factory.create_string_term(allocator.create_static_string("message")))
             .and_then(|value| {
                 let value = value.as_deref();
-                factory
-                    .match_string_term(value)
-                    .map(|message| String::from(message.value().as_deref().as_str().deref()))
+                factory.match_string_term(value).map(|message| {
+                    let prefix = error
+                        .as_deref()
+                        .get(&factory.create_string_term(allocator.create_static_string("name")))
+                        .and_then(|name| {
+                            factory
+                                .match_string_term(name.as_deref())
+                                .map(|name| String::from(name.value().as_deref().as_str().deref()))
+                        });
+                    match prefix {
+                        Some(prefix) => {
+                            format!(
+                                "{}: {}",
+                                prefix,
+                                message.value().as_deref().as_str().deref()
+                            )
+                        }
+                        None => String::from(message.value().as_deref().as_str().deref()),
+                    }
+                })
             })
     } else {
         None

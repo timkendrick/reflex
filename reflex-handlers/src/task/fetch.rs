@@ -172,7 +172,7 @@ where
                 Err(err) => TAction::from(FetchHandlerConnectionErrorAction {
                     operation_id,
                     url,
-                    message: create_fetch_error_message(err),
+                    message: format!("{}", err),
                 }),
             }
         })
@@ -211,8 +211,4 @@ where
             SchedulerCommand::Forward(self.caller_pid),
         ]))
     }
-}
-
-pub(crate) fn create_fetch_error_message(err: impl std::fmt::Display) -> String {
-    format!("Fetch error: {}", err)
 }
