@@ -12,13 +12,18 @@ blanket_trait!(
         Builtin
         + From<crate::stdlib::ToRequest>
         + From<reflex_json::stdlib::JsonDeserialize>
+        + From<stdlib::Apply>
         + From<stdlib::CollectList>
+        + From<stdlib::CollectSignal>
         + From<stdlib::Contains>
         + From<stdlib::Effect>
         + From<stdlib::Get>
         + From<stdlib::If>
+        + From<stdlib::IfError>
         + From<stdlib::Lt>
-        + From<stdlib::ResolveDeep>
+        + From<stdlib::Map>
+        + From<stdlib::ResolveRecord>
+        + From<stdlib::Raise>
     {
     }
 );
@@ -61,13 +66,18 @@ where
     T::Builtin: Builtin
         + From<crate::stdlib::ToRequest>
         + From<reflex_json::stdlib::JsonDeserialize>
+        + From<stdlib::Apply>
         + From<stdlib::CollectList>
+        + From<stdlib::CollectSignal>
         + From<stdlib::Contains>
         + From<stdlib::Effect>
         + From<stdlib::Get>
         + From<stdlib::If>
+        + From<stdlib::IfError>
         + From<stdlib::Lt>
-        + From<stdlib::ResolveDeep>,
+        + From<stdlib::Map>
+        + From<stdlib::ResolveRecord>
+        + From<stdlib::Raise>,
 {
     factory.create_lambda_term(
         1,
@@ -78,76 +88,132 @@ where
             ),
             factory.create_let_term(
                 factory.create_application_term(
-                    factory.create_builtin_term(stdlib::Effect),
-                    allocator.create_triple(
-                        factory
-                            .create_string_term(allocator.create_static_string(EFFECT_TYPE_FETCH)),
+                    factory.create_builtin_term(stdlib::IfError),
+                    allocator.create_pair(
                         factory.create_application_term(
-                            factory.create_builtin_term(stdlib::CollectList),
-                            allocator.create_list([
-                                factory.create_application_term(
-                                    factory.create_builtin_term(stdlib::Get),
-                                    allocator.create_pair(
-                                        factory.create_variable_term(0),
-                                        factory.create_string_term(
-                                            allocator.create_static_string("url"),
-                                        ),
-                                    ),
+                            factory.create_builtin_term(stdlib::Effect),
+                            allocator.create_triple(
+                                factory.create_string_term(
+                                    allocator.create_static_string(EFFECT_TYPE_FETCH),
                                 ),
                                 factory.create_application_term(
-                                    factory.create_builtin_term(stdlib::Get),
-                                    allocator.create_pair(
-                                        factory.create_variable_term(0),
-                                        factory.create_string_term(
-                                            allocator.create_static_string("method"),
-                                        ),
-                                    ),
-                                ),
-                                factory.create_application_term(
-                                    factory.create_builtin_term(stdlib::ResolveDeep),
-                                    allocator.create_unit_list(factory.create_application_term(
-                                        factory.create_builtin_term(stdlib::Get),
-                                        allocator.create_pair(
-                                            factory.create_variable_term(0),
-                                            factory.create_string_term(
-                                                allocator.create_static_string("headers"),
+                                    factory.create_builtin_term(stdlib::CollectList),
+                                    allocator.create_list([
+                                        factory.create_application_term(
+                                            factory.create_builtin_term(stdlib::Get),
+                                            allocator.create_pair(
+                                                factory.create_variable_term(0),
+                                                factory.create_string_term(
+                                                    allocator.create_static_string("url"),
+                                                ),
                                             ),
                                         ),
-                                    )),
+                                        factory.create_application_term(
+                                            factory.create_builtin_term(stdlib::Get),
+                                            allocator.create_pair(
+                                                factory.create_variable_term(0),
+                                                factory.create_string_term(
+                                                    allocator.create_static_string("method"),
+                                                ),
+                                            ),
+                                        ),
+                                        factory.create_application_term(
+                                            factory.create_builtin_term(stdlib::ResolveRecord),
+                                            allocator.create_unit_list(
+                                                factory.create_application_term(
+                                                    factory.create_builtin_term(stdlib::Get),
+                                                    allocator.create_pair(
+                                                        factory.create_variable_term(0),
+                                                        factory.create_string_term(
+                                                            allocator
+                                                                .create_static_string("headers"),
+                                                        ),
+                                                    ),
+                                                ),
+                                            ),
+                                        ),
+                                        factory.create_application_term(
+                                            factory.create_builtin_term(stdlib::Get),
+                                            allocator.create_pair(
+                                                factory.create_variable_term(0),
+                                                factory.create_string_term(
+                                                    allocator.create_static_string("body"),
+                                                ),
+                                            ),
+                                        ),
+                                    ]),
                                 ),
                                 factory.create_application_term(
-                                    factory.create_builtin_term(stdlib::Get),
-                                    allocator.create_pair(
-                                        factory.create_variable_term(0),
-                                        factory.create_string_term(
-                                            allocator.create_static_string("body"),
+                                    factory.create_builtin_term(stdlib::If),
+                                    allocator.create_triple(
+                                        factory.create_application_term(
+                                            factory.create_builtin_term(stdlib::Contains),
+                                            allocator.create_pair(
+                                                factory.create_variable_term(0),
+                                                factory.create_string_term(
+                                                    allocator.create_static_string("token"),
+                                                ),
+                                            ),
                                         ),
+                                        factory.create_application_term(
+                                            factory.create_builtin_term(stdlib::Get),
+                                            allocator.create_pair(
+                                                factory.create_variable_term(0),
+                                                factory.create_string_term(
+                                                    allocator.create_static_string("token"),
+                                                ),
+                                            ),
+                                        ),
+                                        factory.create_nil_term(),
                                     ),
                                 ),
-                            ]),
+                            ),
                         ),
-                        factory.create_application_term(
-                            factory.create_builtin_term(stdlib::If),
-                            allocator.create_triple(
-                                factory.create_application_term(
-                                    factory.create_builtin_term(stdlib::Contains),
-                                    allocator.create_pair(
-                                        factory.create_variable_term(0),
-                                        factory.create_string_term(
-                                            allocator.create_static_string("token"),
+                        factory.create_lambda_term(
+                            1,
+                            factory.create_application_term(
+                                factory.create_builtin_term(stdlib::Apply),
+                                allocator.create_pair(
+                                    factory.create_builtin_term(stdlib::CollectSignal),
+                                    factory.create_application_term(
+                                        factory.create_builtin_term(stdlib::Map),
+                                        allocator.create_pair(
+                                            factory.create_variable_term(0),
+                                            factory.create_lambda_term(
+                                                1,
+                                                factory.create_application_term(
+                                                    factory.create_builtin_term(stdlib::Raise),
+                                                    allocator.create_unit_list(create_record(
+                                                        [
+                                                            (
+                                                                factory.create_string_term(
+                                                                    allocator.create_static_string(
+                                                                        "name",
+                                                                    ),
+                                                                ),
+                                                                factory.create_string_term(
+                                                                    allocator.create_static_string(
+                                                                        "NetworkError",
+                                                                    ),
+                                                                ),
+                                                            ),
+                                                            (
+                                                                factory.create_string_term(
+                                                                    allocator.create_static_string(
+                                                                        "message",
+                                                                    ),
+                                                                ),
+                                                                factory.create_variable_term(0),
+                                                            ),
+                                                        ],
+                                                        factory,
+                                                        allocator,
+                                                    )),
+                                                ),
+                                            ),
                                         ),
                                     ),
                                 ),
-                                factory.create_application_term(
-                                    factory.create_builtin_term(stdlib::Get),
-                                    allocator.create_pair(
-                                        factory.create_variable_term(0),
-                                        factory.create_string_term(
-                                            allocator.create_static_string("token"),
-                                        ),
-                                    ),
-                                ),
-                                factory.create_nil_term(),
                             ),
                         ),
                     ),

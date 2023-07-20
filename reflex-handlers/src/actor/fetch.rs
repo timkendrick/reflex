@@ -35,7 +35,7 @@ use reflex_runtime::{
 
 use crate::{
     action::fetch::{FetchHandlerConnectionErrorAction, FetchHandlerFetchCompleteAction},
-    task::fetch::{create_fetch_error_message, FetchHandlerTask, FetchHandlerTaskFactory},
+    task::fetch::{FetchHandlerTask, FetchHandlerTaskFactory},
     utils::fetch::FetchRequest,
 };
 
@@ -449,9 +449,7 @@ where
                 factory.create_int_term(status_code.as_u16().into()),
                 factory.create_string_term(allocator.create_string(body)),
             )),
-            Err(err) => {
-                create_error_expression(create_fetch_error_message(err), factory, allocator)
-            }
+            Err(err) => create_error_expression(format!("{}", err), factory, allocator),
         };
         Some(SchedulerTransition::new([
             SchedulerCommand::Kill(task_pid),
