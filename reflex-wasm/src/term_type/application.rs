@@ -708,6 +708,22 @@ impl<'a, A: Arena + Clone> CompileWasm<A> for CompiledFunctionCall<'a, A, Stdlib
                     Ok((block, num_signal_scopes))
                 },
             )?;
+        // If a variadic argument list was allocated, initialize the list term with the correct length
+        let block = if arity.variadic().is_some() {
+            // Push the list length onto the stack
+            // => [Term..., ListTerm, u32]
+            let block = block.push(instruction::core::Const {
+                value: ConstValue::U32(num_variadic_args as u32),
+            });
+            // Initialize the list term with the length that is on the stack
+            // => [Term..., ListTerm]
+            let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+                target: RuntimeBuiltin::InitList,
+            });
+            block
+        } else {
+            block
+        };
         // If there were strict arguments and one or more of the strict arguments was a signal, short-circuit the
         // combined signal result, otherwise continue
         // => [Term..., {ListTerm}]
@@ -751,22 +767,6 @@ impl<'a, A: Arena + Clone> CompileWasm<A> for CompiledFunctionCall<'a, A, Stdlib
             // => [Term..., {ListTerm}]
             let block = block.push(instruction::core::Drop {
                 value_type: ValueType::HeapPointer,
-            });
-            block
-        } else {
-            block
-        };
-        // If a variadic argument list was allocated, initialize the list term with the correct length
-        let block = if arity.variadic().is_some() {
-            // Push the list length onto the stack
-            // => [Term..., ListTerm, u32]
-            let block = block.push(instruction::core::Const {
-                value: ConstValue::U32(num_variadic_args as u32),
-            });
-            // Initialize the list term with the length that is on the stack
-            // => [Term..., ListTerm]
-            let block = block.push(instruction::runtime::CallRuntimeBuiltin {
-                target: RuntimeBuiltin::InitList,
             });
             block
         } else {
