@@ -180,38 +180,41 @@ where
                                                                                                                 factory.create_variable_term(0),
                                                                                                             ]),
                                                                                                         ),
-                                                                                                        factory.create_application_term(
-                                                                                                            factory.create_builtin_term(reflex_stdlib::stdlib::Sequence),
-                                                                                                            allocator.create_list([
-                                                                                                                factory.create_application_term(
-                                                                                                                    factory.create_variable_term(8),
-                                                                                                                    allocator.create_list([
-                                                                                                                        factory.create_variable_term(4),
-                                                                                                                        factory.create_variable_term(0),
-                                                                                                                    ]),
-                                                                                                                ),
-                                                                                                                factory.create_lambda_term(
-                                                                                                                    1,
-                                                                                                                    factory.create_signal_term(
-                                                                                                                        allocator.create_signal_list([
-                                                                                                                            allocator.create_signal(SignalType::Error {
-                                                                                                                                payload: factory.create_record_term(
-                                                                                                                                    allocator.create_struct_prototype(
-                                                                                                                                        allocator.create_list([
-                                                                                                                                            factory.create_string_term(allocator.create_static_string("name")),
-                                                                                                                                            factory.create_string_term(allocator.create_static_string("message")),
-                                                                                                                                        ]),
-                                                                                                                                    ),
-                                                                                                                                    allocator.create_list([
-                                                                                                                                        factory.create_string_term(allocator.create_static_string("TimeoutError")),
-                                                                                                                                        factory.create_string_term(allocator.create_static_string("Timeout exceeded")),
-                                                                                                                                    ]),
-                                                                                                                                ),
-                                                                                                                            }),
+                                                                                                        factory.create_lambda_term(
+                                                                                                            0,
+                                                                                                            factory.create_application_term(
+                                                                                                                factory.create_builtin_term(reflex_stdlib::stdlib::Sequence),
+                                                                                                                allocator.create_list([
+                                                                                                                    factory.create_application_term(
+                                                                                                                        factory.create_variable_term(8),
+                                                                                                                        allocator.create_list([
+                                                                                                                            factory.create_variable_term(4),
+                                                                                                                            factory.create_variable_term(0),
                                                                                                                         ]),
                                                                                                                     ),
-                                                                                                                ),
-                                                                                                            ]),
+                                                                                                                    factory.create_lambda_term(
+                                                                                                                        1,
+                                                                                                                        factory.create_signal_term(
+                                                                                                                            allocator.create_signal_list([
+                                                                                                                                allocator.create_signal(SignalType::Error {
+                                                                                                                                    payload: factory.create_record_term(
+                                                                                                                                        allocator.create_struct_prototype(
+                                                                                                                                            allocator.create_list([
+                                                                                                                                                factory.create_string_term(allocator.create_static_string("name")),
+                                                                                                                                                factory.create_string_term(allocator.create_static_string("message")),
+                                                                                                                                            ]),
+                                                                                                                                        ),
+                                                                                                                                        allocator.create_list([
+                                                                                                                                            factory.create_string_term(allocator.create_static_string("TimeoutError")),
+                                                                                                                                            factory.create_string_term(allocator.create_static_string("Timeout exceeded")),
+                                                                                                                                        ]),
+                                                                                                                                    ),
+                                                                                                                                }),
+                                                                                                                            ]),
+                                                                                                                        ),
+                                                                                                                    ),
+                                                                                                                ]),
+                                                                                                            ),
                                                                                                         ),
                                                                                                     ]),
                                                                                                 ),
@@ -412,7 +415,10 @@ where
                                                                                                 ),
                                                                                             ]),
                                                                                         ),
-                                                                                        factory.create_variable_term(0),
+                                                                                        factory.create_lambda_term(
+                                                                                            0,
+                                                                                            factory.create_variable_term(0),
+                                                                                        ),
                                                                                     ]),
                                                                                 ),
                                                                             ]),
