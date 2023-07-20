@@ -3,10 +3,11 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 export default (describe) => {
   describe('Stdlib_IfPending', (test) => {
-    test('(Int, Int)', (assert, {
+    test('(Int, Lambda)', (assert, {
       createApplication,
       createBuiltin,
       createInt,
+      createLambda,
       createPair,
       evaluate,
       format,
@@ -16,7 +17,7 @@ export default (describe) => {
       (() => {
         const expression = createApplication(
           createBuiltin(Stdlib.IfPending),
-          createPair(createInt(3), createInt(4)),
+          createPair(createInt(3), createLambda(0, createInt(4))),
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '3');
@@ -24,13 +25,14 @@ export default (describe) => {
       })();
     });
 
-    test('(Effect, Int)', (assert, {
+    test('(Effect, Lambda)', (assert, {
       createApplication,
       createBuiltin,
       createCustomCondition,
       createEffect,
       createHashmap,
       createInt,
+      createLambda,
       createPair,
       createPendingCondition,
       createSignal,
@@ -45,7 +47,7 @@ export default (describe) => {
           createBuiltin(Stdlib.IfPending),
           createPair(
             createEffect(createCustomCondition(createSymbol(123), createInt(3), createSymbol(0))),
-            createInt(3),
+            createLambda(0, createInt(3)),
           ),
         );
         const [result, dependencies] = evaluate(expression, NULL);
@@ -60,7 +62,7 @@ export default (describe) => {
           createBuiltin(Stdlib.IfPending),
           createPair(
             createEffect(createCustomCondition(createSymbol(123), createInt(3), createSymbol(0))),
-            createInt(3),
+            createLambda(0, createInt(3)),
           ),
         );
         const [result, dependencies] = evaluate(
@@ -109,7 +111,7 @@ export default (describe) => {
                 ),
               ),
             ),
-            createInt(3),
+            createLambda(0, createInt(3)),
           ),
         );
         const [result, dependencies] = evaluate(expression, NULL);
@@ -153,7 +155,7 @@ export default (describe) => {
                 ),
               ),
             ),
-            createInt(3),
+            createLambda(0, createInt(3)),
           ),
         );
         const [result, dependencies] = evaluate(
@@ -209,7 +211,7 @@ export default (describe) => {
                 ),
               ),
             ),
-            createInt(3),
+            createLambda(0, createInt(3)),
           ),
         );
         const [result, dependencies] = evaluate(

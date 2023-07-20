@@ -3,11 +3,11 @@
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 (module
   (@builtin $Stdlib_IfPending "IfPending"
-    (@args (@eager $self) (@lazy $fallback))
+    (@args (@eager $self) (@strict $fallback))
 
     (@impl
       (i32.eq (global.get $TermType::Signal))
-      (i32.or (i32.const 0xFFFFFFFF))
+      (call $TermType::implements::apply)
       (func $Stdlib_IfPending::impl::Signal::<apply> (param $self i32) (param $fallback i32) (param $state i32) (result i32 i32)
         (local $pending_conditions i32)
         (local $remaining_conditions i32)
@@ -26,8 +26,7 @@
             (if (result i32 i32)
               (i32.eqz (call $Term::List::get_length (local.get $remaining_conditions)))
               (then
-                (local.get $fallback)
-                (global.get $NULL))
+                (call $Term::traits::apply (local.get $fallback) (call $Term::List::empty) (local.get $state)))
               (else
                 ;; Otherwise return a signal containing just the non-pending conditions
                 (call $Term::Signal::traits::collect

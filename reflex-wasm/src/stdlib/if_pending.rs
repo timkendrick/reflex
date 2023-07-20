@@ -8,7 +8,7 @@ pub struct IfPending;
 impl IfPending {
     pub const UUID: Uuid = uuid!("ae41033f-ae13-4e46-810b-1a90d62aa306");
     const ARITY: FunctionArity<2, 0> = FunctionArity {
-        required: [ArgType::Eager, ArgType::Lazy],
+        required: [ArgType::Eager, ArgType::Strict],
         optional: [],
         variadic: None,
     };
