@@ -17,7 +17,6 @@ To configure Reflex Server to use a GraphQL schema, pass the path to a GraphQL S
 ```shell
 $ reflex-server --schema ./schema.graphql --port 8080 ./index.js
 ```
-
 > This will serve a GraphQL playground at http://localhost:8080/
 
 ## Example query

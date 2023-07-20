@@ -21,7 +21,6 @@ To enable diff mode for a given query, Reflex Server supports a proprietary exte
 ```shell
 $ reflex-server --port 8080 ./index.js
 ```
-
 > This will serve a GraphQL playground at http://localhost:8080/
 
 ## Example query
