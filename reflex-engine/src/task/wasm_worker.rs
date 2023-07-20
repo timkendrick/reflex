@@ -408,7 +408,7 @@ dispatcher!({
 #[derive(Debug)]
 pub enum WasmWorkerError<T: Expression> {
     Unititialized,
-    InvalidGraphDefinition,
+    ImpureModuleEntryPoint,
     InvalidFunctionTable,
     InvalidEvaluationCache,
     InvalidFunctionTableArityLookup,
@@ -420,7 +420,12 @@ impl<T: Expression + std::fmt::Display> std::fmt::Display for WasmWorkerError<T>
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Unititialized => write!(f, "WebAssembly module not initialized"),
-            Self::InvalidGraphDefinition => write!(f, "Invalid graph definition"),
+            Self::ImpureModuleEntryPoint => {
+                write!(
+                    f,
+                    "Module definition cannot reference runtime values at top level"
+                )
+            }
             Self::InvalidFunctionTable => write!(f, "Invalid function table definition"),
             Self::InvalidEvaluationCache => write!(f, "Invalid evaluation cache definition"),
             Self::InvalidFunctionTableArityLookup => {
@@ -554,7 +559,7 @@ where
                                     if ArenaPointer::from(dependencies).is_null() {
                                         Ok(ArenaPointer::from(graph_root))
                                     } else {
-                                        Err(WasmWorkerError::InvalidGraphDefinition)
+                                        Err(WasmWorkerError::ImpureModuleEntryPoint)
                                     }
                                 })?;
                             let mut wasm_factory =
