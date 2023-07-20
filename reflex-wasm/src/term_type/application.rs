@@ -580,11 +580,19 @@ impl<'a, A: Arena + Clone> CompileWasm<A> for CompiledFunctionCall<'a, A, Stdlib
                     // Yield the argument onto the stack
                     // => [Term..., {ListTerm, ListTerm, u32}, Term]
                     let block = block.append_inner(|stack| {
-                        // If there are multiple strict arguments, create a block boundary around each strict argument
-                        // (this ensures that if signals are encountered across multiple arguments, any signals will be
-                        // 'caught' at their respective block boundaries, to be combined into a single signal result,
-                        // rather than the first signal short-circuiting all the way to the top level)
-                        if has_multiple_strict_args && strictness.is_strict() {
+                        let should_create_signal_boundary = match strictness {
+                            // If the argument is not strict, we need to add a block boundary around this argument to
+                            // prevent any inner signals from breaking out of the current scope
+                            Strictness::NonStrict => true,
+                            // Otherwise if this is a strict argument, if this is the only strict argument it can bubble
+                            // directly to the call site, however if there are multiple strict arguments, we need to add
+                            // a block boundary around each strict argument to allow combining signals before bubbling
+                            // (this ensures that if signals are encountered across multiple arguments, signals will be
+                            // 'caught' at their respective block boundaries, to be combined into a single signal result,
+                            // rather than the first signal short-circuiting all the way to the top level)
+                            Strictness::Strict => has_multiple_strict_args,
+                        };
+                        if should_create_signal_boundary {
                             let block_type = TypeSignature {
                                 params: ParamsSignature::Void,
                                 results: ParamsSignature::Single(ValueType::HeapPointer),
