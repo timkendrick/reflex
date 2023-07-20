@@ -7,6 +7,7 @@ export default (describe) => {
       createApplication,
       createBuiltin,
       createInt,
+      createLambda,
       createPair,
       createTriple,
       evaluate,
@@ -17,7 +18,10 @@ export default (describe) => {
       const expression = createApplication(
         createBuiltin(Stdlib.Scan),
         createTriple(
-          createApplication(createBuiltin(Stdlib.Add), createPair(createInt(3), createInt(4))),
+          createLambda(
+            0,
+            createApplication(createBuiltin(Stdlib.Add), createPair(createInt(3), createInt(4))),
+          ),
           createInt(5),
           createBuiltin(Stdlib.Add),
         ),
@@ -25,11 +29,11 @@ export default (describe) => {
       const [result, dependencies] = evaluate(expression, NULL);
       assert.strictEqual(
         format(result),
-        '{<CustomCondition:"reflex::scan":[Add(3, 4), 5, Add]:null>}',
+        '{<CustomCondition:"reflex::scan":[(0) => Add(3, 4), 5, Add]:null>}',
       );
       assert.strictEqual(
         format(dependencies),
-        '(<CustomCondition:"reflex::scan":[Add(3, 4), 5, Add]:null> . NULL)',
+        '(<CustomCondition:"reflex::scan":[(0) => Add(3, 4), 5, Add]:null> . NULL)',
       );
     });
   });
