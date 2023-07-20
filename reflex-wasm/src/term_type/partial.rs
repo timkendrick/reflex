@@ -237,7 +237,7 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<PartialTerm, A> {
                 .zip(arity.iter())
                 .map(|(arg, arg_type)| match arg_type {
                     ArgType::Strict => {
-                        let strictness = if arg.is_static() && arg.as_signal_term().is_none() {
+                        let strictness = if arg.is_atomic() && arg.as_signal_term().is_none() {
                             Strictness::Strict
                         } else {
                             Strictness::NonStrict

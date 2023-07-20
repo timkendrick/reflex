@@ -211,7 +211,7 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<LetTerm, A> {
                 (
                     Eagerness::Eager,
                     // Skip signal-testing for variable initializers that are already fully evaluated to a non-signal value
-                    if initializer.is_static() && initializer.as_signal_term().is_none() {
+                    if initializer.is_atomic() && initializer.as_signal_term().is_none() {
                         Strictness::NonStrict
                     } else {
                         Strictness::Strict

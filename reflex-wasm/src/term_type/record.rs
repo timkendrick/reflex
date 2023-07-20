@@ -306,6 +306,9 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<RecordTerm, A> {
         // Push the keys argument onto the stack
         // => [ListTerm]
         let block = block.append_inner(|stack| keys.as_inner().compile(stack, state, options))?;
+        // Short-circuit if a signal was encountered while processing the record keys
+        // => [ListTerm]
+        let block = block.push(instruction::runtime::BreakOnSignal { target_block: 0 });
         // Push the property values list argument onto the stack
         // => [ListTerm]
         let block = block.append_inner(|stack| {
@@ -320,7 +323,7 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<RecordTerm, A> {
                 compile_list(
                     values.map(|item| {
                         // Skip signal-testing for record field values that are already fully evaluated to a non-signal value
-                        let strictness = if item.is_static() && item.as_signal_term().is_none() {
+                        let strictness = if item.is_atomic() && item.as_signal_term().is_none() {
                             Strictness::NonStrict
                         } else {
                             Strictness::Strict
@@ -333,6 +336,13 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<RecordTerm, A> {
                 )
             }
         })?;
+        let block = if options.lazy_record_values {
+            block
+        } else {
+            // Short-circuit if a signal was encountered while processing the record values
+            // => [ListTerm]
+            block.push(instruction::runtime::BreakOnSignal { target_block: 0 })
+        };
         // Invoke the term constructor
         // => [RecordTerm]
         let block = block.push(instruction::runtime::CallRuntimeBuiltin {

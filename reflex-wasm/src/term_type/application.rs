@@ -518,7 +518,7 @@ impl<'a, A: Arena + Clone> CompileWasm<A> for CompiledFunctionCall<'a, A, Stdlib
                 let strictness = match arg_type {
                     ArgType::Strict => {
                         // Skip signal-testing for arguments that are already fully evaluated to a non-signal value
-                        if arg.is_static() && arg.as_signal_term().is_none() {
+                        if arg.is_atomic() && arg.as_signal_term().is_none() {
                             Strictness::NonStrict
                         } else {
                             Strictness::Strict
@@ -591,7 +591,9 @@ impl<'a, A: Arena + Clone> CompileWasm<A> for CompiledFunctionCall<'a, A, Stdlib
                             // 'caught' at their respective block boundaries, to be combined into a single signal result,
                             // rather than the first signal short-circuiting all the way to the top level)
                             Strictness::Strict => has_multiple_strict_args,
-                        };
+                            // Variadic arguments also need a block boundary to prevent inner signals from breaking out
+                            // of a half-constructed variadic argument list
+                        } || variadic_arg_index.is_some();
                         if should_create_signal_boundary {
                             let block_type = TypeSignature {
                                 params: ParamsSignature::Void,

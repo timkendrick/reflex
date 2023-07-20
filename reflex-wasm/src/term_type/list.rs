@@ -19,7 +19,7 @@ use crate::{
     compiler::{
         error::CompilerError, instruction, runtime::builtin::RuntimeBuiltin, CompileWasm,
         CompiledBlockBuilder, CompilerOptions, CompilerResult, CompilerStack, CompilerState,
-        ConstValue, LazyExpression, ParamsSignature, Strictness, ValueType,
+        ConstValue, LazyExpression, ParamsSignature, Strictness, TypeSignature, ValueType,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{TermType, TypedTerm, WasmExpression},
@@ -331,7 +331,7 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<ListTerm, A> {
             compile_list(
                 items.map(|item| {
                     // Skip signal-testing for list items that are already fully evaluated to a non-signal value
-                    let strictness = if item.is_static() && item.as_signal_term().is_none() {
+                    let strictness = if item.is_atomic() && item.as_signal_term().is_none() {
                         Strictness::NonStrict
                     } else {
                         Strictness::Strict
@@ -392,7 +392,22 @@ pub(crate) fn compile_list<A: Arena + Clone, T: CompileWasm<A>>(
             });
             // Yield the list item onto the stack
             // => [ListTerm, ListTerm, index, Term]
-            let block = block.append_inner(|stack| item.compile(stack, state, options))?;
+            let block = block.append_inner(|stack| {
+                // Create a wrapper block to surround the list item
+                // (this ensures that any signals encountered when processing the list item will not break out of the
+                // half-constructed list)
+                let block_type = TypeSignature {
+                    params: ParamsSignature::Void,
+                    results: ParamsSignature::Single(ValueType::HeapPointer),
+                };
+                let inner_stack = stack.enter_block(&block_type)?;
+                let block = CompiledBlockBuilder::new(stack);
+                let block = block.push(instruction::core::Block {
+                    block_type,
+                    body: item.compile(inner_stack, state, options)?,
+                });
+                block.finish::<CompilerError<_>>()
+            })?;
             // If this item needs to be tested for signals, combine the item's signal result with the accumulated signal result
             // => [ListTerm, ListTerm, index, Term]
             let (block, num_signal_scopes) = if strictness.is_strict() {
