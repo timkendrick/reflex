@@ -32,7 +32,7 @@ query {
 ```
 {
   "data": {
-    "message": "Fetch error: Invalid HTTP URL: http://@@@"
+    "message": "Failed to load remote data (NetworkError: Invalid HTTP URL: http://@@@/message.txt)"
   }
 }
 ```

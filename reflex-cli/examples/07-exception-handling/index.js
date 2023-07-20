@@ -1,11 +1,11 @@
 import { fetch } from 'reflex::http';
 
-const message = (() => {
+const fetchText = (url) => {
   try {
-    return fetch('http://@@@').json();
+    return fetch(url).text();
   } catch (error) {
-    return error.message;
+    return `Failed to load remote data (${error.message})`;
   }
-})();
+};
 
-export default message;
+export default fetchText('http://@@@/message.txt');

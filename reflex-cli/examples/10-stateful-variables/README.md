@@ -36,8 +36,5 @@ $ reflex-cli ./index.js
 ## Example output
 
 ```
-3 "[reset foo]"
-4 "[increment foo]"
-5 "[increment foo]"
-"Final value: 5"
+"Final value: 4"
 ```

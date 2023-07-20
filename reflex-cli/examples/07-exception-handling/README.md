@@ -21,5 +21,5 @@ $ reflex-cli ./index.js
 ## Example output
 
 ```
-"Fetch error: Invalid HTTP URL: http://@@@"
+"Failed to load remote data (NetworkError: Invalid HTTP URL: http://@@@/message.txt)"
 ```
