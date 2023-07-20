@@ -9,7 +9,7 @@ declare module 'reflex::state' {
   export function decrement(uid: symbol, token: symbol): number;
   export function variable<T>(uid: symbol): [T, (value: T, token: symbol) => T];
   export function scan<T, V>(
-    target: T,
+    input: () => T,
     seed: V,
     reduce: (previous: V, item: T) => V,
   ): V;
