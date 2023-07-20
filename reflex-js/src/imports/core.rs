@@ -213,7 +213,19 @@ where
             ),
             (
                 factory.create_string_term(allocator.create_static_string("ifError")),
-                factory.create_builtin_term(IfError),
+                factory.create_lambda_term(
+                    2,
+                    factory.create_application_term(
+                        factory.create_builtin_term(IfError),
+                        allocator.create_pair(
+                            factory.create_application_term(
+                                factory.create_variable_term(1),
+                                allocator.create_empty_list(),
+                            ),
+                            factory.create_variable_term(0),
+                        ),
+                    ),
+                ),
             ),
             (
                 factory.create_string_term(allocator.create_static_string("ifPending")),
