@@ -9,7 +9,7 @@
     (local.set (@get $result) (call $Term::List::allocate_unsized))
     ;; Iterate through the source iterator items
     (local.set (@get $index) (i32.const 0))
-    (@iterate $LOOP (@get $source) (@get $item) (@get $iterator_state) (@get $state) (@get $dependencies)
+    (@iterate (@get $label) (@get $source) (@get $item) (@get $iterator_state) (@get $state) (@get $dependencies)
       ;; Prepare the stack for pushing items onto the output list
       (local.get (@get $result))
       ;; Inject the iteratee body
@@ -26,7 +26,7 @@
     (local.tee (@get $result) (call $Term::List::allocate (local.get (@get $length))))
     ;; Iterate through the source iterator items
     (local.set (@get $index) (i32.const 0))
-    (@iterate $LOOP (@get $source) (@get $item) (@get $iterator_state) (@get $state) (@get $dependencies)
+    (@iterate (@get $label) (@get $source) (@get $item) (@get $iterator_state) (@get $state) (@get $dependencies)
       ;; Prepare the stack for pushing items onto the output list
       (local.get (@get $result))
       (local.get (@get $index))
