@@ -39,8 +39,8 @@ impl<T: Expression> Applicable<T> for Reduce {
         _cache: &mut impl EvaluationCache<T>,
     ) -> Result<T, String> {
         let target = args.next().unwrap();
-        let iteratee = args.next().unwrap();
         let seed = args.next().unwrap();
+        let iteratee = args.next().unwrap();
         if let Some(target) = factory.match_list_term(&target) {
             Ok(target
                 .items()
@@ -79,7 +79,7 @@ impl<T: Expression> Applicable<T> for Reduce {
                 }))
         } else {
             Err(format!(
-                "Expected (<collection>, <function:2>, <any>), received ({}, {}, {})",
+                "Expected (<iterable>, <any>, <function:2>), received ({}, {}, {})",
                 target, iteratee, seed,
             ))
         }

@@ -399,7 +399,17 @@ where
             allocator.create_unit_list(target.clone()),
         )),
         "reduce" => Some(factory.create_partial_application_term(
-            factory.create_builtin_term(stdlib::Reduce),
+            factory.create_lambda_term(
+                3,
+                factory.create_application_term(
+                    factory.create_builtin_term(stdlib::Reduce),
+                    allocator.create_triple(
+                        factory.create_variable_term(2),
+                        factory.create_variable_term(0),
+                        factory.create_variable_term(1),
+                    ),
+                ),
+            ),
             allocator.create_unit_list(target.clone()),
         )),
         "slice" => Some(factory.create_partial_application_term(
