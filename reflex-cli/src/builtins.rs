@@ -189,11 +189,6 @@ impl From<stdlib::Cons> for CliBuiltins {
         Self::from(stdlib::Stdlib::from(value))
     }
 }
-impl From<stdlib::ConstructHashMap> for CliBuiltins {
-    fn from(value: stdlib::ConstructHashMap) -> Self {
-        Self::from(stdlib::Stdlib::from(value))
-    }
-}
 impl From<stdlib::ConstructRecord> for CliBuiltins {
     fn from(value: stdlib::ConstructRecord) -> Self {
         Self::from(stdlib::Stdlib::from(value))
