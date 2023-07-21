@@ -12,7 +12,7 @@ pub struct Or;
 impl Or {
     pub const UUID: Uuid = uuid!("b4798927-f64e-4835-962e-e3ff1fbe3153");
     const ARITY: FunctionArity<2, 0> = FunctionArity {
-        required: [ArgType::Strict, ArgType::Lazy],
+        required: [ArgType::Strict, ArgType::Strict],
         optional: [],
         variadic: None,
     };
@@ -36,7 +36,7 @@ impl<T: Expression> Applicable<T> for Or {
         &self,
         mut args: impl ExactSizeIterator<Item = T>,
         factory: &impl ExpressionFactory<T>,
-        _allocator: &impl HeapAllocator<T>,
+        allocator: &impl HeapAllocator<T>,
         _cache: &mut impl EvaluationCache<T>,
     ) -> Result<T, String> {
         let left = args.next().unwrap();
@@ -44,7 +44,7 @@ impl<T: Expression> Applicable<T> for Or {
         if is_truthy(&left, factory) {
             Ok(left)
         } else {
-            Ok(right)
+            Ok(factory.create_application_term(right, allocator.create_empty_list()))
         }
     }
 }
