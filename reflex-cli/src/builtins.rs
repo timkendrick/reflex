@@ -216,11 +216,6 @@ impl From<stdlib::ConstructRecord> for CliBuiltins {
         Self::from(stdlib::Stdlib::from(value))
     }
 }
-impl From<stdlib::ConstructList> for CliBuiltins {
-    fn from(value: stdlib::ConstructList) -> Self {
-        Self::from(stdlib::Stdlib::from(value))
-    }
-}
 impl From<stdlib::Contains> for CliBuiltins {
     fn from(value: stdlib::Contains) -> Self {
         Self::from(stdlib::Stdlib::from(value))

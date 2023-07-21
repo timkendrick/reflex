@@ -199,38 +199,3 @@ impl<T: Expression> Applicable<T> for ConstructHashSet {
         Ok(factory.create_hashset_term(deduplicated_values))
     }
 }
-
-pub struct ConstructList;
-impl ConstructList {
-    pub const UUID: Uuid = uuid!("ecdf265f-d628-415b-80d5-5977e10a1141");
-    const ARITY: FunctionArity<0, 0> = FunctionArity {
-        required: [],
-        optional: [],
-        variadic: Some(ArgType::Lazy),
-    };
-    pub fn arity() -> Arity {
-        Arity::from(&Self::ARITY)
-    }
-}
-impl Uid for ConstructList {
-    fn uid(&self) -> Uuid {
-        Self::UUID
-    }
-}
-impl<T: Expression> Applicable<T> for ConstructList {
-    fn arity(&self) -> Option<Arity> {
-        Some(Self::arity())
-    }
-    fn should_parallelize(&self, _args: &[T]) -> bool {
-        false
-    }
-    fn apply(
-        &self,
-        args: impl ExactSizeIterator<Item = T>,
-        factory: &impl ExpressionFactory<T>,
-        allocator: &impl HeapAllocator<T>,
-        _cache: &mut impl EvaluationCache<T>,
-    ) -> Result<T, String> {
-        Ok(factory.create_list_term(allocator.create_list(args)))
-    }
-}

@@ -189,7 +189,6 @@ pub enum Stdlib {
     ConstructHashMap,
     ConstructHashSet,
     ConstructRecord,
-    ConstructList,
     Contains,
     Divide,
     Effect,
@@ -269,7 +268,6 @@ impl TryFrom<Uuid> for Stdlib {
             ConstructHashMap::UUID => Ok(Self::ConstructHashMap),
             ConstructHashSet::UUID => Ok(Self::ConstructHashSet),
             ConstructRecord::UUID => Ok(Self::ConstructRecord),
-            ConstructList::UUID => Ok(Self::ConstructList),
             Contains::UUID => Ok(Self::Contains),
             Divide::UUID => Ok(Self::Divide),
             Effect::UUID => Ok(Self::Effect),
@@ -346,7 +344,6 @@ impl Uid for Stdlib {
             Self::ConstructHashMap => Uid::uid(&ConstructHashMap {}),
             Self::ConstructHashSet => Uid::uid(&ConstructHashSet {}),
             Self::ConstructRecord => Uid::uid(&ConstructRecord {}),
-            Self::ConstructList => Uid::uid(&ConstructList {}),
             Self::Contains => Uid::uid(&Contains {}),
             Self::Divide => Uid::uid(&Divide {}),
             Self::Effect => Uid::uid(&Effect {}),
@@ -422,7 +419,6 @@ impl Stdlib {
             Self::ConstructHashMap => ConstructHashMap::arity(),
             Self::ConstructHashSet => ConstructHashSet::arity(),
             Self::ConstructRecord => ConstructRecord::arity(),
-            Self::ConstructList => ConstructList::arity(),
             Self::Contains => Contains::arity(),
             Self::Divide => Divide::arity(),
             Self::Effect => Effect::arity(),
@@ -521,9 +517,6 @@ impl Stdlib {
             Self::ConstructRecord => {
                 Applicable::<T>::apply(&ConstructRecord, args, factory, allocator, cache)
             }
-            Self::ConstructList => {
-                Applicable::<T>::apply(&ConstructList, args, factory, allocator, cache)
-            }
             Self::Contains => Applicable::<T>::apply(&Contains, args, factory, allocator, cache),
             Self::Divide => Applicable::<T>::apply(&Divide, args, factory, allocator, cache),
             Self::Effect => Applicable::<T>::apply(&Effect, args, factory, allocator, cache),
@@ -618,7 +611,6 @@ impl Stdlib {
             Self::ConstructHashMap => Applicable::<T>::should_parallelize(&ConstructHashMap, args),
             Self::ConstructHashSet => Applicable::<T>::should_parallelize(&ConstructHashSet, args),
             Self::ConstructRecord => Applicable::<T>::should_parallelize(&ConstructRecord, args),
-            Self::ConstructList => Applicable::<T>::should_parallelize(&ConstructList, args),
             Self::Contains => Applicable::<T>::should_parallelize(&Contains, args),
             Self::Divide => Applicable::<T>::should_parallelize(&Divide, args),
             Self::Effect => Applicable::<T>::should_parallelize(&Effect, args),
@@ -780,11 +772,6 @@ impl From<ConstructHashSet> for Stdlib {
 impl From<ConstructRecord> for Stdlib {
     fn from(_value: ConstructRecord) -> Self {
         Self::ConstructRecord
-    }
-}
-impl From<ConstructList> for Stdlib {
-    fn from(_value: ConstructList) -> Self {
-        Self::ConstructList
     }
 }
 impl From<Contains> for Stdlib {

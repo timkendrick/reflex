@@ -27,7 +27,6 @@ where
         + From<ConstructHashMap>
         + From<ConstructHashSet>
         + From<ConstructRecord>
-        + From<ConstructList>
         + From<Contains>
         + From<Divide>
         + From<Effect>
@@ -150,10 +149,6 @@ where
             (
                 factory.create_string_term(allocator.create_static_string("constructRecord")),
                 factory.create_builtin_term(ConstructRecord),
-            ),
-            (
-                factory.create_string_term(allocator.create_static_string("constructList")),
-                factory.create_builtin_term(ConstructList),
             ),
             (
                 factory.create_string_term(allocator.create_static_string("contains")),
