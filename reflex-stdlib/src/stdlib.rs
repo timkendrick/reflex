@@ -148,6 +148,7 @@ pub trait StdlibBuiltin:
     + From<ResolveDeep>
     + From<ResolveList>
     + From<Sequence>
+    + From<Unzip>
 {
 }
 impl<T> StdlibBuiltin for T where
@@ -164,6 +165,7 @@ impl<T> StdlibBuiltin for T where
         + From<ResolveDeep>
         + From<ResolveList>
         + From<Sequence>
+        + From<Unzip>
 {
 }
 

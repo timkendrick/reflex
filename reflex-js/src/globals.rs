@@ -9,8 +9,8 @@ use crate::stdlib::{
 use reflex::core::{Builtin, Expression, ExpressionFactory, HeapAllocator};
 use reflex_json::stdlib::{JsonDeserialize, JsonSerialize};
 use reflex_stdlib::{
-    Abs, Apply, Ceil, CollectHashMap, CollectHashSet, ConstructRecord, Floor, Get, If, Keys, Map,
-    Max, Min, Pow, ResolveDeep, ResolveHashMap, ResolveList, Round, Unzip, Values, Zip,
+    Abs, Apply, Ceil, CollectHashMap, CollectHashSet, ConstructRecord, Flatten, Floor, Get, If,
+    Keys, Map, Max, Min, Pow, ResolveDeep, ResolveList, Round, Unzip, Values, Zip,
 };
 
 pub(crate) mod boolean;
@@ -46,6 +46,7 @@ pub trait JsGlobalsBuiltin:
     + From<ConstructRecord>
     + From<ParseDate>
     + From<EncodeUriComponent>
+    + From<Flatten>
     + From<Floor>
     + From<FormatErrorMessage>
     + From<Get>
@@ -61,7 +62,6 @@ pub trait JsGlobalsBuiltin:
     + From<ParseInt>
     + From<Pow>
     + From<ResolveDeep>
-    + From<ResolveHashMap>
     + From<ResolveList>
     + From<Round>
     + From<ToString>
@@ -81,6 +81,7 @@ impl<T> JsGlobalsBuiltin for T where
         + From<ConstructRecord>
         + From<ParseDate>
         + From<EncodeUriComponent>
+        + From<Flatten>
         + From<Floor>
         + From<FormatErrorMessage>
         + From<Get>
@@ -96,7 +97,6 @@ impl<T> JsGlobalsBuiltin for T where
         + From<ParseInt>
         + From<Pow>
         + From<ResolveDeep>
-        + From<ResolveHashMap>
         + From<ResolveList>
         + From<Round>
         + From<ToString>

@@ -29,7 +29,7 @@ use swc_ecma_ast::{
 use swc_ecma_parser::{lexer::Lexer, Parser, StringInput, Syntax};
 
 use crate::{
-    globals::global_aggregate_error,
+    globals::{global_aggregate_error, global_map},
     stdlib::{Accessor, Construct, FormatErrorMessage, Throw, ToString},
     Env,
 };
@@ -2075,11 +2075,8 @@ where
         match (args.next(), args.next()) {
             (None, _) => Ok(factory.create_hashmap_term(empty())),
             (Some(arg), None) => Ok(factory.create_application_term(
-                factory.create_builtin_term(ResolveHashMap),
-                allocator.create_unit_list(factory.create_application_term(
-                    factory.create_builtin_term(Apply),
-                    allocator.create_pair(factory.create_builtin_term(CollectHashMap), arg),
-                )),
+                global_map(factory, allocator),
+                allocator.create_unit_list(arg),
             )),
             (Some(_), Some(_)) => Err(err("Invalid Map constructor arguments", node)),
         }

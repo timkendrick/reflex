@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 use reflex::core::{
-    create_error_expression, deduplicate_hashmap_entries, deduplicate_hashset_entries,
-    match_typed_expression_list, uuid, Applicable, ArgType, Arity, ConditionListType,
-    EvaluationCache, Expression, ExpressionFactory, ExpressionListType, FunctionArity,
-    HeapAllocator, ListTermType, RefType, SignalTermType, Uid, Uuid,
+    deduplicate_hashmap_entries, deduplicate_hashset_entries, match_typed_expression_list, uuid,
+    Applicable, ArgType, Arity, ConditionListType, EvaluationCache, Expression, ExpressionFactory,
+    FunctionArity, HeapAllocator, RefType, SignalTermType, Uid, Uuid,
 };
 
 use crate::Get;
@@ -116,59 +115,32 @@ where
         &self,
         args: impl ExactSizeIterator<Item = T>,
         factory: &impl ExpressionFactory<T>,
-        allocator: &impl HeapAllocator<T>,
+        _allocator: &impl HeapAllocator<T>,
         _cache: &mut impl EvaluationCache<T>,
     ) -> Result<T, String> {
-        let (keys, values): (Vec<_>, Vec<_>) = {
-            args.map(|arg| {
-                let static_entry = if let Some(entry) = factory.match_list_term(&arg) {
-                    match (
-                        entry
-                            .items()
-                            .as_deref()
-                            .get(0)
-                            .map(|item| item.as_deref().clone()),
-                        entry
-                            .items()
-                            .as_deref()
-                            .get(1)
-                            .map(|item| item.as_deref().clone()),
-                    ) {
-                        (Some(key), Some(value)) => Ok(Some((key, value))),
-                        _ => Err(format!("Invalid HashMap entry: {}", arg)),
+        let num_args = args.len();
+        let entries = args
+            .fold(
+                Ok(Vec::with_capacity(num_args / 2)),
+                |state, arg| match state {
+                    Ok(entries) => Err((entries, arg)),
+                    Err((mut entries, key)) => {
+                        entries.push((key, arg));
+                        Ok(entries)
                     }
-                } else {
-                    Ok(None)
-                };
-                match static_entry {
-                    Ok(Some((key, value))) => (key, value),
-                    Ok(None) => (
-                        factory.create_application_term(
-                            factory.create_builtin_term(Get),
-                            allocator.create_pair(arg.clone(), factory.create_int_term(0)),
-                        ),
-                        factory.create_application_term(
-                            factory.create_builtin_term(Get),
-                            allocator.create_pair(arg, factory.create_int_term(1)),
-                        ),
-                    ),
-                    Err(err) => {
-                        let signal = create_error_expression(
-                            factory.create_string_term(allocator.create_string(err)),
-                            factory,
-                            allocator,
-                        );
-                        (signal.clone(), signal)
-                    }
-                }
-            })
-        }
-        .unzip();
+                },
+            )
+            .map_err(|(_entries, key)| {
+                format!(
+                    "Expected <key1>, <value1>, <key2>, <value2>..., received trailing key: {key}"
+                )
+            })?;
         // FIXME: prevent unnecessary vector allocations
-        let entries = match deduplicate_hashmap_entries(&keys, &values) {
-            Some(entries) => entries,
-            None => keys.into_iter().zip(values).collect::<Vec<_>>(),
-        };
+        let (keys, values): (Vec<_>, Vec<_>) = entries
+            .iter()
+            .map(|(key, value)| (key.clone(), value.clone()))
+            .unzip();
+        let entries = deduplicate_hashmap_entries(&keys, &values).unwrap_or(entries);
         Ok(factory.create_hashmap_term(entries))
     }
 }
