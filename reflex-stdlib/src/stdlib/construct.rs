@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 use reflex::core::{
-    deduplicate_hashmap_entries, deduplicate_hashset_entries, uuid, Applicable, ArgType, Arity,
-    EvaluationCache, Expression, ExpressionFactory, ExpressionListType, FunctionArity,
-    HeapAllocator, ListTermType, RefType, Uid, Uuid,
+    deduplicate_hashmap_entries, uuid, Applicable, ArgType, Arity, EvaluationCache, Expression,
+    ExpressionFactory, ExpressionListType, FunctionArity, HeapAllocator, ListTermType, RefType,
+    Uid, Uuid,
 };
 
 pub struct ConstructRecord;
@@ -157,45 +157,5 @@ impl<T: Expression> Applicable<T> for ConstructHashMap {
             }
             None => Err(format!("Invalid property values: {}", values)),
         }
-    }
-}
-
-pub struct ConstructHashSet;
-impl ConstructHashSet {
-    pub const UUID: Uuid = uuid!("d2772dad-f42c-49a1-9707-e1df4b07b1ae");
-    const ARITY: FunctionArity<0, 0> = FunctionArity {
-        required: [],
-        optional: [],
-        variadic: Some(ArgType::Lazy),
-    };
-    pub fn arity() -> Arity {
-        Arity::from(&Self::ARITY)
-    }
-}
-impl Uid for ConstructHashSet {
-    fn uid(&self) -> Uuid {
-        Self::UUID
-    }
-}
-impl<T: Expression> Applicable<T> for ConstructHashSet {
-    fn arity(&self) -> Option<Arity> {
-        Some(Self::arity())
-    }
-    fn should_parallelize(&self, _args: &[T]) -> bool {
-        false
-    }
-    fn apply(
-        &self,
-        args: impl ExactSizeIterator<Item = T>,
-        factory: &impl ExpressionFactory<T>,
-        _allocator: &impl HeapAllocator<T>,
-        _cache: &mut impl EvaluationCache<T>,
-    ) -> Result<T, String> {
-        let values = args.collect::<Vec<_>>();
-        let deduplicated_values = match deduplicate_hashset_entries(&values) {
-            Some(values) => values,
-            None => values,
-        };
-        Ok(factory.create_hashset_term(deduplicated_values))
     }
 }
