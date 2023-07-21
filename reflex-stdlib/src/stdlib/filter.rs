@@ -142,12 +142,20 @@ where
                                                     factory.create_variable_term(0),
                                                 ),
                                             ),
-                                            factory.create_list_term(
-                                                allocator.create_unit_list(
-                                                    factory.create_variable_term(0),
+                                            factory.create_lambda_term(
+                                                0,
+                                                factory.create_list_term(
+                                                    allocator.create_unit_list(
+                                                        factory.create_variable_term(0),
+                                                    ),
                                                 ),
                                             ),
-                                            factory.create_list_term(allocator.create_empty_list()),
+                                            factory.create_lambda_term(
+                                                0,
+                                                factory.create_list_term(
+                                                    allocator.create_empty_list(),
+                                                ),
+                                            ),
                                         ),
                                     ),
                                 ),

@@ -292,11 +292,14 @@ where
                 factory.create_builtin_term(Contains),
                 allocator.create_pair(target.clone(), field.clone()),
             ),
-            factory.create_application_term(
-                factory.create_builtin_term(Get),
-                allocator.create_pair(target, field),
+            factory.create_lambda_term(
+                0,
+                factory.create_application_term(
+                    factory.create_builtin_term(Get),
+                    allocator.create_pair(target, field),
+                ),
             ),
-            fallback,
+            factory.create_lambda_term(0, fallback),
         ),
     )
 }
