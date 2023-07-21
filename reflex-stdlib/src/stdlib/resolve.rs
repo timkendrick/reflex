@@ -7,7 +7,7 @@ use reflex::core::{
     ListTermType, RecordTermType, RefType, Uid, Uuid,
 };
 
-use crate::{Apply, CollectHashSet, CollectList, ConstructHashMap};
+use crate::{Apply, CollectHashMap, CollectHashSet, CollectList};
 
 pub struct ResolveRecord;
 impl ResolveRecord {
@@ -204,7 +204,7 @@ impl Uid for ResolveHashMap {
 }
 impl<T: Expression> Applicable<T> for ResolveHashMap
 where
-    T::Builtin: From<ConstructHashMap> + From<CollectList>,
+    T::Builtin: From<CollectHashMap> + From<CollectList>,
 {
     fn arity(&self) -> Option<Arity> {
         Some(Self::arity())
@@ -221,22 +221,20 @@ where
     ) -> Result<T, String> {
         let target = args.next().unwrap();
         if let Some(value) = factory.match_hashmap_term(&target) {
-            let has_dynamic_keys = value.keys().any(|item| !item.as_deref().is_static());
-            if !has_dynamic_keys {
+            let keys_are_atomic = value.keys().all(|key| key.as_deref().is_atomic());
+            let values_are_atomic = value.values().all(|value| value.as_deref().is_atomic());
+            if keys_are_atomic && values_are_atomic {
                 Ok(target)
             } else {
                 Ok(factory.create_application_term(
-                    factory.create_builtin_term(ConstructHashMap),
-                    allocator.create_pair(
-                        factory.create_application_term(
-                            factory.create_builtin_term(CollectList),
-                            allocator.create_list(value.keys().map(|item| item.as_deref().clone())),
-                        ),
-                        factory.create_application_term(
-                            factory.create_builtin_term(CollectList),
-                            allocator
-                                .create_list(value.values().map(|item| item.as_deref().clone())),
-                        ),
+                    factory.create_builtin_term(CollectHashMap),
+                    allocator.create_sized_list(
+                        value.keys().len() + value.values().len(),
+                        value
+                            .keys()
+                            .zip(value.values())
+                            .flat_map(|(key, value)| [key, value])
+                            .map(|item| item.as_deref().clone()),
                     ),
                 ))
             }
