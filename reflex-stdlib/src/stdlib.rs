@@ -23,7 +23,6 @@ pub use chain::*;
 pub use collect::*;
 pub use collect_string::*;
 pub use cons::*;
-pub use construct::*;
 pub use contains::*;
 pub use divide::*;
 pub use effect::*;
@@ -84,7 +83,6 @@ mod chain;
 mod collect;
 mod collect_string;
 mod cons;
-mod construct;
 mod contains;
 mod divide;
 mod effect;
@@ -185,7 +183,6 @@ pub enum Stdlib {
     CollectSignal,
     CollectString,
     Cons,
-    ConstructRecord,
     Contains,
     Divide,
     Effect,
@@ -262,7 +259,6 @@ impl TryFrom<Uuid> for Stdlib {
             CollectSignal::UUID => Ok(Self::CollectSignal),
             CollectString::UUID => Ok(Self::CollectString),
             Cons::UUID => Ok(Self::Cons),
-            ConstructRecord::UUID => Ok(Self::ConstructRecord),
             Contains::UUID => Ok(Self::Contains),
             Divide::UUID => Ok(Self::Divide),
             Effect::UUID => Ok(Self::Effect),
@@ -336,7 +332,6 @@ impl Uid for Stdlib {
             Self::CollectSignal => Uid::uid(&CollectSignal {}),
             Self::CollectString => Uid::uid(&CollectString {}),
             Self::Cons => Uid::uid(&Cons {}),
-            Self::ConstructRecord => Uid::uid(&ConstructRecord {}),
             Self::Contains => Uid::uid(&Contains {}),
             Self::Divide => Uid::uid(&Divide {}),
             Self::Effect => Uid::uid(&Effect {}),
@@ -409,7 +404,6 @@ impl Stdlib {
             Self::CollectSignal => CollectSignal::arity(),
             Self::CollectString => CollectString::arity(),
             Self::Cons => Cons::arity(),
-            Self::ConstructRecord => ConstructRecord::arity(),
             Self::Contains => Contains::arity(),
             Self::Divide => Divide::arity(),
             Self::Effect => Effect::arity(),
@@ -501,9 +495,6 @@ impl Stdlib {
                 Applicable::<T>::apply(&CollectString, args, factory, allocator, cache)
             }
             Self::Cons => Applicable::<T>::apply(&Cons, args, factory, allocator, cache),
-            Self::ConstructRecord => {
-                Applicable::<T>::apply(&ConstructRecord, args, factory, allocator, cache)
-            }
             Self::Contains => Applicable::<T>::apply(&Contains, args, factory, allocator, cache),
             Self::Divide => Applicable::<T>::apply(&Divide, args, factory, allocator, cache),
             Self::Effect => Applicable::<T>::apply(&Effect, args, factory, allocator, cache),
@@ -593,7 +584,6 @@ impl Stdlib {
             Self::CollectSignal => Applicable::<T>::should_parallelize(&CollectSignal, args),
             Self::CollectString => Applicable::<T>::should_parallelize(&CollectString, args),
             Self::Cons => Applicable::<T>::should_parallelize(&Cons, args),
-            Self::ConstructRecord => Applicable::<T>::should_parallelize(&ConstructRecord, args),
             Self::Contains => Applicable::<T>::should_parallelize(&Contains, args),
             Self::Divide => Applicable::<T>::should_parallelize(&Divide, args),
             Self::Effect => Applicable::<T>::should_parallelize(&Effect, args),
@@ -744,11 +734,6 @@ impl From<CollectString> for Stdlib {
 impl From<Cons> for Stdlib {
     fn from(_value: Cons) -> Self {
         Self::Cons
-    }
-}
-impl From<ConstructRecord> for Stdlib {
-    fn from(_value: ConstructRecord) -> Self {
-        Self::ConstructRecord
     }
 }
 impl From<Contains> for Stdlib {
