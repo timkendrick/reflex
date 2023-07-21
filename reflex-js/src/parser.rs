@@ -3869,21 +3869,30 @@ mod tests {
             parse("!true", &env, &factory, &allocator),
             Ok(factory.create_application_term(
                 factory.create_builtin_term(Not),
-                allocator.create_unit_list(factory.create_boolean_term(true)),
+                allocator.create_unit_list(factory.create_application_term(
+                    factory.create_builtin_term(IsTruthy),
+                    allocator.create_unit_list(factory.create_boolean_term(true)),
+                )),
             )),
         );
         assert_eq!(
             parse("!false", &env, &factory, &allocator),
             Ok(factory.create_application_term(
                 factory.create_builtin_term(Not),
-                allocator.create_unit_list(factory.create_boolean_term(false)),
+                allocator.create_unit_list(factory.create_application_term(
+                    factory.create_builtin_term(IsTruthy),
+                    allocator.create_unit_list(factory.create_boolean_term(false)),
+                )),
             )),
         );
         assert_eq!(
             parse("!3", &env, &factory, &allocator),
             Ok(factory.create_application_term(
                 factory.create_builtin_term(Not),
-                allocator.create_unit_list(factory.create_float_term(3.0)),
+                allocator.create_unit_list(factory.create_application_term(
+                    factory.create_builtin_term(IsTruthy),
+                    allocator.create_unit_list(factory.create_float_term(3.0)),
+                )),
             )),
         );
     }
@@ -4035,7 +4044,10 @@ mod tests {
             Ok(factory.create_application_term(
                 factory.create_builtin_term(And),
                 allocator.create_pair(
-                    factory.create_boolean_term(true),
+                    factory.create_application_term(
+                        factory.create_builtin_term(IsTruthy),
+                        allocator.create_unit_list(factory.create_boolean_term(true)),
+                    ),
                     factory.create_lambda_term(0, factory.create_boolean_term(false)),
                 ),
             )),
@@ -4045,7 +4057,10 @@ mod tests {
             Ok(factory.create_application_term(
                 factory.create_builtin_term(Or),
                 allocator.create_pair(
-                    factory.create_boolean_term(true),
+                    factory.create_application_term(
+                        factory.create_builtin_term(IsTruthy),
+                        allocator.create_unit_list(factory.create_boolean_term(true)),
+                    ),
                     factory.create_lambda_term(0, factory.create_boolean_term(false)),
                 ),
             )),
@@ -4062,7 +4077,10 @@ mod tests {
             Ok(factory.create_application_term(
                 factory.create_builtin_term(If),
                 allocator.create_triple(
-                    factory.create_boolean_term(true),
+                    factory.create_application_term(
+                        factory.create_builtin_term(IsTruthy),
+                        allocator.create_unit_list(factory.create_boolean_term(true)),
+                    ),
                     factory.create_lambda_term(0, factory.create_float_term(3.0)),
                     factory.create_lambda_term(0, factory.create_float_term(4.0)),
                 ),
@@ -4088,7 +4106,10 @@ mod tests {
                     factory.create_application_term(
                         factory.create_builtin_term(If),
                         allocator.create_triple(
-                            factory.create_boolean_term(true),
+                            factory.create_application_term(
+                                factory.create_builtin_term(IsTruthy),
+                                allocator.create_unit_list(factory.create_boolean_term(true)),
+                            ),
                             factory.create_lambda_term(0, factory.create_float_term(3.0)),
                             factory.create_lambda_term(0, factory.create_float_term(4.0)),
                         )
@@ -4105,7 +4126,10 @@ mod tests {
                     factory.create_application_term(
                         factory.create_builtin_term(If),
                         allocator.create_triple(
-                            factory.create_boolean_term(true),
+                            factory.create_application_term(
+                                factory.create_builtin_term(IsTruthy),
+                                allocator.create_unit_list(factory.create_boolean_term(true)),
+                            ),
                             factory.create_lambda_term(0, factory.create_application_term(
                                 factory.create_builtin_term(Throw),
                                 allocator.create_unit_list(
@@ -4140,7 +4164,10 @@ mod tests {
                     factory.create_application_term(
                         factory.create_builtin_term(If),
                         allocator.create_triple(
-                            factory.create_boolean_term(true),
+                            factory.create_application_term(
+                                factory.create_builtin_term(IsTruthy),
+                                allocator.create_unit_list(factory.create_boolean_term(true)),
+                            ),
                             factory.create_lambda_term(0, factory.create_let_term(
                                 factory.create_float_term(3.0),
                                 factory.create_let_term(
@@ -4181,7 +4208,10 @@ mod tests {
                     factory.create_application_term(
                         factory.create_builtin_term(If),
                         allocator.create_triple(
-                            factory.create_boolean_term(true),
+                            factory.create_application_term(
+                                factory.create_builtin_term(IsTruthy),
+                                allocator.create_unit_list(factory.create_boolean_term(true)),
+                            ),
                             factory.create_lambda_term(0, factory.create_let_term(
                                 factory.create_float_term(3.0),
                                 factory.create_let_term(
@@ -4222,7 +4252,10 @@ mod tests {
                     factory.create_application_term(
                         factory.create_builtin_term(If),
                         allocator.create_triple(
-                            factory.create_boolean_term(true),
+                            factory.create_application_term(
+                                factory.create_builtin_term(IsTruthy),
+                                allocator.create_unit_list(factory.create_boolean_term(true)),
+                            ),
                             factory.create_lambda_term(0, factory.create_application_term(
                                 factory.create_builtin_term(Throw),
                                 allocator.create_unit_list(
