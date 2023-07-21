@@ -187,7 +187,6 @@ pub enum Stdlib {
     CollectString,
     Cons,
     ConstructHashMap,
-    ConstructHashSet,
     ConstructRecord,
     Contains,
     Divide,
@@ -266,7 +265,6 @@ impl TryFrom<Uuid> for Stdlib {
             CollectString::UUID => Ok(Self::CollectString),
             Cons::UUID => Ok(Self::Cons),
             ConstructHashMap::UUID => Ok(Self::ConstructHashMap),
-            ConstructHashSet::UUID => Ok(Self::ConstructHashSet),
             ConstructRecord::UUID => Ok(Self::ConstructRecord),
             Contains::UUID => Ok(Self::Contains),
             Divide::UUID => Ok(Self::Divide),
@@ -342,7 +340,6 @@ impl Uid for Stdlib {
             Self::CollectString => Uid::uid(&CollectString {}),
             Self::Cons => Uid::uid(&Cons {}),
             Self::ConstructHashMap => Uid::uid(&ConstructHashMap {}),
-            Self::ConstructHashSet => Uid::uid(&ConstructHashSet {}),
             Self::ConstructRecord => Uid::uid(&ConstructRecord {}),
             Self::Contains => Uid::uid(&Contains {}),
             Self::Divide => Uid::uid(&Divide {}),
@@ -417,7 +414,6 @@ impl Stdlib {
             Self::CollectString => CollectString::arity(),
             Self::Cons => Cons::arity(),
             Self::ConstructHashMap => ConstructHashMap::arity(),
-            Self::ConstructHashSet => ConstructHashSet::arity(),
             Self::ConstructRecord => ConstructRecord::arity(),
             Self::Contains => Contains::arity(),
             Self::Divide => Divide::arity(),
@@ -510,9 +506,6 @@ impl Stdlib {
             Self::Cons => Applicable::<T>::apply(&Cons, args, factory, allocator, cache),
             Self::ConstructHashMap => {
                 Applicable::<T>::apply(&ConstructHashMap, args, factory, allocator, cache)
-            }
-            Self::ConstructHashSet => {
-                Applicable::<T>::apply(&ConstructHashSet, args, factory, allocator, cache)
             }
             Self::ConstructRecord => {
                 Applicable::<T>::apply(&ConstructRecord, args, factory, allocator, cache)
@@ -609,7 +602,6 @@ impl Stdlib {
             Self::CollectString => Applicable::<T>::should_parallelize(&CollectString, args),
             Self::Cons => Applicable::<T>::should_parallelize(&Cons, args),
             Self::ConstructHashMap => Applicable::<T>::should_parallelize(&ConstructHashMap, args),
-            Self::ConstructHashSet => Applicable::<T>::should_parallelize(&ConstructHashSet, args),
             Self::ConstructRecord => Applicable::<T>::should_parallelize(&ConstructRecord, args),
             Self::Contains => Applicable::<T>::should_parallelize(&Contains, args),
             Self::Divide => Applicable::<T>::should_parallelize(&Divide, args),
@@ -762,11 +754,6 @@ impl From<Cons> for Stdlib {
 impl From<ConstructHashMap> for Stdlib {
     fn from(_value: ConstructHashMap) -> Self {
         Self::ConstructHashMap
-    }
-}
-impl From<ConstructHashSet> for Stdlib {
-    fn from(_value: ConstructHashSet) -> Self {
-        Self::ConstructHashSet
     }
 }
 impl From<ConstructRecord> for Stdlib {

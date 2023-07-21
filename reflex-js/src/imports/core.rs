@@ -25,7 +25,6 @@ where
         + From<CollectString>
         + From<Cons>
         + From<ConstructHashMap>
-        + From<ConstructHashSet>
         + From<ConstructRecord>
         + From<Contains>
         + From<Divide>
@@ -141,10 +140,6 @@ where
             (
                 factory.create_string_term(allocator.create_static_string("constructHashMap")),
                 factory.create_builtin_term(ConstructHashMap),
-            ),
-            (
-                factory.create_string_term(allocator.create_static_string("constructHashSet")),
-                factory.create_builtin_term(ConstructHashSet),
             ),
             (
                 factory.create_string_term(allocator.create_static_string("constructRecord")),
