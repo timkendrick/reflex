@@ -61,7 +61,6 @@ import resolveHashmap from './resolve_hashmap.test.mjs';
 import resolveHashset from './resolve_hashset.test.mjs';
 import resolveList from './resolve_list.test.mjs';
 import resolveRecord from './resolve_record.test.mjs';
-import resolveShallow from './resolve_shallow.test.mjs';
 import resolveTree from './resolve_tree.test.mjs';
 import round from './round.test.mjs';
 import set from './set.test.mjs';
@@ -172,7 +171,6 @@ export default (describe) => {
   resolveList(describe);
   resolveLoaderResults(describe);
   resolveRecord(describe);
-  resolveShallow(describe);
   resolveTree(describe);
   round(describe);
   scan(describe);

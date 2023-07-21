@@ -427,11 +427,6 @@ impl From<reflex_stdlib::stdlib::ResolveHashSet> for ServerBuiltins {
         Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
     }
 }
-impl From<reflex_stdlib::stdlib::ResolveShallow> for ServerBuiltins {
-    fn from(value: reflex_stdlib::stdlib::ResolveShallow) -> Self {
-        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
-    }
-}
 impl From<reflex_stdlib::stdlib::ResolveRecord> for ServerBuiltins {
     fn from(value: reflex_stdlib::stdlib::ResolveRecord) -> Self {
         Self::from(reflex_stdlib::stdlib::Stdlib::from(value))

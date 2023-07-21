@@ -410,11 +410,6 @@ impl From<stdlib::ResolveHashSet> for WasmCompilerBuiltins {
         Self::from(stdlib::Stdlib::from(value))
     }
 }
-impl From<stdlib::ResolveShallow> for WasmCompilerBuiltins {
-    fn from(value: stdlib::ResolveShallow) -> Self {
-        Self::from(stdlib::Stdlib::from(value))
-    }
-}
 impl From<stdlib::ResolveRecord> for WasmCompilerBuiltins {
     fn from(value: stdlib::ResolveRecord) -> Self {
         Self::from(stdlib::Stdlib::from(value))

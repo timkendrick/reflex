@@ -74,7 +74,6 @@ pub trait JsImportsBuiltin:
     + From<ResolveHashSet>
     + From<ResolveList>
     + From<ResolveRecord>
-    + From<ResolveShallow>
     + From<Round>
     + From<Sequence>
     + From<Slice>
@@ -147,7 +146,6 @@ impl<T> JsImportsBuiltin for T where
         + From<ResolveHashSet>
         + From<ResolveList>
         + From<ResolveRecord>
-        + From<ResolveShallow>
         + From<Round>
         + From<Sequence>
         + From<Slice>

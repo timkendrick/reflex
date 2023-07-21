@@ -83,7 +83,6 @@
   (@include "./resolve_hashset.wat")
   (@include "./resolve_list.wat")
   (@include "./resolve_record.wat")
-  (@include "./resolve_shallow.wat")
   (@include "./resolve_tree.wat")
   (@include "./round.wat")
   (@include "./sequence.wat")
@@ -177,7 +176,6 @@
       $Stdlib_ResolveQueryBranch
       $Stdlib_ResolveQueryLeaf
       $Stdlib_ResolveRecord
-      $Stdlib_ResolveShallow
       $Stdlib_ResolveTree
       $Stdlib_Round
       $Stdlib_Scan

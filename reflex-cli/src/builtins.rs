@@ -411,11 +411,6 @@ impl From<stdlib::ResolveHashSet> for CliBuiltins {
         Self::from(stdlib::Stdlib::from(value))
     }
 }
-impl From<stdlib::ResolveShallow> for CliBuiltins {
-    fn from(value: stdlib::ResolveShallow) -> Self {
-        Self::from(stdlib::Stdlib::from(value))
-    }
-}
 impl From<stdlib::ResolveRecord> for CliBuiltins {
     fn from(value: stdlib::ResolveRecord) -> Self {
         Self::from(stdlib::Stdlib::from(value))

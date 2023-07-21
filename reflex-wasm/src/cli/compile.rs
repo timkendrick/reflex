@@ -1697,10 +1697,6 @@ fn parse_runtime_exports(module: &Module) -> Result<RuntimeExportMappings, WasmC
                 stdlib::ResolveQueryLeaf.into(),
             )?,
             resolve_record: get_stdlib_function(&exported_functions, stdlib::ResolveRecord.into())?,
-            resolve_shallow: get_stdlib_function(
-                &exported_functions,
-                stdlib::ResolveShallow.into(),
-            )?,
             resolve_tree: get_stdlib_function(&exported_functions, stdlib::ResolveTree.into())?,
             round: get_stdlib_function(&exported_functions, stdlib::Round.into())?,
             scan: get_stdlib_function(&exported_functions, stdlib::Scan.into())?,

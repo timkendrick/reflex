@@ -72,7 +72,6 @@ pub mod resolve_hashmap;
 pub mod resolve_hashset;
 pub mod resolve_list;
 pub mod resolve_record;
-pub mod resolve_shallow;
 pub mod resolve_tree;
 pub mod round;
 pub mod sequence;
@@ -152,7 +151,6 @@ pub use resolve_hashmap::*;
 pub use resolve_hashset::*;
 pub use resolve_list::*;
 pub use resolve_record::*;
-pub use resolve_shallow::*;
 pub use resolve_tree::*;
 pub use round::*;
 pub use sequence::*;
@@ -246,7 +244,6 @@ pub enum Stdlib {
     ResolveQueryBranch(ResolveQueryBranch),
     ResolveQueryLeaf(ResolveQueryLeaf),
     ResolveRecord(ResolveRecord),
-    ResolveShallow(ResolveShallow),
     ResolveTree(ResolveTree),
     Round(Round),
     Scan(Scan),
@@ -355,7 +352,6 @@ impl From<Stdlib> for u32 {
             Stdlib::ResolveQueryBranch(_) => StdlibDiscriminants::ResolveQueryBranch as u32,
             Stdlib::ResolveQueryLeaf(_) => StdlibDiscriminants::ResolveQueryLeaf as u32,
             Stdlib::ResolveRecord(_) => StdlibDiscriminants::ResolveRecord as u32,
-            Stdlib::ResolveShallow(_) => StdlibDiscriminants::ResolveShallow as u32,
             Stdlib::ResolveTree(_) => StdlibDiscriminants::ResolveTree as u32,
             Stdlib::Round(_) => StdlibDiscriminants::Round as u32,
             Stdlib::Scan(_) => StdlibDiscriminants::Scan as u32,
@@ -520,9 +516,6 @@ impl TryFrom<u32> for Stdlib {
             value if value == StdlibDiscriminants::ResolveRecord as u32 => {
                 Ok(Self::ResolveRecord(ResolveRecord))
             }
-            value if value == StdlibDiscriminants::ResolveShallow as u32 => {
-                Ok(Self::ResolveShallow(ResolveShallow))
-            }
             value if value == StdlibDiscriminants::ResolveTree as u32 => {
                 Ok(Self::ResolveTree(ResolveTree))
             }
@@ -640,7 +633,6 @@ impl Stdlib {
             Self::ResolveQueryBranch(_) => "Stdlib_ResolveQueryBranch",
             Self::ResolveQueryLeaf(_) => "Stdlib_ResolveQueryLeaf",
             Self::ResolveRecord(_) => "Stdlib_ResolveRecord",
-            Self::ResolveShallow(_) => "Stdlib_ResolveShallow",
             Self::ResolveTree(_) => "Stdlib_ResolveTree",
             Self::Round(_) => "Stdlib_Round",
             Self::Scan(_) => "Stdlib_Scan",
@@ -742,7 +734,6 @@ impl Stdlib {
             Self::ResolveQueryBranch(inner) => inner.arity(),
             Self::ResolveQueryLeaf(inner) => inner.arity(),
             Self::ResolveRecord(inner) => inner.arity(),
-            Self::ResolveShallow(inner) => inner.arity(),
             Self::ResolveTree(inner) => inner.arity(),
             Self::Round(inner) => inner.arity(),
             Self::Scan(inner) => inner.arity(),
@@ -844,7 +835,6 @@ impl Stdlib {
             Self::ResolveQueryBranch(inner) => inner.uid(),
             Self::ResolveQueryLeaf(inner) => inner.uid(),
             Self::ResolveRecord(inner) => inner.uid(),
-            Self::ResolveShallow(inner) => inner.uid(),
             Self::ResolveTree(inner) => inner.uid(),
             Self::Round(inner) => inner.uid(),
             Self::Scan(inner) => inner.uid(),
@@ -984,7 +974,6 @@ impl TryFrom<Uuid> for Stdlib {
             ResolveQueryBranch::UUID => Ok(Self::ResolveQueryBranch(ResolveQueryBranch)),
             ResolveQueryLeaf::UUID => Ok(Self::ResolveQueryLeaf(ResolveQueryLeaf)),
             ResolveRecord::UUID => Ok(Self::ResolveRecord(ResolveRecord)),
-            ResolveShallow::UUID => Ok(Self::ResolveShallow(ResolveShallow)),
             ResolveTree::UUID => Ok(Self::ResolveTree(ResolveTree)),
             Round::UUID => Ok(Self::Round(Round)),
             Scan::UUID => Ok(Self::Scan(Scan)),
@@ -1099,26 +1088,25 @@ mod tests {
         assert_eq!(StdlibDiscriminants::ResolveQueryBranch as u32, 74);
         assert_eq!(StdlibDiscriminants::ResolveQueryLeaf as u32, 75);
         assert_eq!(StdlibDiscriminants::ResolveRecord as u32, 76);
-        assert_eq!(StdlibDiscriminants::ResolveShallow as u32, 77);
-        assert_eq!(StdlibDiscriminants::ResolveTree as u32, 78);
-        assert_eq!(StdlibDiscriminants::Round as u32, 79);
-        assert_eq!(StdlibDiscriminants::Scan as u32, 80);
-        assert_eq!(StdlibDiscriminants::Sequence as u32, 81);
-        assert_eq!(StdlibDiscriminants::Set as u32, 82);
-        assert_eq!(StdlibDiscriminants::SetVariable as u32, 83);
-        assert_eq!(StdlibDiscriminants::Skip as u32, 84);
-        assert_eq!(StdlibDiscriminants::Slice as u32, 85);
-        assert_eq!(StdlibDiscriminants::Split as u32, 86);
-        assert_eq!(StdlibDiscriminants::StartsWith as u32, 87);
-        assert_eq!(StdlibDiscriminants::StringifyJson as u32, 88);
-        assert_eq!(StdlibDiscriminants::Subtract as u32, 89);
-        assert_eq!(StdlibDiscriminants::Take as u32, 90);
-        assert_eq!(StdlibDiscriminants::Throw as u32, 91);
-        assert_eq!(StdlibDiscriminants::ToRequest as u32, 92);
-        assert_eq!(StdlibDiscriminants::ToString as u32, 93);
-        assert_eq!(StdlibDiscriminants::Urlencode as u32, 94);
-        assert_eq!(StdlibDiscriminants::Unzip as u32, 95);
-        assert_eq!(StdlibDiscriminants::Values as u32, 96);
-        assert_eq!(StdlibDiscriminants::Zip as u32, 97);
+        assert_eq!(StdlibDiscriminants::ResolveTree as u32, 77);
+        assert_eq!(StdlibDiscriminants::Round as u32, 78);
+        assert_eq!(StdlibDiscriminants::Scan as u32, 79);
+        assert_eq!(StdlibDiscriminants::Sequence as u32, 80);
+        assert_eq!(StdlibDiscriminants::Set as u32, 81);
+        assert_eq!(StdlibDiscriminants::SetVariable as u32, 82);
+        assert_eq!(StdlibDiscriminants::Skip as u32, 83);
+        assert_eq!(StdlibDiscriminants::Slice as u32, 84);
+        assert_eq!(StdlibDiscriminants::Split as u32, 85);
+        assert_eq!(StdlibDiscriminants::StartsWith as u32, 86);
+        assert_eq!(StdlibDiscriminants::StringifyJson as u32, 87);
+        assert_eq!(StdlibDiscriminants::Subtract as u32, 88);
+        assert_eq!(StdlibDiscriminants::Take as u32, 89);
+        assert_eq!(StdlibDiscriminants::Throw as u32, 90);
+        assert_eq!(StdlibDiscriminants::ToRequest as u32, 91);
+        assert_eq!(StdlibDiscriminants::ToString as u32, 92);
+        assert_eq!(StdlibDiscriminants::Urlencode as u32, 93);
+        assert_eq!(StdlibDiscriminants::Unzip as u32, 94);
+        assert_eq!(StdlibDiscriminants::Values as u32, 95);
+        assert_eq!(StdlibDiscriminants::Zip as u32, 96);
     }
 }

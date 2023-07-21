@@ -151,7 +151,6 @@ function createStdlib(runtime) {
     ResolveQueryLeaf: runtime.__Stdlib_ResolveQueryLeaf.value,
     ResolveRecord: runtime.__Stdlib_ResolveRecord.value,
     ResolveTree: runtime.__Stdlib_ResolveTree.value,
-    ResolveShallow: runtime.__Stdlib_ResolveShallow.value,
     Round: runtime.__Stdlib_Round.value,
     Scan: runtime.__Stdlib_Scan.value,
     Sequence: runtime.__Stdlib_Sequence.value,

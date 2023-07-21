@@ -392,11 +392,6 @@ impl From<stdlib::ResolveRecord> for JsBuiltins {
         Self::from(stdlib::Stdlib::from(value))
     }
 }
-impl From<stdlib::ResolveShallow> for JsBuiltins {
-    fn from(value: stdlib::ResolveShallow) -> Self {
-        Self::from(stdlib::Stdlib::from(value))
-    }
-}
 impl From<stdlib::Round> for JsBuiltins {
     fn from(value: stdlib::Round) -> Self {
         Self::from(stdlib::Stdlib::from(value))

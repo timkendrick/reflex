@@ -1521,9 +1521,6 @@ impl From<reflex_stdlib::stdlib::Stdlib> for reflex_wasm::stdlib::Stdlib {
             reflex_stdlib::stdlib::Stdlib::ResolveHashSet => {
                 reflex_wasm::stdlib::Stdlib::ResolveHashset(reflex_wasm::stdlib::ResolveHashset)
             }
-            reflex_stdlib::stdlib::Stdlib::ResolveShallow => {
-                reflex_wasm::stdlib::Stdlib::ResolveShallow(reflex_wasm::stdlib::ResolveShallow)
-            }
             reflex_stdlib::stdlib::Stdlib::ResolveRecord => {
                 reflex_wasm::stdlib::Stdlib::ResolveRecord(reflex_wasm::stdlib::ResolveRecord)
             }
@@ -1951,11 +1948,6 @@ impl From<reflex_stdlib::stdlib::ResolveHashMap> for reflex_wasm::stdlib::Stdlib
 }
 impl From<reflex_stdlib::stdlib::ResolveHashSet> for reflex_wasm::stdlib::Stdlib {
     fn from(value: reflex_stdlib::stdlib::ResolveHashSet) -> Self {
-        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
-    }
-}
-impl From<reflex_stdlib::stdlib::ResolveShallow> for reflex_wasm::stdlib::Stdlib {
-    fn from(value: reflex_stdlib::stdlib::ResolveShallow) -> Self {
         Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
     }
 }
