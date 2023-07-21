@@ -2,11 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 use reflex::core::{
-    uuid, Applicable, ArgType, Arity, EvaluationCache, Expression, ExpressionFactory,
-    FunctionArity, HeapAllocator, Uid, Uuid,
+    uuid, Applicable, ArgType, Arity, BooleanTermType, EvaluationCache, Expression,
+    ExpressionFactory, FunctionArity, HeapAllocator, Uid, Uuid,
 };
-
-use super::is_truthy;
 
 pub struct Not;
 impl Not {
@@ -40,6 +38,10 @@ impl<T: Expression> Applicable<T> for Not {
         _cache: &mut impl EvaluationCache<T>,
     ) -> Result<T, String> {
         let operand = args.next().unwrap();
-        Ok(factory.create_boolean_term(!is_truthy(&operand, factory)))
+        if let Some(value) = factory.match_boolean_term(&operand) {
+            Ok(factory.create_boolean_term(!value.value()))
+        } else {
+            Err(format!("Expected Boolean, received {}", operand))
+        }
     }
 }
