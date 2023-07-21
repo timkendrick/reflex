@@ -63,7 +63,6 @@ pub use replace::*;
 pub use resolve::*;
 pub use resolve_args::*;
 pub use resolve_deep::*;
-pub use resolve_shallow::*;
 pub use round::*;
 pub use sequence::*;
 pub use slice::*;
@@ -125,7 +124,6 @@ mod replace;
 mod resolve;
 mod resolve_args;
 mod resolve_deep;
-mod resolve_shallow;
 mod round;
 mod sequence;
 mod slice;
@@ -228,7 +226,6 @@ pub enum Stdlib {
     ResolveDeep,
     ResolveHashMap,
     ResolveHashSet,
-    ResolveShallow,
     ResolveRecord,
     ResolveList,
     Round,
@@ -306,7 +303,6 @@ impl TryFrom<Uuid> for Stdlib {
             ResolveDeep::UUID => Ok(Self::ResolveDeep),
             ResolveHashMap::UUID => Ok(Self::ResolveHashMap),
             ResolveHashSet::UUID => Ok(Self::ResolveHashSet),
-            ResolveShallow::UUID => Ok(Self::ResolveShallow),
             ResolveRecord::UUID => Ok(Self::ResolveRecord),
             ResolveList::UUID => Ok(Self::ResolveList),
             Round::UUID => Ok(Self::Round),
@@ -381,7 +377,6 @@ impl Uid for Stdlib {
             Self::ResolveDeep => Uid::uid(&ResolveDeep {}),
             Self::ResolveHashMap => Uid::uid(&ResolveHashMap {}),
             Self::ResolveHashSet => Uid::uid(&ResolveHashSet {}),
-            Self::ResolveShallow => Uid::uid(&ResolveShallow {}),
             Self::ResolveRecord => Uid::uid(&ResolveRecord {}),
             Self::ResolveList => Uid::uid(&ResolveList {}),
             Self::Round => Uid::uid(&Round {}),
@@ -455,7 +450,6 @@ impl Stdlib {
             Self::ResolveDeep => ResolveDeep::arity(),
             Self::ResolveHashMap => ResolveHashMap::arity(),
             Self::ResolveHashSet => ResolveHashSet::arity(),
-            Self::ResolveShallow => ResolveShallow::arity(),
             Self::ResolveRecord => ResolveRecord::arity(),
             Self::ResolveList => ResolveList::arity(),
             Self::Round => Round::arity(),
@@ -560,9 +554,6 @@ impl Stdlib {
             Self::ResolveHashSet => {
                 Applicable::<T>::apply(&ResolveHashSet, args, factory, allocator, cache)
             }
-            Self::ResolveShallow => {
-                Applicable::<T>::apply(&ResolveShallow, args, factory, allocator, cache)
-            }
             Self::ResolveRecord => {
                 Applicable::<T>::apply(&ResolveRecord, args, factory, allocator, cache)
             }
@@ -643,7 +634,6 @@ impl Stdlib {
             Self::ResolveDeep => Applicable::<T>::should_parallelize(&ResolveDeep, args),
             Self::ResolveHashMap => Applicable::<T>::should_parallelize(&ResolveHashMap, args),
             Self::ResolveHashSet => Applicable::<T>::should_parallelize(&ResolveHashSet, args),
-            Self::ResolveShallow => Applicable::<T>::should_parallelize(&ResolveShallow, args),
             Self::ResolveRecord => Applicable::<T>::should_parallelize(&ResolveRecord, args),
             Self::ResolveList => Applicable::<T>::should_parallelize(&ResolveList, args),
             Self::Round => Applicable::<T>::should_parallelize(&Round, args),
@@ -959,11 +949,6 @@ impl From<ResolveHashMap> for Stdlib {
 impl From<ResolveHashSet> for Stdlib {
     fn from(_value: ResolveHashSet) -> Self {
         Self::ResolveHashSet
-    }
-}
-impl From<ResolveShallow> for Stdlib {
-    fn from(_value: ResolveShallow) -> Self {
-        Self::ResolveShallow
     }
 }
 impl From<ResolveRecord> for Stdlib {

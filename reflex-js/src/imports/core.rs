@@ -66,7 +66,6 @@ where
         + From<ResolveDeep>
         + From<ResolveHashMap>
         + From<ResolveHashSet>
-        + From<ResolveShallow>
         + From<ResolveRecord>
         + From<ResolveList>
         + From<Round>
@@ -328,10 +327,6 @@ where
             (
                 factory.create_string_term(allocator.create_static_string("resolveHashSet")),
                 factory.create_builtin_term(ResolveHashSet),
-            ),
-            (
-                factory.create_string_term(allocator.create_static_string("resolveShallow")),
-                factory.create_builtin_term(ResolveShallow),
             ),
             (
                 factory.create_string_term(allocator.create_static_string("resolveRecord")),

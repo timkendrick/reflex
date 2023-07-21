@@ -1410,11 +1410,6 @@ mod tests {
             Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
         }
     }
-    impl From<reflex_stdlib::stdlib::ResolveShallow> for GraphQlTestBuiltins {
-        fn from(value: reflex_stdlib::stdlib::ResolveShallow) -> Self {
-            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
-        }
-    }
     impl From<reflex_stdlib::stdlib::ResolveRecord> for GraphQlTestBuiltins {
         fn from(value: reflex_stdlib::stdlib::ResolveRecord) -> Self {
             Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
