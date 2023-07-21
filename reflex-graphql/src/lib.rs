@@ -1215,11 +1215,6 @@ mod tests {
             Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
         }
     }
-    impl From<reflex_stdlib::stdlib::ConstructList> for GraphQlTestBuiltins {
-        fn from(value: reflex_stdlib::stdlib::ConstructList) -> Self {
-            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
-        }
-    }
     impl From<reflex_stdlib::stdlib::Contains> for GraphQlTestBuiltins {
         fn from(value: reflex_stdlib::stdlib::Contains) -> Self {
             Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
