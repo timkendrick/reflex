@@ -9,8 +9,8 @@ use crate::stdlib::{
 use reflex::core::{Builtin, Expression, ExpressionFactory, HeapAllocator};
 use reflex_json::stdlib::{JsonDeserialize, JsonSerialize};
 use reflex_stdlib::{
-    Abs, Apply, Ceil, CollectHashMap, CollectHashSet, ConstructRecord, Flatten, Floor, Get, If,
-    Keys, Map, Max, Min, Pow, ResolveDeep, ResolveList, Round, Unzip, Values, Zip,
+    Abs, Apply, Ceil, CollectHashMap, CollectHashSet, CollectRecord, Flatten, Floor, Get, If, Keys,
+    Map, Max, Min, Pow, ResolveDeep, ResolveList, Round, Unzip, Values, Zip,
 };
 
 pub(crate) mod boolean;
@@ -43,7 +43,7 @@ pub trait JsGlobalsBuiltin:
     + From<Ceil>
     + From<CollectHashMap>
     + From<CollectHashSet>
-    + From<ConstructRecord>
+    + From<CollectRecord>
     + From<ParseDate>
     + From<EncodeUriComponent>
     + From<Flatten>
@@ -78,7 +78,7 @@ impl<T> JsGlobalsBuiltin for T where
         + From<Ceil>
         + From<CollectHashMap>
         + From<CollectHashSet>
-        + From<ConstructRecord>
+        + From<CollectRecord>
         + From<ParseDate>
         + From<EncodeUriComponent>
         + From<Flatten>
