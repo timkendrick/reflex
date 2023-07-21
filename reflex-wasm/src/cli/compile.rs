@@ -1608,10 +1608,6 @@ fn parse_runtime_exports(module: &Module) -> Result<RuntimeExportMappings, WasmC
                 &exported_functions,
                 stdlib::ConstructHashmap.into(),
             )?,
-            construct_hashset: get_stdlib_function(
-                &exported_functions,
-                stdlib::ConstructHashset.into(),
-            )?,
             construct_record: get_stdlib_function(
                 &exported_functions,
                 stdlib::ConstructRecord.into(),

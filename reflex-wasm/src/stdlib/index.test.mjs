@@ -15,7 +15,6 @@ import collectList from './collect_list.test.mjs';
 import collectSignal from './collect_signal.test.mjs';
 import collectString from './collect_string.test.mjs';
 import collectTree from './collect_tree.test.mjs';
-import constructHashset from './construct_hashset.test.mjs';
 import constructHashmap from './construct_hashmap.test.mjs';
 import constructRecord from './construct_record.test.mjs';
 import cons from './cons.test.mjs';
@@ -116,7 +115,6 @@ export default (describe) => {
   collectTree(describe);
   cons(describe);
   construct(describe);
-  constructHashset(describe);
   constructHashmap(describe);
   constructRecord(describe);
   debug(describe);

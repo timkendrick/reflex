@@ -205,11 +205,6 @@ impl From<stdlib::ConstructHashMap> for WasmCompilerBuiltins {
         Self::from(stdlib::Stdlib::from(value))
     }
 }
-impl From<stdlib::ConstructHashSet> for WasmCompilerBuiltins {
-    fn from(value: stdlib::ConstructHashSet) -> Self {
-        Self::from(stdlib::Stdlib::from(value))
-    }
-}
 impl From<stdlib::ConstructRecord> for WasmCompilerBuiltins {
     fn from(value: stdlib::ConstructRecord) -> Self {
         Self::from(stdlib::Stdlib::from(value))

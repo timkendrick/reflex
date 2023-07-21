@@ -1398,9 +1398,6 @@ impl From<reflex_stdlib::stdlib::Stdlib> for reflex_wasm::stdlib::Stdlib {
             reflex_stdlib::stdlib::Stdlib::ConstructHashMap => {
                 reflex_wasm::stdlib::Stdlib::ConstructHashmap(reflex_wasm::stdlib::ConstructHashmap)
             }
-            reflex_stdlib::stdlib::Stdlib::ConstructHashSet => {
-                reflex_wasm::stdlib::Stdlib::ConstructHashset(reflex_wasm::stdlib::ConstructHashset)
-            }
             reflex_stdlib::stdlib::Stdlib::ConstructRecord => {
                 reflex_wasm::stdlib::Stdlib::ConstructRecord(reflex_wasm::stdlib::ConstructRecord)
             }
@@ -1749,11 +1746,6 @@ impl From<reflex_stdlib::stdlib::Cons> for reflex_wasm::stdlib::Stdlib {
 }
 impl From<reflex_stdlib::stdlib::ConstructHashMap> for reflex_wasm::stdlib::Stdlib {
     fn from(value: reflex_stdlib::stdlib::ConstructHashMap) -> Self {
-        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
-    }
-}
-impl From<reflex_stdlib::stdlib::ConstructHashSet> for reflex_wasm::stdlib::Stdlib {
-    fn from(value: reflex_stdlib::stdlib::ConstructHashSet) -> Self {
         Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
     }
 }
