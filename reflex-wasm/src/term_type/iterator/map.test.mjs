@@ -51,10 +51,14 @@ export default (describe) => {
     test('signals', (assert, {
       createApplication,
       createBuiltin,
+      createErrorCondition,
+      createInt,
       createMapIterator,
       createLambda,
       createRangeIterator,
-      createPair,
+      createSignal,
+      createString,
+      createTriple,
       createUnitList,
       createVariable,
       evaluate,
@@ -64,9 +68,26 @@ export default (describe) => {
     }) => {
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.Apply),
-          createPair(
-            createBuiltin(Stdlib.ConstructList),
+          createBuiltin(Stdlib.ResolveList),
+          createUnitList(
+            createMapIterator(
+              createTriple(
+                createSignal(createErrorCondition(createString('foo'))),
+                createInt(3),
+                createSignal(createErrorCondition(createString('bar'))),
+              ),
+              createBuiltin(Stdlib.Identity),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '{<ErrorCondition:"foo">,<ErrorCondition:"bar">}');
+        assert.deepEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.ResolveList),
+          createUnitList(
             createMapIterator(
               createRangeIterator(3, 3),
               createLambda(
@@ -79,7 +100,7 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(
           format(result),
-          '[{<ErrorCondition:3>}, {<ErrorCondition:4>}, {<ErrorCondition:5>}]',
+          '{<ErrorCondition:3>,<ErrorCondition:4>,<ErrorCondition:5>}',
         );
         assert.deepEqual(format(dependencies), 'NULL');
       })();

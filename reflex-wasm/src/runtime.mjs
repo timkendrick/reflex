@@ -90,7 +90,6 @@ function createStdlib(runtime) {
     CollectTree: runtime.__Stdlib_CollectTree.value,
     ConstructHashmap: runtime.__Stdlib_ConstructHashmap.value,
     ConstructHashset: runtime.__Stdlib_ConstructHashset.value,
-    ConstructList: runtime.__Stdlib_ConstructList.value,
     ConstructRecord: runtime.__Stdlib_ConstructRecord.value,
     Cons: runtime.__Stdlib_Cons.value,
     Construct: runtime.__Stdlib_Construct.value,

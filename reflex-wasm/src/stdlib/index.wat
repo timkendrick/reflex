@@ -18,7 +18,6 @@
   (@include "./collect_tree.wat")
   (@include "./construct_hashmap.wat")
   (@include "./construct_hashset.wat")
-  (@include "./construct_list.wat")
   (@include "./construct_record.wat")
   (@include "./cons.wat")
   (@include "./divide.wat")
@@ -121,7 +120,6 @@
       $Stdlib_Construct
       $Stdlib_ConstructHashmap
       $Stdlib_ConstructHashset
-      $Stdlib_ConstructList
       $Stdlib_ConstructRecord
       $Stdlib_Debug
       $Stdlib_DecrementVariable

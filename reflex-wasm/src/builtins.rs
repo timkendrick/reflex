@@ -215,11 +215,6 @@ impl From<stdlib::ConstructRecord> for WasmCompilerBuiltins {
         Self::from(stdlib::Stdlib::from(value))
     }
 }
-impl From<stdlib::ConstructList> for WasmCompilerBuiltins {
-    fn from(value: stdlib::ConstructList) -> Self {
-        Self::from(stdlib::Stdlib::from(value))
-    }
-}
 impl From<stdlib::Contains> for WasmCompilerBuiltins {
     fn from(value: stdlib::Contains) -> Self {
         Self::from(stdlib::Stdlib::from(value))

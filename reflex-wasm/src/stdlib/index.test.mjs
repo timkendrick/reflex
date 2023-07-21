@@ -17,7 +17,6 @@ import collectString from './collect_string.test.mjs';
 import collectTree from './collect_tree.test.mjs';
 import constructHashset from './construct_hashset.test.mjs';
 import constructHashmap from './construct_hashmap.test.mjs';
-import constructList from './construct_list.test.mjs';
 import constructRecord from './construct_record.test.mjs';
 import cons from './cons.test.mjs';
 import divide from './divide.test.mjs';
@@ -119,7 +118,6 @@ export default (describe) => {
   construct(describe);
   constructHashset(describe);
   constructHashmap(describe);
-  constructList(describe);
   constructRecord(describe);
   debug(describe);
   divide(describe);
