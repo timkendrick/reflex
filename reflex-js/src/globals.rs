@@ -3,13 +3,13 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 // SPDX-FileContributor: Chris Campbell <c.campbell@mwam.com> https://github.com/c-campbell-mwam
 use crate::stdlib::{
-    Accessor, EncodeUriComponent, FormatErrorMessage, IsFinite, ParseDate, ParseFloat, ParseInt,
-    ToString,
+    Accessor, EncodeUriComponent, FormatErrorMessage, IsFinite, IsTruthy, ParseDate, ParseFloat,
+    ParseInt, ToString,
 };
 use reflex::core::{Builtin, Expression, ExpressionFactory, HeapAllocator};
 use reflex_json::stdlib::{JsonDeserialize, JsonSerialize};
 use reflex_stdlib::{
-    Abs, Apply, Ceil, CollectHashMap, CollectHashSet, CollectRecord, Flatten, Floor, Get, If, Keys,
+    Abs, Apply, Ceil, CollectHashMap, CollectHashSet, CollectRecord, Flatten, Floor, Get, Keys,
     Map, Max, Min, Pow, ResolveDeep, ResolveList, Round, Unzip, Values, Zip,
 };
 
@@ -50,8 +50,8 @@ pub trait JsGlobalsBuiltin:
     + From<Floor>
     + From<FormatErrorMessage>
     + From<Get>
-    + From<If>
     + From<IsFinite>
+    + From<IsTruthy>
     + From<JsonDeserialize>
     + From<JsonSerialize>
     + From<Keys>
@@ -85,8 +85,8 @@ impl<T> JsGlobalsBuiltin for T where
         + From<Floor>
         + From<FormatErrorMessage>
         + From<Get>
-        + From<If>
         + From<IsFinite>
+        + From<IsTruthy>
         + From<JsonDeserialize>
         + From<JsonSerialize>
         + From<Keys>

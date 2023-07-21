@@ -16,6 +16,7 @@ pub use construct::*;
 pub use encode_uri_component::*;
 pub use format_error_message::*;
 pub use is_finite::*;
+pub use is_truthy::*;
 pub use log::*;
 pub use parse_date::*;
 pub use parse_float::*;
@@ -28,6 +29,7 @@ mod construct;
 mod encode_uri_component;
 mod format_error_message;
 mod is_finite;
+mod is_truthy;
 mod log;
 mod parse_date;
 mod parse_float;
@@ -45,6 +47,7 @@ pub enum Stdlib {
     EncodeUriComponent,
     FormatErrorMessage,
     IsFinite,
+    IsTruthy,
     Log,
     LogArgs,
     ParseDate,
@@ -66,6 +69,7 @@ impl Uid for Stdlib {
             Self::EncodeUriComponent => Uid::uid(&EncodeUriComponent {}),
             Self::FormatErrorMessage => Uid::uid(&FormatErrorMessage {}),
             Self::IsFinite => Uid::uid(&IsFinite {}),
+            Self::IsTruthy => Uid::uid(&IsTruthy {}),
             Self::Log => Uid::uid(&Log {}),
             Self::LogArgs => Uid::uid(&LogArgs {}),
             Self::ParseDate => Uid::uid(&ParseDate {}),
@@ -85,6 +89,7 @@ impl TryFrom<Uuid> for Stdlib {
             EncodeUriComponent::UUID => Ok(Self::EncodeUriComponent),
             FormatErrorMessage::UUID => Ok(Self::FormatErrorMessage),
             IsFinite::UUID => Ok(Self::IsFinite),
+            IsTruthy::UUID => Ok(Self::IsTruthy),
             Log::UUID => Ok(Self::Log),
             LogArgs::UUID => Ok(Self::LogArgs),
             ParseDate::UUID => Ok(Self::ParseDate),
@@ -104,6 +109,7 @@ impl Stdlib {
             Self::EncodeUriComponent => EncodeUriComponent::arity(),
             Self::FormatErrorMessage => FormatErrorMessage::arity(),
             Self::IsFinite => IsFinite::arity(),
+            Self::IsTruthy => IsTruthy::arity(),
             Self::Log => Log::arity(),
             Self::LogArgs => LogArgs::arity(),
             Self::ParseDate => ParseDate::arity(),
@@ -127,6 +133,7 @@ impl Stdlib {
                 Applicable::<T>::should_parallelize(&FormatErrorMessage, args)
             }
             Self::IsFinite => Applicable::<T>::should_parallelize(&IsFinite, args),
+            Self::IsTruthy => Applicable::<T>::should_parallelize(&IsTruthy, args),
             Self::Log => Applicable::<T>::should_parallelize(&Log, args),
             Self::LogArgs => Applicable::<T>::should_parallelize(&LogArgs, args),
             Self::ParseDate => Applicable::<T>::should_parallelize(&ParseDate, args),
@@ -156,6 +163,7 @@ impl Stdlib {
                 Applicable::<T>::apply(&FormatErrorMessage, args, factory, allocator, cache)
             }
             Self::IsFinite => Applicable::<T>::apply(&IsFinite, args, factory, allocator, cache),
+            Self::IsTruthy => Applicable::<T>::apply(&IsTruthy, args, factory, allocator, cache),
             Self::Log => Applicable::<T>::apply(&Log, args, factory, allocator, cache),
             Self::LogArgs => Applicable::<T>::apply(&LogArgs, args, factory, allocator, cache),
             Self::ParseDate => Applicable::<T>::apply(&ParseDate, args, factory, allocator, cache),
@@ -197,6 +205,11 @@ impl From<FormatErrorMessage> for Stdlib {
 impl From<IsFinite> for Stdlib {
     fn from(_value: IsFinite) -> Self {
         Self::IsFinite
+    }
+}
+impl From<IsTruthy> for Stdlib {
+    fn from(_value: IsTruthy) -> Self {
+        Self::IsTruthy
     }
 }
 impl From<Log> for Stdlib {
