@@ -157,6 +157,11 @@ impl From<stdlib::CollectList> for JsBuiltins {
         Self::from(stdlib::Stdlib::from(value))
     }
 }
+impl From<stdlib::CollectRecord> for JsBuiltins {
+    fn from(value: stdlib::CollectRecord) -> Self {
+        Self::from(stdlib::Stdlib::from(value))
+    }
+}
 impl From<stdlib::CollectSignal> for JsBuiltins {
     fn from(value: stdlib::CollectSignal) -> Self {
         Self::from(stdlib::Stdlib::from(value))

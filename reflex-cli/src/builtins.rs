@@ -174,6 +174,11 @@ impl From<stdlib::CollectList> for CliBuiltins {
         Self::from(stdlib::Stdlib::from(value))
     }
 }
+impl From<stdlib::CollectRecord> for CliBuiltins {
+    fn from(value: stdlib::CollectRecord) -> Self {
+        Self::from(stdlib::Stdlib::from(value))
+    }
+}
 impl From<stdlib::CollectSignal> for CliBuiltins {
     fn from(value: stdlib::CollectSignal) -> Self {
         Self::from(stdlib::Stdlib::from(value))

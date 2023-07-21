@@ -21,6 +21,7 @@ where
         + From<CollectHashMap>
         + From<CollectHashSet>
         + From<CollectList>
+        + From<CollectRecord>
         + From<CollectSignal>
         + From<CollectString>
         + From<Cons>
@@ -122,6 +123,10 @@ where
             (
                 factory.create_string_term(allocator.create_static_string("collectList")),
                 factory.create_builtin_term(CollectList),
+            ),
+            (
+                factory.create_string_term(allocator.create_static_string("collectRecord")),
+                factory.create_builtin_term(CollectRecord),
             ),
             (
                 factory.create_string_term(allocator.create_static_string("collectSignal")),
