@@ -30,7 +30,7 @@ use swc_ecma_parser::{lexer::Lexer, Parser, StringInput, Syntax};
 
 use crate::{
     globals::{global_aggregate_error, global_map},
-    stdlib::{Accessor, Construct, FormatErrorMessage, Throw, ToString},
+    stdlib::{Accessor, Construct, FormatErrorMessage, IsTruthy, Throw, ToString},
     Env,
 };
 
@@ -59,6 +59,7 @@ pub trait JsParserBuiltin:
     + From<Gte>
     + From<If>
     + From<IfError>
+    + From<IsTruthy>
     + From<Lt>
     + From<Lte>
     + From<Merge>
@@ -99,6 +100,7 @@ impl<T> JsParserBuiltin for T where
         + From<Gte>
         + From<If>
         + From<IfError>
+        + From<IsTruthy>
         + From<Lt>
         + From<Lte>
         + From<Merge>
@@ -1409,7 +1411,10 @@ where
     let operand = parse_expression(&node.arg, scope, env, factory, allocator)?;
     Ok(factory.create_application_term(
         factory.create_builtin_term(Not),
-        allocator.create_unit_list(operand),
+        allocator.create_unit_list(factory.create_application_term(
+            factory.create_builtin_term(IsTruthy),
+            allocator.create_unit_list(operand),
+        )),
     ))
 }
 
@@ -1642,7 +1647,13 @@ where
     let right = parse_expression(&node.right, scope, env, factory, allocator)?;
     Ok(factory.create_application_term(
         factory.create_builtin_term(And),
-        allocator.create_pair(left, factory.create_lambda_term(0, right)),
+        allocator.create_pair(
+            factory.create_application_term(
+                factory.create_builtin_term(IsTruthy),
+                allocator.create_unit_list(left),
+            ),
+            factory.create_lambda_term(0, right),
+        ),
     ))
 }
 
@@ -1660,7 +1671,13 @@ where
     let right = parse_expression(&node.right, scope, env, factory, allocator)?;
     Ok(factory.create_application_term(
         factory.create_builtin_term(Or),
-        allocator.create_pair(left, factory.create_lambda_term(0, right)),
+        allocator.create_pair(
+            factory.create_application_term(
+                factory.create_builtin_term(IsTruthy),
+                allocator.create_unit_list(left),
+            ),
+            factory.create_lambda_term(0, right),
+        ),
     ))
 }
 
@@ -1713,7 +1730,10 @@ where
     factory.create_application_term(
         factory.create_builtin_term(If),
         allocator.create_triple(
-            condition,
+            factory.create_application_term(
+                factory.create_builtin_term(IsTruthy),
+                allocator.create_unit_list(condition),
+            ),
             factory.create_lambda_term(0, consequent),
             factory.create_lambda_term(0, alternate),
         ),
@@ -2177,17 +2197,26 @@ mod tests {
                 _ => None,
             })
             .map(|payload| {
+                let name = factory
+                    .match_record_term(&payload)
+                    .unwrap()
+                    .get(&factory.create_string_term(allocator.create_static_string("name")))
+                    .unwrap();
+                let name = factory.match_string_term(name.as_deref()).unwrap().value();
                 let message = factory
                     .match_record_term(&payload)
                     .unwrap()
                     .get(&factory.create_string_term(allocator.create_static_string("message")))
                     .unwrap();
-                let value = factory
+                let message = factory
                     .match_string_term(message.as_deref())
                     .unwrap()
                     .value();
-                let value = String::from(value.as_deref().as_str().deref());
-                value
+                format!(
+                    "{}: {}",
+                    name.as_deref().as_str().deref(),
+                    message.as_deref().as_str().deref()
+                )
             })
             .collect()
     }
@@ -4476,7 +4505,9 @@ mod tests {
         assert_eq!(
             result,
             EvaluationResult::new(
-                factory.create_string_term(allocator.create_static_string("foo")),
+                factory.create_string_term(allocator.create_string(
+                    get_combined_errors(vec![String::from("foo")], &factory, &allocator).join("\n")
+                )),
                 DependencyList::empty(),
             ),
         );
@@ -4570,18 +4601,7 @@ mod tests {
         assert_eq!(
             result,
             EvaluationResult::new(
-                factory.create_string_term(
-                    allocator.create_string(
-                        get_combined_errors(
-                            vec![String::from("foo"), String::from("bar")],
-                            &factory,
-                            &allocator
-                        )
-                        .get(0)
-                        .cloned()
-                        .unwrap()
-                    )
-                ),
+                factory.create_string_term(allocator.create_static_string("foo")),
                 DependencyList::empty(),
             ),
         );
@@ -4610,18 +4630,7 @@ mod tests {
         assert_eq!(
             result,
             EvaluationResult::new(
-                factory.create_string_term(
-                    allocator.create_string(
-                        get_combined_errors(
-                            vec![String::from("foo"), String::from("bar")],
-                            &factory,
-                            &allocator
-                        )
-                        .get(1)
-                        .cloned()
-                        .unwrap()
-                    )
-                ),
+                factory.create_string_term(allocator.create_static_string("bar")),
                 DependencyList::empty(),
             ),
         );
