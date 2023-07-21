@@ -18,6 +18,7 @@ pub trait AccessorBuiltin:
     + From<stdlib::Filter>
     + From<stdlib::Flatten>
     + From<stdlib::EndsWith>
+    + From<stdlib::Fold>
     + From<stdlib::Get>
     + From<stdlib::Insert>
     + From<stdlib::Intersperse>
@@ -27,7 +28,6 @@ pub trait AccessorBuiltin:
     + From<stdlib::Multiply>
     + From<crate::stdlib::ParseInt>
     + From<stdlib::Push>
-    + From<stdlib::Reduce>
     + From<stdlib::Replace>
     + From<stdlib::ResolveList>
     + From<stdlib::Slice>
@@ -47,6 +47,7 @@ impl<T> AccessorBuiltin for T where
         + From<stdlib::EndsWith>
         + From<stdlib::Filter>
         + From<stdlib::Flatten>
+        + From<stdlib::Fold>
         + From<stdlib::Get>
         + From<stdlib::Insert>
         + From<stdlib::Intersperse>
@@ -56,7 +57,6 @@ impl<T> AccessorBuiltin for T where
         + From<stdlib::Multiply>
         + From<crate::stdlib::ParseInt>
         + From<stdlib::Push>
-        + From<stdlib::Reduce>
         + From<stdlib::Replace>
         + From<stdlib::ResolveList>
         + From<stdlib::Slice>
@@ -152,13 +152,13 @@ where
         + From<stdlib::CollectString>
         + From<stdlib::Filter>
         + From<stdlib::Flatten>
+        + From<stdlib::Fold>
         + From<stdlib::Get>
         + From<stdlib::Intersperse>
         + From<stdlib::Keys>
         + From<stdlib::Length>
         + From<stdlib::Map>
         + From<stdlib::Multiply>
-        + From<stdlib::Reduce>
         + From<stdlib::ResolveList>
         + From<stdlib::Slice>
         + From<stdlib::Subtract>
@@ -320,13 +320,13 @@ where
         + From<stdlib::CollectString>
         + From<stdlib::Filter>
         + From<stdlib::Flatten>
+        + From<stdlib::Fold>
         + From<stdlib::Get>
         + From<stdlib::Intersperse>
         + From<stdlib::Keys>
         + From<stdlib::Length>
         + From<stdlib::Map>
         + From<stdlib::Multiply>
-        + From<stdlib::Reduce>
         + From<stdlib::ResolveList>
         + From<stdlib::Slice>
         + From<stdlib::Subtract>
@@ -402,7 +402,7 @@ where
             factory.create_lambda_term(
                 3,
                 factory.create_application_term(
-                    factory.create_builtin_term(stdlib::Reduce),
+                    factory.create_builtin_term(stdlib::Fold),
                     allocator.create_triple(
                         factory.create_variable_term(2),
                         factory.create_variable_term(0),

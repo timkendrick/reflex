@@ -40,6 +40,7 @@ pub trait JsImportsBuiltin:
     + From<Filter>
     + From<Flatten>
     + From<Floor>
+    + From<Fold>
     + From<Get>
     + From<Gt>
     + From<Gte>
@@ -65,7 +66,6 @@ pub trait JsImportsBuiltin:
     + From<Push>
     + From<PushFront>
     + From<Raise>
-    + From<Reduce>
     + From<Remainder>
     + From<Replace>
     + From<ResolveArgs>
@@ -112,6 +112,7 @@ impl<T> JsImportsBuiltin for T where
         + From<Filter>
         + From<Flatten>
         + From<Floor>
+        + From<Fold>
         + From<Get>
         + From<Gt>
         + From<Gte>
@@ -137,7 +138,6 @@ impl<T> JsImportsBuiltin for T where
         + From<Push>
         + From<PushFront>
         + From<Raise>
-        + From<Reduce>
         + From<Remainder>
         + From<Replace>
         + From<ResolveArgs>

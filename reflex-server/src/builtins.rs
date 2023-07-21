@@ -259,6 +259,11 @@ impl From<reflex_stdlib::stdlib::Floor> for ServerBuiltins {
         Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
     }
 }
+impl From<reflex_stdlib::stdlib::Fold> for ServerBuiltins {
+    fn from(value: reflex_stdlib::stdlib::Fold) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
 impl From<reflex_stdlib::stdlib::Get> for ServerBuiltins {
     fn from(value: reflex_stdlib::stdlib::Get) -> Self {
         Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
@@ -376,11 +381,6 @@ impl From<reflex_stdlib::stdlib::PushFront> for ServerBuiltins {
 }
 impl From<reflex_stdlib::stdlib::Raise> for ServerBuiltins {
     fn from(value: reflex_stdlib::stdlib::Raise) -> Self {
-        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
-    }
-}
-impl From<reflex_stdlib::stdlib::Reduce> for ServerBuiltins {
-    fn from(value: reflex_stdlib::stdlib::Reduce) -> Self {
         Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
     }
 }
