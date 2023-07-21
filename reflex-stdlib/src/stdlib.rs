@@ -176,6 +176,7 @@ pub enum Stdlib {
     Cdr,
     Ceil,
     Chain,
+    CollectConstructor,
     CollectHashMap,
     CollectHashSet,
     CollectList,
@@ -252,6 +253,7 @@ impl TryFrom<Uuid> for Stdlib {
             Cdr::UUID => Ok(Self::Cdr),
             Ceil::UUID => Ok(Self::Ceil),
             Chain::UUID => Ok(Self::Chain),
+            CollectConstructor::UUID => Ok(Self::CollectConstructor),
             CollectHashMap::UUID => Ok(Self::CollectHashMap),
             CollectHashSet::UUID => Ok(Self::CollectHashSet),
             CollectList::UUID => Ok(Self::CollectList),
@@ -325,6 +327,7 @@ impl Uid for Stdlib {
             Self::Cdr => Uid::uid(&Cdr {}),
             Self::Ceil => Uid::uid(&Ceil {}),
             Self::Chain => Uid::uid(&Chain {}),
+            Self::CollectConstructor => Uid::uid(&CollectConstructor {}),
             Self::CollectHashMap => Uid::uid(&CollectHashMap {}),
             Self::CollectHashSet => Uid::uid(&CollectHashSet {}),
             Self::CollectList => Uid::uid(&CollectList {}),
@@ -397,6 +400,7 @@ impl Stdlib {
             Self::Cdr => Cdr::arity(),
             Self::Ceil => Ceil::arity(),
             Self::Chain => Chain::arity(),
+            Self::CollectConstructor => CollectConstructor::arity(),
             Self::CollectHashMap => CollectHashMap::arity(),
             Self::CollectHashSet => CollectHashSet::arity(),
             Self::CollectList => CollectList::arity(),
@@ -476,6 +480,9 @@ impl Stdlib {
             Self::Cdr => Applicable::<T>::apply(&Cdr, args, factory, allocator, cache),
             Self::Ceil => Applicable::<T>::apply(&Ceil, args, factory, allocator, cache),
             Self::Chain => Applicable::<T>::apply(&Chain, args, factory, allocator, cache),
+            Self::CollectConstructor => {
+                Applicable::<T>::apply(&CollectConstructor, args, factory, allocator, cache)
+            }
             Self::CollectHashMap => {
                 Applicable::<T>::apply(&CollectHashMap, args, factory, allocator, cache)
             }
@@ -577,6 +584,9 @@ impl Stdlib {
             Self::Cdr => Applicable::<T>::should_parallelize(&Cdr, args),
             Self::Ceil => Applicable::<T>::should_parallelize(&Ceil, args),
             Self::Chain => Applicable::<T>::should_parallelize(&Chain, args),
+            Self::CollectConstructor => {
+                Applicable::<T>::should_parallelize(&CollectConstructor, args)
+            }
             Self::CollectHashMap => Applicable::<T>::should_parallelize(&CollectHashMap, args),
             Self::CollectHashSet => Applicable::<T>::should_parallelize(&CollectHashSet, args),
             Self::CollectList => Applicable::<T>::should_parallelize(&CollectList, args),
@@ -699,6 +709,11 @@ impl From<Ceil> for Stdlib {
 impl From<Chain> for Stdlib {
     fn from(_value: Chain) -> Self {
         Self::Chain
+    }
+}
+impl From<CollectConstructor> for Stdlib {
+    fn from(_value: CollectConstructor) -> Self {
+        Self::CollectConstructor
     }
 }
 impl From<CollectHashMap> for Stdlib {
