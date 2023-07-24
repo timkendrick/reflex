@@ -4192,7 +4192,7 @@ mod tests {
 
     #[test]
     fn term_type() {
-        assert_eq!(std::mem::size_of::<TermType>(), 36);
+        assert_eq!(std::mem::size_of::<TermType>(), 20);
         assert_eq!(TermTypeDiscriminants::Application as u32, 0);
         assert_eq!(TermTypeDiscriminants::Boolean as u32, 1);
         assert_eq!(TermTypeDiscriminants::Builtin as u32, 2);
