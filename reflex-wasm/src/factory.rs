@@ -1398,9 +1398,6 @@ impl From<reflex_stdlib::stdlib::Stdlib> for reflex_wasm::stdlib::Stdlib {
             reflex_stdlib::stdlib::Stdlib::Cons => {
                 reflex_wasm::stdlib::Stdlib::Cons(reflex_wasm::stdlib::Cons)
             }
-            reflex_stdlib::stdlib::Stdlib::ConstructRecord => {
-                reflex_wasm::stdlib::Stdlib::ConstructRecord(reflex_wasm::stdlib::ConstructRecord)
-            }
             reflex_stdlib::stdlib::Stdlib::Contains => {
                 reflex_wasm::stdlib::Stdlib::Has(reflex_wasm::stdlib::Has)
             }
@@ -1738,11 +1735,6 @@ impl From<reflex_stdlib::stdlib::CollectString> for reflex_wasm::stdlib::Stdlib 
 }
 impl From<reflex_stdlib::stdlib::Cons> for reflex_wasm::stdlib::Stdlib {
     fn from(value: reflex_stdlib::stdlib::Cons) -> Self {
-        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
-    }
-}
-impl From<reflex_stdlib::stdlib::ConstructRecord> for reflex_wasm::stdlib::Stdlib {
-    fn from(value: reflex_stdlib::stdlib::ConstructRecord) -> Self {
         Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
     }
 }

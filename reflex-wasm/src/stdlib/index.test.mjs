@@ -16,7 +16,6 @@ import collectRecord from './collect_record.test.mjs';
 import collectSignal from './collect_signal.test.mjs';
 import collectString from './collect_string.test.mjs';
 import collectTree from './collect_tree.test.mjs';
-import constructRecord from './construct_record.test.mjs';
 import cons from './cons.test.mjs';
 import divide from './divide.test.mjs';
 import effect from './effect.test.mjs';
@@ -115,7 +114,6 @@ export default (describe) => {
   collectTree(describe);
   cons(describe);
   construct(describe);
-  constructRecord(describe);
   debug(describe);
   divide(describe);
   effect(describe);

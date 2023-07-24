@@ -89,7 +89,6 @@ function createStdlib(runtime) {
     CollectSignal: runtime.__Stdlib_CollectSignal.value,
     CollectString: runtime.__Stdlib_CollectString.value,
     CollectTree: runtime.__Stdlib_CollectTree.value,
-    ConstructRecord: runtime.__Stdlib_ConstructRecord.value,
     Cons: runtime.__Stdlib_Cons.value,
     Construct: runtime.__Stdlib_Construct.value,
     Debug: runtime.__Stdlib_Debug.value,

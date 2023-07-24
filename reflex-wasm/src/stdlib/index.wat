@@ -17,7 +17,6 @@
   (@include "./collect_signal.wat")
   (@include "./collect_string.wat")
   (@include "./collect_tree.wat")
-  (@include "./construct_record.wat")
   (@include "./cons.wat")
   (@include "./divide.wat")
   (@include "./effect.wat")
@@ -117,7 +116,6 @@
       $Stdlib_CollectTree
       $Stdlib_Cons
       $Stdlib_Construct
-      $Stdlib_ConstructRecord
       $Stdlib_Debug
       $Stdlib_DecrementVariable
       $Stdlib_Divide
