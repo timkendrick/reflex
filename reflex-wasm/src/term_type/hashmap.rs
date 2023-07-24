@@ -4,9 +4,12 @@
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use std::{collections::HashSet, iter::once, marker::PhantomData};
 
-use reflex::core::{
-    DependencyList, Eagerness, Expression, GraphNode, HashmapTermType, HashsetTermType, Internable,
-    NodeId, RefType, SerializeJson, StackOffset,
+use reflex::{
+    core::{
+        DependencyList, Eagerness, Expression, GraphNode, HashmapTermType, HashsetTermType,
+        Internable, NodeId, RefType, SerializeJson, StackOffset,
+    },
+    hash::HashId,
 };
 use reflex_utils::MapIntoIterator;
 use serde_json::Value as JsonValue;
@@ -18,7 +21,7 @@ use crate::{
         CompiledBlockBuilder, CompilerOptions, CompilerResult, CompilerStack, CompilerState,
         ConstValue, ValueType,
     },
-    hash::{TermHash, TermHashState, TermHasher, TermSize},
+    hash::{TermHash, TermHasher, TermSize},
     term_type::{TermType, TypedTerm, WasmExpression},
     ArenaArrayIter, ArenaPointer, ArenaRef, Array, IntoArenaRefIter, PointerIter, Term,
 };
@@ -110,9 +113,7 @@ impl HashmapTerm {
         });
         Array::<HashmapBucket>::extend(list, empty_buckets, arena);
         for (key, value) in entries {
-            let key_hash = arena.read_value::<Term, TermHashState>(key, |term| {
-                TermHasher::default().hash(term, arena).finish()
-            });
+            let key_hash = arena.read_value::<Term, HashId>(key, |term| u64::from(term.id()));
             let mut bucket_index = (u64::from(key_hash) % capacity as u64) as usize;
             while !ArenaPointer::is_uninitialized(arena.read_value::<HashmapBucket, ArenaPointer>(
                 Array::<HashmapBucket>::get_item_offset(list, bucket_index),
