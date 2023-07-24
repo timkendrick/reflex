@@ -1604,10 +1604,6 @@ fn parse_runtime_exports(module: &Module) -> Result<RuntimeExportMappings, WasmC
             collect_tree: get_stdlib_function(&exported_functions, stdlib::CollectTree.into())?,
             cons: get_stdlib_function(&exported_functions, stdlib::Cons.into())?,
             construct: get_stdlib_function(&exported_functions, stdlib::Construct.into())?,
-            construct_hashmap: get_stdlib_function(
-                &exported_functions,
-                stdlib::ConstructHashmap.into(),
-            )?,
             construct_record: get_stdlib_function(
                 &exported_functions,
                 stdlib::ConstructRecord.into(),
