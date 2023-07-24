@@ -170,6 +170,11 @@ impl From<stdlib::Chain> for WasmCompilerBuiltins {
         Self::from(stdlib::Stdlib::from(value))
     }
 }
+impl From<stdlib::CollectConstructor> for WasmCompilerBuiltins {
+    fn from(value: stdlib::CollectConstructor) -> Self {
+        Self::from(stdlib::Stdlib::from(value))
+    }
+}
 impl From<stdlib::CollectHashMap> for WasmCompilerBuiltins {
     fn from(value: stdlib::CollectHashMap) -> Self {
         Self::from(stdlib::Stdlib::from(value))

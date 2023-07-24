@@ -9,6 +9,7 @@ import car from './car.test.mjs';
 import cdr from './cdr.test.mjs';
 import ceil from './ceil.test.mjs';
 import chain from './chain.test.mjs';
+import collectConstructor from './collect_constructor.test.mjs';
 import collectHashmap from './collect_hashmap.test.mjs';
 import collectHashset from './collect_hashset.test.mjs';
 import collectList from './collect_list.test.mjs';
@@ -105,6 +106,7 @@ export default (describe) => {
   cdr(describe);
   ceil(describe);
   chain(describe);
+  collectConstructor(describe);
   collectHashmap(describe);
   collectHashset(describe);
   collectList(describe);

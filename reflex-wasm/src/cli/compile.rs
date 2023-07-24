@@ -1590,6 +1590,10 @@ fn parse_runtime_exports(module: &Module) -> Result<RuntimeExportMappings, WasmC
             cdr: get_stdlib_function(&exported_functions, stdlib::Cdr.into())?,
             ceil: get_stdlib_function(&exported_functions, stdlib::Ceil.into())?,
             chain: get_stdlib_function(&exported_functions, stdlib::Chain.into())?,
+            collect_constructor: get_stdlib_function(
+                &exported_functions,
+                stdlib::CollectConstructor.into(),
+            )?,
             collect_hashmap: get_stdlib_function(
                 &exported_functions,
                 stdlib::CollectHashmap.into(),

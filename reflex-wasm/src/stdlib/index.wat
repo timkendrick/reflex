@@ -10,6 +10,7 @@
   (@include "./cdr.wat")
   (@include "./ceil.wat")
   (@include "./chain.wat")
+  (@include "./collect_constructor.wat")
   (@include "./collect_hashmap.wat")
   (@include "./collect_hashset.wat")
   (@include "./collect_list.wat")
@@ -107,6 +108,7 @@
       $Stdlib_Cdr
       $Stdlib_Ceil
       $Stdlib_Chain
+      $Stdlib_CollectConstructor
       $Stdlib_CollectHashmap
       $Stdlib_CollectHashset
       $Stdlib_CollectList

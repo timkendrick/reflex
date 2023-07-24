@@ -1377,6 +1377,11 @@ impl From<reflex_stdlib::stdlib::Stdlib> for reflex_wasm::stdlib::Stdlib {
             reflex_stdlib::stdlib::Stdlib::Chain => {
                 reflex_wasm::stdlib::Stdlib::Chain(reflex_wasm::stdlib::Chain)
             }
+            reflex_stdlib::stdlib::Stdlib::CollectConstructor => {
+                reflex_wasm::stdlib::Stdlib::CollectConstructor(
+                    reflex_wasm::stdlib::CollectConstructor,
+                )
+            }
             reflex_stdlib::stdlib::Stdlib::CollectHashMap => {
                 reflex_wasm::stdlib::Stdlib::CollectHashmap(reflex_wasm::stdlib::CollectHashmap)
             }

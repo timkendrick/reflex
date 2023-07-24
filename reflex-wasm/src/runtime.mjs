@@ -82,6 +82,7 @@ function createStdlib(runtime) {
     Cdr: runtime.__Stdlib_Cdr.value,
     Ceil: runtime.__Stdlib_Ceil.value,
     Chain: runtime.__Stdlib_Chain.value,
+    CollectConstructor: runtime.__Stdlib_CollectConstructor.value,
     CollectHashmap: runtime.__Stdlib_CollectHashmap.value,
     CollectHashset: runtime.__Stdlib_CollectHashset.value,
     CollectList: runtime.__Stdlib_CollectList.value,
