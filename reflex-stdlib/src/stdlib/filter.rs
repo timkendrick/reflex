@@ -1,3 +1,5 @@
+use std::convert::identity;
+
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
@@ -6,7 +8,9 @@ use reflex::core::{
     FunctionArity, HeapAllocator, Uid, Uuid,
 };
 
-use crate::{Apply, CollectHashMap, CollectHashSet, CollectList, Flatten, If, Map, ResolveList};
+use crate::{
+    Apply, CollectHashMap, CollectHashSet, CollectList, Flatten, If, Map, ResolveList, Unzip,
+};
 
 pub struct Filter;
 impl Filter {
@@ -35,7 +39,8 @@ where
         + From<Flatten>
         + From<If>
         + From<Map>
-        + From<ResolveList>,
+        + From<ResolveList>
+        + From<Unzip>,
 {
     fn arity(&self) -> Option<Arity> {
         Some(Self::arity())
@@ -54,6 +59,7 @@ where
         let predicate = args.next().unwrap();
         let result = if let Some(_) = factory.match_list_term(&target) {
             Some(collect_filter_results(
+                identity,
                 CollectList,
                 &target,
                 &predicate,
@@ -63,6 +69,15 @@ where
         } else if let Some(_) = factory.match_hashmap_term(&target) {
             // TODO: Clarify expected behavior of filtering non-list terms
             Some(collect_filter_results(
+                |entries| {
+                    factory.create_application_term(
+                        factory.create_builtin_term(Flatten),
+                        allocator.create_unit_list(factory.create_application_term(
+                            factory.create_builtin_term(Unzip),
+                            allocator.create_unit_list(entries),
+                        )),
+                    )
+                },
                 CollectHashMap,
                 &target,
                 &predicate,
@@ -72,6 +87,7 @@ where
         } else if let Some(_) = factory.match_hashset_term(&target) {
             // TODO: Clarify expected behavior of filtering non-list terms
             Some(collect_filter_results(
+                identity,
                 CollectHashSet,
                 &target,
                 &predicate,
@@ -92,6 +108,7 @@ where
 }
 
 fn collect_filter_results<T: Expression>(
+    transform_entries: impl Fn(T) -> T,
     collect: impl Into<T::Builtin>,
     target: &T,
     predicate: &T,
@@ -105,7 +122,7 @@ where
         factory.create_builtin_term(Apply),
         allocator.create_pair(
             factory.create_builtin_term(collect),
-            factory.create_application_term(
+            transform_entries(factory.create_application_term(
                 factory.create_builtin_term(Flatten),
                 allocator.create_unit_list(factory.create_application_term(
                     factory.create_builtin_term(ResolveList),
@@ -138,7 +155,7 @@ where
                         ),
                     ),
                 )),
-            ),
+            )),
         ),
     )
 }

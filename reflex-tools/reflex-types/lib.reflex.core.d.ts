@@ -14,7 +14,9 @@ declare module 'reflex::core' {
   export function cdr<T>(pair: [any, T]): T;
   export function ceil(left: number, right: number): number;
   export function chain<T>(left: Array<T>, right: Array<T>): Array<T>;
-  export function collectHashMap<K, V>(...entries: Array<[K, V]>): Map<K, V>;
+  export function collectHashMap<K, V>(
+    ...keysAndValues: Array<K | V>
+  ): Map<K, V>;
   export function collectHashSet<T>(...values: Array<T>): Set<T>;
   export function collectList<T>(...items: Array<T>): Array<T>;
   export function collectSignal(...signals: Array<never>): never;
