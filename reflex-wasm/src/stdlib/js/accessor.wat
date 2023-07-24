@@ -500,7 +500,14 @@
               (call $Term::traits::equals (local.get $key) (global.get $Stdlib_Accessor::REDUCE))
               (return
                 (call $Term::Partial::new
-                  (call $Term::Builtin::new (global.get $Stdlib_Fold))
+                  (call $Term::Lambda::new
+                    (i32.const 3)
+                    (call $Term::Application::new
+                      (call $Term::Builtin::new (global.get $Stdlib_Fold))
+                      (call $Term::List::create_triple
+                        (call $Term::Variable::new (i32.const 2))
+                        (call $Term::Variable::new (i32.const 0))
+                        (call $Term::Variable::new (i32.const 1)))))
                   (call $Term::List::of (local.get $self)))
                 (global.get $NULL)))
             (@list

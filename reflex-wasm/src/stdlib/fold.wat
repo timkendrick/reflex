@@ -3,13 +3,13 @@
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 (module
   (@builtin $Stdlib_Fold "Fold"
-    (@args (@strict $self) (@strict $iteratee) (@strict $seed))
+    (@args (@strict $self) (@strict $seed) (@strict $iteratee))
 
     (@impl
       (call $TermType::implements::iterate)
-      (call $TermType::implements::apply)
       (i32.or (i32.const 0xFFFFFFFF))
-      (func $Stdlib_Fold::impl::<iterate>::<apply>::any (param $self i32) (param $iteratee i32) (param $seed i32) (param $state i32) (result i32 i32)
+      (call $TermType::implements::apply)
+      (func $Stdlib_Fold::impl::<iterate>::<apply>::any (param $self i32) (param $seed i32) (param $iteratee i32) (param $state i32) (result i32 i32)
         (local $value i32)
         (local $iterator_state i32)
         (local $dependencies i32)
@@ -36,7 +36,7 @@
         (local.get $dependencies)))
 
     (@default
-      (func $Stdlib_Fold::impl::default (param $self i32) (param $iteratee i32) (param $seed i32) (param $state i32) (result i32 i32)
+      (func $Stdlib_Fold::impl::default (param $self i32) (param $seed i32) (param $iteratee i32) (param $state i32) (result i32 i32)
         (call $Term::Signal::of
           (call $Term::Condition::invalid_builtin_function_args
             (global.get $Stdlib_Fold)
