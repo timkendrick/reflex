@@ -7,7 +7,7 @@ use reflex::core::{
     ListTermType, RecordTermType, RefType, Uid, Uuid,
 };
 
-use crate::{Apply, CollectHashSet, CollectList, ConstructHashMap};
+use crate::{Apply, CollectHashMap, CollectHashSet, CollectList};
 
 pub struct ResolveDeep;
 impl ResolveDeep {
@@ -30,9 +30,9 @@ impl<T: Expression> Applicable<T> for ResolveDeep
 where
     T::Builtin: Builtin
         + From<Apply>
+        + From<CollectHashMap>
         + From<CollectHashSet>
         + From<CollectList>
-        + From<ConstructHashMap>
         + From<ResolveDeep>,
 {
     fn arity(&self) -> Option<Arity> {
@@ -137,58 +137,14 @@ where
                 Ok(target)
             } else {
                 Ok(factory.create_application_term(
-                    factory.create_builtin_term(ConstructHashMap),
-                    allocator.create_pair(
-                        if keys_are_atomic {
-                            factory.create_list_term(
-                                allocator
-                                    .create_list(value.keys().map(|item| item.as_deref().clone())),
-                            )
-                        } else {
-                            factory.create_application_term(
-                                factory.create_builtin_term(CollectList),
-                                allocator.create_list(
-                                    value
-                                        .keys()
-                                        .map(|item| item.as_deref().clone())
-                                        .map(|item| {
-                                            if item.is_atomic() {
-                                                item
-                                            } else {
-                                                factory.create_application_term(
-                                                    factory.create_builtin_term(ResolveDeep),
-                                                    allocator.create_unit_list(item),
-                                                )
-                                            }
-                                        }),
-                                ),
-                            )
-                        },
-                        if values_are_atomic {
-                            factory.create_list_term(
-                                allocator.create_list(
-                                    value.values().map(|item| item.as_deref().clone()),
-                                ),
-                            )
-                        } else {
-                            factory.create_application_term(
-                                factory.create_builtin_term(CollectList),
-                                allocator.create_list(
-                                    value.values().map(|item| item.as_deref().clone()).map(
-                                        |item| {
-                                            if item.is_atomic() {
-                                                item
-                                            } else {
-                                                factory.create_application_term(
-                                                    factory.create_builtin_term(ResolveDeep),
-                                                    allocator.create_unit_list(item),
-                                                )
-                                            }
-                                        },
-                                    ),
-                                ),
-                            )
-                        },
+                    factory.create_builtin_term(CollectHashMap),
+                    allocator.create_sized_list(
+                        value.keys().len() + value.values().len(),
+                        value
+                            .keys()
+                            .zip(value.values())
+                            .flat_map(|(key, value)| [key, value])
+                            .map(|item| item.as_deref().clone()),
                     ),
                 ))
             }

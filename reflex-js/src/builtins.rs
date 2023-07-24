@@ -172,11 +172,6 @@ impl From<stdlib::Cons> for JsBuiltins {
         Self::from(stdlib::Stdlib::from(value))
     }
 }
-impl From<stdlib::ConstructHashMap> for JsBuiltins {
-    fn from(value: stdlib::ConstructHashMap) -> Self {
-        Self::from(stdlib::Stdlib::from(value))
-    }
-}
 impl From<stdlib::ConstructRecord> for JsBuiltins {
     fn from(value: stdlib::ConstructRecord) -> Self {
         Self::from(stdlib::Stdlib::from(value))

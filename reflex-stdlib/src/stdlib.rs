@@ -140,7 +140,6 @@ pub trait StdlibBuiltin:
     + From<CollectHashMap>
     + From<CollectHashSet>
     + From<CollectList>
-    + From<ConstructHashMap>
     + From<Flatten>
     + From<Get>
     + From<If>
@@ -157,7 +156,6 @@ impl<T> StdlibBuiltin for T where
         + From<CollectHashMap>
         + From<CollectHashSet>
         + From<CollectList>
-        + From<ConstructHashMap>
         + From<Flatten>
         + From<Get>
         + From<If>
@@ -186,7 +184,6 @@ pub enum Stdlib {
     CollectSignal,
     CollectString,
     Cons,
-    ConstructHashMap,
     ConstructRecord,
     Contains,
     Divide,
@@ -263,7 +260,6 @@ impl TryFrom<Uuid> for Stdlib {
             CollectSignal::UUID => Ok(Self::CollectSignal),
             CollectString::UUID => Ok(Self::CollectString),
             Cons::UUID => Ok(Self::Cons),
-            ConstructHashMap::UUID => Ok(Self::ConstructHashMap),
             ConstructRecord::UUID => Ok(Self::ConstructRecord),
             Contains::UUID => Ok(Self::Contains),
             Divide::UUID => Ok(Self::Divide),
@@ -337,7 +333,6 @@ impl Uid for Stdlib {
             Self::CollectSignal => Uid::uid(&CollectSignal {}),
             Self::CollectString => Uid::uid(&CollectString {}),
             Self::Cons => Uid::uid(&Cons {}),
-            Self::ConstructHashMap => Uid::uid(&ConstructHashMap {}),
             Self::ConstructRecord => Uid::uid(&ConstructRecord {}),
             Self::Contains => Uid::uid(&Contains {}),
             Self::Divide => Uid::uid(&Divide {}),
@@ -410,7 +405,6 @@ impl Stdlib {
             Self::CollectSignal => CollectSignal::arity(),
             Self::CollectString => CollectString::arity(),
             Self::Cons => Cons::arity(),
-            Self::ConstructHashMap => ConstructHashMap::arity(),
             Self::ConstructRecord => ConstructRecord::arity(),
             Self::Contains => Contains::arity(),
             Self::Divide => Divide::arity(),
@@ -500,9 +494,6 @@ impl Stdlib {
                 Applicable::<T>::apply(&CollectString, args, factory, allocator, cache)
             }
             Self::Cons => Applicable::<T>::apply(&Cons, args, factory, allocator, cache),
-            Self::ConstructHashMap => {
-                Applicable::<T>::apply(&ConstructHashMap, args, factory, allocator, cache)
-            }
             Self::ConstructRecord => {
                 Applicable::<T>::apply(&ConstructRecord, args, factory, allocator, cache)
             }
@@ -594,7 +585,6 @@ impl Stdlib {
             Self::CollectSignal => Applicable::<T>::should_parallelize(&CollectSignal, args),
             Self::CollectString => Applicable::<T>::should_parallelize(&CollectString, args),
             Self::Cons => Applicable::<T>::should_parallelize(&Cons, args),
-            Self::ConstructHashMap => Applicable::<T>::should_parallelize(&ConstructHashMap, args),
             Self::ConstructRecord => Applicable::<T>::should_parallelize(&ConstructRecord, args),
             Self::Contains => Applicable::<T>::should_parallelize(&Contains, args),
             Self::Divide => Applicable::<T>::should_parallelize(&Divide, args),
@@ -741,11 +731,6 @@ impl From<CollectString> for Stdlib {
 impl From<Cons> for Stdlib {
     fn from(_value: Cons) -> Self {
         Self::Cons
-    }
-}
-impl From<ConstructHashMap> for Stdlib {
-    fn from(_value: ConstructHashMap) -> Self {
-        Self::ConstructHashMap
     }
 }
 impl From<ConstructRecord> for Stdlib {

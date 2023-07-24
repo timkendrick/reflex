@@ -1200,11 +1200,6 @@ mod tests {
             Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
         }
     }
-    impl From<reflex_stdlib::stdlib::ConstructHashMap> for GraphQlTestBuiltins {
-        fn from(value: reflex_stdlib::stdlib::ConstructHashMap) -> Self {
-            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
-        }
-    }
     impl From<reflex_stdlib::stdlib::ConstructRecord> for GraphQlTestBuiltins {
         fn from(value: reflex_stdlib::stdlib::ConstructRecord) -> Self {
             Self::from(reflex_stdlib::stdlib::Stdlib::from(value))

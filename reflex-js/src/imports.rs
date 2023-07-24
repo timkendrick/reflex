@@ -29,7 +29,6 @@ pub trait JsImportsBuiltin:
     + From<CollectSignal>
     + From<CollectString>
     + From<Cons>
-    + From<ConstructHashMap>
     + From<ConstructRecord>
     + From<Contains>
     + From<Divide>
@@ -101,7 +100,6 @@ impl<T> JsImportsBuiltin for T where
         + From<CollectSignal>
         + From<CollectString>
         + From<Cons>
-        + From<ConstructHashMap>
         + From<ConstructRecord>
         + From<Contains>
         + From<Divide>

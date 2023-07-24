@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 use reflex::core::{
-    deduplicate_hashmap_entries, uuid, Applicable, ArgType, Arity, EvaluationCache, Expression,
-    ExpressionFactory, ExpressionListType, FunctionArity, HeapAllocator, ListTermType, RefType,
-    Uid, Uuid,
+    uuid, Applicable, ArgType, Arity, EvaluationCache, Expression, ExpressionFactory,
+    ExpressionListType, FunctionArity, HeapAllocator, ListTermType, RefType, Uid, Uuid,
 };
 
 pub struct ConstructRecord;
@@ -68,91 +67,6 @@ impl<T: Expression> Applicable<T> for ConstructRecord {
                         allocator.create_struct_prototype(keys),
                         allocator.clone_list(values.items()),
                     ))
-                }
-            }
-            None => Err(format!("Invalid property values: {}", values)),
-        }
-    }
-}
-
-pub struct ConstructHashMap;
-impl ConstructHashMap {
-    pub const UUID: Uuid = uuid!("e9d74f69-3722-47f0-810b-76730129d6d3");
-    const ARITY: FunctionArity<2, 0> = FunctionArity {
-        required: [ArgType::Strict, ArgType::Strict],
-        optional: [],
-        variadic: None,
-    };
-    pub fn arity() -> Arity {
-        Arity::from(&Self::ARITY)
-    }
-}
-impl Uid for ConstructHashMap {
-    fn uid(&self) -> Uuid {
-        Self::UUID
-    }
-}
-impl<T: Expression> Applicable<T> for ConstructHashMap {
-    fn arity(&self) -> Option<Arity> {
-        Some(Self::arity())
-    }
-    fn should_parallelize(&self, _args: &[T]) -> bool {
-        false
-    }
-    fn apply(
-        &self,
-        mut args: impl ExactSizeIterator<Item = T>,
-        factory: &impl ExpressionFactory<T>,
-        _allocator: &impl HeapAllocator<T>,
-        _cache: &mut impl EvaluationCache<T>,
-    ) -> Result<T, String> {
-        let keys = args.next().unwrap();
-        let values = args.next().unwrap();
-        let keys = match factory.match_list_term(&keys) {
-            Some(keys) => {
-                if let Some(dynamic_key) = keys
-                    .items()
-                    .as_deref()
-                    .iter()
-                    .find(|key| !key.as_deref().is_static())
-                {
-                    Err(format!("Invalid HashMap key: {}", dynamic_key.as_deref()))
-                } else {
-                    Ok(keys)
-                }
-            }
-            None => Err(format!("Invalid HashMap keys: {}", keys)),
-        }?;
-        match factory.match_list_term(&values) {
-            Some(values) => {
-                if values.items().as_deref().len() != keys.items().as_deref().len() {
-                    Err(format!(
-                        "Invalid HashMap entries: received {} keys and {} values",
-                        keys.items().as_deref().len(),
-                        values.items().as_deref().len(),
-                    ))
-                } else {
-                    let keys = keys.items();
-                    let values = values.items();
-                    // FIXME: prevent unnecessary intermediate allocations
-                    let entries = {
-                        let keys = keys
-                            .as_deref()
-                            .iter()
-                            .map(|item| item.as_deref().clone())
-                            .collect::<Vec<_>>();
-                        let values = values
-                            .as_deref()
-                            .iter()
-                            .map(|item| item.as_deref().clone())
-                            .collect::<Vec<_>>();
-                        let entries = match deduplicate_hashmap_entries(&keys, &values) {
-                            Some(entries) => entries,
-                            None => keys.into_iter().zip(values).collect::<Vec<_>>(),
-                        };
-                        entries
-                    };
-                    Ok(factory.create_hashmap_term(entries))
                 }
             }
             None => Err(format!("Invalid property values: {}", values)),
