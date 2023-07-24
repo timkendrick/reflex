@@ -9,6 +9,7 @@ export default (describe) => {
       createEmptyList,
       createInt,
       createLambda,
+      createList,
       createTriple,
       createUnitList,
       createVariable,
@@ -76,6 +77,33 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '[3, 4, 5]');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createApplication(
+            createBuiltin(Stdlib.ResolveArgs),
+            createUnitList(
+              createLambda(
+                4,
+                createList([
+                  createVariable(3),
+                  createVariable(2),
+                  createVariable(1),
+                  createVariable(0),
+                ]),
+              ),
+            ),
+          ),
+          createList([
+            createApplication(createBuiltin(Stdlib.Identity), createUnitList(createInt(3))),
+            createApplication(createBuiltin(Stdlib.Identity), createUnitList(createInt(4))),
+            createApplication(createBuiltin(Stdlib.Identity), createUnitList(createInt(5))),
+            createApplication(createBuiltin(Stdlib.Identity), createUnitList(createInt(6))),
+          ]),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '[3, 4, 5, 6]');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });

@@ -2,6 +2,53 @@
 ;; SPDX-License-Identifier: Apache-2.0
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 (module
+  (@const $Stdlib_ResolveArgs::APPLY_RESOLVED_1 i32
+    (@depends-on $Term::Variable::INSTANCE_0)
+    (@depends-on $Term::Variable::INSTANCE_1)
+    (call $Term::Lambda::new
+      (i32.const 2)
+      (call $Term::Application::new
+        (call $Term::Builtin::new (global.get $Stdlib_Sequence))
+        (call $Term::List::create_pair
+          (call $Term::Variable::new (i32.const 0))
+          (call $Term::Variable::new (i32.const 1))))))
+
+  (@const $Stdlib_ResolveArgs::APPLY_RESOLVED_2 i32
+    (@depends-on $Term::Variable::INSTANCE_0)
+    (@depends-on $Term::Variable::INSTANCE_1)
+    (@depends-on $Term::Variable::INSTANCE_2)
+    (call $Term::Lambda::new
+      (i32.const 3)
+      ;; TODO: Convert argument lists to iterators for more efficient dynamic application
+      (call $Term::Application::new
+        (call $Term::Builtin::new (global.get $Stdlib_Apply))
+        (call $Term::List::create_pair
+          (call $Term::Variable::new (i32.const 2))
+          (call $Term::Application::new
+            (call $Term::Builtin::new (global.get $Stdlib_CollectList))
+            (call $Term::List::create_pair
+              (call $Term::Variable::new (i32.const 1))
+              (call $Term::Variable::new (i32.const 0))))))))
+
+  (@const $Stdlib_ResolveArgs::APPLY_RESOLVED_3 i32
+    (@depends-on $Term::Variable::INSTANCE_0)
+    (@depends-on $Term::Variable::INSTANCE_1)
+    (@depends-on $Term::Variable::INSTANCE_2)
+    (@depends-on $Term::Variable::INSTANCE_3)
+    (call $Term::Lambda::new
+      (i32.const 4)
+      ;; TODO: Convert argument lists to iterators for more efficient dynamic application
+      (call $Term::Application::new
+        (call $Term::Builtin::new (global.get $Stdlib_Apply))
+        (call $Term::List::create_pair
+          (call $Term::Variable::new (i32.const 3))
+          (call $Term::Application::new
+            (call $Term::Builtin::new (global.get $Stdlib_CollectList))
+            (call $Term::List::create_triple
+              (call $Term::Variable::new (i32.const 2))
+              (call $Term::Variable::new (i32.const 1))
+              (call $Term::Variable::new (i32.const 0))))))))
+
   (@builtin $Stdlib_ResolveArgs "ResolveArgs"
     (@args (@strict $self))
 
@@ -38,15 +85,24 @@
               (global.get $NULL))
             ;; If the provided function is unary, wrap it with a lambda that resolves the argument before invoking the function
             (return
-              (call $Term::Lambda::new
-                (i32.const 1)
-                (call $Term::Application::new
-                  (call $Term::Builtin::new (global.get $Stdlib_Sequence))
-                  (call $Term::List::create_pair
-                    (call $Term::Variable::new (i32.const 0))
-                    (local.get $self))))
+              (call $Term::Partial::new
+                (global.get $Stdlib_ResolveArgs::APPLY_RESOLVED_1)
+                (call $Term::List::of (local.get $self)))
+              (global.get $NULL))
+            ;; If the provided function has arity 2, wrap it with a lambda that resolves the arguments before invoking the function
+            (return
+              (call $Term::Partial::new
+                (global.get $Stdlib_ResolveArgs::APPLY_RESOLVED_2)
+                (call $Term::List::of (local.get $self)))
+              (global.get $NULL))
+            ;; If the provided function has arity 3, wrap it with a lambda that resolves the arguments before invoking the function
+            (return
+              (call $Term::Partial::new
+                (global.get $Stdlib_ResolveArgs::APPLY_RESOLVED_3)
+                (call $Term::List::of (local.get $self)))
               (global.get $NULL)))
-          ;; If the provided function has multiple arguments, wrap it with a lambda that resolves all the arguments before invoking the function
+          ;; If the provided function has an unknown number of arguments, wrap it with a lambda that resolves all the arguments
+          ;; before invoking the function
           ;; First create a list of all the variable expressions (to be used within the lambda function body)
           (local.set $arg_list (call $Term::List::allocate (local.get $num_args)))
           (loop $LOOP

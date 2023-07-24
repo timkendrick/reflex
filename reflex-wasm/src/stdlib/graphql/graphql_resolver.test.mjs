@@ -10,6 +10,7 @@ export default (describe) => {
       createNil,
       createPair,
       createString,
+      createSymbol,
       createTriple,
       createUnitList,
       evaluate,
@@ -19,64 +20,73 @@ export default (describe) => {
     }) => {
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.GraphQlResolver),
-          createUnitList(
-            createRecord(
-              createTriple(
-                createString('query'),
-                createString('mutation'),
-                createString('subscription'),
+          createApplication(
+            createBuiltin(Stdlib.GraphQlResolver),
+            createUnitList(
+              createRecord(
+                createTriple(
+                  createString('query'),
+                  createString('mutation'),
+                  createString('subscription'),
+                ),
+                createTriple(createNil(), createNil(), createNil()),
               ),
-              createTriple(createNil(), createNil(), createNil()),
             ),
           ),
+          createUnitList(createSymbol(123)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(
           format(result),
-          '(1) => { "query": null, "mutation": null, "subscription": null }',
+          '{ "query": null, "mutation": null, "subscription": null }',
         );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.GraphQlResolver),
-          createUnitList(
-            createRecord(
-              createTriple(
-                createString('query'),
-                createString('mutation'),
-                createString('subscription'),
+          createApplication(
+            createBuiltin(Stdlib.GraphQlResolver),
+            createUnitList(
+              createRecord(
+                createTriple(
+                  createString('query'),
+                  createString('mutation'),
+                  createString('subscription'),
+                ),
+                createTriple(createString('foo'), createString('bar'), createString('baz')),
               ),
-              createTriple(createString('foo'), createString('bar'), createString('baz')),
             ),
           ),
+          createUnitList(createSymbol(123)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(
           format(result),
-          '(1) => { "query": "foo", "mutation": "bar", "subscription": "baz" }',
+          '{ "query": "foo", "mutation": "bar", "subscription": "baz" }',
         );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.GraphQlResolver),
-          createUnitList(
-            createRecord(
-              createTriple(
-                createString('subscription'),
-                createString('query'),
-                createString('mutation'),
+          createApplication(
+            createBuiltin(Stdlib.GraphQlResolver),
+            createUnitList(
+              createRecord(
+                createTriple(
+                  createString('subscription'),
+                  createString('query'),
+                  createString('mutation'),
+                ),
+                createTriple(createString('foo'), createString('bar'), createString('baz')),
               ),
-              createTriple(createString('foo'), createString('bar'), createString('baz')),
             ),
           ),
+          createUnitList(createSymbol(123)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(
           format(result),
-          '(1) => { "subscription": "foo", "query": "bar", "mutation": "baz" }',
+          '{ "subscription": "foo", "query": "bar", "mutation": "baz" }',
         );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
@@ -105,8 +115,10 @@ export default (describe) => {
       createBuiltin,
       createLambda,
       createString,
+      createSymbol,
       createTriple,
       createUnitList,
+      createVariable,
       evaluate,
       format,
       NULL,
@@ -114,49 +126,55 @@ export default (describe) => {
     }) => {
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.GraphQlResolver),
-          createUnitList(
-            createLambda(
-              0,
-              createRecord(
-                createTriple(
-                  createString('query'),
-                  createString('mutation'),
-                  createString('subscription'),
+          createApplication(
+            createBuiltin(Stdlib.GraphQlResolver),
+            createUnitList(
+              createLambda(
+                0,
+                createRecord(
+                  createTriple(
+                    createString('query'),
+                    createString('mutation'),
+                    createString('subscription'),
+                  ),
+                  createTriple(createString('foo'), createString('bar'), createString('baz')),
                 ),
-                createTriple(createString('foo'), createString('bar'), createString('baz')),
               ),
             ),
           ),
+          createUnitList(createSymbol(123)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(
           format(result),
-          '(1) => (0) => { "query": "foo", "mutation": "bar", "subscription": "baz" }()',
+          '{ "query": "foo", "mutation": "bar", "subscription": "baz" }',
         );
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.GraphQlResolver),
-          createUnitList(
-            createLambda(
-              1,
-              createRecord(
-                createTriple(
-                  createString('query'),
-                  createString('mutation'),
-                  createString('subscription'),
+          createApplication(
+            createBuiltin(Stdlib.GraphQlResolver),
+            createUnitList(
+              createLambda(
+                1,
+                createRecord(
+                  createTriple(
+                    createString('query'),
+                    createString('mutation'),
+                    createString('subscription'),
+                  ),
+                  createTriple(createString('foo'), createString('bar'), createVariable(0)),
                 ),
-                createTriple(createString('foo'), createString('bar'), createString('baz')),
               ),
             ),
           ),
+          createUnitList(createSymbol(123)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(
           format(result),
-          '(1) => { "query": "foo", "mutation": "bar", "subscription": "baz" }',
+          '{ "query": "foo", "mutation": "bar", "subscription": Symbol(123) }',
         );
         assert.strictEqual(format(dependencies), 'NULL');
       })();

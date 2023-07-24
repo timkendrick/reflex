@@ -6,6 +6,23 @@
   (@const-string $Stdlib_GraphQlResolver::MUTATION "mutation")
   (@const-string $Stdlib_GraphQlResolver::SUBSCRIPTION "subscription")
 
+  (@const $Stdlib_GraphQlResolver::CONST_2 i32
+    (@depends-on $Term::Variable::INSTANCE_1)
+    (call $Term::Lambda::new
+      (i32.const 2)
+      ;; Ignore the second argument and return the first argument
+      (call $Term::Variable::new (i32.const 1))))
+
+  (@const $Stdlib_GraphQlResolver_APPLY_CONST_2 i32
+    (@depends-on $Term::Variable::INSTANCE_1)
+    (@depends-on $Term::List::EMPTY)
+    (call $Term::Lambda::new
+      (i32.const 2)
+      ;; Ignore the second argument and invoke the first argument with an empty argument list
+      (call $Term::Application::new
+        (call $Term::Variable::new (i32.const 1))
+        (call $Term::List::empty))))
+
   (@builtin $Stdlib_GraphQlResolver "GraphQlResolver"
     (@args (@strict $self))
 
@@ -24,7 +41,9 @@
         (if (result i32 i32)
           (then
             ;; If the provided record has all the required fields, wrap the graph root within a unary lambda factory
-            (call $Term::Lambda::new (i32.const 1) (local.get $self))
+            (call $Term::Partial::new
+              (global.get $Stdlib_GraphQlResolver::CONST_2)
+              (call $Term::List::of (local.get $self)))
             (global.get $NULL))
           (else
             ;; Otherwise return an error
@@ -44,8 +63,9 @@
           (@list
             ;; Wrap nullary factories with a unary lambda that immediately invokes the factory with no arguments
             (return
-              (call $Term::Lambda::new (i32.const 1)
-                (call $Term::Application::new (local.get $self) (call $Term::List::empty)))
+              (call $Term::Partial::new
+                (global.get $Stdlib_GraphQlResolver_APPLY_CONST_2)
+                (call $Term::List::of (local.get $self)))
               (global.get $NULL))
             ;; Return unary factories unchanged
             (return

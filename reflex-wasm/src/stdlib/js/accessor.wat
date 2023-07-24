@@ -23,6 +23,37 @@
   (@const-string $Stdlib_Accessor::STARTS_WITH "startsWith")
   (@const-string $Stdlib_Accessor::VALUES "values")
 
+  (@const $Stdlib_Accessor::method::<iterate>::FILTER i32
+    (@depends-on $Term::Variable::INSTANCE_0)
+    (@depends-on $Term::Variable::INSTANCE_1)
+    (call $Term::Lambda::new
+      (i32.const 2)
+      (call $Term::FilterIterator::new
+        (call $Term::Variable::new (i32.const 1))
+        (call $Term::Variable::new (i32.const 0)))))
+
+  (@const $Stdlib_Accessor::method::<iterate>::FLAT_MAP i32
+    (@depends-on $Term::Variable::INSTANCE_0)
+    (@depends-on $Term::Variable::INSTANCE_1)
+    (call $Term::Lambda::new
+      (i32.const 2)
+      (call $Term::FlattenIterator::new
+        (call $Term::MapIterator::new
+          (call $Term::Variable::new (i32.const 1))
+          (call $Term::Variable::new (i32.const 0))))))
+
+  (@const $Stdlib_Accessor::method::<iterate>::KEYS i32
+    (@depends-on $Term::Variable::INSTANCE_0)
+    (@depends-on $Term::IntegersIterator::INSTANCE)
+    (@depends-on $Stdlib_Accessor::SELECT_FIRST)
+    (call $Term::Lambda::new
+      (i32.const 1)
+      (call $Term::MapIterator::new
+        (call $Term::ZipIterator::new
+          (call $Term::IntegersIterator::new)
+          (call $Term::Variable::new (i32.const 0)))
+        (global.get $Stdlib_Accessor::SELECT_FIRST))))
+
   (@const $Stdlib_Accessor::SELECT_FIRST i32
     (@depends-on $Term::Int::INSTANCE_0)
     (@depends-on $Term::Variable::INSTANCE_0)
@@ -33,6 +64,43 @@
         (call $Term::List::create_pair
           (call $Term::Variable::new (i32.const 0))
           (call $Term::Int::new (i64.const 0))))))
+
+  (@const $Stdlib_Accessor::method::<iterate>::JOIN i32
+    (@depends-on $Term::Variable::INSTANCE_0)
+    (@depends-on $Term::Variable::INSTANCE_1)
+    (call $Term::Lambda::new
+      (i32.const 2)
+      (call $Term::Application::new
+        (call $Term::Builtin::new (global.get $Stdlib_Apply))
+        (call $Term::List::create_pair
+          (call $Term::Builtin::new (global.get $Stdlib_CollectString))
+          (call $Term::IntersperseIterator::new
+            (call $Term::MapIterator::new
+              (call $Term::Variable::new (i32.const 1))
+              (call $Term::Builtin::new (global.get $Stdlib_ToString)))
+            (call $Term::Variable::new (i32.const 0)))))))
+
+  (@const $Stdlib_Accessor::method::<iterate>::MAP i32
+    (@depends-on $Term::Variable::INSTANCE_0)
+    (@depends-on $Term::Variable::INSTANCE_1)
+    (call $Term::Lambda::new
+      (i32.const 2)
+      (call $Term::MapIterator::new
+        (call $Term::Variable::new (i32.const 1))
+        (call $Term::Variable::new (i32.const 0)))))
+
+  (@const $Stdlib_Accessor::method::<iterate>::REDUCE i32
+    (@depends-on $Term::Variable::INSTANCE_0)
+    (@depends-on $Term::Variable::INSTANCE_1)
+    (@depends-on $Term::Variable::INSTANCE_2)
+    (call $Term::Lambda::new
+      (i32.const 3)
+      (call $Term::Application::new
+        (call $Term::Builtin::new (global.get $Stdlib_Fold))
+        (call $Term::List::create_triple
+          (call $Term::Variable::new (i32.const 2))
+          (call $Term::Variable::new (i32.const 0))
+          (call $Term::Variable::new (i32.const 1))))))
 
   (@builtin $Stdlib_Accessor "Accessor"
     (@args (@strict $self) (@strict $key))
@@ -284,9 +352,9 @@
             (@list
               (call $Term::traits::equals (local.get $key) (global.get $Stdlib_Accessor::ENTRIES))
               (return
-                (call $Term::Lambda::new
-                  (i32.const 0)
-                  (call $Term::Hashmap::traits::iterate (local.get $self)))
+                (call $Term::Partial::new
+                  (call $Term::Builtin::new (global.get $Stdlib_Identity))
+                  (call $Term::List::of (call $Term::Hashmap::traits::iterate (local.get $self))))
                 (global.get $NULL)))
             (@list
               (call $Term::traits::equals (local.get $key) (global.get $Stdlib_Accessor::GET))
@@ -436,48 +504,29 @@
             (@list
               (call $Term::traits::equals (local.get $key) (global.get $Stdlib_Accessor::FILTER))
               (return
-                (call $Term::Lambda::new
-                  (i32.const 1)
-                  (call $Term::FilterIterator::new
-                    (local.get $self)
-                    (call $Term::Variable::new (i32.const 0))))
+                (call $Term::Partial::new
+                  (global.get $Stdlib_Accessor::method::<iterate>::FILTER)
+                  (call $Term::List::of (local.get $self)))
                 (global.get $NULL)))
             (@list
               (call $Term::traits::equals (local.get $key) (global.get $Stdlib_Accessor::FLAT_MAP))
               (return
-                (call $Term::Lambda::new
-                  (i32.const 1)
-                  (call $Term::FlattenIterator::new
-                    (call $Term::MapIterator::new
-                      (local.get $self)
-                      (call $Term::Variable::new (i32.const 0)))))
+                (call $Term::Partial::new
+                  (global.get $Stdlib_Accessor::method::<iterate>::FLAT_MAP)
+                  (call $Term::List::of (local.get $self)))
                 (global.get $NULL)))
             (@list
               (call $Term::traits::equals (local.get $key) (global.get $Stdlib_Accessor::KEYS))
               (return
-                (call $Term::Lambda::new
-                  (i32.const 0)
-                  (call $Term::MapIterator::new
-                    (call $Term::ZipIterator::new
-                      (call $Term::IntegersIterator::new)
-                      (local.get $self))
-                    (global.get $Stdlib_Accessor::SELECT_FIRST)))
+                (call $Term::Partial::new
+                  (global.get $Stdlib_Accessor::method::<iterate>::KEYS)
+                  (call $Term::List::of (local.get $self)))
                 (global.get $NULL)))
             (@list
               (call $Term::traits::equals (local.get $key) (global.get $Stdlib_Accessor::JOIN))
               (return
                 (call $Term::Partial::new
-                  (call $Term::Lambda::new
-                    (i32.const 2)
-                    (call $Term::Application::new
-                      (call $Term::Builtin::new (global.get $Stdlib_Apply))
-                      (call $Term::List::create_pair
-                        (call $Term::Builtin::new (global.get $Stdlib_CollectString))
-                        (call $Term::IntersperseIterator::new
-                          (call $Term::MapIterator::new
-                            (call $Term::Variable::new (i32.const 1))
-                            (call $Term::Builtin::new (global.get $Stdlib_ToString)))
-                          (call $Term::Variable::new (i32.const 0))))))
+                  (global.get $Stdlib_Accessor::method::<iterate>::JOIN)
                   (call $Term::List::of (local.get $self)))
                 (global.get $NULL)))
             (@list
@@ -490,24 +539,15 @@
             (@list
               (call $Term::traits::equals (local.get $key) (global.get $Stdlib_Accessor::MAP))
               (return
-                (call $Term::Lambda::new
-                  (i32.const 1)
-                  (call $Term::MapIterator::new
-                    (local.get $self)
-                    (call $Term::Variable::new (i32.const 0))))
+                (call $Term::Partial::new
+                  (global.get $Stdlib_Accessor::method::<iterate>::MAP)
+                  (call $Term::List::of (local.get $self)))
                 (global.get $NULL)))
             (@list
               (call $Term::traits::equals (local.get $key) (global.get $Stdlib_Accessor::REDUCE))
               (return
                 (call $Term::Partial::new
-                  (call $Term::Lambda::new
-                    (i32.const 3)
-                    (call $Term::Application::new
-                      (call $Term::Builtin::new (global.get $Stdlib_Fold))
-                      (call $Term::List::create_triple
-                        (call $Term::Variable::new (i32.const 2))
-                        (call $Term::Variable::new (i32.const 0))
-                        (call $Term::Variable::new (i32.const 1)))))
+                  (global.get $Stdlib_Accessor::method::<iterate>::REDUCE)
                   (call $Term::List::of (local.get $self)))
                 (global.get $NULL)))
             (@list
