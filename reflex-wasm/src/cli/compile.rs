@@ -1599,6 +1599,7 @@ fn parse_runtime_exports(module: &Module) -> Result<RuntimeExportMappings, WasmC
                 stdlib::CollectHashset.into(),
             )?,
             collect_list: get_stdlib_function(&exported_functions, stdlib::CollectList.into())?,
+            collect_record: get_stdlib_function(&exported_functions, stdlib::CollectRecord.into())?,
             collect_signal: get_stdlib_function(&exported_functions, stdlib::CollectSignal.into())?,
             collect_string: get_stdlib_function(&exported_functions, stdlib::CollectString.into())?,
             collect_tree: get_stdlib_function(&exported_functions, stdlib::CollectTree.into())?,

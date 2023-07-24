@@ -1386,6 +1386,9 @@ impl From<reflex_stdlib::stdlib::Stdlib> for reflex_wasm::stdlib::Stdlib {
             reflex_stdlib::stdlib::Stdlib::CollectList => {
                 reflex_wasm::stdlib::Stdlib::CollectList(reflex_wasm::stdlib::CollectList)
             }
+            reflex_stdlib::stdlib::Stdlib::CollectRecord => {
+                reflex_wasm::stdlib::Stdlib::CollectRecord(reflex_wasm::stdlib::CollectRecord)
+            }
             reflex_stdlib::stdlib::Stdlib::CollectSignal => {
                 reflex_wasm::stdlib::Stdlib::CollectSignal(reflex_wasm::stdlib::CollectSignal)
             }

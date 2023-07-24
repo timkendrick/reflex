@@ -13,6 +13,7 @@
   (@include "./collect_hashmap.wat")
   (@include "./collect_hashset.wat")
   (@include "./collect_list.wat")
+  (@include "./collect_record.wat")
   (@include "./collect_signal.wat")
   (@include "./collect_string.wat")
   (@include "./collect_tree.wat")
@@ -110,6 +111,7 @@
       $Stdlib_CollectHashmap
       $Stdlib_CollectHashset
       $Stdlib_CollectList
+      $Stdlib_CollectRecord
       $Stdlib_CollectSignal
       $Stdlib_CollectString
       $Stdlib_CollectTree

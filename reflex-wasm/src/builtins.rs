@@ -185,6 +185,11 @@ impl From<stdlib::CollectList> for WasmCompilerBuiltins {
         Self::from(stdlib::Stdlib::from(value))
     }
 }
+impl From<stdlib::CollectRecord> for WasmCompilerBuiltins {
+    fn from(value: stdlib::CollectRecord) -> Self {
+        Self::from(stdlib::Stdlib::from(value))
+    }
+}
 impl From<stdlib::CollectSignal> for WasmCompilerBuiltins {
     fn from(value: stdlib::CollectSignal) -> Self {
         Self::from(stdlib::Stdlib::from(value))
