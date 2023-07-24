@@ -456,10 +456,11 @@
 
   (func $Term::Hashmap::collect_sized (param $length i32) (param $iterator i32) (param $state i32) (result i32 i32)
     (local $instance i32)
-    (local $item i32)
     (local $num_entries i32)
     (local $iterator_state i32)
     (local $dependencies i32)
+    (local $key i32)
+    (local $value i32)
     (if (result i32 i32)
       ;; If the iterator is empty, return the empty hashmap
       (i32.eqz (local.get $length))
@@ -468,7 +469,10 @@
         (global.get $NULL))
       (else
         ;; Otherwise allocate a new hashmap to hold the results and fill it by consuming each iterator item in turn
-        (local.tee $instance (call $Term::Hashmap::allocate (call $Term::Hashmap::default_capacity (local.get $length))))
+        (local.set $instance
+          (call $Term::Hashmap::allocate
+            (call $Term::Hashmap::default_capacity
+              (i32.div_u (local.get $length) (i32.const 2)))))
         (local.set $iterator_state (global.get $NULL))
         (local.set $dependencies (global.get $NULL))
         (loop $LOOP
@@ -479,45 +483,49 @@
           (local.set $iterator_state)
           (if
             ;; If the iterator has been fully consumed, nothing more to do
-            (i32.eq (local.tee $item) (global.get $NULL))
+            (i32.eq (local.tee $key) (global.get $NULL))
             (then)
             (else
-              ;; Otherwise resolve the current entry
-              (call $Term::traits::evaluate (local.get $item) (local.get $state))
+              ;; Otherwise consume the next iterator item
+              (call $Term::traits::next (local.get $iterator) (local.get $iterator_state) (local.get $state))
+              ;; Update the accumulated dependencies and iterator state
               (local.set $dependencies (call $Dependencies::traits::union (local.get $dependencies)))
-              ;; Skip over any entries which are not valid key/value pairs
-              (br_if $LOOP
-                (if (result i32)
-                  (call $Term::List::is (local.tee $item))
-                  (then
-                    (i32.lt_u (call $Term::List::get_length (local.get $item)) (i32.const 2)))
-                  (else
-                    (i32.const 1))))
-              ;; Store the item in the results hashmap
-              ;; (this function returns the number of new entries added to the hashmap)
-              (call $Term::Hashmap::insert_entry
-                (local.get $instance)
-                (call $Term::List::get_item (local.get $item) (i32.const 0))
-                (call $Term::List::get_item (local.get $item) (i32.const 1)))
-              ;; Keep track of how many unique entries have been added to the hashmap
-              (local.set $num_entries (i32.add (local.get $num_entries)))
-              ;; Continue with the next item
-              (br $LOOP))))
-        ;; Set the hashmap size
-        (call $Term::Hashmap::set::num_entries (local.get $instance) (local.get $num_entries))
-        ;; Initialize the hashmap term
-        (call $Term::init)
-        (local.get $dependencies))))
+              (local.set $iterator_state)
+              (if
+                ;; If the iterator has been fully consumed (i.e. the iterator ended with a trailing key), nothing more to do
+                (i32.eq (local.tee $value) (global.get $NULL))
+                (then)
+                (else
+                  ;; Otherwise store the entry in the results hashmap
+                  ;; (this function returns the number of new entries added to the hashmap)
+                  (call $Term::Hashmap::insert_entry (local.get $instance) (local.get $key) (local.get $value))
+                  ;; Keep track of how many unique entries have been added to the hashmap
+                  (local.set $num_entries (i32.add (local.get $num_entries)))
+                  ;; Continue with the next entry
+                  (br $LOOP))))))
+        ;; If the source iterator did not produce any valid entries, return the empty results hashmap as-is
+        (if (result i32 i32)
+          (i32.eqz (local.get $num_entries))
+          (then
+            (local.get $instance)
+            (local.get $dependencies))
+          (else
+            ;; Otherwise set the hashmap size
+            (call $Term::Hashmap::set::num_entries (local.get $instance) (local.get $num_entries))
+            ;; Initialize the results hashmap
+            (call $Term::init (local.get $instance))
+            (local.get $dependencies))))))
 
   (func $Term::Hashmap::collect_unsized (param $iterator i32) (param $state i32) (result i32 i32)
     ;; We cannot know in advance the correct size of hashmap to allocate, so we start off with the empty hashmap, then
     ;; allocate a series of hashmaps of doubling capacity as more iterator items are consumed from the source iterator
     (local $instance i32)
     (local $capacity i32)
-    (local $item i32)
     (local $num_entries i32)
     (local $iterator_state i32)
     (local $dependencies i32)
+    (local $key i32)
+    (local $value i32)
     ;; Start off with the empty hashmap to avoid an unnecessary allocation for empty source iterators
     (local.set $instance (call $Term::Hashmap::empty))
     (local.set $iterator_state (global.get $NULL))
@@ -530,37 +538,33 @@
       (local.set $iterator_state)
       (if
         ;; If the iterator has been fully consumed, nothing more to do
-        (i32.eq (local.tee $item) (global.get $NULL))
+        (i32.eq (local.tee $key) (global.get $NULL))
         (then)
         (else
-          ;; Resolve the current entry
-          (call $Term::traits::evaluate (local.get $item) (local.get $state))
+          ;; Consume the next iterator item
+          (call $Term::traits::next (local.get $iterator) (local.get $iterator_state) (local.get $state))
+          ;; Update the accumulated dependencies and iterator state
           (local.set $dependencies (call $Dependencies::traits::union (local.get $dependencies)))
-          ;; Skip over any entries which are not valid key/value pairs
-          (br_if $LOOP
-            (if (result i32)
-              (call $Term::List::is (local.tee $item))
-              (then
-                (i32.lt_u (call $Term::List::get_length (local.get $item)) (i32.const 2)))
-              (else
-                (i32.const 1))))
-          ;; Ensure enough capacity exists in the hashmap to store an additional entry
-          (local.set $instance
-            (call $Term::Hashmap::ensure_capacity
-              (local.get $instance)
-              (call $Term::Hashmap::default_capacity (i32.add (local.get $num_entries) (i32.const 1)))))
-          ;; Store the item in the results hashmap
-          ;; (this function returns the number of new entries added to the hashmap)
-          (call $Term::Hashmap::insert_entry
-            (local.get $instance)
-            (call $Term::List::get_item (local.get $item) (i32.const 0))
-            (call $Term::List::get_item (local.get $item) (i32.const 1)))
-          ;; Keep track of how many unique entries have been added to the hashmap
-          (local.set $num_entries (i32.add (local.get $num_entries)))
-          ;; Update the hashmap length to ensure that any reallocations copy all the items collected so far
-          (call $Term::Hashmap::set::num_entries (local.get $instance) (local.get $num_entries))
-          ;; Continue with the next entry
-          (br $LOOP))))
+          (local.set $iterator_state)
+          (if
+            ;; If the iterator has been fully consumed, nothing more to do
+            (i32.eq (local.tee $value) (global.get $NULL))
+            (then)
+            (else
+              ;; Ensure enough capacity exists in the hashmap to store an additional entry
+              (local.set $instance
+                (call $Term::Hashmap::ensure_capacity
+                  (local.get $instance)
+                  (call $Term::Hashmap::default_capacity (i32.add (local.get $num_entries) (i32.const 1)))))
+              ;; Store the entry in the results hashmap
+              ;; (this function returns the number of new entries added to the hashmap)
+              (call $Term::Hashmap::insert_entry (local.get $instance) (local.get $key) (local.get $value))
+              ;; Keep track of how many unique entries have been added to the hashmap
+              (local.set $num_entries (i32.add (local.get $num_entries)))
+              ;; Update the hashmap length to ensure that any reallocations copy all the items collected so far
+              (call $Term::Hashmap::set::num_entries (local.get $instance) (local.get $num_entries))
+              ;; Continue with the next entry
+              (br $LOOP))))))
     (if (result i32 i32)
       ;; If the source iterator did not produce any valid entries, return the empty results hashmap as-is
       (i32.eqz (local.get $num_entries))
@@ -574,29 +578,16 @@
 
   (func $Term::Hashmap::traits::collect_strict (param $iterator i32) (param $state i32) (result i32 i32)
     (local $length i32)
+    ;; Collect the hashmap items according to whether the iterator size is known
     (if (result i32 i32)
-      ;; If the source iterator is already a hashmap composed solely of static items, return the existing instance
-      (if (result i32)
-        (call $Term::Hashmap::is (local.get $iterator))
-        (then
-          (i32.eqz (call $Term::Hashmap::has_dynamic_entries (local.get $iterator))))
-        (else
-          (global.get $FALSE)))
+      (i32.eq (local.tee $length (call $Term::traits::size_hint (local.get $iterator))) (global.get $NULL))
       (then
-        (local.get $iterator)
-        (global.get $NULL))
+        (call $Term::Hashmap::collect_strict_unsized (local.get $iterator) (local.get $state)))
       (else
-        ;; Otherwise collect the hashmap items according to whether the iterator size is known
-        (if (result i32 i32)
-          (i32.eq (local.tee $length (call $Term::traits::size_hint (local.get $iterator))) (global.get $NULL))
-          (then
-            (call $Term::Hashmap::collect_strict_unsized (local.get $iterator) (local.get $state)))
-          (else
-            (call $Term::Hashmap::collect_strict_sized (local.get $length) (local.get $iterator) (local.get $state)))))))
+        (call $Term::Hashmap::collect_strict_sized (local.get $length) (local.get $iterator) (local.get $state)))))
 
   (func $Term::Hashmap::collect_strict_sized (param $length i32) (param $iterator i32) (param $state i32) (result i32 i32)
     (local $instance i32)
-    (local $item i32)
     (local $num_entries i32)
     (local $iterator_state i32)
     (local $dependencies i32)
@@ -611,7 +602,10 @@
         (global.get $NULL))
       (else
         ;; Otherwise allocate a new hashmap to hold the results and fill it by consuming each iterator item in turn
-        (local.set $instance (call $Term::Hashmap::allocate (call $Term::Hashmap::default_capacity (local.get $length))))
+        (local.set $instance
+          (call $Term::Hashmap::allocate
+            (call $Term::Hashmap::default_capacity
+              (i32.div_u (local.get $length) (i32.const 2)))))
         (local.set $iterator_state (global.get $NULL))
         (local.set $dependencies (global.get $NULL))
         (local.set $signal (global.get $NULL))
@@ -623,82 +617,51 @@
           (local.set $iterator_state)
           (if
             ;; If the iterator has been fully consumed, nothing more to do
-            (i32.eq (local.tee $item) (global.get $NULL))
+            (i32.eq (local.tee $key) (global.get $NULL))
             (then)
             (else
-              ;; Otherwise resolve the current entry
-              (call $Term::traits::evaluate (local.get $item) (local.get $state))
-              (local.set $dependencies (call $Dependencies::traits::union (local.get $dependencies)))
-              (local.set $item)
-              ;; Short-circuit any signals, including type error signals for any entries which are not valid key/value pairs
-              (block $List
-                (block $Signal
-                  (block $default
-                    (br_table
-                      $List
-                      $Signal
-                      $default
-                      (select
-                        (i32.const 0)
-                        (select
-                          (i32.const 1)
-                          (i32.const 2)
-                          (call $Term::Signal::is (local.get $item)))
-                        (call $Term::List::is (local.get $item)))))
-                  (; default ;)
-                  ;; Create a type error signal and fall through to the signal implementation
-                  (local.set $item (call $Term::Signal::of (call $Term::Condition::type_error (global.get $TermType::List) (local.get $item)))))
-                (; Signal ;)
-                ;; Update the combined signal and continue with the next item
-                (local.set $signal (call $Term::Signal::traits::union (local.get $signal) (local.get $item)))
-                (br $LOOP))
-              ;; Resolve the key and value
-              (if (result i32 i32)
-                (i32.ge_u (call $Term::List::get_length (local.get $item)) (i32.const 2))
-                (then
-                  (call $Term::traits::evaluate
-                    (call $Term::List::get_item (local.get $item) (i32.const 0))
-                    (local.get $state)))
-                (else
-                  (call $Term::Signal::of (call $Term::Condition::type_error (global.get $TermType::List) (local.get $item))
-                  (global.get $NULL))))
+              ;; Otherwise resolve the key
+              (call $Term::traits::evaluate (local.get $key) (local.get $state))
               (local.set $dependencies (call $Dependencies::traits::union (local.get $dependencies)))
               (local.set $key)
-              (if (result i32 i32)
-                (i32.ge_u (call $Term::List::get_length (local.get $item)) (i32.const 2))
-                (then
-                  (call $Term::traits::evaluate
-                    (call $Term::List::get_item (local.get $item) (i32.const 1))
-                    (local.get $state)))
-                (else
-                  (call $Term::Signal::of (call $Term::Condition::type_error (global.get $TermType::List) (local.get $item))
-                  (global.get $NULL))))
+              ;; Consume the next iterator item
+              (call $Term::traits::next (local.get $iterator) (local.get $iterator_state) (local.get $state))
+              ;; Update the accumulated dependencies and iterator state
               (local.set $dependencies (call $Dependencies::traits::union (local.get $dependencies)))
-              (local.set $value)
-              ;; If the key or value resolve to a signal, or a signal has already been encountered,
-              ;; update the combined signal and continue with the next item
-              (br_if $LOOP
-                (i32.ne
-                  (global.get $NULL)
-                  (local.tee $signal
-                    (call $Term::Signal::traits::union
-                      (local.get $signal)
-                      (call $Term::Signal::traits::union
-                        (select
-                          (local.get $value)
-                          (global.get $NULL)
-                          (call $Term::Signal::is (local.get $value)))
-                        (select
-                          (local.get $key)
-                          (global.get $NULL)
-                          (call $Term::Signal::is (local.get $key))))))))
-              ;; Otherwise store the item in the results hashmap
-              ;; (this function returns the number of new entries added to the hashmap)
-              (call $Term::Hashmap::insert_entry (local.get $instance) (local.get $key) (local.get $value))
-              ;; Keep track of how many unique entries have been added to the hashmap
-              (local.set $num_entries (i32.add (local.get $num_entries)))
-              ;; Continue with the next item
-              (br $LOOP))))
+              (local.set $iterator_state)
+              (if
+                ;; If the iterator has been fully consumed (i.e. the iterator ended with a trailing key), nothing more to do
+                (i32.eq (local.tee $value) (global.get $NULL))
+                (then)
+                (else
+                  ;; Otherwise resolve the value
+                  (call $Term::traits::evaluate (local.get $value) (local.get $state))
+                  (local.set $dependencies (call $Dependencies::traits::union (local.get $dependencies)))
+                  (local.set $value)
+                  ;; If the key or value resolve to a signal, or a signal has already been encountered,
+                  ;; update the combined signal and continue with the next item
+                  (br_if $LOOP
+                    (i32.ne
+                      (global.get $NULL)
+                      (local.tee $signal
+                        (call $Term::Signal::traits::union
+                          (local.get $signal)
+                          (call $Term::Signal::traits::union
+                            (select
+                              (local.get $value)
+                              (global.get $NULL)
+                              (call $Term::Signal::is (local.get $value)))
+                            (select
+                              (local.get $key)
+                              (global.get $NULL)
+                              (call $Term::Signal::is (local.get $key))))))))
+                  ;; Otherwise store the entry in the results hashmap
+                  ;; (this function returns the number of new entries added to the hashmap)
+                  (call $Term::Hashmap::insert_entry (local.get $instance) (local.get $key) (local.get $value))
+                  ;; Keep track of how many unique entries have been added to the hashmap
+                  (local.set $num_entries (i32.add (local.get $num_entries)))
+                  ;; Continue with the next entry
+                  (br $LOOP))))))
         (if (result i32 i32)
           ;; If a signal was encountered during the iteration, return the combined signal
           (i32.ne (global.get $NULL) (local.get $signal))
@@ -713,7 +676,7 @@
                 (local.get $instance)
                 (local.get $dependencies))
               (else
-                ;; Set the hashmap size
+                ;; Otherwise set the hashmap size
                 (call $Term::Hashmap::set::num_entries (local.get $instance) (local.get $num_entries))
                 ;; Initialize the results hashmap
                 (call $Term::init (local.get $instance))
@@ -738,95 +701,64 @@
     (loop $LOOP
       ;; Consume the next iterator item
       (call $Term::traits::next (local.get $iterator) (local.get $iterator_state) (local.get $state))
-        ;; Update the accumulated dependencies and iterator state
+      ;; Update the accumulated dependencies and iterator state
       (local.set $dependencies (call $Dependencies::traits::union (local.get $dependencies)))
       (local.set $iterator_state)
       (if
         ;; If the iterator has been fully consumed, nothing more to do
-        (i32.eq (local.tee $item) (global.get $NULL))
+        (i32.eq (local.tee $key) (global.get $NULL))
         (then)
         (else
-          ;; Otherwise resolve the current entry
-          (call $Term::traits::evaluate (local.get $item) (local.get $state))
-          (local.set $dependencies (call $Dependencies::traits::union (local.get $dependencies)))
-          (local.set $item)
-          ;; Short-circuit any signals, including type error signals for any entries which are not valid key/value pairs
-          (block $List
-            (block $Signal
-              (block $default
-                (br_table
-                  $List
-                  $Signal
-                  $default
-                  (select
-                    (i32.const 0)
-                    (select
-                      (i32.const 1)
-                      (i32.const 2)
-                      (call $Term::Signal::is (local.get $item)))
-                    (call $Term::List::is (local.get $item)))))
-              (; default ;)
-              ;; Create a type error signal and fall through to the signal implementation
-              (local.set $item (call $Term::Signal::of (call $Term::Condition::type_error (global.get $TermType::List) (local.get $item)))))
-            (; Signal ;)
-            ;; Update the combined signal and continue with the next item
-            (local.set $signal (call $Term::Signal::traits::union (local.get $signal) (local.get $item)))
-            (br $LOOP))
-          ;; Resolve the key and value
-          (if (result i32 i32)
-            (i32.ge_u (call $Term::List::get_length (local.get $item)) (i32.const 2))
-            (then
-              (call $Term::traits::evaluate
-                (call $Term::List::get_item (local.get $item) (i32.const 0))
-                (local.get $state)))
-            (else
-              (call $Term::Signal::of (call $Term::Condition::type_error (global.get $TermType::List) (local.get $item))
-              (global.get $NULL))))
+          ;; Otherwise resolve the key
+          (call $Term::traits::evaluate (local.get $key) (local.get $state))
           (local.set $dependencies (call $Dependencies::traits::union (local.get $dependencies)))
           (local.set $key)
-          (if (result i32 i32)
-            (i32.ge_u (call $Term::List::get_length (local.get $item)) (i32.const 2))
-            (then
-              (call $Term::traits::evaluate
-                (call $Term::List::get_item (local.get $item) (i32.const 1))
-                (local.get $state)))
-            (else
-              (call $Term::Signal::of (call $Term::Condition::type_error (global.get $TermType::List) (local.get $item))
-              (global.get $NULL))))
+          ;; Consume the next iterator item
+          (call $Term::traits::next (local.get $iterator) (local.get $iterator_state) (local.get $state))
+          ;; Update the accumulated dependencies and iterator state
           (local.set $dependencies (call $Dependencies::traits::union (local.get $dependencies)))
-          (local.set $value)
-          ;; If the key or value resolve to a signal, or a signal has already been encountered,
-          ;; update the combined signal and continue with the next item
-          (br_if $LOOP
-            (i32.ne
-              (global.get $NULL)
-              (local.tee $signal
-                (call $Term::Signal::traits::union
-                  (local.get $signal)
-                  (call $Term::Signal::traits::union
-                    (select
-                      (local.get $value)
-                      (global.get $NULL)
-                      (call $Term::Signal::is (local.get $value)))
-                    (select
-                      (local.get $key)
-                      (global.get $NULL)
-                      (call $Term::Signal::is (local.get $key))))))))
-          ;; Otherwise store the entry in the results hashmap, reallocating if necessary
-          ;; Ensure enough capacity exists in the hashmap to store an additional entry
-          (local.set $instance
-            (call $Term::Hashmap::ensure_capacity
-              (local.get $instance)
-              (call $Term::Hashmap::default_capacity (i32.add (local.get $num_entries) (i32.const 1)))))
-          ;; Store the item in the results hashmap
-          ;; (this function returns the number of new entries added to the hashmap)
-          (call $Term::Hashmap::insert_entry (local.get $instance) (local.get $key) (local.get $value))
-          ;; Keep track of how many unique entries have been added to the hashmap
-          (local.set $num_entries (i32.add (local.get $num_entries)))
-          ;; Update the hashmap length to ensure that any reallocations copy all the items collected so far
-          (call $Term::Hashmap::set::num_entries (local.get $instance) (local.get $num_entries))
-          ;; Continue with the next item
-          (br $LOOP))))
+          (local.set $iterator_state)
+          (if
+            ;; If the iterator has been fully consumed (i.e. the iterator ended with a trailing key), nothing more to do
+            (i32.eq (local.tee $value) (global.get $NULL))
+            (then)
+            (else
+              ;; Otherwise resolve the value
+              (call $Term::traits::evaluate (local.get $value) (local.get $state))
+              (local.set $dependencies (call $Dependencies::traits::union (local.get $dependencies)))
+              (local.set $value)
+              ;; If the key or value resolve to a signal, or a signal has already been encountered,
+              ;; update the combined signal and continue with the next item
+              (br_if $LOOP
+                (i32.ne
+                  (global.get $NULL)
+                  (local.tee $signal
+                    (call $Term::Signal::traits::union
+                      (local.get $signal)
+                      (call $Term::Signal::traits::union
+                        (select
+                          (local.get $value)
+                          (global.get $NULL)
+                          (call $Term::Signal::is (local.get $value)))
+                        (select
+                          (local.get $key)
+                          (global.get $NULL)
+                          (call $Term::Signal::is (local.get $key))))))))
+              ;; Otherwise store the entry in the results hashmap, reallocating if necessary
+              ;; Ensure enough capacity exists in the hashmap to store an additional entry
+              (local.set $instance
+                (call $Term::Hashmap::ensure_capacity
+                  (local.get $instance)
+                  (call $Term::Hashmap::default_capacity (i32.add (local.get $num_entries) (i32.const 1)))))
+              ;; Store the entry in the results hashmap
+              ;; (this function returns the number of new entries added to the hashmap)
+              (call $Term::Hashmap::insert_entry (local.get $instance) (local.get $key) (local.get $value))
+              ;; Keep track of how many unique entries have been added to the hashmap
+              (local.set $num_entries (i32.add (local.get $num_entries)))
+              ;; Update the hashmap length to ensure that any reallocations copy all the items collected so far
+              (call $Term::Hashmap::set::num_entries (local.get $instance) (local.get $num_entries))
+              ;; Continue with the next entry
+              (br $LOOP))))))
     (if (result i32 i32)
       ;; If a signal was encountered during the iteration, return the combined signal
       (i32.ne (global.get $NULL) (local.get $signal))

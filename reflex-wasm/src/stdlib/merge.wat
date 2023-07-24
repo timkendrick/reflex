@@ -15,7 +15,7 @@
         (local $dependencies i32)
         ;; Combine all the sets of record entries into a temporary lookup hashmap instance
         (call $Term::Hashmap::traits::collect
-          (call $Term::FlattenIterator::new (local.get $arg_list))
+          (call $Term::FlattenIterator::new (call $Term::FlattenIterator::new (local.get $arg_list)))
           (local.get $state))
         (local.set $dependencies)
         (local.tee $entries)

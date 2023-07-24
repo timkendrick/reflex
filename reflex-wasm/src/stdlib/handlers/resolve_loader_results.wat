@@ -78,7 +78,8 @@
           (then
             ;; Create a lookup hashmap to determine whether a provided key is in the set of expected keys
             (call $Term::Hashmap::traits::collect
-              (call $Term::ZipIterator::new (local.get $keys) (local.get $keys))
+              (call $Term::FlattenIterator::new
+                (call $Term::ZipIterator::new (local.get $keys) (local.get $keys)))
               (global.get $NULL))
             (call $Dependencies::assert_empty)
             (local.set $expected_keys)
@@ -168,7 +169,8 @@
           (then
             ;; Create a lookup record to determine whether a provided key is in the set of expected keys
             (call $Term::Hashmap::traits::collect
-              (call $Term::ZipIterator::new (local.get $keys) (local.get $keys))
+              (call $Term::FlattenIterator::new
+                (call $Term::ZipIterator::new (local.get $keys) (local.get $keys)))
               (global.get $NULL))
             (call $Dependencies::assert_empty)
             (local.set $expected_keys)

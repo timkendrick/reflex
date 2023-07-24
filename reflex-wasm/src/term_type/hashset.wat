@@ -82,9 +82,11 @@
   (func $Term::Hashset::traits::collect (param $iterator i32) (param $state i32) (result i32 i32)
     (local $dependencies i32)
     (call $Term::Hashmap::traits::collect
-      (call $Term::ZipIterator::new
-        (local.get $iterator)
-        (call $Term::RepeatIterator::new (call $Term::Nil::new)))
+      ;; TODO: Avoid unnecessary heap allocations for intermediate values
+      (call $Term::FlattenIterator::new
+        (call $Term::ZipIterator::new
+          (local.get $iterator)
+          (call $Term::RepeatIterator::new (call $Term::Nil::new))))
       (local.get $state))
     (local.set $dependencies)
     (call $Term::Hashset::new)
@@ -93,9 +95,11 @@
   (func $Term::Hashset::traits::collect_strict (param $iterator i32) (param $state i32) (result i32 i32)
     (local $dependencies i32)
     (call $Term::Hashmap::traits::collect_strict
-      (call $Term::ZipIterator::new
-        (local.get $iterator)
-        (call $Term::RepeatIterator::new (call $Term::Nil::new)))
+      ;; TODO: Avoid unnecessary heap allocations for intermediate values
+      (call $Term::FlattenIterator::new
+        (call $Term::ZipIterator::new
+          (local.get $iterator)
+          (call $Term::RepeatIterator::new (call $Term::Nil::new))))
       (local.get $state))
     (local.set $dependencies)
     (call $Term::Hashset::new)

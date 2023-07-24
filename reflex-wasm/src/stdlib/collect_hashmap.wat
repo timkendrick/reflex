@@ -8,7 +8,7 @@
     (@impl
       (call $TermType::implements::iterate)
       (func $Stdlib_CollectHashmap::impl::<iterate> (param $arg_list i32) (param $state i32) (result i32 i32)
-        (call $Term::Hashmap::traits::collect_strict (local.get $arg_list) (local.get $state))))
+        (call $Term::Hashmap::traits::collect (local.get $arg_list) (local.get $state))))
 
     (@default
       (func $Stdlib_CollectHashmap::impl::default (param $arg_list i32) (param $state i32) (result i32 i32)

@@ -72,7 +72,8 @@
     (@impl
       (i32.eq (global.get $TermType::Hashmap))
       (func $Stdlib_ResolveDeep::impl::Hashmap (param $self i32) (param $state i32) (result i32 i32)
-        (local $iterator i32)
+        (local $map_iterator i32)
+        (local $flatten_iterator i32)
         (if (result i32 i32)
           ;; If the hashmap is already fully resolved, return it as-is
           (call $Stdlib_ResolveDeep::is_fully_resolved::Hashmap (local.get $self))
@@ -82,13 +83,15 @@
           (else
             ;; Otherwise resolve all the entries and collect them into a new hashmap, short-circuiting any signals
             ;; TODO: Avoid unnecessary heap allocations for intermediate values
-            (local.tee $iterator
+            (local.tee $map_iterator
               (call $Term::MapIterator::new
                 (local.get $self)
                 (call $Term::Builtin::new (global.get $Stdlib_ResolveDeep))))
+            (local.tee $flatten_iterator (call $Term::FlattenIterator::new))
             (call $Term::Hashmap::traits::collect_strict (local.get $state))
-            ;; Dispose the temporary iterator instance
-            (call $Term::drop (local.get $iterator))))))
+            ;; Dispose the temporary iterator instances
+            (call $Term::drop (local.get $flatten_iterator))
+            (call $Term::drop (local.get $map_iterator))))))
 
     (@impl
       (i32.eq (global.get $TermType::Hashset))

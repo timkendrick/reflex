@@ -10,7 +10,7 @@
       (call $TermType::implements::iterate)
       (func $Stdlib_ConstructHashmap::impl::<iterate>::<iterate> (param $keys i32) (param $values i32) (param $state i32) (result i32 i32)
         (call $Term::Hashmap::traits::collect
-          (call $Term::ZipIterator::new (local.get $keys) (local.get $values))
+          (call $Term::FlattenIterator::new (call $Term::ZipIterator::new (local.get $keys) (local.get $values)))
           (local.get $state))))
 
     (@default
