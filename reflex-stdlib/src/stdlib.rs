@@ -181,6 +181,7 @@ pub enum Stdlib {
     CollectHashMap,
     CollectHashSet,
     CollectList,
+    CollectRecord,
     CollectSignal,
     CollectString,
     Cons,
@@ -257,6 +258,7 @@ impl TryFrom<Uuid> for Stdlib {
             CollectHashMap::UUID => Ok(Self::CollectHashMap),
             CollectHashSet::UUID => Ok(Self::CollectHashSet),
             CollectList::UUID => Ok(Self::CollectList),
+            CollectRecord::UUID => Ok(Self::CollectRecord),
             CollectSignal::UUID => Ok(Self::CollectSignal),
             CollectString::UUID => Ok(Self::CollectString),
             Cons::UUID => Ok(Self::Cons),
@@ -330,6 +332,7 @@ impl Uid for Stdlib {
             Self::CollectHashMap => Uid::uid(&CollectHashMap {}),
             Self::CollectHashSet => Uid::uid(&CollectHashSet {}),
             Self::CollectList => Uid::uid(&CollectList {}),
+            Self::CollectRecord => Uid::uid(&CollectRecord {}),
             Self::CollectSignal => Uid::uid(&CollectSignal {}),
             Self::CollectString => Uid::uid(&CollectString {}),
             Self::Cons => Uid::uid(&Cons {}),
@@ -402,6 +405,7 @@ impl Stdlib {
             Self::CollectHashMap => CollectHashMap::arity(),
             Self::CollectHashSet => CollectHashSet::arity(),
             Self::CollectList => CollectList::arity(),
+            Self::CollectRecord => CollectRecord::arity(),
             Self::CollectSignal => CollectSignal::arity(),
             Self::CollectString => CollectString::arity(),
             Self::Cons => Cons::arity(),
@@ -486,6 +490,9 @@ impl Stdlib {
             }
             Self::CollectList => {
                 Applicable::<T>::apply(&CollectList, args, factory, allocator, cache)
+            }
+            Self::CollectRecord => {
+                Applicable::<T>::apply(&CollectRecord, args, factory, allocator, cache)
             }
             Self::CollectSignal => {
                 Applicable::<T>::apply(&CollectSignal, args, factory, allocator, cache)
@@ -582,6 +589,7 @@ impl Stdlib {
             Self::CollectHashMap => Applicable::<T>::should_parallelize(&CollectHashMap, args),
             Self::CollectHashSet => Applicable::<T>::should_parallelize(&CollectHashSet, args),
             Self::CollectList => Applicable::<T>::should_parallelize(&CollectList, args),
+            Self::CollectRecord => Applicable::<T>::should_parallelize(&CollectRecord, args),
             Self::CollectSignal => Applicable::<T>::should_parallelize(&CollectSignal, args),
             Self::CollectString => Applicable::<T>::should_parallelize(&CollectString, args),
             Self::Cons => Applicable::<T>::should_parallelize(&Cons, args),
@@ -716,6 +724,11 @@ impl From<CollectHashSet> for Stdlib {
 impl From<CollectList> for Stdlib {
     fn from(_value: CollectList) -> Self {
         Self::CollectList
+    }
+}
+impl From<CollectRecord> for Stdlib {
+    fn from(_value: CollectRecord) -> Self {
+        Self::CollectRecord
     }
 }
 impl From<CollectSignal> for Stdlib {
