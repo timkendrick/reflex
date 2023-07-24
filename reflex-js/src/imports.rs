@@ -23,6 +23,7 @@ pub trait JsImportsBuiltin:
     + From<Cdr>
     + From<Ceil>
     + From<Chain>
+    + From<CollectConstructor>
     + From<CollectHashMap>
     + From<CollectHashSet>
     + From<CollectList>
@@ -94,6 +95,7 @@ impl<T> JsImportsBuiltin for T where
         + From<Cdr>
         + From<Ceil>
         + From<Chain>
+        + From<CollectConstructor>
         + From<CollectHashMap>
         + From<CollectHashSet>
         + From<CollectList>

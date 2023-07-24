@@ -18,6 +18,7 @@ where
         + From<Cdr>
         + From<Ceil>
         + From<Chain>
+        + From<CollectConstructor>
         + From<CollectHashMap>
         + From<CollectHashSet>
         + From<CollectList>
@@ -110,6 +111,10 @@ where
             (
                 factory.create_string_term(allocator.create_static_string("chain")),
                 factory.create_builtin_term(Chain),
+            ),
+            (
+                factory.create_string_term(allocator.create_static_string("collectConstructor")),
+                factory.create_builtin_term(CollectConstructor),
             ),
             (
                 factory.create_string_term(allocator.create_static_string("collectHashMap")),

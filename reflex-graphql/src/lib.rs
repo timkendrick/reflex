@@ -1170,6 +1170,11 @@ mod tests {
             Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
         }
     }
+    impl From<reflex_stdlib::stdlib::CollectConstructor> for GraphQlTestBuiltins {
+        fn from(value: reflex_stdlib::stdlib::CollectConstructor) -> Self {
+            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+        }
+    }
     impl From<reflex_stdlib::stdlib::CollectHashMap> for GraphQlTestBuiltins {
         fn from(value: reflex_stdlib::stdlib::CollectHashMap) -> Self {
             Self::from(reflex_stdlib::stdlib::Stdlib::from(value))

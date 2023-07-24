@@ -142,6 +142,11 @@ impl From<stdlib::Chain> for JsBuiltins {
         Self::from(stdlib::Stdlib::from(value))
     }
 }
+impl From<stdlib::CollectConstructor> for JsBuiltins {
+    fn from(value: stdlib::CollectConstructor) -> Self {
+        Self::from(stdlib::Stdlib::from(value))
+    }
+}
 impl From<stdlib::CollectHashMap> for JsBuiltins {
     fn from(value: stdlib::CollectHashMap) -> Self {
         Self::from(stdlib::Stdlib::from(value))
