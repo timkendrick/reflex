@@ -589,7 +589,6 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<HashmapTerm, A> {
         options: &CompilerOptions,
     ) -> CompilerResult<A> {
         let capacity = self.capacity();
-        let num_entries = self.num_entries();
         let keys = self.keys();
         let values = self.values();
         let block = CompiledBlockBuilder::new(stack);
@@ -627,12 +626,7 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<HashmapTerm, A> {
                 Ok(block)
             },
         )?;
-        // Now that the hashmap entries have been added, push the number of entries onto the stack
-        // => [HashmapTerm, num_entries]
-        let block = block.push(instruction::core::Const {
-            value: ConstValue::U32(num_entries as u32),
-        });
-        // Initialize the hashmap term with the length that is on the stack
+        // Initialize the hashmap term
         // => [HashmapTerm]
         let block = block.push(instruction::runtime::CallRuntimeBuiltin {
             target: RuntimeBuiltin::InitHashmap,
