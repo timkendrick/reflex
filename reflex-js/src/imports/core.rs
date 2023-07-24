@@ -25,7 +25,6 @@ where
         + From<CollectSignal>
         + From<CollectString>
         + From<Cons>
-        + From<ConstructRecord>
         + From<Contains>
         + From<Divide>
         + From<Effect>
@@ -139,10 +138,6 @@ where
             (
                 factory.create_string_term(allocator.create_static_string("cons")),
                 factory.create_builtin_term(Cons),
-            ),
-            (
-                factory.create_string_term(allocator.create_static_string("constructRecord")),
-                factory.create_builtin_term(ConstructRecord),
             ),
             (
                 factory.create_string_term(allocator.create_static_string("contains")),

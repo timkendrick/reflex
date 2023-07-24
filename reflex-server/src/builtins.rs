@@ -222,11 +222,6 @@ impl From<reflex_stdlib::stdlib::Cons> for ServerBuiltins {
         Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
     }
 }
-impl From<reflex_stdlib::stdlib::ConstructRecord> for ServerBuiltins {
-    fn from(value: reflex_stdlib::stdlib::ConstructRecord) -> Self {
-        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
-    }
-}
 impl From<reflex_stdlib::stdlib::Contains> for ServerBuiltins {
     fn from(value: reflex_stdlib::stdlib::Contains) -> Self {
         Self::from(reflex_stdlib::stdlib::Stdlib::from(value))

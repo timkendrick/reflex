@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 use reflex::core::{create_record, Builtin, Expression, ExpressionFactory, HeapAllocator};
-use reflex_stdlib::{Apply, ConstructRecord, Get, Keys, Map, ResolveList, Unzip, Values, Zip};
+use reflex_stdlib::{
+    Apply, CollectRecord, Flatten, Get, Keys, Map, ResolveList, Unzip, Values, Zip,
+};
 
 use crate::stdlib::Accessor;
 
@@ -14,7 +16,8 @@ where
     T::Builtin: Builtin
         + From<Accessor>
         + From<Apply>
-        + From<ConstructRecord>
+        + From<CollectRecord>
+        + From<Flatten>
         + From<Get>
         + From<Keys>
         + From<Map>
@@ -48,34 +51,13 @@ where
                 factory.create_string_term(allocator.create_static_string("fromEntries")),
                 factory.create_lambda_term(
                     1,
-                    factory.create_let_term(
-                        factory.create_application_term(
-                            factory.create_builtin_term(Unzip),
-                            allocator.create_unit_list(factory.create_variable_term(0)),
-                        ),
-                        factory.create_application_term(
-                            factory.create_builtin_term(ConstructRecord),
-                            allocator.create_pair(
-                                factory.create_application_term(
-                                    factory.create_builtin_term(ResolveList),
-                                    allocator.create_unit_list(factory.create_application_term(
-                                        factory.create_builtin_term(Get),
-                                        allocator.create_pair(
-                                            factory.create_variable_term(0),
-                                            factory.create_int_term(0),
-                                        ),
-                                    )),
-                                ),
-                                factory.create_application_term(
-                                    factory.create_builtin_term(ResolveList),
-                                    allocator.create_unit_list(factory.create_application_term(
-                                        factory.create_builtin_term(Get),
-                                        allocator.create_pair(
-                                            factory.create_variable_term(0),
-                                            factory.create_int_term(1),
-                                        ),
-                                    )),
-                                ),
+                    factory.create_application_term(
+                        factory.create_builtin_term(Apply),
+                        allocator.create_pair(
+                            factory.create_builtin_term(CollectRecord),
+                            factory.create_application_term(
+                                factory.create_builtin_term(Flatten),
+                                allocator.create_unit_list(factory.create_variable_term(0)),
                             ),
                         ),
                     ),

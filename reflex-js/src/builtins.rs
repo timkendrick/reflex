@@ -177,11 +177,6 @@ impl From<stdlib::Cons> for JsBuiltins {
         Self::from(stdlib::Stdlib::from(value))
     }
 }
-impl From<stdlib::ConstructRecord> for JsBuiltins {
-    fn from(value: stdlib::ConstructRecord) -> Self {
-        Self::from(stdlib::Stdlib::from(value))
-    }
-}
 impl From<stdlib::Contains> for JsBuiltins {
     fn from(value: stdlib::Contains) -> Self {
         Self::from(stdlib::Stdlib::from(value))
