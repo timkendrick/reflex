@@ -347,8 +347,8 @@ impl From<stdlib::Raise> for JsBuiltins {
         Self::from(stdlib::Stdlib::from(value))
     }
 }
-impl From<stdlib::Reduce> for JsBuiltins {
-    fn from(value: stdlib::Reduce) -> Self {
+impl From<stdlib::Fold> for JsBuiltins {
+    fn from(value: stdlib::Fold) -> Self {
         Self::from(stdlib::Stdlib::from(value))
     }
 }

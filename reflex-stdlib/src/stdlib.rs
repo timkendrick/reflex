@@ -32,6 +32,7 @@ pub use equal::*;
 pub use filter::*;
 pub use flatten::*;
 pub use floor::*;
+pub use fold::*;
 pub use get::*;
 pub use gt::*;
 pub use gte::*;
@@ -56,7 +57,6 @@ pub use push::*;
 pub use push_front::*;
 pub use r#if::*;
 pub use raise::*;
-pub use reduce::*;
 pub use remainder::*;
 pub use replace::*;
 pub use resolve::*;
@@ -92,6 +92,7 @@ mod equal;
 mod filter;
 mod flatten;
 mod floor;
+mod fold;
 mod get;
 mod gt;
 mod gte;
@@ -116,7 +117,6 @@ mod pow;
 mod push;
 mod push_front;
 mod raise;
-mod reduce;
 mod remainder;
 mod replace;
 mod resolve;
@@ -193,6 +193,7 @@ pub enum Stdlib {
     Filter,
     Flatten,
     Floor,
+    Fold,
     Get,
     Gt,
     Gte,
@@ -217,7 +218,6 @@ pub enum Stdlib {
     Push,
     PushFront,
     Raise,
-    Reduce,
     Remainder,
     Replace,
     ResolveArgs,
@@ -270,6 +270,7 @@ impl TryFrom<Uuid> for Stdlib {
             Filter::UUID => Ok(Self::Filter),
             Flatten::UUID => Ok(Self::Flatten),
             Floor::UUID => Ok(Self::Floor),
+            Fold::UUID => Ok(Self::Fold),
             Get::UUID => Ok(Self::Get),
             Gt::UUID => Ok(Self::Gt),
             Gte::UUID => Ok(Self::Gte),
@@ -294,7 +295,6 @@ impl TryFrom<Uuid> for Stdlib {
             Push::UUID => Ok(Self::Push),
             PushFront::UUID => Ok(Self::PushFront),
             Raise::UUID => Ok(Self::Raise),
-            Reduce::UUID => Ok(Self::Reduce),
             Remainder::UUID => Ok(Self::Remainder),
             Replace::UUID => Ok(Self::Replace),
             ResolveArgs::UUID => Ok(Self::ResolveArgs),
@@ -344,6 +344,7 @@ impl Uid for Stdlib {
             Self::Filter => Uid::uid(&Filter {}),
             Self::Flatten => Uid::uid(&Flatten {}),
             Self::Floor => Uid::uid(&Floor {}),
+            Self::Fold => Uid::uid(&Fold {}),
             Self::Get => Uid::uid(&Get {}),
             Self::Gt => Uid::uid(&Gt {}),
             Self::Gte => Uid::uid(&Gte {}),
@@ -368,7 +369,6 @@ impl Uid for Stdlib {
             Self::Push => Uid::uid(&Push {}),
             Self::PushFront => Uid::uid(&PushFront {}),
             Self::Raise => Uid::uid(&Raise {}),
-            Self::Reduce => Uid::uid(&Reduce {}),
             Self::Remainder => Uid::uid(&Remainder {}),
             Self::Replace => Uid::uid(&Replace {}),
             Self::ResolveArgs => Uid::uid(&ResolveArgs {}),
@@ -417,6 +417,7 @@ impl Stdlib {
             Self::Filter => Filter::arity(),
             Self::Flatten => Flatten::arity(),
             Self::Floor => Floor::arity(),
+            Self::Fold => Fold::arity(),
             Self::Get => Get::arity(),
             Self::Gt => Gt::arity(),
             Self::Gte => Gte::arity(),
@@ -441,7 +442,6 @@ impl Stdlib {
             Self::Push => Push::arity(),
             Self::PushFront => PushFront::arity(),
             Self::Raise => Raise::arity(),
-            Self::Reduce => Reduce::arity(),
             Self::Remainder => Remainder::arity(),
             Self::Replace => Replace::arity(),
             Self::ResolveArgs => ResolveArgs::arity(),
@@ -511,6 +511,7 @@ impl Stdlib {
             Self::Filter => Applicable::<T>::apply(&Filter, args, factory, allocator, cache),
             Self::Flatten => Applicable::<T>::apply(&Flatten, args, factory, allocator, cache),
             Self::Floor => Applicable::<T>::apply(&Floor, args, factory, allocator, cache),
+            Self::Fold => Applicable::<T>::apply(&Fold, args, factory, allocator, cache),
             Self::Get => Applicable::<T>::apply(&Get, args, factory, allocator, cache),
             Self::Gt => Applicable::<T>::apply(&Gt, args, factory, allocator, cache),
             Self::Gte => Applicable::<T>::apply(&Gte, args, factory, allocator, cache),
@@ -537,7 +538,6 @@ impl Stdlib {
             Self::Push => Applicable::<T>::apply(&Push, args, factory, allocator, cache),
             Self::PushFront => Applicable::<T>::apply(&PushFront, args, factory, allocator, cache),
             Self::Raise => Applicable::<T>::apply(&Raise, args, factory, allocator, cache),
-            Self::Reduce => Applicable::<T>::apply(&Reduce, args, factory, allocator, cache),
             Self::Remainder => Applicable::<T>::apply(&Remainder, args, factory, allocator, cache),
             Self::Replace => Applicable::<T>::apply(&Replace, args, factory, allocator, cache),
             Self::ResolveArgs => {
@@ -603,6 +603,7 @@ impl Stdlib {
             Self::Filter => Applicable::<T>::should_parallelize(&Filter, args),
             Self::Flatten => Applicable::<T>::should_parallelize(&Flatten, args),
             Self::Floor => Applicable::<T>::should_parallelize(&Floor, args),
+            Self::Fold => Applicable::<T>::should_parallelize(&Fold, args),
             Self::Get => Applicable::<T>::should_parallelize(&Get, args),
             Self::Gt => Applicable::<T>::should_parallelize(&Gt, args),
             Self::Gte => Applicable::<T>::should_parallelize(&Gte, args),
@@ -627,7 +628,6 @@ impl Stdlib {
             Self::Push => Applicable::<T>::should_parallelize(&Push, args),
             Self::PushFront => Applicable::<T>::should_parallelize(&PushFront, args),
             Self::Raise => Applicable::<T>::should_parallelize(&Raise, args),
-            Self::Reduce => Applicable::<T>::should_parallelize(&Reduce, args),
             Self::Remainder => Applicable::<T>::should_parallelize(&Remainder, args),
             Self::Replace => Applicable::<T>::should_parallelize(&Replace, args),
             Self::ResolveArgs => Applicable::<T>::should_parallelize(&ResolveArgs, args),
@@ -796,6 +796,11 @@ impl From<Floor> for Stdlib {
         Self::Floor
     }
 }
+impl From<Fold> for Stdlib {
+    fn from(_value: Fold) -> Self {
+        Self::Fold
+    }
+}
 impl From<Get> for Stdlib {
     fn from(_value: Get) -> Self {
         Self::Get
@@ -914,11 +919,6 @@ impl From<PushFront> for Stdlib {
 impl From<Raise> for Stdlib {
     fn from(_value: Raise) -> Self {
         Self::Raise
-    }
-}
-impl From<Reduce> for Stdlib {
-    fn from(_value: Reduce) -> Self {
-        Self::Reduce
     }
 }
 impl From<Remainder> for Stdlib {

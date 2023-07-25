@@ -256,6 +256,11 @@ impl From<stdlib::Floor> for CliBuiltins {
         Self::from(stdlib::Stdlib::from(value))
     }
 }
+impl From<stdlib::Fold> for CliBuiltins {
+    fn from(value: stdlib::Fold) -> Self {
+        Self::from(stdlib::Stdlib::from(value))
+    }
+}
 impl From<stdlib::Get> for CliBuiltins {
     fn from(value: stdlib::Get) -> Self {
         Self::from(stdlib::Stdlib::from(value))
@@ -373,11 +378,6 @@ impl From<stdlib::PushFront> for CliBuiltins {
 }
 impl From<stdlib::Raise> for CliBuiltins {
     fn from(value: stdlib::Raise) -> Self {
-        Self::from(stdlib::Stdlib::from(value))
-    }
-}
-impl From<stdlib::Reduce> for CliBuiltins {
-    fn from(value: stdlib::Reduce) -> Self {
         Self::from(stdlib::Stdlib::from(value))
     }
 }

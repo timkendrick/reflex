@@ -35,6 +35,7 @@ where
         + From<Filter>
         + From<Flatten>
         + From<Floor>
+        + From<Fold>
         + From<Get>
         + From<Gt>
         + From<Gte>
@@ -59,7 +60,6 @@ where
         + From<Push>
         + From<PushFront>
         + From<Raise>
-        + From<Reduce>
         + From<Remainder>
         + From<Replace>
         + From<ResolveArgs>
@@ -181,6 +181,10 @@ where
                 factory.create_builtin_term(Floor),
             ),
             (
+                factory.create_string_term(allocator.create_static_string("fold")),
+                factory.create_builtin_term(Fold),
+            ),
+            (
                 factory.create_string_term(allocator.create_static_string("get")),
                 factory.create_builtin_term(Get),
             ),
@@ -299,10 +303,6 @@ where
             (
                 factory.create_string_term(allocator.create_static_string("raise")),
                 factory.create_builtin_term(Raise),
-            ),
-            (
-                factory.create_string_term(allocator.create_static_string("reduce")),
-                factory.create_builtin_term(Reduce),
             ),
             (
                 factory.create_string_term(allocator.create_static_string("remainder")),
