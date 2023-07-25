@@ -10,6 +10,7 @@ use crate::{
         CompiledBlockBuilder, CompiledFunctionCall, CompilerOptions, CompilerResult, CompilerStack,
         CompilerState, ParamsSignature, TypeSignature, ValueType,
     },
+    stdlib::r#if::compile_conditional_branch,
 };
 
 #[derive(Default, PartialEq, Eq, Clone, Copy, Debug)]
@@ -17,7 +18,7 @@ pub struct And;
 impl And {
     pub const UUID: Uuid = uuid!("223539c0-3858-4257-a53d-55fa93e2e7ba");
     const ARITY: FunctionArity<2, 0> = FunctionArity {
-        required: [ArgType::Strict, ArgType::Lazy],
+        required: [ArgType::Strict, ArgType::Strict],
         optional: [],
         variadic: None,
     };
@@ -93,9 +94,9 @@ impl<'a, A: Arena + Clone> CompileWasm<A> for CompiledFunctionCall<'a, A, And> {
             let block = block.push(instruction::core::If {
                 block_type,
                 consequent: {
-                    // Yield the consequent onto the stack
+                    // Yield the consequent branch onto the stack
                     // => [Term]
-                    consequent.compile(consequent_stack, state, options)
+                    compile_conditional_branch(&consequent, consequent_stack, state, options)
                 }?,
                 alternative: {
                     let block = CompiledBlockBuilder::new(alternative_stack);
