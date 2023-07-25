@@ -1465,6 +1465,10 @@ fn parse_runtime_exports(module: &Module) -> Result<RuntimeExportMappings, WasmC
                 &exported_functions,
                 RuntimeBuiltin::CreateConstructor,
             )?,
+            create_empty_list: get_builtin_function(
+                &exported_functions,
+                RuntimeBuiltin::CreateEmptyList,
+            )?,
             create_effect: get_builtin_function(&exported_functions, RuntimeBuiltin::CreateEffect)?,
             create_float: get_builtin_function(&exported_functions, RuntimeBuiltin::CreateFloat)?,
             create_hashset: get_builtin_function(

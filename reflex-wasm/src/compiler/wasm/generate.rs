@@ -65,6 +65,7 @@ pub struct RuntimeBuiltinMappings {
     pub create_invalid_function_args_condition: FunctionId,
     pub create_invalid_pointer_condition: FunctionId,
     pub create_constructor: FunctionId,
+    pub create_empty_list: FunctionId,
     pub create_effect: FunctionId,
     pub create_float: FunctionId,
     pub create_hashset: FunctionId,
@@ -135,6 +136,7 @@ impl RuntimeBuiltinMappings {
             }
             RuntimeBuiltin::CreateInvalidPointerCondition => self.create_invalid_pointer_condition,
             RuntimeBuiltin::CreateConstructor => self.create_constructor,
+            RuntimeBuiltin::CreateEmptyList => self.create_empty_list,
             RuntimeBuiltin::CreateEffect => self.create_effect,
             RuntimeBuiltin::CreateFloat => self.create_float,
             RuntimeBuiltin::CreateHashset => self.create_hashset,

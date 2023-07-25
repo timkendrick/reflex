@@ -1126,6 +1126,51 @@ impl<A: Arena + Clone> CompileWasm<A> for CompiledFunctionCallArgs<A> {
     }
 }
 
+/// Compile each of the provided initializers, pushing a new variable declaration scope onto the lexical scope stack for each one
+pub(crate) fn compile_variable_declarations<A: Arena>(
+    initializers: impl IntoIterator<Item = (ValueType, impl CompileWasm<A>)>,
+    stack: CompilerStack,
+    state: &mut CompilerState,
+    options: &CompilerOptions,
+) -> CompilerResult<A> {
+    // Compile the closed-over variable initializer values separately within the correct lexical scopes
+    let block = initializers
+        .into_iter()
+        .fold(
+            Result::<_, CompilerError<A>>::Ok((CompiledBlockBuilder::new(stack.clone()), stack)),
+            |result, (value_type, initializer)| {
+                let (block, initializer_stack) = result?;
+                // Compile the initializer within the correct lexical scope stack,
+                // taking into account the lexical scopes created for the preceding initializers
+                let (initializer_block, initializer_stack) = {
+                    let block = CompiledBlockBuilder::new(initializer_stack.clone());
+                    let block =
+                        block.append_inner(|stack| initializer.compile(stack, state, options))?;
+                    let block = block.finish::<CompilerError<A>>()?;
+                    // Create a new stack that reflects a new lexical scope having been created for the initializer
+                    // without affecting the variable scope stack
+                    (block, initializer_stack.enter_scope(value_type))
+                };
+                // Yield the initializer value onto the operand stack
+                // => [Term]
+                let block = block.append_inner(
+                    // The variable initializer has already been compiled within the correct lexical scope stack,
+                    // so we ignore the expected stack
+                    // (this is necessary because the initializers are compiled within intermediate lexical scopes,
+                    // whereas the output block encodes the preceding initializers as fully-fledged variables,
+                    // which would interfere with the scope offsets of any variable references within the initializers)
+                    |_stack| CompilerResult::<A>::Ok(initializer_block),
+                )?;
+                // Pop the initializer value off the stack and declare a new variable with the initializer value as its value
+                // => []
+                let block = block.push(instruction::runtime::DeclareVariable { value_type });
+                Ok((block, initializer_stack))
+            },
+        )
+        .map(|(block, _initializer_stack)| block)?;
+    block.finish()
+}
+
 pub(crate) fn intern_static_value<A: Arena + Clone>(
     value: &WasmExpression<A>,
     state: &mut CompilerState,

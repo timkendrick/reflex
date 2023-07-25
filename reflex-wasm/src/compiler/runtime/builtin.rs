@@ -29,6 +29,7 @@ pub enum RuntimeBuiltin {
     CreateInvalidFunctionArgsCondition,
     CreateInvalidPointerCondition,
     CreateConstructor,
+    CreateEmptyList,
     CreateEffect,
     CreateFloat,
     CreateHashset,
@@ -144,6 +145,7 @@ impl RuntimeBuiltin {
             RuntimeBuiltin::CreateConstructor => {
                 TypeSignature::new(ValueType::HeapPointer, ValueType::HeapPointer)
             }
+            RuntimeBuiltin::CreateEmptyList => TypeSignature::new((), ValueType::HeapPointer),
             RuntimeBuiltin::CreateEffect => {
                 TypeSignature::new(ValueType::HeapPointer, ValueType::HeapPointer)
             }
@@ -314,6 +316,7 @@ impl RuntimeBuiltin {
             }
             RuntimeBuiltin::CreateInvalidPointerCondition => "createInvalidPointerCondition",
             RuntimeBuiltin::CreateConstructor => "createConstructor",
+            RuntimeBuiltin::CreateEmptyList => "createEmptyList",
             RuntimeBuiltin::CreateEffect => "createEffect",
             RuntimeBuiltin::CreateFloat => "createFloat",
             RuntimeBuiltin::CreateHashset => "createHashset",
