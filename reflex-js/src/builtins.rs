@@ -479,6 +479,11 @@ impl From<reflex_js::stdlib::IsFinite> for JsBuiltins {
         Self::from(reflex_js::stdlib::Stdlib::from(value))
     }
 }
+impl From<reflex_js::stdlib::IsTruthy> for JsBuiltins {
+    fn from(value: reflex_js::stdlib::IsTruthy) -> Self {
+        Self::from(reflex_js::stdlib::Stdlib::from(value))
+    }
+}
 impl From<reflex_js::stdlib::Log> for JsBuiltins {
     fn from(value: reflex_js::stdlib::Log) -> Self {
         Self::from(reflex_js::stdlib::Stdlib::from(value))
