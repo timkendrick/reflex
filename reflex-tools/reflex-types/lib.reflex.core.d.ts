@@ -5,7 +5,7 @@
 declare module 'reflex::core' {
   export function abs(value: number): number;
   export function add(left: number, right: number): number;
-  export function and(left: boolean, right: boolean): boolean;
+  export function and(left: boolean, right: () => boolean): boolean;
   export function apply<F extends (...args: A) => T, A extends Array<any>, T>(
     target: F,
     args: A,

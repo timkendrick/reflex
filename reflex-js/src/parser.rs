@@ -1641,7 +1641,7 @@ where
     let right = parse_expression(&node.right, scope, env, factory, allocator)?;
     Ok(factory.create_application_term(
         factory.create_builtin_term(And),
-        allocator.create_pair(left, right),
+        allocator.create_pair(left, factory.create_lambda_term(0, right)),
     ))
 }
 
@@ -4035,7 +4035,7 @@ mod tests {
                 factory.create_builtin_term(And),
                 allocator.create_pair(
                     factory.create_boolean_term(true),
-                    factory.create_boolean_term(false),
+                    factory.create_lambda_term(0, factory.create_boolean_term(false)),
                 ),
             )),
         );

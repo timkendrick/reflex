@@ -333,7 +333,6 @@ where
         "/" => Some(factory.create_builtin_term(Divide)),
         "=" => Some(factory.create_builtin_term(Equal)),
         "abs" => Some(factory.create_builtin_term(Abs)),
-        "and" => Some(factory.create_builtin_term(And)),
         "car" => Some(factory.create_builtin_term(Car)),
         "cdr" => Some(factory.create_builtin_term(Cdr)),
         "concat" => Some(factory.create_builtin_term(CollectString)),
@@ -400,6 +399,16 @@ where
             )
             .map(Some),
             "if" => parse_if_expression(
+                input,
+                args,
+                scope,
+                symbol_cache,
+                evaluation_cache,
+                factory,
+                allocator,
+            )
+            .map(Some),
+            "and" => parse_and_expression(
                 input,
                 args,
                 scope,
@@ -959,6 +968,49 @@ where
             factory.create_lambda_term(0, consequent),
             factory.create_lambda_term(0, alternate),
         ),
+    ))
+}
+
+fn parse_and_expression<'src, T: Expression + Rewritable<T>>(
+    input: &SyntaxDatum<'src>,
+    args: &[SyntaxDatum<'src>],
+    scope: &LexicalScope<'src>,
+    symbol_cache: &mut SymbolCache<'src>,
+    evaluation_cache: &mut impl EvaluationCache<T>,
+    factory: &impl ExpressionFactory<T>,
+    allocator: &impl HeapAllocator<T>,
+) -> ParserResult<'src, T>
+where
+    T::Builtin: LispParserBuiltin,
+{
+    if args.len() != 2 {
+        return Err(ParserError::new(
+            String::from("Invalid and expression"),
+            input,
+        ));
+    }
+    let mut args = args.iter();
+    let left = args.next().unwrap();
+    let right = args.next().unwrap();
+    let left = parse_expression(
+        left,
+        scope,
+        symbol_cache,
+        evaluation_cache,
+        factory,
+        allocator,
+    )?;
+    let right = parse_expression(
+        right,
+        scope,
+        symbol_cache,
+        evaluation_cache,
+        factory,
+        allocator,
+    )?;
+    Ok(factory.create_application_term(
+        factory.create_builtin_term(And),
+        allocator.create_pair(left, factory.create_lambda_term(0, right)),
     ))
 }
 
