@@ -2021,8 +2021,8 @@ mod tests {
             factory.create_builtin_term(If),
             allocator.create_triple(
                 factory.create_boolean_term(true),
-                factory.create_int_term(3),
-                factory.create_int_term(4),
+                factory.create_lambda_term(0, factory.create_int_term(3)),
+                factory.create_lambda_term(0, factory.create_int_term(4)),
             ),
         );
         let program = Compiler::new(CompilerOptions::unoptimized(), None)
@@ -2054,8 +2054,8 @@ mod tests {
             factory.create_builtin_term(If),
             allocator.create_triple(
                 factory.create_boolean_term(false),
-                factory.create_int_term(3),
-                factory.create_int_term(4),
+                factory.create_lambda_term(0, factory.create_int_term(3)),
+                factory.create_lambda_term(0, factory.create_int_term(4)),
             ),
         );
         let program = Compiler::new(CompilerOptions::unoptimized(), None)
@@ -2095,8 +2095,8 @@ mod tests {
                         factory.create_boolean_term(true),
                     ),
                 ),
-                factory.create_int_term(3),
-                factory.create_int_term(4),
+                factory.create_lambda_term(0, factory.create_int_term(3)),
+                factory.create_lambda_term(0, factory.create_int_term(4)),
             ),
         );
         let program = Compiler::new(CompilerOptions::unoptimized(), None)
@@ -2136,8 +2136,8 @@ mod tests {
                         factory.create_boolean_term(false),
                     ),
                 ),
-                factory.create_int_term(3),
-                factory.create_int_term(4),
+                factory.create_lambda_term(0, factory.create_int_term(3)),
+                factory.create_lambda_term(0, factory.create_int_term(4)),
             ),
         );
         let program = Compiler::new(CompilerOptions::unoptimized(), None)
@@ -2217,8 +2217,8 @@ mod tests {
                         factory.create_boolean_term(false),
                     ),
                 ),
-                factory.create_int_term(3),
-                factory.create_int_term(4),
+                factory.create_lambda_term(0, factory.create_int_term(3)),
+                factory.create_lambda_term(0, factory.create_int_term(4)),
             ),
         );
         let program = Compiler::new(CompilerOptions::unoptimized(), None)

@@ -1026,14 +1026,17 @@ mod tests {
                 factory.create_builtin_term(If),
                 allocator.create_triple(
                     factory.create_boolean_term(false),
-                    factory.create_nil_term(),
-                    factory.create_application_term(
-                        factory.create_builtin_term(Add),
-                        allocator.create_pair(
-                            factory.create_int_term(4),
-                            factory.create_let_term(
-                                factory.create_nil_term(),
-                                factory.create_variable_term(1),
+                    factory.create_lambda_term(0, factory.create_nil_term()),
+                    factory.create_lambda_term(
+                        0,
+                        factory.create_application_term(
+                            factory.create_builtin_term(Add),
+                            allocator.create_pair(
+                                factory.create_int_term(4),
+                                factory.create_let_term(
+                                    factory.create_nil_term(),
+                                    factory.create_variable_term(1),
+                                ),
                             ),
                         ),
                     ),

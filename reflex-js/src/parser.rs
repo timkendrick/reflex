@@ -1711,7 +1711,11 @@ where
 {
     factory.create_application_term(
         factory.create_builtin_term(If),
-        allocator.create_triple(condition, consequent, alternate),
+        allocator.create_triple(
+            condition,
+            factory.create_lambda_term(0, consequent),
+            factory.create_lambda_term(0, alternate),
+        ),
     )
 }
 
@@ -4058,8 +4062,8 @@ mod tests {
                 factory.create_builtin_term(If),
                 allocator.create_triple(
                     factory.create_boolean_term(true),
-                    factory.create_float_term(3.0),
-                    factory.create_float_term(4.0),
+                    factory.create_lambda_term(0, factory.create_float_term(3.0)),
+                    factory.create_lambda_term(0, factory.create_float_term(4.0)),
                 ),
             )),
         );
@@ -4084,8 +4088,8 @@ mod tests {
                         factory.create_builtin_term(If),
                         allocator.create_triple(
                             factory.create_boolean_term(true),
-                            factory.create_float_term(3.0),
-                            factory.create_float_term(4.0),
+                            factory.create_lambda_term(0, factory.create_float_term(3.0)),
+                            factory.create_lambda_term(0, factory.create_float_term(4.0)),
                         )
                     )
                 ),
@@ -4101,7 +4105,7 @@ mod tests {
                         factory.create_builtin_term(If),
                         allocator.create_triple(
                             factory.create_boolean_term(true),
-                            factory.create_application_term(
+                            factory.create_lambda_term(0, factory.create_application_term(
                                 factory.create_builtin_term(Throw),
                                 allocator.create_unit_list(
                                     create_error_instance(
@@ -4110,8 +4114,8 @@ mod tests {
                                         &allocator,
                                     )
                                 ),
-                            ),
-                            factory.create_application_term(
+                            )),
+                            factory.create_lambda_term(0, factory.create_application_term(
                                 factory.create_builtin_term(Throw),
                                 allocator.create_unit_list(
                                     create_error_instance(
@@ -4120,7 +4124,7 @@ mod tests {
                                         &allocator,
                                     )
                                 ),
-                            ),
+                            )),
                         ),
                     )
                 ),
@@ -4136,7 +4140,7 @@ mod tests {
                         factory.create_builtin_term(If),
                         allocator.create_triple(
                             factory.create_boolean_term(true),
-                            factory.create_let_term(
+                            factory.create_lambda_term(0, factory.create_let_term(
                                 factory.create_float_term(3.0),
                                 factory.create_let_term(
                                     factory.create_float_term(4.0),
@@ -4148,8 +4152,8 @@ mod tests {
                                         ),
                                     ),
                                 ),
-                            ),
-                            factory.create_let_term(
+                            )),
+                            factory.create_lambda_term(0, factory.create_let_term(
                                 factory.create_float_term(4.0),
                                 factory.create_let_term(
                                     factory.create_float_term(3.0),
@@ -4161,7 +4165,7 @@ mod tests {
                                         ),
                                     ),
                                 ),
-                            ),
+                            )),
                         ),
                     ),
                 ),
@@ -4177,7 +4181,7 @@ mod tests {
                         factory.create_builtin_term(If),
                         allocator.create_triple(
                             factory.create_boolean_term(true),
-                            factory.create_let_term(
+                            factory.create_lambda_term(0, factory.create_let_term(
                                 factory.create_float_term(3.0),
                                 factory.create_let_term(
                                     factory.create_float_term(4.0),
@@ -4189,8 +4193,8 @@ mod tests {
                                         ),
                                     ),
                                 ),
-                            ),
-                            factory.create_let_term(
+                            )),
+                            factory.create_lambda_term(0, factory.create_let_term(
                                 factory.create_float_term(4.0),
                                 factory.create_let_term(
                                     factory.create_float_term(3.0),
@@ -4202,7 +4206,7 @@ mod tests {
                                         ),
                                     ),
                                 ),
-                            ),
+                            )),
                         ),
                     ),
                 ),
@@ -4218,7 +4222,7 @@ mod tests {
                         factory.create_builtin_term(If),
                         allocator.create_triple(
                             factory.create_boolean_term(true),
-                            factory.create_application_term(
+                            factory.create_lambda_term(0, factory.create_application_term(
                                 factory.create_builtin_term(Throw),
                                 allocator.create_unit_list(
                                     create_error_instance(
@@ -4227,8 +4231,8 @@ mod tests {
                                         &allocator,
                                     )
                                 ),
-                            ),
-                            factory.create_let_term(
+                            )),
+                            factory.create_lambda_term(0, factory.create_let_term(
                                 factory.create_float_term(3.0),
                                 factory.create_let_term(
                                     factory.create_float_term(4.0),
@@ -4240,7 +4244,7 @@ mod tests {
                                         ),
                                     ),
                                 ),
-                            ),
+                            )),
                         ),
                     ),
                 ),

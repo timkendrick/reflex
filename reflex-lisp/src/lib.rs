@@ -341,7 +341,6 @@ where
         "eq" => Some(factory.create_builtin_term(Eq)),
         "gt" => Some(factory.create_builtin_term(Gt)),
         "gte" => Some(factory.create_builtin_term(Gte)),
-        "if" => Some(factory.create_builtin_term(If)),
         "lt" => Some(factory.create_builtin_term(Lt)),
         "lte" => Some(factory.create_builtin_term(Lte)),
         "not" => Some(factory.create_builtin_term(Not)),
@@ -391,6 +390,16 @@ where
             )
             .map(Some),
             "letrec" => parse_letrec_expression(
+                input,
+                args,
+                scope,
+                symbol_cache,
+                evaluation_cache,
+                factory,
+                allocator,
+            )
+            .map(Some),
+            "if" => parse_if_expression(
                 input,
                 args,
                 scope,
@@ -895,6 +904,62 @@ fn parse_binding_definitions<'src, 'b>(
             )),
         })
         .collect()
+}
+
+fn parse_if_expression<'src, T: Expression + Rewritable<T>>(
+    input: &SyntaxDatum<'src>,
+    args: &[SyntaxDatum<'src>],
+    scope: &LexicalScope<'src>,
+    symbol_cache: &mut SymbolCache<'src>,
+    evaluation_cache: &mut impl EvaluationCache<T>,
+    factory: &impl ExpressionFactory<T>,
+    allocator: &impl HeapAllocator<T>,
+) -> ParserResult<'src, T>
+where
+    T::Builtin: LispParserBuiltin,
+{
+    if args.len() != 3 {
+        return Err(ParserError::new(
+            String::from("Invalid if expression"),
+            input,
+        ));
+    }
+    let mut args = args.iter();
+    let condition = args.next().unwrap();
+    let consequent = args.next().unwrap();
+    let alternate = args.next().unwrap();
+    let condition = parse_expression(
+        condition,
+        scope,
+        symbol_cache,
+        evaluation_cache,
+        factory,
+        allocator,
+    )?;
+    let consequent = parse_expression(
+        consequent,
+        scope,
+        symbol_cache,
+        evaluation_cache,
+        factory,
+        allocator,
+    )?;
+    let alternate = parse_expression(
+        alternate,
+        scope,
+        symbol_cache,
+        evaluation_cache,
+        factory,
+        allocator,
+    )?;
+    Ok(factory.create_application_term(
+        factory.create_builtin_term(If),
+        allocator.create_triple(
+            condition,
+            factory.create_lambda_term(0, consequent),
+            factory.create_lambda_term(0, alternate),
+        ),
+    ))
 }
 
 #[cfg(test)]
@@ -1882,23 +1947,24 @@ mod tests {
                         allocator.create_unit_list(factory.create_int_term(5)),
                     )
                 ),
-                allocator.create_unit_list(
-                    factory.create_recursive_term(
+                allocator.create_unit_list(factory.create_recursive_term(
+                    factory.create_lambda_term(
+                        1,
                         factory.create_lambda_term(
                             1,
-                            factory.create_lambda_term(
-                                1,
-                                factory.create_application_term(
-                                    factory.create_builtin_term(If),
-                                    allocator.create_triple(
-                                        factory.create_application_term(
-                                            factory.create_builtin_term(Equal),
-                                            allocator.create_pair(
-                                                factory.create_variable_term(0),
-                                                factory.create_int_term(1),
-                                            ),
+                            factory.create_application_term(
+                                factory.create_builtin_term(If),
+                                allocator.create_triple(
+                                    factory.create_application_term(
+                                        factory.create_builtin_term(Equal),
+                                        allocator.create_pair(
+                                            factory.create_variable_term(0),
+                                            factory.create_int_term(1),
                                         ),
-                                        factory.create_variable_term(0),
+                                    ),
+                                    factory.create_lambda_term(0, factory.create_variable_term(0)),
+                                    factory.create_lambda_term(
+                                        0,
                                         factory.create_application_term(
                                             factory.create_builtin_term(Multiply),
                                             allocator.create_pair(
@@ -1918,13 +1984,13 @@ mod tests {
                                                     ),
                                                 ),
                                             ),
-                                        ),
+                                        )
                                     ),
                                 ),
-                            )
-                        ),
-                    )
-                ),
+                            ),
+                        )
+                    ),
+                )),
             )),
         );
     }

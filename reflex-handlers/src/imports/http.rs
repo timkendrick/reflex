@@ -155,16 +155,19 @@ where
                                                 ),
                                             ),
                                         ),
-                                        factory.create_application_term(
-                                            factory.create_builtin_term(stdlib::Get),
-                                            allocator.create_pair(
-                                                factory.create_variable_term(0),
-                                                factory.create_string_term(
-                                                    allocator.create_static_string("token"),
+                                        factory.create_lambda_term(
+                                            0,
+                                            factory.create_application_term(
+                                                factory.create_builtin_term(stdlib::Get),
+                                                allocator.create_pair(
+                                                    factory.create_variable_term(0),
+                                                    factory.create_string_term(
+                                                        allocator.create_static_string("token"),
+                                                    ),
                                                 ),
                                             ),
                                         ),
-                                        factory.create_nil_term(),
+                                        factory.create_lambda_term(0, factory.create_nil_term()),
                                     ),
                                 ),
                             ),

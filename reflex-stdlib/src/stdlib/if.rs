@@ -10,7 +10,7 @@ pub struct If;
 impl If {
     pub const UUID: Uuid = uuid!("9c8fc3a1-2d55-420e-bf81-3098932f8cf0");
     const ARITY: FunctionArity<3, 0> = FunctionArity {
-        required: [ArgType::Strict, ArgType::Lazy, ArgType::Lazy],
+        required: [ArgType::Strict, ArgType::Strict, ArgType::Strict],
         optional: [],
         variadic: None,
     };
@@ -34,16 +34,16 @@ impl<T: Expression> Applicable<T> for If {
         &self,
         mut args: impl ExactSizeIterator<Item = T>,
         factory: &impl ExpressionFactory<T>,
-        _allocator: &impl HeapAllocator<T>,
+        allocator: &impl HeapAllocator<T>,
         _cache: &mut impl EvaluationCache<T>,
     ) -> Result<T, String> {
         let condition = args.next().unwrap();
         let consequent = args.next().unwrap();
         let alternate = args.next().unwrap();
         if is_truthy(&condition, factory) {
-            Ok(consequent)
+            Ok(factory.create_application_term(consequent, allocator.create_empty_list()))
         } else {
-            Ok(alternate)
+            Ok(factory.create_application_term(alternate, allocator.create_empty_list()))
         }
     }
 }

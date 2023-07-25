@@ -310,19 +310,25 @@ where
                                                                                                                 factory.create_string_term(allocator.create_static_string("success")),
                                                                                                             ]),
                                                                                                         ),
-                                                                                                        factory.create_application_term(
-                                                                                                            factory.create_builtin_term(reflex_stdlib::stdlib::Get),
-                                                                                                            allocator.create_list([
-                                                                                                                factory.create_variable_term(0),
-                                                                                                                factory.create_string_term(allocator.create_static_string("retryIndex")),
-                                                                                                            ]),
+                                                                                                        factory.create_lambda_term(
+                                                                                                            0,
+                                                                                                            factory.create_application_term(
+                                                                                                                factory.create_builtin_term(reflex_stdlib::stdlib::Get),
+                                                                                                                allocator.create_list([
+                                                                                                                    factory.create_variable_term(0),
+                                                                                                                    factory.create_string_term(allocator.create_static_string("retryIndex")),
+                                                                                                                ]),
+                                                                                                            ),
                                                                                                         ),
-                                                                                                        factory.create_application_term(
-                                                                                                            factory.create_builtin_term(reflex_stdlib::stdlib::Get),
-                                                                                                            allocator.create_list([
-                                                                                                                factory.create_variable_term(1),
-                                                                                                                factory.create_string_term(allocator.create_static_string("latestSuccessIndex")),
-                                                                                                            ]),
+                                                                                                        factory.create_lambda_term(
+                                                                                                            0,
+                                                                                                            factory.create_application_term(
+                                                                                                                factory.create_builtin_term(reflex_stdlib::stdlib::Get),
+                                                                                                                allocator.create_list([
+                                                                                                                    factory.create_variable_term(1),
+                                                                                                                    factory.create_string_term(allocator.create_static_string("latestSuccessIndex")),
+                                                                                                                ]),
+                                                                                                            ),
                                                                                                         ),
                                                                                                     ]),
                                                                                                 ),
@@ -351,75 +357,81 @@ where
                                                                                         factory.create_string_term(allocator.create_static_string("success")),
                                                                                     ]),
                                                                                 ),
-                                                                                factory.create_variable_term(0),
-                                                                                factory.create_application_term(
-                                                                                    factory.create_builtin_term(reflex_stdlib::stdlib::IfPending),
-                                                                                    allocator.create_list([
-                                                                                        factory.create_application_term(
-                                                                                            factory.create_builtin_term(reflex_stdlib::stdlib::Sequence),
-                                                                                            allocator.create_list([
-                                                                                                factory.create_application_term(
-                                                                                                    factory.create_variable_term(10),
-                                                                                                    allocator.create_list([
+                                                                                factory.create_lambda_term(
+                                                                                    0,
+                                                                                    factory.create_variable_term(0),
+                                                                                ),
+                                                                                factory.create_lambda_term(
+                                                                                    0,
+                                                                                    factory.create_application_term(
+                                                                                        factory.create_builtin_term(reflex_stdlib::stdlib::IfPending),
+                                                                                        allocator.create_list([
+                                                                                            factory.create_application_term(
+                                                                                                factory.create_builtin_term(reflex_stdlib::stdlib::Sequence),
+                                                                                                allocator.create_list([
+                                                                                                    factory.create_application_term(
+                                                                                                        factory.create_variable_term(10),
+                                                                                                        allocator.create_list([
+                                                                                                            factory.create_application_term(
+                                                                                                                factory.create_builtin_term(reflex_stdlib::stdlib::Max),
+                                                                                                                allocator.create_list([
+                                                                                                                    factory.create_int_term(1),
+                                                                                                                    factory.create_application_term(
+                                                                                                                        factory.create_variable_term(7),
+                                                                                                                        allocator.create_list([
+                                                                                                                            factory.create_application_term(
+                                                                                                                                factory.create_builtin_term(reflex_stdlib::stdlib::Subtract),
+                                                                                                                                allocator.create_list([
+                                                                                                                                    factory.create_application_term(
+                                                                                                                                        factory.create_builtin_term(reflex_stdlib::stdlib::Get),
+                                                                                                                                        allocator.create_list([
+                                                                                                                                            factory.create_variable_term(1),
+                                                                                                                                            factory.create_string_term(allocator.create_static_string("retryIndex")),
+                                                                                                                                        ]),
+                                                                                                                                    ),
+                                                                                                                                    factory.create_application_term(
+                                                                                                                                        factory.create_builtin_term(reflex_stdlib::stdlib::Get),
+                                                                                                                                        allocator.create_list([
+                                                                                                                                            factory.create_variable_term(1),
+                                                                                                                                            factory.create_string_term(allocator.create_static_string("latestSuccessIndex")),
+                                                                                                                                        ]),
+                                                                                                                                    ),
+                                                                                                                                ]),
+                                                                                                                            ),
+                                                                                                                        ]),
+                                                                                                                    ),
+                                                                                                                ]),
+                                                                                                            ),
+                                                                                                            factory.create_variable_term(2),
+                                                                                                        ]),
+                                                                                                    ),
+                                                                                                    factory.create_lambda_term(
+                                                                                                        1,
                                                                                                         factory.create_application_term(
-                                                                                                            factory.create_builtin_term(reflex_stdlib::stdlib::Max),
+                                                                                                            factory.create_builtin_term(reflex_stdlib::stdlib::Sequence),
                                                                                                             allocator.create_list([
-                                                                                                                factory.create_int_term(1),
                                                                                                                 factory.create_application_term(
-                                                                                                                    factory.create_variable_term(7),
+                                                                                                                    factory.create_builtin_term(crate::stdlib::IncrementVariable),
                                                                                                                     allocator.create_list([
-                                                                                                                        factory.create_application_term(
-                                                                                                                            factory.create_builtin_term(reflex_stdlib::stdlib::Subtract),
-                                                                                                                            allocator.create_list([
-                                                                                                                                factory.create_application_term(
-                                                                                                                                    factory.create_builtin_term(reflex_stdlib::stdlib::Get),
-                                                                                                                                    allocator.create_list([
-                                                                                                                                        factory.create_variable_term(1),
-                                                                                                                                        factory.create_string_term(allocator.create_static_string("retryIndex")),
-                                                                                                                                    ]),
-                                                                                                                                ),
-                                                                                                                                factory.create_application_term(
-                                                                                                                                    factory.create_builtin_term(reflex_stdlib::stdlib::Get),
-                                                                                                                                    allocator.create_list([
-                                                                                                                                        factory.create_variable_term(1),
-                                                                                                                                        factory.create_string_term(allocator.create_static_string("latestSuccessIndex")),
-                                                                                                                                    ]),
-                                                                                                                                ),
-                                                                                                                            ]),
-                                                                                                                        ),
+                                                                                                                        factory.create_variable_term(6),
+                                                                                                                        factory.create_variable_term(3),
                                                                                                                     ]),
+                                                                                                                ),
+                                                                                                                factory.create_lambda_term(
+                                                                                                                    1,
+                                                                                                                    factory.create_variable_term(2),
                                                                                                                 ),
                                                                                                             ]),
                                                                                                         ),
-                                                                                                        factory.create_variable_term(2),
-                                                                                                    ]),
-                                                                                                ),
-                                                                                                factory.create_lambda_term(
-                                                                                                    1,
-                                                                                                    factory.create_application_term(
-                                                                                                        factory.create_builtin_term(reflex_stdlib::stdlib::Sequence),
-                                                                                                        allocator.create_list([
-                                                                                                            factory.create_application_term(
-                                                                                                                factory.create_builtin_term(crate::stdlib::IncrementVariable),
-                                                                                                                allocator.create_list([
-                                                                                                                    factory.create_variable_term(6),
-                                                                                                                    factory.create_variable_term(3),
-                                                                                                                ]),
-                                                                                                            ),
-                                                                                                            factory.create_lambda_term(
-                                                                                                                1,
-                                                                                                                factory.create_variable_term(2),
-                                                                                                            ),
-                                                                                                        ]),
                                                                                                     ),
-                                                                                                ),
-                                                                                            ]),
-                                                                                        ),
-                                                                                        factory.create_lambda_term(
-                                                                                            0,
-                                                                                            factory.create_variable_term(0),
-                                                                                        ),
-                                                                                    ]),
+                                                                                                ]),
+                                                                                            ),
+                                                                                            factory.create_lambda_term(
+                                                                                                0,
+                                                                                                factory.create_variable_term(0),
+                                                                                            ),
+                                                                                        ]),
+                                                                                    ),
                                                                                 ),
                                                                             ]),
                                                                         ),
