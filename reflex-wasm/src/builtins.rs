@@ -255,6 +255,11 @@ impl From<stdlib::Floor> for WasmCompilerBuiltins {
         Self::from(stdlib::Stdlib::from(value))
     }
 }
+impl From<stdlib::Fold> for WasmCompilerBuiltins {
+    fn from(value: stdlib::Fold) -> Self {
+        Self::from(stdlib::Stdlib::from(value))
+    }
+}
 impl From<stdlib::Get> for WasmCompilerBuiltins {
     fn from(value: stdlib::Get) -> Self {
         Self::from(stdlib::Stdlib::from(value))
@@ -372,11 +377,6 @@ impl From<stdlib::PushFront> for WasmCompilerBuiltins {
 }
 impl From<stdlib::Raise> for WasmCompilerBuiltins {
     fn from(value: stdlib::Raise) -> Self {
-        Self::from(stdlib::Stdlib::from(value))
-    }
-}
-impl From<stdlib::Reduce> for WasmCompilerBuiltins {
-    fn from(value: stdlib::Reduce) -> Self {
         Self::from(stdlib::Stdlib::from(value))
     }
 }

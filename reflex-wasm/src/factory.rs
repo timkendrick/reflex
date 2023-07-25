@@ -1430,6 +1430,9 @@ impl From<reflex_stdlib::stdlib::Stdlib> for reflex_wasm::stdlib::Stdlib {
             reflex_stdlib::stdlib::Stdlib::Floor => {
                 reflex_wasm::stdlib::Stdlib::Floor(reflex_wasm::stdlib::Floor)
             }
+            reflex_stdlib::stdlib::Stdlib::Fold => {
+                reflex_wasm::stdlib::Stdlib::Fold(reflex_wasm::stdlib::Fold)
+            }
             reflex_stdlib::stdlib::Stdlib::Get => {
                 reflex_wasm::stdlib::Stdlib::Get(reflex_wasm::stdlib::Get)
             }
@@ -1501,9 +1504,6 @@ impl From<reflex_stdlib::stdlib::Stdlib> for reflex_wasm::stdlib::Stdlib {
             }
             reflex_stdlib::stdlib::Stdlib::Raise => {
                 reflex_wasm::stdlib::Stdlib::Raise(reflex_wasm::stdlib::Raise)
-            }
-            reflex_stdlib::stdlib::Stdlib::Reduce => {
-                reflex_wasm::stdlib::Stdlib::Fold(reflex_wasm::stdlib::Fold)
             }
             reflex_stdlib::stdlib::Stdlib::Remainder => {
                 reflex_wasm::stdlib::Stdlib::Remainder(reflex_wasm::stdlib::Remainder)
@@ -1788,6 +1788,11 @@ impl From<reflex_stdlib::stdlib::Floor> for reflex_wasm::stdlib::Stdlib {
         Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
     }
 }
+impl From<reflex_stdlib::stdlib::Fold> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_stdlib::stdlib::Fold) -> Self {
+        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
+    }
+}
 impl From<reflex_stdlib::stdlib::Get> for reflex_wasm::stdlib::Stdlib {
     fn from(value: reflex_stdlib::stdlib::Get) -> Self {
         Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
@@ -1905,11 +1910,6 @@ impl From<reflex_stdlib::stdlib::PushFront> for reflex_wasm::stdlib::Stdlib {
 }
 impl From<reflex_stdlib::stdlib::Raise> for reflex_wasm::stdlib::Stdlib {
     fn from(value: reflex_stdlib::stdlib::Raise) -> Self {
-        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
-    }
-}
-impl From<reflex_stdlib::stdlib::Reduce> for reflex_wasm::stdlib::Stdlib {
-    fn from(value: reflex_stdlib::stdlib::Reduce) -> Self {
         Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
     }
 }
