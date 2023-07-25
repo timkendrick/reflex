@@ -59,6 +59,14 @@ fn stdlib_or() {
     let scenario = StdlibOrResolvedFalsyStatefulConditionResolvedStatefulConsequentScenario;
     let (actual, expected) = run_scenario(&scenario).unwrap();
     assert_eq!(actual, expected);
+
+    let scenario = StdlibOrCapturingConsequentScenario;
+    let (actual, expected) = run_scenario(&scenario).unwrap();
+    assert_eq!(actual, expected);
+
+    let scenario = StdlibOrDynamicConsequentFactoryScenario;
+    let (actual, expected) = run_scenario(&scenario).unwrap();
+    assert_eq!(actual, expected);
 }
 
 struct StdlibOrStaticTruthyConditionStaticConsequentScenario;
@@ -74,7 +82,7 @@ where
             factory.create_builtin_term(stdlib::Or),
             allocator.create_pair(
                 factory.create_boolean_term(true),
-                factory.create_int_term(3),
+                factory.create_lambda_term(0, factory.create_int_term(3)),
             ),
         )
     }
@@ -103,7 +111,7 @@ where
             factory.create_builtin_term(stdlib::Or),
             allocator.create_pair(
                 factory.create_boolean_term(false),
-                factory.create_int_term(3),
+                factory.create_lambda_term(0, factory.create_int_term(3)),
             ),
         )
     }
@@ -132,9 +140,12 @@ where
             factory.create_builtin_term(stdlib::Or),
             allocator.create_pair(
                 factory.create_boolean_term(true),
-                factory.create_application_term(
-                    factory.create_builtin_term(stdlib::Abs),
-                    allocator.create_unit_list(factory.create_int_term(-3)),
+                factory.create_lambda_term(
+                    0,
+                    factory.create_application_term(
+                        factory.create_builtin_term(stdlib::Abs),
+                        allocator.create_unit_list(factory.create_int_term(-3)),
+                    ),
                 ),
             ),
         )
@@ -164,9 +175,12 @@ where
             factory.create_builtin_term(stdlib::Or),
             allocator.create_pair(
                 factory.create_boolean_term(false),
-                factory.create_application_term(
-                    factory.create_builtin_term(stdlib::Abs),
-                    allocator.create_unit_list(factory.create_int_term(-3)),
+                factory.create_lambda_term(
+                    0,
+                    factory.create_application_term(
+                        factory.create_builtin_term(stdlib::Abs),
+                        allocator.create_unit_list(factory.create_int_term(-3)),
+                    ),
                 ),
             ),
         )
@@ -199,7 +213,7 @@ where
                     factory.create_builtin_term(stdlib::Identity),
                     allocator.create_unit_list(factory.create_boolean_term(true)),
                 ),
-                factory.create_int_term(3),
+                factory.create_lambda_term(0, factory.create_int_term(3)),
             ),
         )
     }
@@ -231,7 +245,7 @@ where
                     factory.create_builtin_term(stdlib::Identity),
                     allocator.create_unit_list(factory.create_boolean_term(false)),
                 ),
-                factory.create_int_term(3),
+                factory.create_lambda_term(0, factory.create_int_term(3)),
             ),
         )
     }
@@ -263,9 +277,12 @@ where
                     factory.create_builtin_term(stdlib::Identity),
                     allocator.create_unit_list(factory.create_boolean_term(true)),
                 ),
-                factory.create_application_term(
-                    factory.create_builtin_term(stdlib::Abs),
-                    allocator.create_unit_list(factory.create_int_term(-3)),
+                factory.create_lambda_term(
+                    0,
+                    factory.create_application_term(
+                        factory.create_builtin_term(stdlib::Abs),
+                        allocator.create_unit_list(factory.create_int_term(-3)),
+                    ),
                 ),
             ),
         )
@@ -298,9 +315,12 @@ where
                     factory.create_builtin_term(stdlib::Identity),
                     allocator.create_unit_list(factory.create_boolean_term(false)),
                 ),
-                factory.create_application_term(
-                    factory.create_builtin_term(stdlib::Abs),
-                    allocator.create_unit_list(factory.create_int_term(-3)),
+                factory.create_lambda_term(
+                    0,
+                    factory.create_application_term(
+                        factory.create_builtin_term(stdlib::Abs),
+                        allocator.create_unit_list(factory.create_int_term(-3)),
+                    ),
                 ),
             ),
         )
@@ -334,11 +354,15 @@ where
                     payload: factory.create_int_term(3),
                     token: factory.create_nil_term(),
                 })),
-                factory.create_effect_term(allocator.create_signal(SignalType::Custom {
-                    effect_type: factory.create_string_term(allocator.create_static_string("bar")),
-                    payload: factory.create_int_term(4),
-                    token: factory.create_nil_term(),
-                })),
+                factory.create_lambda_term(
+                    0,
+                    factory.create_effect_term(allocator.create_signal(SignalType::Custom {
+                        effect_type:
+                            factory.create_string_term(allocator.create_static_string("bar")),
+                        payload: factory.create_int_term(4),
+                        token: factory.create_nil_term(),
+                    })),
+                ),
             ),
         )
     }
@@ -393,11 +417,15 @@ where
                     payload: factory.create_int_term(3),
                     token: factory.create_nil_term(),
                 })),
-                factory.create_effect_term(allocator.create_signal(SignalType::Custom {
-                    effect_type: factory.create_string_term(allocator.create_static_string("bar")),
-                    payload: factory.create_int_term(4),
-                    token: factory.create_nil_term(),
-                })),
+                factory.create_lambda_term(
+                    0,
+                    factory.create_effect_term(allocator.create_signal(SignalType::Custom {
+                        effect_type:
+                            factory.create_string_term(allocator.create_static_string("bar")),
+                        payload: factory.create_int_term(4),
+                        token: factory.create_nil_term(),
+                    })),
+                ),
             ),
         )
     }
@@ -455,11 +483,15 @@ where
                     payload: factory.create_int_term(3),
                     token: factory.create_nil_term(),
                 })),
-                factory.create_effect_term(allocator.create_signal(SignalType::Custom {
-                    effect_type: factory.create_string_term(allocator.create_static_string("bar")),
-                    payload: factory.create_int_term(4),
-                    token: factory.create_nil_term(),
-                })),
+                factory.create_lambda_term(
+                    0,
+                    factory.create_effect_term(allocator.create_signal(SignalType::Custom {
+                        effect_type:
+                            factory.create_string_term(allocator.create_static_string("bar")),
+                        payload: factory.create_int_term(4),
+                        token: factory.create_nil_term(),
+                    })),
+                ),
             ),
         )
     }
@@ -507,11 +539,15 @@ where
                     payload: factory.create_int_term(3),
                     token: factory.create_nil_term(),
                 })),
-                factory.create_effect_term(allocator.create_signal(SignalType::Custom {
-                    effect_type: factory.create_string_term(allocator.create_static_string("bar")),
-                    payload: factory.create_int_term(4),
-                    token: factory.create_nil_term(),
-                })),
+                factory.create_lambda_term(
+                    0,
+                    factory.create_effect_term(allocator.create_signal(SignalType::Custom {
+                        effect_type:
+                            factory.create_string_term(allocator.create_static_string("bar")),
+                        payload: factory.create_int_term(4),
+                        token: factory.create_nil_term(),
+                    })),
+                ),
             ),
         )
     }
@@ -583,11 +619,15 @@ where
                     payload: factory.create_int_term(3),
                     token: factory.create_nil_term(),
                 })),
-                factory.create_effect_term(allocator.create_signal(SignalType::Custom {
-                    effect_type: factory.create_string_term(allocator.create_static_string("bar")),
-                    payload: factory.create_int_term(4),
-                    token: factory.create_nil_term(),
-                })),
+                factory.create_lambda_term(
+                    0,
+                    factory.create_effect_term(allocator.create_signal(SignalType::Custom {
+                        effect_type:
+                            factory.create_string_term(allocator.create_static_string("bar")),
+                        payload: factory.create_int_term(4),
+                        token: factory.create_nil_term(),
+                    })),
+                ),
             ),
         )
     }
@@ -611,5 +651,109 @@ where
             }),
         ];
         (result, dependencies)
+    }
+}
+
+struct StdlibOrCapturingConsequentScenario;
+
+impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibOrCapturingConsequentScenario
+where
+    T: Expression<Builtin = stdlib::Stdlib>,
+    TFactory: ExpressionFactory<T>,
+{
+    fn input(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> T {
+        (0..=9).rev().fold(
+            factory.create_application_term(
+                factory.create_builtin_term(stdlib::Or),
+                allocator.create_pair(
+                    factory.create_boolean_term(false),
+                    factory.create_partial_application_term(
+                        factory.create_lambda_term(
+                            3,
+                            factory.create_application_term(
+                                factory.create_builtin_term(stdlib::Subtract),
+                                allocator.create_pair(
+                                    factory.create_variable_term(1),
+                                    factory.create_variable_term(2),
+                                ),
+                            ),
+                        ),
+                        allocator.create_list([
+                            factory.create_variable_term(5),
+                            factory.create_variable_term(3),
+                            factory.create_variable_term(1),
+                        ]),
+                    ),
+                ),
+            ),
+            |expression, index| {
+                factory.create_let_term(factory.create_int_term(fib(index)), expression)
+            },
+        )
+    }
+
+    fn expected(
+        &self,
+        factory: &TFactory,
+        _allocator: &impl HeapAllocator<T>,
+    ) -> (T, Vec<T::Signal>) {
+        let result = factory.create_int_term(fib(9 - 3) - fib(9 - 5));
+        let dependencies = Default::default();
+        (result, dependencies)
+    }
+}
+
+struct StdlibOrDynamicConsequentFactoryScenario;
+
+impl<T, TFactory> WasmTestScenario<T, TFactory> for StdlibOrDynamicConsequentFactoryScenario
+where
+    T: Expression<Builtin = stdlib::Stdlib>,
+    TFactory: ExpressionFactory<T>,
+{
+    fn input(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> T {
+        factory.create_application_term(
+            factory.create_builtin_term(stdlib::Or),
+            allocator.create_pair(
+                factory.create_boolean_term(false),
+                factory.create_application_term(
+                    factory.create_lambda_term(
+                        1,
+                        factory.create_partial_application_term(
+                            factory.create_lambda_term(1, factory.create_variable_term(0)),
+                            allocator.create_unit_list(factory.create_variable_term(0)),
+                        ),
+                    ),
+                    allocator.create_unit_list(factory.create_int_term(3)),
+                ),
+            ),
+        )
+    }
+
+    fn expected(
+        &self,
+        factory: &TFactory,
+        _allocator: &impl HeapAllocator<T>,
+    ) -> (T, Vec<T::Signal>) {
+        let result = factory.create_int_term(3);
+        let dependencies = Default::default();
+        (result, dependencies)
+    }
+}
+
+fn fib(n: i64) -> i64 {
+    if n < 2 {
+        n
+    } else {
+        let mut n1 = 1;
+        let mut n2 = 0;
+        let mut n = n - 2;
+        while n > 0 {
+            let value = n1 + n2;
+            n2 = n1;
+            n1 = value;
+            n -= 1;
+        }
+        let value = n1 + n2;
+        value
     }
 }

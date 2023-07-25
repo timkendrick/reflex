@@ -6,9 +6,14 @@
     (@args (@strict $self) (@lazy $other))
 
     (@default
-      (func $Stdlib_Or::impl::default (param $self i32) (param $other i32) (param $state i32) (result i32 i32)
-        (select
-          (local.get $self)
-          (local.get $other)
-          (call $Term::traits::is_truthy (local.get $self)))
-        (global.get $NULL)))))
+      (func $Stdlib_Or::impl::default (param $self i32) (param $alternative i32) (param $state i32) (result i32 i32)
+        ;; Determine whether the condition is truthy
+        (if (result i32 i32)
+          (call $Term::traits::is_truthy (local.get $self))
+          (then
+            ;; If the condition is truthy, return the condition
+            (local.get $self)
+            (global.get $NULL))
+          (else
+            ;; Otherwise invoke the alternative function with an empty argument list
+            (call $Term::traits::apply (local.get $alternative) (call $Term::List::empty) (local.get $state))))))))

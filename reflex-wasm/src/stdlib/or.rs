@@ -10,6 +10,7 @@ use crate::{
         CompiledBlockBuilder, CompiledFunctionCall, CompilerOptions, CompilerResult, CompilerStack,
         CompilerState, ParamsSignature, TypeSignature, ValueType,
     },
+    stdlib::r#if::compile_conditional_branch,
 };
 
 #[derive(Default, PartialEq, Eq, Clone, Copy, Debug)]
@@ -17,7 +18,7 @@ pub struct Or;
 impl Or {
     pub const UUID: Uuid = uuid!("b4798927-f64e-4835-962e-e3ff1fbe3153");
     const ARITY: FunctionArity<2, 0> = FunctionArity {
-        required: [ArgType::Strict, ArgType::Lazy],
+        required: [ArgType::Strict, ArgType::Strict],
         optional: [],
         variadic: None,
     };
@@ -93,7 +94,7 @@ impl<'a, A: Arena + Clone> CompileWasm<A> for CompiledFunctionCall<'a, A, Or> {
             let block = block.push(instruction::core::If {
                 block_type,
                 consequent: {
-                    let block = CompiledBlockBuilder::new(alternative_stack);
+                    let block = CompiledBlockBuilder::new(consequent_stack);
                     // Push the stored result onto the stack
                     // => [Term]
                     let block = block.push(instruction::core::GetScopeValue {
@@ -103,9 +104,9 @@ impl<'a, A: Arena + Clone> CompileWasm<A> for CompiledFunctionCall<'a, A, Or> {
                     block.finish::<CompilerError<_>>()
                 }?,
                 alternative: {
-                    // Yield the alternative onto the stack
+                    // Yield the alternative branch onto the stack
                     // => [Term]
-                    alternative.compile(consequent_stack, state, options)
+                    compile_conditional_branch(&alternative, alternative_stack, state, options)
                 }?,
             });
             block.finish::<CompilerError<_>>()
