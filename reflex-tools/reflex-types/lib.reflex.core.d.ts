@@ -97,7 +97,7 @@ declare module 'reflex::core' {
   export function min(left: number, right: number): number;
   export function multiply(left: number, right: number): number;
   export function not(value: boolean): boolean;
-  export function or(left: boolean, right: boolean): boolean;
+  export function or(left: boolean, right: () => boolean): boolean;
   export function pow(base: number, exponent: number): number;
   export function push<T>(target: Array<T>, value: T): Array<T>;
   export function pushFront<T>(target: Array<T>, value: T): Array<T>;
