@@ -3,7 +3,10 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 // SPDX-FileContributor: Chris Campbell <c.campbell@mwam.com> https://github.com/c-campbell-mwam
-use std::{collections::HashSet, iter::once};
+use std::{
+    collections::{HashMap, HashSet},
+    iter::once,
+};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -17,6 +20,8 @@ use reflex::{
         StackOffset, Substitutions, VariableTermType,
     },
 };
+
+use crate::term::variable::should_inline_value;
 
 #[derive(Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct LambdaTerm<T: Expression> {
@@ -248,6 +253,123 @@ impl<T: Expression> SerializeJson for LambdaTerm<T> {
     }
 }
 
+pub(crate) fn inline_lambda_arg_values<T: Expression + Rewritable<T>>(
+    target: &T::LambdaTerm,
+    substitutions: impl IntoIterator<Item = (StackOffset, T)>,
+    factory: &impl ExpressionFactory<T>,
+    allocator: &impl HeapAllocator<T>,
+    cache: &mut impl EvaluationCache<T>,
+) -> Option<T> {
+    let num_args = target.num_args();
+    // Collect a list of substitutions sorted by scope offset, starting with the lowest scope offset
+    // (i.e. sorting the substituted arguments from rightmost to leftmost)
+    let substitutions = {
+        let mut substituted_args = substitutions
+            .into_iter()
+            // Filter out any invalid substitutions
+            .filter(|(offset, _arg_value)| *offset < num_args)
+            // Deduplicate any duplicate offsets
+            .collect::<HashMap<_, _>>()
+            .into_iter()
+            .collect::<Vec<_>>();
+        // Order by increasing scope offset
+        substituted_args.sort_by_key(|(offset, _)| *offset);
+        substituted_args
+    };
+    if substitutions.is_empty() {
+        return None;
+    }
+    // Keep track of how many arguments will remain after the substitution
+    let num_remaining_args = num_args - substitutions.len();
+    // Iterate over each injected argument, replacing all references within the function body with the provided value
+    // Note that we modify the function body incrementally, one substitution at a time, starting with the lowest scope
+    // offset within the function body (i.e. the rightmost substituted argument) and iterating through the substituted
+    // arguments in order of increasig scope offset
+    let body = substitutions.into_iter().enumerate().fold(
+        target.body().as_deref().clone(),
+        |body, (substitution_index, (offset, arg_value))| {
+            // Keep track of how many arguments have already been removed from the the work-in-progress lambda due to
+            // previous iterations (one argument per iteration)
+            let num_removed_args = substitution_index;
+            // Get the current offset within the work-in-progress function body for the argument we are replacing
+            // (this diverges from the provided offset as more of the arguments are inlined)
+            let target_offset = offset - num_removed_args;
+            // If the value can be inlined, or if the argument is unused, or if there is only a single reference to the
+            // argument within the function body, we replace any references to the argument with the value itself.
+            // Otherwise if the value cannot be inlined, and there are multiple references to the argument within the
+            // function body, we create a lexically-scoped variable within the function body that is initialized to the
+            // argument value, and replace any references to the argument with references to the scoped variable
+            let should_inline = should_inline_value(&arg_value, factory)
+                || body.count_variable_usages(target_offset) <= 1;
+            // The provided argument value is being moved inside the lambda, so before injecting the it into the
+            // function body we need to increase any variable scope offsets present within the argument value itself
+            // by the number of arguments remaining in the work-in-progress lambda, to reflect the argument value having
+            // been moved into the deeper scope
+            let replacement = arg_value
+                .substitute_static(
+                    &Substitutions::increase_scope_offset(num_args - (num_removed_args + 1), 0),
+                    factory,
+                    allocator,
+                    cache,
+                )
+                .unwrap_or(arg_value);
+            if should_inline {
+                // If the value can be inlined, or if the argument is unused, or if there is only a single reference to
+                // the argument within the function body, replace any references to the argument with the value itself
+                // (the scope is unwrapped on all other nodes of at least the target depth, to account for the fact that
+                // an argument has been removed from the lambda)
+                let substituted_body = body
+                    .substitute_static(
+                        &Substitutions::named(
+                            &vec![(target_offset, replacement)],
+                            Some(ScopeOffset::Unwrap(1)),
+                        ),
+                        factory,
+                        allocator,
+                        cache,
+                    )
+                    .unwrap_or(body);
+                substituted_body
+            } else {
+                // Otherwise if the value cannot be inlined, replace the argument with a lexically-scoped variable
+                // declaration within the function body that is initialized to the argument value, and replace any
+                // references to the argument with references to the scoped variable.
+                // Increment all scope offsets within the function body to account for them being nested within a new
+                // variable scope that we are about to create
+                let shifted_body = body
+                    .substitute_static(
+                        &Substitutions::increase_scope_offset(1, 0),
+                        factory,
+                        allocator,
+                        cache,
+                    )
+                    .unwrap_or(body);
+                // Given that we have just incremented all the scope offsets in the function body, we must also
+                // increment the target offset that we are looking to substitute
+                let target_offset = target_offset + 1;
+                // Replace all references to the target variable within the function body with a reference to the new
+                // lexical scope variable that we are about to create
+                // (the scope is unwrapped on all other nodes of at least the target depth, to account for the fact that
+                // an argument has been removed from the lambda)
+                let substituted_body = shifted_body
+                    .substitute_static(
+                        &Substitutions::named(
+                            &vec![(target_offset, factory.create_variable_term(0))],
+                            Some(ScopeOffset::Unwrap(1)),
+                        ),
+                        factory,
+                        allocator,
+                        cache,
+                    )
+                    .unwrap_or(shifted_body);
+                // Return the newly-wrapped function body
+                factory.create_let_term(replacement, substituted_body)
+            }
+        },
+    );
+    Some(factory.create_lambda_term(num_remaining_args, body))
+}
+
 fn apply_eta_reduction<'a, T: Expression>(
     body: &'a T,
     num_args: StackOffset,
@@ -283,7 +405,7 @@ impl<T: Expression> Internable for LambdaTerm<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{allocator::DefaultAllocator, SharedTermFactory};
+    use pretty_assertions::assert_eq;
     use reflex::{
         cache::SubstitutionCache,
         core::{
@@ -291,7 +413,694 @@ mod tests {
             Rewritable, StateCache,
         },
     };
-    use reflex_stdlib::{Add, Stdlib};
+    use reflex_stdlib::{Add, Floor, Stdlib};
+
+    use crate::{allocator::DefaultAllocator, SharedTermFactory};
+
+    use super::*;
+
+    #[test]
+    fn inline_lambda_args() {
+        let factory = SharedTermFactory::<Stdlib>::default();
+        let allocator = DefaultAllocator::default();
+        let target = {
+            "
+            (lambda (foo bar baz qux)
+                (+ (+ (+ foo bar) (+ baz baz)) qux))
+            ";
+            factory.create_lambda_term(
+                4,
+                factory.create_application_term(
+                    factory.create_builtin_term(Add),
+                    allocator.create_pair(
+                        factory.create_application_term(
+                            factory.create_builtin_term(Add),
+                            allocator.create_pair(
+                                factory.create_application_term(
+                                    factory.create_builtin_term(Add),
+                                    allocator.create_pair(
+                                        factory.create_variable_term(3),
+                                        factory.create_variable_term(2),
+                                    ),
+                                ),
+                                factory.create_application_term(
+                                    factory.create_builtin_term(Add),
+                                    allocator.create_pair(
+                                        factory.create_variable_term(1),
+                                        factory.create_variable_term(1),
+                                    ),
+                                ),
+                            ),
+                        ),
+                        factory.create_variable_term(0),
+                    ),
+                ),
+            )
+        };
+        let term = factory.match_lambda_term(&target).unwrap();
+        {
+            let substitutions = [];
+            let result = inline_lambda_arg_values(
+                term,
+                substitutions,
+                &factory,
+                &allocator,
+                &mut SubstitutionCache::new(),
+            );
+            let expected = None;
+            assert_eq!(result, expected);
+        }
+        {
+            let substitutions = [(0, factory.create_int_term(0))];
+            let result = inline_lambda_arg_values(
+                term,
+                substitutions,
+                &factory,
+                &allocator,
+                &mut SubstitutionCache::new(),
+            );
+            let expected = Some(factory.create_lambda_term(
+                3,
+                factory.create_application_term(
+                    factory.create_builtin_term(Add),
+                    allocator.create_pair(
+                        factory.create_application_term(
+                            factory.create_builtin_term(Add),
+                            allocator.create_pair(
+                                factory.create_application_term(
+                                    factory.create_builtin_term(Add),
+                                    allocator.create_pair(
+                                        factory.create_variable_term(2),
+                                        factory.create_variable_term(1),
+                                    ),
+                                ),
+                                factory.create_application_term(
+                                    factory.create_builtin_term(Add),
+                                    allocator.create_pair(
+                                        factory.create_variable_term(0),
+                                        factory.create_variable_term(0),
+                                    ),
+                                ),
+                            ),
+                        ),
+                        factory.create_int_term(0),
+                    ),
+                ),
+            ));
+            assert_eq!(result, expected);
+        }
+        {
+            let substitutions = [(3, factory.create_int_term(3))];
+            let result = inline_lambda_arg_values(
+                term,
+                substitutions,
+                &factory,
+                &allocator,
+                &mut SubstitutionCache::new(),
+            );
+            let expected = Some(factory.create_lambda_term(
+                3,
+                factory.create_application_term(
+                    factory.create_builtin_term(Add),
+                    allocator.create_pair(
+                        factory.create_application_term(
+                            factory.create_builtin_term(Add),
+                            allocator.create_pair(
+                                factory.create_application_term(
+                                    factory.create_builtin_term(Add),
+                                    allocator.create_pair(
+                                        factory.create_int_term(3),
+                                        factory.create_variable_term(2),
+                                    ),
+                                ),
+                                factory.create_application_term(
+                                    factory.create_builtin_term(Add),
+                                    allocator.create_pair(
+                                        factory.create_variable_term(1),
+                                        factory.create_variable_term(1),
+                                    ),
+                                ),
+                            ),
+                        ),
+                        factory.create_variable_term(0),
+                    ),
+                ),
+            ));
+            assert_eq!(result, expected);
+        }
+        {
+            let substitutions = [(1, factory.create_int_term(1))];
+            let result = inline_lambda_arg_values(
+                term,
+                substitutions,
+                &factory,
+                &allocator,
+                &mut SubstitutionCache::new(),
+            );
+            let expected = Some(factory.create_lambda_term(
+                3,
+                factory.create_application_term(
+                    factory.create_builtin_term(Add),
+                    allocator.create_pair(
+                        factory.create_application_term(
+                            factory.create_builtin_term(Add),
+                            allocator.create_pair(
+                                factory.create_application_term(
+                                    factory.create_builtin_term(Add),
+                                    allocator.create_pair(
+                                        factory.create_variable_term(2),
+                                        factory.create_variable_term(1),
+                                    ),
+                                ),
+                                factory.create_application_term(
+                                    factory.create_builtin_term(Add),
+                                    allocator.create_pair(
+                                        factory.create_int_term(1),
+                                        factory.create_int_term(1),
+                                    ),
+                                ),
+                            ),
+                        ),
+                        factory.create_variable_term(0),
+                    ),
+                ),
+            ));
+            assert_eq!(result, expected);
+        }
+        {
+            let substitutions = [
+                (0, factory.create_int_term(0)),
+                (1, factory.create_int_term(1)),
+                (2, factory.create_int_term(2)),
+                (3, factory.create_int_term(3)),
+            ];
+            let result = inline_lambda_arg_values(
+                term,
+                substitutions,
+                &factory,
+                &allocator,
+                &mut SubstitutionCache::new(),
+            );
+            let expected = Some(factory.create_lambda_term(
+                0,
+                factory.create_application_term(
+                    factory.create_builtin_term(Add),
+                    allocator.create_pair(
+                        factory.create_application_term(
+                            factory.create_builtin_term(Add),
+                            allocator.create_pair(
+                                factory.create_application_term(
+                                    factory.create_builtin_term(Add),
+                                    allocator.create_pair(
+                                        factory.create_int_term(3),
+                                        factory.create_int_term(2),
+                                    ),
+                                ),
+                                factory.create_application_term(
+                                    factory.create_builtin_term(Add),
+                                    allocator.create_pair(
+                                        factory.create_int_term(1),
+                                        factory.create_int_term(1),
+                                    ),
+                                ),
+                            ),
+                        ),
+                        factory.create_int_term(0),
+                    ),
+                ),
+            ));
+            assert_eq!(result, expected);
+        }
+        {
+            let substitutions = [
+                (1, factory.create_variable_term(123)),
+                (2, factory.create_variable_term(234)),
+            ];
+            let result = inline_lambda_arg_values(
+                term,
+                substitutions,
+                &factory,
+                &allocator,
+                &mut SubstitutionCache::new(),
+            );
+            let expected = Some(factory.create_lambda_term(
+                2,
+                factory.create_application_term(
+                    factory.create_builtin_term(Add),
+                    allocator.create_pair(
+                        factory.create_application_term(
+                            factory.create_builtin_term(Add),
+                            allocator.create_pair(
+                                factory.create_application_term(
+                                    factory.create_builtin_term(Add),
+                                    allocator.create_pair(
+                                        factory.create_variable_term(1),
+                                        factory.create_variable_term(236),
+                                    ),
+                                ),
+                                factory.create_application_term(
+                                    factory.create_builtin_term(Add),
+                                    allocator.create_pair(
+                                        factory.create_variable_term(125),
+                                        factory.create_variable_term(125),
+                                    ),
+                                ),
+                            ),
+                        ),
+                        factory.create_variable_term(0),
+                    ),
+                ),
+            ));
+            assert_eq!(result, expected);
+        }
+        {
+            let substitutions = [(
+                3,
+                factory.create_application_term(
+                    factory.create_builtin_term(Floor),
+                    allocator.create_unit_list(factory.create_int_term(3)),
+                ),
+            )];
+            let result = inline_lambda_arg_values(
+                term,
+                substitutions,
+                &factory,
+                &allocator,
+                &mut SubstitutionCache::new(),
+            );
+            let expected = Some(factory.create_lambda_term(
+                3,
+                factory.create_application_term(
+                    factory.create_builtin_term(Add),
+                    allocator.create_pair(
+                        factory.create_application_term(
+                            factory.create_builtin_term(Add),
+                            allocator.create_pair(
+                                factory.create_application_term(
+                                    factory.create_builtin_term(Add),
+                                    allocator.create_pair(
+                                        factory.create_application_term(
+                                            factory.create_builtin_term(Floor),
+                                            allocator.create_unit_list(factory.create_int_term(3)),
+                                        ),
+                                        factory.create_variable_term(2),
+                                    ),
+                                ),
+                                factory.create_application_term(
+                                    factory.create_builtin_term(Add),
+                                    allocator.create_pair(
+                                        factory.create_variable_term(1),
+                                        factory.create_variable_term(1),
+                                    ),
+                                ),
+                            ),
+                        ),
+                        factory.create_variable_term(0),
+                    ),
+                ),
+            ));
+            assert_eq!(result, expected);
+        }
+        {
+            let substitutions = [(
+                1,
+                factory.create_application_term(
+                    factory.create_builtin_term(Floor),
+                    allocator.create_unit_list(factory.create_int_term(1)),
+                ),
+            )];
+            let result = inline_lambda_arg_values(
+                term,
+                substitutions,
+                &factory,
+                &allocator,
+                &mut SubstitutionCache::new(),
+            );
+            let expected = Some(factory.create_lambda_term(
+                3,
+                factory.create_let_term(
+                    factory.create_application_term(
+                        factory.create_builtin_term(Floor),
+                        allocator.create_unit_list(factory.create_int_term(1)),
+                    ),
+                    factory.create_application_term(
+                        factory.create_builtin_term(Add),
+                        allocator.create_pair(
+                            factory.create_application_term(
+                                factory.create_builtin_term(Add),
+                                allocator.create_pair(
+                                    factory.create_application_term(
+                                        factory.create_builtin_term(Add),
+                                        allocator.create_pair(
+                                            factory.create_variable_term(3),
+                                            factory.create_variable_term(2),
+                                        ),
+                                    ),
+                                    factory.create_application_term(
+                                        factory.create_builtin_term(Add),
+                                        allocator.create_pair(
+                                            factory.create_variable_term(0),
+                                            factory.create_variable_term(0),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                            factory.create_variable_term(1),
+                        ),
+                    ),
+                ),
+            ));
+            assert_eq!(result, expected);
+        }
+        {
+            let substitutions = [
+                (
+                    0,
+                    factory.create_application_term(
+                        factory.create_builtin_term(Floor),
+                        allocator.create_unit_list(factory.create_int_term(0)),
+                    ),
+                ),
+                (
+                    1,
+                    factory.create_application_term(
+                        factory.create_builtin_term(Floor),
+                        allocator.create_unit_list(factory.create_int_term(1)),
+                    ),
+                ),
+                (
+                    2,
+                    factory.create_application_term(
+                        factory.create_builtin_term(Floor),
+                        allocator.create_unit_list(factory.create_int_term(2)),
+                    ),
+                ),
+                (
+                    3,
+                    factory.create_application_term(
+                        factory.create_builtin_term(Floor),
+                        allocator.create_unit_list(factory.create_int_term(3)),
+                    ),
+                ),
+            ];
+            let result = inline_lambda_arg_values(
+                term,
+                substitutions,
+                &factory,
+                &allocator,
+                &mut SubstitutionCache::new(),
+            );
+            let expected =
+                Some(factory.create_lambda_term(
+                    0,
+                    factory.create_let_term(
+                        factory.create_application_term(
+                            factory.create_builtin_term(Floor),
+                            allocator.create_unit_list(factory.create_int_term(1)),
+                        ),
+                        factory.create_application_term(
+                            factory.create_builtin_term(Add),
+                            allocator.create_pair(
+                                factory.create_application_term(
+                                    factory.create_builtin_term(Add),
+                                    allocator.create_pair(
+                                        factory.create_application_term(
+                                            factory.create_builtin_term(Add),
+                                            allocator.create_pair(
+                                                factory.create_application_term(
+                                                    factory.create_builtin_term(Floor),
+                                                    allocator.create_unit_list(
+                                                        factory.create_int_term(3),
+                                                    ),
+                                                ),
+                                                factory.create_application_term(
+                                                    factory.create_builtin_term(Floor),
+                                                    allocator.create_unit_list(
+                                                        factory.create_int_term(2),
+                                                    ),
+                                                ),
+                                            ),
+                                        ),
+                                        factory.create_application_term(
+                                            factory.create_builtin_term(Add),
+                                            allocator.create_pair(
+                                                factory.create_variable_term(0),
+                                                factory.create_variable_term(0),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                                factory.create_application_term(
+                                    factory.create_builtin_term(Floor),
+                                    allocator.create_unit_list(factory.create_int_term(0)),
+                                ),
+                            ),
+                        ),
+                    ),
+                ));
+            assert_eq!(result, expected);
+        }
+        {
+            let substitutions = [(
+                1,
+                factory.create_application_term(
+                    factory.create_builtin_term(Floor),
+                    allocator.create_unit_list(factory.create_variable_term(123)),
+                ),
+            )];
+            let result = inline_lambda_arg_values(
+                term,
+                substitutions,
+                &factory,
+                &allocator,
+                &mut SubstitutionCache::new(),
+            );
+            let expected = Some(factory.create_lambda_term(
+                3,
+                factory.create_let_term(
+                    factory.create_application_term(
+                        factory.create_builtin_term(Floor),
+                        allocator.create_unit_list(factory.create_variable_term(126)),
+                    ),
+                    factory.create_application_term(
+                        factory.create_builtin_term(Add),
+                        allocator.create_pair(
+                            factory.create_application_term(
+                                factory.create_builtin_term(Add),
+                                allocator.create_pair(
+                                    factory.create_application_term(
+                                        factory.create_builtin_term(Add),
+                                        allocator.create_pair(
+                                            factory.create_variable_term(3),
+                                            factory.create_variable_term(2),
+                                        ),
+                                    ),
+                                    factory.create_application_term(
+                                        factory.create_builtin_term(Add),
+                                        allocator.create_pair(
+                                            factory.create_variable_term(0),
+                                            factory.create_variable_term(0),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                            factory.create_variable_term(1),
+                        ),
+                    ),
+                ),
+            ));
+            assert_eq!(result, expected);
+        }
+        {
+            let target = {
+                "
+                (lambda (five four three two one zero)
+                    (+ (+ (+ (+ (+ (+ five five) (+ four four)) (+ three three)) (+ two two)) (+ one one)) (+ zero zero)))
+                ";
+                factory.create_lambda_term(
+                    6,
+                    factory.create_application_term(
+                        factory.create_builtin_term(Add),
+                        allocator.create_pair(
+                            factory.create_application_term(
+                                factory.create_builtin_term(Add),
+                                allocator.create_pair(
+                                    factory.create_application_term(
+                                        factory.create_builtin_term(Add),
+                                        allocator.create_pair(
+                                            factory.create_application_term(
+                                                factory.create_builtin_term(Add),
+                                                allocator.create_pair(
+                                                    factory.create_application_term(
+                                                        factory.create_builtin_term(Add),
+                                                        allocator.create_pair(
+                                                            factory.create_application_term(
+                                                                factory.create_builtin_term(Add),
+                                                                allocator.create_pair(
+                                                                    factory.create_variable_term(5),
+                                                                    factory.create_variable_term(5),
+                                                                ),
+                                                            ),
+                                                            factory.create_application_term(
+                                                                factory.create_builtin_term(Add),
+                                                                allocator.create_pair(
+                                                                    factory.create_variable_term(4),
+                                                                    factory.create_variable_term(4),
+                                                                ),
+                                                            ),
+                                                        ),
+                                                    ),
+                                                    factory.create_application_term(
+                                                        factory.create_builtin_term(Add),
+                                                        allocator.create_pair(
+                                                            factory.create_variable_term(3),
+                                                            factory.create_variable_term(3),
+                                                        ),
+                                                    ),
+                                                ),
+                                            ),
+                                            factory.create_application_term(
+                                                factory.create_builtin_term(Add),
+                                                allocator.create_pair(
+                                                    factory.create_variable_term(2),
+                                                    factory.create_variable_term(2),
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                    factory.create_application_term(
+                                        factory.create_builtin_term(Add),
+                                        allocator.create_pair(
+                                            factory.create_variable_term(1),
+                                            factory.create_variable_term(1),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                            factory.create_application_term(
+                                factory.create_builtin_term(Add),
+                                allocator.create_pair(
+                                    factory.create_variable_term(0),
+                                    factory.create_variable_term(0),
+                                ),
+                            ),
+                        ),
+                    ),
+                )
+            };
+            let term = factory.match_lambda_term(&target).unwrap();
+            let substitutions = [
+                (1, factory.create_variable_term(123)),
+                (
+                    2,
+                    factory.create_application_term(
+                        factory.create_builtin_term(Floor),
+                        allocator.create_unit_list(factory.create_variable_term(123)),
+                    ),
+                ),
+                (
+                    4,
+                    factory.create_application_term(
+                        factory.create_builtin_term(Floor),
+                        allocator.create_unit_list(factory.create_variable_term(456)),
+                    ),
+                ),
+                (5, factory.create_variable_term(567)),
+            ];
+            let result = inline_lambda_arg_values(
+                term,
+                substitutions,
+                &factory,
+                &allocator,
+                &mut SubstitutionCache::new(),
+            );
+            let expected = Some(
+                factory.create_lambda_term(
+                    2,
+                    factory.create_let_term(
+                        factory.create_application_term(
+                            factory.create_builtin_term(Floor),
+                            allocator.create_unit_list(factory.create_variable_term(458)),
+                        ),
+                        factory.create_let_term(
+                            factory.create_application_term(
+                                factory.create_builtin_term(Floor),
+                                allocator.create_unit_list(factory.create_variable_term(126)),
+                            ),
+                            factory.create_application_term(
+                                factory.create_builtin_term(Add),
+                                allocator.create_pair(
+                                    factory.create_application_term(
+                                        factory.create_builtin_term(Add),
+                                        allocator.create_pair(
+                                            factory.create_application_term(
+                                                factory.create_builtin_term(Add),
+                                                allocator.create_pair(
+                                                    factory.create_application_term(
+                                                        factory.create_builtin_term(Add),
+                                                        allocator.create_pair(
+                                                            factory.create_application_term(
+                                                                factory.create_builtin_term(Add),
+                                                                allocator.create_pair(
+                                                                    factory.create_application_term(
+                                                                        factory.create_builtin_term(Add),
+                                                                        allocator.create_pair(
+                                                                            factory.create_variable_term(571),
+                                                                            factory.create_variable_term(571),
+                                                                        ),
+                                                                    ),
+                                                                    factory.create_application_term(
+                                                                        factory.create_builtin_term(Add),
+                                                                        allocator.create_pair(
+                                                                            factory.create_variable_term(1),
+                                                                            factory.create_variable_term(1),
+                                                                        ),
+                                                                    ),
+                                                                ),
+                                                            ),
+                                                            factory.create_application_term(
+                                                                factory.create_builtin_term(Add),
+                                                                allocator.create_pair(
+                                                                    factory.create_variable_term(3),
+                                                                    factory.create_variable_term(3),
+                                                                ),
+                                                            ),
+                                                        ),
+                                                    ),
+                                                    factory.create_application_term(
+                                                        factory.create_builtin_term(Add),
+                                                        allocator.create_pair(
+                                                            factory.create_variable_term(0),
+                                                            factory.create_variable_term(0),
+                                                        ),
+                                                    ),
+                                                ),
+                                            ),
+                                            factory.create_application_term(
+                                                factory.create_builtin_term(Add),
+                                                allocator.create_pair(
+                                                    factory.create_variable_term(127),
+                                                    factory.create_variable_term(127),
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                    factory.create_application_term(
+                                        factory.create_builtin_term(Add),
+                                        allocator.create_pair(
+                                            factory.create_variable_term(2),
+                                            factory.create_variable_term(2),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            );
+            assert_eq!(expected, result);
+        }
+    }
 
     #[test]
     fn hoist_lambda_variables() {

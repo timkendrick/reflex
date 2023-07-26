@@ -123,3 +123,14 @@ impl SerializeJson for VariableTerm {
         ))
     }
 }
+
+pub(crate) fn should_inline_value<T: Expression>(
+    value: &T,
+    factory: &impl ExpressionFactory<T>,
+) -> bool {
+    // FIXME: Defer to trait method to determine whether terms can be inlined
+    let is_primitive_value = !value.is_complex();
+    is_primitive_value
+        || factory.match_lambda_term(value).is_some()
+        || factory.match_constructor_term(value).is_some()
+}

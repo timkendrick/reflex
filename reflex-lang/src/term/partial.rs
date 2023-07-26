@@ -11,9 +11,11 @@ use serde_json::Value as JsonValue;
 use reflex::core::{
     transform_expression_list, Applicable, ArgType, Arity, CompoundNode, DependencyList,
     DynamicState, Eagerness, EvaluationCache, Expression, ExpressionFactory, ExpressionListIter,
-    ExpressionListType, GraphNode, HeapAllocator, Internable, PartialApplicationTermType, RefType,
-    Rewritable, SerializeJson, StackOffset, Substitutions,
+    ExpressionListType, GraphNode, HeapAllocator, Internable, LambdaTermType,
+    PartialApplicationTermType, RefType, Rewritable, SerializeJson, StackOffset, Substitutions,
 };
+
+use crate::term::lambda::inline_lambda_arg_values;
 
 #[derive(Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct PartialApplicationTerm<T: Expression> {
@@ -208,13 +210,34 @@ impl<T: Expression + Rewritable<T>> Rewritable<T> for PartialApplicationTerm<T> 
         let normalized_args = transform_expression_list(&self.args, allocator, |arg| {
             arg.normalize(factory, allocator, cache)
         });
-        if normalized_target.is_none() && normalized_args.is_none() {
-            None
+        let target = normalized_target.as_ref().unwrap_or(&self.target);
+        let args = normalized_args.as_ref().unwrap_or(&self.args);
+        if let Some(partial) = factory.match_partial_application_term(target) {
+            factory
+                .create_partial_application_term(
+                    partial.target().as_deref().clone(),
+                    allocator.create_sized_list(
+                        partial.args().as_deref().len() + args.len(),
+                        partial
+                            .args()
+                            .as_deref()
+                            .iter()
+                            .map(|item| item.as_deref().clone())
+                            .chain(args.iter().map(|item| item.as_deref().clone())),
+                    ),
+                )
+                .normalize(factory, allocator, cache)
         } else {
-            Some(factory.create_partial_application_term(
-                normalized_target.unwrap_or_else(|| self.target.clone()),
-                normalized_args.unwrap_or_else(|| allocator.clone_list((&self.args).into())),
-            ))
+            normalize_partial_application(target, args, factory, allocator, cache).or_else(|| {
+                if normalized_target.is_some() || normalized_args.is_some() {
+                    Some(factory.create_partial_application_term(
+                        normalized_target.unwrap_or_else(|| self.target.clone()),
+                        normalized_args.unwrap_or_else(|| self.args.clone()),
+                    ))
+                } else {
+                    None
+                }
+            })
         }
     }
 }
@@ -249,6 +272,79 @@ impl<T: Expression + Applicable<T>> Applicable<T> for PartialApplicationTerm<T> 
     }
 }
 
+fn normalize_partial_application<T: Expression + Rewritable<T>>(
+    target: &T,
+    args: &T::ExpressionList,
+    factory: &impl ExpressionFactory<T>,
+    allocator: &impl HeapAllocator<T>,
+    cache: &mut impl EvaluationCache<T>,
+) -> Option<T> {
+    if let Some(lambda) = factory.match_lambda_term(target) {
+        normalize_partial_lambda_application(target, lambda, args, factory, allocator, cache)
+    } else {
+        None
+    }
+}
+
+fn normalize_partial_lambda_application<T: Expression + Rewritable<T>>(
+    target: &T,
+    lambda: &T::LambdaTerm,
+    args: &T::ExpressionList,
+    factory: &impl ExpressionFactory<T>,
+    allocator: &impl HeapAllocator<T>,
+    cache: &mut impl EvaluationCache<T>,
+) -> Option<T> {
+    if args.len() == 0 {
+        Some(target.clone())
+    } else {
+        let num_args = lambda.num_args();
+        let (inlined_args, remaining_args): (Vec<_>, Vec<_>) = args
+            .iter()
+            .map(|item| item.as_deref().clone())
+            .take(num_args)
+            .enumerate()
+            .map(|(index, arg)| (num_args - index - 1, arg))
+            .partition({
+                // Prevent currently-unreferenced free variable scopes from being pulled into partial application targets
+                let existing_capture_depth = target.capture_depth();
+                move |(_offset, arg)| arg.capture_depth() <= existing_capture_depth
+            });
+        if inlined_args.is_empty() {
+            return None;
+        }
+        let remaining_args = allocator.create_list(remaining_args.into_iter().map(|(_, arg)| arg));
+        inline_lambda_arg_values(lambda, inlined_args, factory, allocator, cache)
+            .map(|target| {
+                if remaining_args.len() == 0 {
+                    target
+                        .normalize(factory, allocator, cache)
+                        .unwrap_or(target)
+                } else {
+                    let target = target
+                        .normalize(factory, allocator, cache)
+                        .unwrap_or(target);
+                    factory.create_partial_application_term(target, remaining_args)
+                }
+            })
+            .or_else(|| {
+                if args.len() > num_args {
+                    Some(
+                        factory.create_partial_application_term(
+                            target.clone(),
+                            allocator.create_list(
+                                args.iter()
+                                    .take(num_args)
+                                    .map(|item| item.as_deref().clone()),
+                            ),
+                        ),
+                    )
+                } else {
+                    None
+                }
+            })
+    }
+}
+
 impl<T: Expression> Internable for PartialApplicationTerm<T> {
     fn should_intern(&self, _eager: Eagerness) -> bool {
         self.args.capture_depth() == 0 && self.target.capture_depth() == 0
@@ -279,7 +375,7 @@ mod tests {
         cache::SubstitutionCache,
         core::{ExpressionFactory, HeapAllocator, Rewritable},
     };
-    use reflex_stdlib::Stdlib;
+    use reflex_stdlib::{Add, Get, Stdlib, Subtract};
 
     use crate::{allocator::DefaultAllocator, CachedSharedTerm, SharedTermFactory};
 
@@ -344,5 +440,340 @@ mod tests {
         );
         let result = expression.normalize(&factory, &allocator, &mut SubstitutionCache::new());
         assert_eq!(result, Some(factory.create_int_term(3)));
+    }
+
+    #[test]
+    fn normalize_fully_specified_partial_application() {
+        let factory = SharedTermFactory::<Stdlib>::default();
+        let allocator = DefaultAllocator::<CachedSharedTerm<Stdlib>>::default();
+        let expression = factory.create_partial_application_term(
+            factory.create_lambda_term(
+                3,
+                factory.create_application_term(
+                    factory.create_builtin_term(Subtract),
+                    allocator.create_pair(
+                        factory.create_variable_term(2),
+                        factory.create_application_term(
+                            factory.create_builtin_term(Add),
+                            allocator.create_pair(
+                                factory.create_variable_term(1),
+                                factory.create_variable_term(0),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            allocator.create_triple(
+                factory.create_int_term(3),
+                factory.create_int_term(4),
+                factory.create_int_term(5),
+            ),
+        );
+        let result = expression.normalize(&factory, &allocator, &mut SubstitutionCache::new());
+        assert_eq!(
+            result,
+            Some(factory.create_lambda_term(0, factory.create_int_term(3 - (4 + 5))))
+        );
+    }
+
+    #[test]
+    fn normalize_partially_specified_partial_application() {
+        let factory = SharedTermFactory::<Stdlib>::default();
+        let allocator = DefaultAllocator::<CachedSharedTerm<Stdlib>>::default();
+        let expression = factory.create_partial_application_term(
+            factory.create_lambda_term(
+                4,
+                factory.create_application_term(
+                    factory.create_builtin_term(Subtract),
+                    allocator.create_pair(
+                        factory.create_application_term(
+                            factory.create_builtin_term(Subtract),
+                            allocator.create_pair(
+                                factory.create_variable_term(3),
+                                factory.create_variable_term(2),
+                            ),
+                        ),
+                        factory.create_application_term(
+                            factory.create_builtin_term(Subtract),
+                            allocator.create_pair(
+                                factory.create_variable_term(1),
+                                factory.create_variable_term(0),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            allocator.create_triple(
+                factory.create_int_term(3),
+                factory.create_variable_term(123),
+                factory.create_int_term(4),
+            ),
+        );
+        let result = expression.normalize(&factory, &allocator, &mut SubstitutionCache::new());
+        assert_eq!(
+            result,
+            Some(factory.create_partial_application_term(
+                factory.create_lambda_term(
+                    2,
+                    factory.create_application_term(
+                        factory.create_builtin_term(Subtract),
+                        allocator.create_pair(
+                            factory.create_application_term(
+                                factory.create_builtin_term(Subtract),
+                                allocator.create_pair(
+                                    factory.create_int_term(3),
+                                    factory.create_variable_term(1),
+                                ),
+                            ),
+                            factory.create_application_term(
+                                factory.create_builtin_term(Subtract),
+                                allocator.create_pair(
+                                    factory.create_int_term(4),
+                                    factory.create_variable_term(0),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                allocator.create_unit_list(factory.create_variable_term(123)),
+            )),
+        );
+    }
+
+    #[test]
+    fn normalize_reused_primitive_partial_application_args() {
+        let factory = SharedTermFactory::<Stdlib>::default();
+        let allocator = DefaultAllocator::<CachedSharedTerm<Stdlib>>::default();
+        let expression = factory.create_partial_application_term(
+            factory.create_lambda_term(
+                5,
+                factory.create_application_term(
+                    factory.create_variable_term(4),
+                    allocator.create_pair(
+                        factory.create_application_term(
+                            factory.create_variable_term(4),
+                            allocator.create_pair(
+                                factory.create_variable_term(3),
+                                factory.create_variable_term(2),
+                            ),
+                        ),
+                        factory.create_application_term(
+                            factory.create_variable_term(4),
+                            allocator.create_pair(
+                                factory.create_variable_term(1),
+                                factory.create_variable_term(0),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            allocator.create_list([
+                factory.create_builtin_term(Add),
+                factory.create_int_term(3),
+                factory.create_variable_term(123),
+                factory.create_int_term(4),
+                factory.create_variable_term(456),
+            ]),
+        );
+        let result = expression.normalize(&factory, &allocator, &mut SubstitutionCache::new());
+        assert_eq!(
+            result,
+            Some(factory.create_partial_application_term(
+                factory.create_lambda_term(
+                    2,
+                    factory.create_application_term(
+                        factory.create_builtin_term(Add),
+                        allocator.create_pair(
+                            factory.create_application_term(
+                                factory.create_builtin_term(Add),
+                                allocator.create_pair(
+                                    factory.create_int_term(3),
+                                    factory.create_variable_term(1),
+                                ),
+                            ),
+                            factory.create_application_term(
+                                factory.create_builtin_term(Add),
+                                allocator.create_pair(
+                                    factory.create_int_term(4),
+                                    factory.create_variable_term(0),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                allocator.create_pair(
+                    factory.create_variable_term(123),
+                    factory.create_variable_term(456),
+                ),
+            ))
+        );
+    }
+
+    #[test]
+    fn normalize_reused_complex_partial_application_args() {
+        let factory = SharedTermFactory::<Stdlib>::default();
+        let allocator = DefaultAllocator::<CachedSharedTerm<Stdlib>>::default();
+        let expression = factory.create_partial_application_term(
+            factory.create_lambda_term(
+                6,
+                factory.create_application_term(
+                    factory.create_builtin_term(Add),
+                    allocator.create_pair(
+                        factory.create_application_term(
+                            factory.create_builtin_term(Get),
+                            allocator.create_pair(
+                                factory.create_variable_term(5),
+                                factory.create_application_term(
+                                    factory.create_builtin_term(Get),
+                                    allocator.create_pair(
+                                        factory.create_variable_term(4),
+                                        factory.create_application_term(
+                                            factory.create_builtin_term(Add),
+                                            allocator.create_pair(
+                                                factory.create_variable_term(3),
+                                                factory.create_variable_term(2),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ),
+                        factory.create_application_term(
+                            factory.create_builtin_term(Get),
+                            allocator.create_pair(
+                                factory.create_variable_term(5),
+                                factory.create_application_term(
+                                    factory.create_builtin_term(Get),
+                                    allocator.create_pair(
+                                        factory.create_variable_term(4),
+                                        factory.create_application_term(
+                                            factory.create_builtin_term(Add),
+                                            allocator.create_pair(
+                                                factory.create_variable_term(1),
+                                                factory.create_variable_term(0),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            allocator.create_list([
+                factory.create_list_term(allocator.create_triple(
+                    factory.create_int_term(0),
+                    factory.create_int_term(1),
+                    factory.create_int_term(2),
+                )),
+                factory.create_list_term(allocator.create_triple(
+                    factory.create_int_term(3),
+                    factory.create_int_term(4),
+                    factory.create_int_term(5),
+                )),
+                factory.create_int_term(6),
+                factory.create_variable_term(0),
+                factory.create_int_term(7),
+                factory.create_variable_term(1),
+            ]),
+        );
+        let result = expression.normalize(&factory, &allocator, &mut SubstitutionCache::new());
+        assert_eq!(
+            result,
+            Some(factory.create_partial_application_term(
+                factory.create_lambda_term(
+                    2,
+                    factory.create_let_term(
+                        factory.create_list_term(allocator.create_triple(
+                            factory.create_int_term(0),
+                            factory.create_int_term(1),
+                            factory.create_int_term(2),
+                        )),
+                        factory.create_let_term(
+                            factory.create_list_term(allocator.create_triple(
+                                factory.create_int_term(3),
+                                factory.create_int_term(4),
+                                factory.create_int_term(5),
+                            )),
+                            factory.create_application_term(
+                                factory.create_builtin_term(Add),
+                                allocator.create_pair(
+                                    factory.create_application_term(
+                                        factory.create_builtin_term(Get),
+                                        allocator.create_pair(
+                                            factory.create_variable_term(1),
+                                            factory.create_application_term(
+                                                factory.create_builtin_term(Get),
+                                                allocator.create_pair(
+                                                    factory.create_variable_term(0),
+                                                    factory.create_application_term(
+                                                        factory.create_builtin_term(Add),
+                                                        allocator.create_pair(
+                                                            factory.create_int_term(6),
+                                                            factory.create_variable_term(3),
+                                                        ),
+                                                    ),
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                    factory.create_application_term(
+                                        factory.create_builtin_term(Get),
+                                        allocator.create_pair(
+                                            factory.create_variable_term(1),
+                                            factory.create_application_term(
+                                                factory.create_builtin_term(Get),
+                                                allocator.create_pair(
+                                                    factory.create_variable_term(0),
+                                                    factory.create_application_term(
+                                                        factory.create_builtin_term(Add),
+                                                        allocator.create_pair(
+                                                            factory.create_int_term(7),
+                                                            factory.create_variable_term(2),
+                                                        ),
+                                                    ),
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                            )
+                        ),
+                    ),
+                ),
+                allocator.create_pair(
+                    factory.create_variable_term(0),
+                    factory.create_variable_term(1),
+                ),
+            ))
+        );
+    }
+
+    #[test]
+    fn normalize_higher_order_partial_application_arg_usages() {
+        let factory = SharedTermFactory::<Stdlib>::default();
+        let allocator = DefaultAllocator::<CachedSharedTerm<Stdlib>>::default();
+        let expression = factory.create_partial_application_term(
+            factory.create_lambda_term(
+                1,
+                factory.create_application_term(
+                    factory.create_lambda_term(
+                        1,
+                        factory.create_application_term(
+                            factory.create_variable_term(1),
+                            allocator.create_unit_list(factory.create_int_term(3)),
+                        ),
+                    ),
+                    allocator.create_unit_list(factory.create_boolean_term(false)),
+                ),
+            ),
+            allocator
+                .create_unit_list(factory.create_lambda_term(1, factory.create_boolean_term(true))),
+        );
+        let result = expression.normalize(&factory, &allocator, &mut SubstitutionCache::new());
+        assert_eq!(
+            result,
+            Some(factory.create_lambda_term(0, factory.create_boolean_term(true)))
+        );
     }
 }
