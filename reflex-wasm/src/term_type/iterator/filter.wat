@@ -105,9 +105,15 @@
             (local.get $iterator_state)
             (local.get $dependencies))
           (else
-            ;; Otherwise if the predicate returned a truthy result, emit the iterator value
+            ;; Otherwise if the predicate returned a true boolean result, emit the iterator value
             (if (result i32 i32 i32)
-              (call $Term::traits::is_truthy (local.get $filter_result))
+              ;; Determine whether the predicate result is a true boolean value
+              (if (result i32)
+                (call $Term::Boolean::is (local.get $filter_result))
+                (then
+                  (call $Term::Boolean::get::value (local.get $filter_result)))
+                (else
+                  (global.get $FALSE)))
               (then
                 (local.get $value)
                 (local.get $iterator_state)

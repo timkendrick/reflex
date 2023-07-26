@@ -6,13 +6,15 @@ export default (describe) => {
     test('iteration', (assert, {
       createApplication,
       createBoolean,
-      createEmptyIterator,
       createBuiltin,
+      createEmptyIterator,
+      createLambda,
       createList,
       createNil,
       createFilterIterator,
       createRangeIterator,
       createUnitList,
+      createVariable,
       evaluate,
       format,
       NULL,
@@ -21,7 +23,23 @@ export default (describe) => {
       (() => {
         const expression = createApplication(
           createBuiltin(Stdlib.ResolveList),
-          createUnitList(createFilterIterator(createEmptyIterator(), createBuiltin(Stdlib.Not))),
+          createUnitList(
+            createFilterIterator(
+              createEmptyIterator(),
+              createLambda(
+                1,
+                createApplication(
+                  createBuiltin(Stdlib.Not),
+                  createUnitList(
+                    createApplication(
+                      createBuiltin(Stdlib.IsTruthy),
+                      createUnitList(createVariable(0)),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '[]');
@@ -31,7 +49,21 @@ export default (describe) => {
         const expression = createApplication(
           createBuiltin(Stdlib.ResolveList),
           createUnitList(
-            createFilterIterator(createRangeIterator(3, 3), createBuiltin(Stdlib.Not)),
+            createFilterIterator(
+              createRangeIterator(3, 3),
+              createLambda(
+                1,
+                createApplication(
+                  createBuiltin(Stdlib.Not),
+                  createUnitList(
+                    createApplication(
+                      createBuiltin(Stdlib.IsTruthy),
+                      createUnitList(createVariable(0)),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
         );
         const [result, dependencies] = evaluate(expression, NULL);
@@ -44,7 +76,18 @@ export default (describe) => {
           createUnitList(
             createFilterIterator(
               createList([createNil(), createBoolean(false), createBoolean(true), createNil()]),
-              createBuiltin(Stdlib.Not),
+              createLambda(
+                1,
+                createApplication(
+                  createBuiltin(Stdlib.Not),
+                  createUnitList(
+                    createApplication(
+                      createBuiltin(Stdlib.IsTruthy),
+                      createUnitList(createVariable(0)),
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         );
