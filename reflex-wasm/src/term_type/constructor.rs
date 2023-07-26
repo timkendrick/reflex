@@ -6,7 +6,7 @@ use std::collections::HashSet;
 
 use reflex::core::{
     Arity, ConstructorTermType, DependencyList, Eagerness, Expression, GraphNode, Internable,
-    RefType, SerializeJson, StackOffset,
+    SerializeJson, StackOffset,
 };
 use reflex_macros::PointerIter;
 use serde_json::Value as JsonValue;
@@ -15,10 +15,10 @@ use crate::{
     allocator::Arena,
     compiler::{
         instruction, runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder,
-        CompilerOptions, CompilerResult, CompilerStack, CompilerState,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState, Strictness,
     },
     hash::{TermHash, TermHasher, TermSize},
-    term_type::{ListTerm, TypedTerm, WasmExpression},
+    term_type::{list::compile_list, ListTerm, TypedTerm, WasmExpression},
     ArenaPointer, ArenaRef, Term,
 };
 
@@ -153,8 +153,20 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<ConstructorTerm, A> {
         let block = CompiledBlockBuilder::new(stack);
         // Push the prototype key list onto the stack
         // => [ListTerm]
-        let block = block
-            .append_inner(|stack| keys.as_deref().as_inner().compile(stack, state, options))?;
+        let block = if keys.as_term().should_intern(Eagerness::Eager) {
+            block.append_inner(|stack| keys.as_term().compile(stack, state, options))
+        } else {
+            block.append_inner(|stack| {
+                compile_list(
+                    keys.as_inner()
+                        .iter()
+                        .map(|key| (key, Strictness::NonStrict)),
+                    stack,
+                    state,
+                    options,
+                )
+            })
+        }?;
         // Invoke the term constructor
         // => [ConstructorTerm]
         let block = block.push(instruction::runtime::CallRuntimeBuiltin {

@@ -1590,7 +1590,7 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<InvalidFunctionArgsCondition,
         }?;
         // Yield the argument list onto the stack
         // => [Option<Term>, ListTerm]
-        let block = block.append_inner(|stack| args.as_inner().compile(stack, state, options))?;
+        let block = block.append_inner(|stack| args.as_term().compile(stack, state, options))?;
         // Invoke the term constructor
         // => [ConditionTerm]
         let block = block.push(instruction::runtime::CallRuntimeBuiltin {

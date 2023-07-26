@@ -148,7 +148,7 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<EffectTerm, A> {
         // Yield the condition onto the stack (this will be used as the state key)
         // => [ConditionTerm]
         let block =
-            block.append_inner(|stack| condition.as_inner().compile(stack, state, options))?;
+            block.append_inner(|stack| condition.as_term().compile(stack, state, options))?;
         // Duplicate the condition on the stack so that it can be assigned to a local variable
         // => [ConditionTerm, ConditionTerm]
         let block = block.push(instruction::core::Duplicate {

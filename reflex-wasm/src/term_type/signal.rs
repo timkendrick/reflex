@@ -156,7 +156,7 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<SignalTerm, A> {
         // Push the conditions argument onto the stack
         // => [TreeTerm]
         let block =
-            block.append_inner(|stack| conditions.as_inner().compile(stack, state, options))?;
+            block.append_inner(|stack| conditions.as_term().compile(stack, state, options))?;
         // Invoke the term constructor
         // => [SignalTerm]
         let block = block.push(instruction::runtime::CallRuntimeBuiltin {

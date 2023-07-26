@@ -231,8 +231,7 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<HashsetTerm, A> {
         let block = CompiledBlockBuilder::new(stack);
         // Allocate the entries argument onto the stack
         // => [HashmapTerm]
-        let block =
-            block.append_inner(|stack| entries.as_inner().compile(stack, state, options))?;
+        let block = block.append_inner(|stack| entries.as_term().compile(stack, state, options))?;
         // Invoke the term constructor
         // => [HashsetTerm]
         let block = block.push(instruction::runtime::CallRuntimeBuiltin {
