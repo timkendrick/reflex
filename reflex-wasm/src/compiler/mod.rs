@@ -1344,30 +1344,6 @@ impl<A: Arena + Clone> CompileWasm<A> for LazyExpression<A> {
                     compiled_function_term,
                     ..
                 }) => {
-                    let captured_variables = {
-                        let mut captured_variables = free_variables
-                            .iter()
-                            .copied()
-                            .map(|stack_offset| {
-                                (
-                                    ClosureCapture {
-                                        scope_offset: stack_offset,
-                                    },
-                                    Strictness::NonStrict,
-                                )
-                            })
-                            .collect::<Vec<_>>();
-                        captured_variables.sort_by_key(
-                            |(
-                                ClosureCapture {
-                                    scope_offset: stack_offset,
-                                },
-                                _,
-                            )| *stack_offset,
-                        );
-                        captured_variables.reverse();
-                        captured_variables
-                    };
                     // Capturing thunks capture their variables from the current stack
                     let block = CompiledBlockBuilder::new(stack);
                     // Push a pointer to the precompiled thunk target function onto the stack
@@ -1375,10 +1351,26 @@ impl<A: Arena + Clone> CompileWasm<A> for LazyExpression<A> {
                     let block = block.push(instruction::core::Const {
                         value: ConstValue::HeapPointer(*compiled_function_term),
                     });
-                    // Yield the list of captured variables onto the stack
+                    // Collect a list of captured variable lexical scope offsets, from deepest to shallowest
+                    let captured_variable_scope_offsets = {
+                        let mut captured_variables = free_variables.clone();
+                        captured_variables.sort();
+                        captured_variables.reverse();
+                        captured_variables
+                    };
+                    // Yield a list term containing the captured variable values onto the stack
                     // => [BuiltinTerm, ListTerm]
                     let block = block.append_inner(|stack| {
-                        compile_list(captured_variables, stack, state, options)
+                        compile_list(
+                            captured_variable_scope_offsets
+                                .into_iter()
+                                .map(|scope_offset| {
+                                    (ClosureCapture { scope_offset }, Strictness::NonStrict)
+                                }),
+                            stack,
+                            state,
+                            options,
+                        )
                     })?;
                     // Create an application term that applies the thunk function to the list of captured variables
                     // => [ApplicationTerm]
