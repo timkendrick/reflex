@@ -209,7 +209,7 @@ fn get_eager_args<T>(args: impl IntoIterator<Item = T>, arity: &Arity) -> impl I
 
 impl<A: Arena + Clone> Internable for ArenaRef<ApplicationTerm, A> {
     fn should_intern(&self, eager: Eagerness) -> bool {
-        eager == Eagerness::Lazy
+        matches!(eager, Eagerness::Lazy)
             && self.target().is_static()
             && self.target().should_intern(eager)
             && self.args().as_inner().should_intern(eager)
