@@ -6,7 +6,7 @@ use std::collections::HashSet;
 
 use reflex::core::{
     ApplicationTermType, ArgType, Arity, DependencyList, Eagerness, Expression, GraphNode,
-    Internable, SerializeJson, StackOffset,
+    Internable, LambdaTermType, SerializeJson, StackOffset,
 };
 use reflex_macros::PointerIter;
 use serde_json::Value as JsonValue;
@@ -341,10 +341,6 @@ impl<A: Arena + Clone> CompileWasm<A> for LambdaCompiledFunctionCall<A> {
         let Self { target, args } = self;
         let target_term = target.as_inner();
         let num_args = target_term.num_args() as usize;
-        // Ensure that the target lambda is compiled
-        // (note that all lambda functions are extracted out and linked in a later compiler phase)
-        let _ = target_term.compile(stack.clone(), state, options)?;
-        let compiled_function_id = CompiledFunctionId::from(&target_term);
         // If insufficient arguments were provided, return a compiler error
         if args.len() < num_args {
             return Err(CompilerError::InvalidFunctionArgs {
@@ -353,6 +349,14 @@ impl<A: Arena + Clone> CompileWasm<A> for LambdaCompiledFunctionCall<A> {
                 args: args.iter().collect(),
             });
         }
+        // If this is an immediately-invoked nullary lambda, inline the function body directly
+        if num_args == 0 {
+            return target.body().compile(stack, state, options);
+        }
+        // Ensure that the target lambda is compiled
+        // (note that all lambda functions are extracted out and linked in a later compiler phase)
+        let _ = target_term.compile(stack.clone(), state, options)?;
+        let compiled_function_id = CompiledFunctionId::from(&target_term);
         let block = CompiledBlockBuilder::new(stack);
         // Push each argument onto the stack
         // => [Term...]
