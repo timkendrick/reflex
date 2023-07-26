@@ -47,7 +47,7 @@ impl<A: Arena + Clone> ArenaRef<ConstructorTerm, A> {
         )
     }
     pub fn arity(&self) -> Arity {
-        Arity::lazy(self.keys().as_inner().len(), 0, false)
+        Arity::eager(self.keys().as_inner().len(), 0, false)
     }
 }
 
