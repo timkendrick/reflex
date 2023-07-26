@@ -40,20 +40,16 @@ impl<T: Expression> Applicable<T> for If {
         let condition = args.next().unwrap();
         let consequent = args.next().unwrap();
         let alternate = args.next().unwrap();
-        if is_truthy(&condition, factory) {
-            Ok(factory.create_application_term(consequent, allocator.create_empty_list()))
+        if let Some(value) = factory.match_boolean_term(&condition) {
+            Ok(match value.value() {
+                true => factory.create_application_term(consequent, allocator.create_empty_list()),
+                false => factory.create_application_term(alternate, allocator.create_empty_list()),
+            })
         } else {
-            Ok(factory.create_application_term(alternate, allocator.create_empty_list()))
+            Err(format!(
+                "Expected (Boolean, <function:0>, <function:0>), received ({}, {}, {})",
+                condition, consequent, alternate
+            ))
         }
-    }
-}
-
-pub fn is_truthy<T: Expression>(value: &T, factory: &impl ExpressionFactory<T>) -> bool {
-    match factory.match_boolean_term(value) {
-        Some(term) => term.value(),
-        _ => match factory.match_nil_term(value) {
-            Some(_) => false,
-            _ => true,
-        },
     }
 }

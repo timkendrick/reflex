@@ -2,11 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 use reflex::core::{
-    uuid, Applicable, ArgType, Arity, EvaluationCache, Expression, ExpressionFactory,
-    FunctionArity, HeapAllocator, Uid, Uuid,
+    uuid, Applicable, ArgType, Arity, BooleanTermType, EvaluationCache, Expression,
+    ExpressionFactory, FunctionArity, HeapAllocator, Uid, Uuid,
 };
-
-use super::is_truthy;
 
 pub struct Or;
 impl Or {
@@ -41,10 +39,16 @@ impl<T: Expression> Applicable<T> for Or {
     ) -> Result<T, String> {
         let left = args.next().unwrap();
         let right = args.next().unwrap();
-        if is_truthy(&left, factory) {
-            Ok(left)
+        if let Some(value) = factory.match_boolean_term(&left) {
+            Ok(match value.value() {
+                true => left,
+                false => factory.create_application_term(right, allocator.create_empty_list()),
+            })
         } else {
-            Ok(factory.create_application_term(right, allocator.create_empty_list()))
+            Err(format!(
+                "Expected (Boolean, <function:0>), received ({}, {})",
+                left, right
+            ))
         }
     }
 }
