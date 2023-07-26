@@ -16,12 +16,15 @@ use crate::{
     compiler::{
         error::CompilerError, instruction, runtime::builtin::RuntimeBuiltin, CompileWasm,
         CompiledBlockBuilder, CompiledFunctionCall, CompiledFunctionCallArgs, CompiledFunctionId,
-        CompilerOptions, CompilerResult, CompilerStack, CompilerState, ConstValue,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState, ConstValue, LazyExpression,
         MaybeLazyExpression, ParamsSignature, Strictness, TypeSignature, ValueType,
     },
     hash::{TermHash, TermHasher, TermSize},
     stdlib::Stdlib,
-    term_type::{BuiltinTerm, ConstructorTerm, LambdaTerm, ListTerm, TypedTerm, WasmExpression},
+    term_type::{
+        list::compile_list, BuiltinTerm, ConstructorTerm, LambdaTerm, ListTerm, TypedTerm,
+        WasmExpression,
+    },
     ArenaPointer, ArenaRef, Term,
 };
 
@@ -401,14 +404,57 @@ impl<A: Arena + Clone> CompileWasm<A> for ConstructorCompiledFunctionCall<A> {
     ) -> CompilerResult<A> {
         let Self { target, args } = self;
         let term = target.as_inner();
-        let keys = term.keys().as_inner();
+        let keys = term.keys();
         let block = CompiledBlockBuilder::new(stack);
-        // Yield the key list onto the stack as-is
+        // Yield the key list onto the stack
         // => [ListTerm]
-        let block = block.append_inner(|stack| keys.compile(stack, state, options))?;
+        let block = if keys.as_term().should_intern(Eagerness::Eager) {
+            block.append_inner(|stack| keys.as_term().compile(stack, state, options))
+        } else {
+            block.append_inner(|stack| {
+                compile_list(
+                    keys.as_inner()
+                        .iter()
+                        .map(|key| (key, Strictness::NonStrict)),
+                    stack,
+                    state,
+                    options,
+                )
+            })
+        }?;
         // Yield the value list onto the stack
         // => [ListTerm, ListTerm]
-        let block = block.append_inner(|stack| args.compile(stack, state, options))?;
+        let block = if options.lazy_constructors {
+            block.append_inner(|stack| {
+                compile_list(
+                    args.iter()
+                        .map(|value| (LazyExpression::new(value), Strictness::NonStrict)),
+                    stack,
+                    state,
+                    options,
+                )
+            })
+        } else {
+            block
+                .append_inner(|stack| {
+                    compile_list(
+                        args.iter().map(|item| {
+                            // Skip signal-testing for list items that are already fully evaluated to a non-signal value
+                            let strictness = if item.is_atomic() && item.as_signal_term().is_none()
+                            {
+                                Strictness::NonStrict
+                            } else {
+                                Strictness::Strict
+                            };
+                            (item, strictness)
+                        }),
+                        stack,
+                        state,
+                        options,
+                    )
+                })
+                .map(|block| block.push(instruction::runtime::BreakOnSignal { target_block: 0 }))
+        }?;
         // Invoke the term constructor
         // => [RecordTerm]
         let block = block.push(instruction::runtime::CallRuntimeBuiltin {

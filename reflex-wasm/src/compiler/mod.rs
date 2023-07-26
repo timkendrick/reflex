@@ -348,6 +348,7 @@ pub struct CompilerOptions {
     pub lazy_record_values: bool,
     pub lazy_list_items: bool,
     pub lazy_variable_initializers: bool,
+    pub lazy_constructors: bool,
 }
 
 #[derive(Clone, Debug)]
