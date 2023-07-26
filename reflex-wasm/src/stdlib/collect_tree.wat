@@ -8,7 +8,7 @@
     (@impl
       (call $TermType::implements::iterate)
       (func $Stdlib_CollectTree::impl::<iterate> (param $arg_list i32) (param $state i32) (result i32 i32)
-        (call $Term::Tree::traits::collect_strict (local.get $arg_list) (local.get $state))))
+        (call $Term::Tree::traits::collect (local.get $arg_list) (local.get $state))))
 
     (@default
       (func $Stdlib_CollectTree::impl::default (param $arg_list i32) (param $state i32) (result i32 i32)
