@@ -300,18 +300,17 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<RecordTerm, A> {
     ) -> CompilerResult<A> {
         let keys = self.keys();
         let values = self.values();
-        let keys = keys.as_inner();
-        let values = values.as_inner();
-        let values = values.iter();
         let block = CompiledBlockBuilder::new(stack);
         // Collect the property keys list onto the stack
         // => [ListTerm]
-        let block = if keys.should_intern(Eagerness::Eager) {
-            block.append_inner(|stack| keys.compile(stack, state, options))
+        let block = if keys.as_term().should_intern(Eagerness::Eager) {
+            block.append_inner(|stack| keys.as_term().compile(stack, state, options))
         } else {
             block.append_inner(|stack| {
                 compile_list(
-                    keys.iter().map(|key| (key, Strictness::NonStrict)),
+                    keys.as_inner()
+                        .iter()
+                        .map(|key| (key, Strictness::NonStrict)),
                     stack,
                     state,
                     options,
@@ -320,37 +319,46 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<RecordTerm, A> {
         }?;
         // Collect the property values list onto the stack
         // => [ListTerm]
-        let block = if options.lazy_record_values {
-            block.append_inner(|stack| {
-                compile_list(
-                    values.map(|item| (LazyExpression::new(item), Strictness::NonStrict)),
-                    stack,
-                    state,
-                    options,
-                )
-            })
+        let block = if values.as_term().should_intern(Eagerness::Eager) {
+            block.append_inner(|stack| values.as_term().compile(stack, state, options))
         } else {
-            block
-                .append_inner(|stack| {
+            if options.lazy_record_values {
+                block.append_inner(|stack| {
                     compile_list(
-                        values.map(|item| {
-                            // Skip signal-testing for record field values that are already fully evaluated to a non-signal value
-                            let strictness = if item.is_atomic() && item.as_signal_term().is_none()
-                            {
-                                Strictness::NonStrict
-                            } else {
-                                Strictness::Strict
-                            };
-                            (item, strictness)
-                        }),
+                        values
+                            .as_inner()
+                            .iter()
+                            .map(|item| (LazyExpression::new(item), Strictness::NonStrict)),
                         stack,
                         state,
                         options,
                     )
                 })
-                // Short-circuit if a signal was encountered while processing the property values
-                // => [ListTerm]
-                .map(|block| block.push(instruction::runtime::BreakOnSignal { target_block: 0 }))
+            } else {
+                block
+                    .append_inner(|stack| {
+                        compile_list(
+                            values.as_inner().iter().map(|item| {
+                                // Skip signal-testing for record field values that are already fully evaluated to a non-signal value
+                                let strictness =
+                                    if item.is_atomic() && item.as_signal_term().is_none() {
+                                        Strictness::NonStrict
+                                    } else {
+                                        Strictness::Strict
+                                    };
+                                (item, strictness)
+                            }),
+                            stack,
+                            state,
+                            options,
+                        )
+                    })
+                    // Short-circuit if a signal was encountered while processing the property values
+                    // => [ListTerm]
+                    .map(|block| {
+                        block.push(instruction::runtime::BreakOnSignal { target_block: 0 })
+                    })
+            }
         }?;
         // Invoke the term constructor
         // => [RecordTerm]
