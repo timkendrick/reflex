@@ -34,6 +34,7 @@ pub trait AccessorBuiltin:
     + From<stdlib::Split>
     + From<stdlib::StartsWith>
     + From<stdlib::Subtract>
+    + From<crate::stdlib::IsTruthy>
     + From<crate::stdlib::ToString>
     + From<stdlib::Values>
     + From<stdlib::Zip>
@@ -63,6 +64,7 @@ impl<T> AccessorBuiltin for T where
         + From<stdlib::Split>
         + From<stdlib::StartsWith>
         + From<stdlib::Subtract>
+        + From<crate::stdlib::IsTruthy>
         + From<crate::stdlib::ToString>
         + From<stdlib::Values>
         + From<stdlib::Zip>
@@ -162,6 +164,7 @@ where
         + From<stdlib::ResolveList>
         + From<stdlib::Slice>
         + From<stdlib::Subtract>
+        + From<crate::stdlib::IsTruthy>
         + From<crate::stdlib::ToString>
         + From<stdlib::Values>,
 {
@@ -330,6 +333,7 @@ where
         + From<stdlib::ResolveList>
         + From<stdlib::Slice>
         + From<stdlib::Subtract>
+        + From<crate::stdlib::IsTruthy>
         + From<crate::stdlib::ToString>
         + From<stdlib::Values>,
 {
@@ -339,7 +343,28 @@ where
             allocator.create_unit_list(target.clone()),
         )),
         "filter" => Some(factory.create_partial_application_term(
-            factory.create_builtin_term(stdlib::Filter),
+            factory.create_lambda_term(
+                2,
+                factory.create_application_term(
+                    factory.create_builtin_term(stdlib::Filter),
+                    allocator.create_pair(
+                        factory.create_variable_term(1),
+                        factory.create_partial_application_term(
+                            factory.create_lambda_term(
+                                2,
+                                factory.create_application_term(
+                                    factory.create_builtin_term(crate::stdlib::IsTruthy),
+                                    allocator.create_unit_list(factory.create_application_term(
+                                        factory.create_variable_term(1),
+                                        allocator.create_unit_list(factory.create_variable_term(0)),
+                                    )),
+                                ),
+                            ),
+                            allocator.create_unit_list(factory.create_variable_term(0)),
+                        ),
+                    ),
+                ),
+            ),
             allocator.create_unit_list(target.clone()),
         )),
         "join" => Some(factory.create_partial_application_term(
