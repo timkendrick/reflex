@@ -250,20 +250,33 @@ enum ApplicationFunctionCall<A: Arena + Clone> {
 
 impl<A: Arena + Clone> ApplicationFunctionCall<A> {
     pub fn parse(target: WasmExpression<A>, args: ArenaRef<TypedTerm<ListTerm>, A>) -> Self {
-        let mut target = target;
-        let mut partial_args = Vec::new();
-        while let Some(partial) = target.as_partial_term() {
-            let partial = partial.as_inner();
-            target = partial.target();
-            let partial_arg_list = partial.args().as_inner();
-            // Prepend the partially-appied args to any existing partially-applied args
-            let existing_partial_args = std::mem::take(&mut partial_args);
-            let added_args = partial_arg_list.iter();
-            partial_args = added_args.chain(existing_partial_args).collect();
-        }
+        // Collect a list of partially-applied arguments, in the order in which the arguments will be passed to the function
+        let (target, combined_args) = {
+            // Combine arguments across multiple levels of nested partial terms
+            let mut target = target;
+            let mut arg_lists = Vec::new();
+            while let Some(partial) = target.as_partial_term() {
+                let partial = partial.as_inner();
+                target = partial.target();
+                let partial_args = partial.args();
+                if partial_args.as_inner().len() > 0 {
+                    arg_lists.push(partial_args);
+                }
+            }
+            // Partially-applied arguments are applied deepest-first, so reverse the list
+            arg_lists.reverse();
+            (target, arg_lists)
+        };
+        // Push the provided argument list onto the collection of partially-applied arguments
+        let combined_args = if args.as_inner().len() > 0 {
+            let mut combined_args = combined_args;
+            combined_args.push(args);
+            combined_args
+        } else {
+            combined_args
+        };
         let args = CompiledFunctionCallArgs {
-            partial_args,
-            args: args.as_inner(),
+            args: combined_args,
         };
         if let Some(target) = target.as_builtin_term().cloned() {
             ApplicationFunctionCall::Builtin(BuiltinCompiledFunctionCall { target, args })
@@ -317,7 +330,44 @@ impl<A: Arena + Clone> CompileWasm<A> for GenericCompiledFunctionCall<A> {
         let block = block.push(instruction::runtime::BreakOnSignal { target_block: 0 });
         // Yield the argument list onto the stack
         // => [Term, ListTerm]
-        let block = block.append_inner(|stack| args.compile(stack, state, options))?;
+        let block = {
+            // If this function call comprises a single argument list (taking into account partially-applied arguments),
+            // and that argument list is eligible for static term inlining, delegate to the underlying implementation
+            if let Some(args) = args.as_internable(Eagerness::Eager) {
+                block.append_inner(|stack| args.as_term().compile(stack, state, options))
+            } else {
+                // Otherwise compile the combined argument sequence into a list according to the compiler eagerness strategy
+                if options.lazy_function_args {
+                    block.append_inner(|stack| {
+                        compile_list(
+                            args.iter()
+                                .map(|arg| (LazyExpression::new(arg), Strictness::NonStrict)),
+                            stack,
+                            state,
+                            options,
+                        )
+                    })
+                } else {
+                    block.append_inner(|stack| {
+                        compile_list(
+                            args.iter().map(|item| {
+                                // Skip signal-testing for list items that are already fully evaluated to a non-signal value
+                                let strictness =
+                                    if item.is_atomic() && item.as_signal_term().is_none() {
+                                        Strictness::NonStrict
+                                    } else {
+                                        Strictness::Strict
+                                    };
+                                (item, strictness)
+                            }),
+                            stack,
+                            state,
+                            options,
+                        )
+                    })
+                }
+            }
+        }?;
         // Apply the target to the arguments
         // => [Term]
         let block = block.push(instruction::runtime::Apply);
@@ -367,10 +417,15 @@ impl<A: Arena + Clone> CompileWasm<A> for LambdaCompiledFunctionCall<A> {
             .iter()
             .fold(Result::<_, CompilerError<_>>::Ok(block), |block, arg| {
                 let block = block?;
-                // TODO: Support eager lambda arguments
                 // Push the argument onto the stack
                 // => [Term...]
-                let block = block.append_inner(|stack| arg.compile(stack, state, options))?;
+                let block = if options.lazy_function_args {
+                    block.append_inner(|stack| {
+                        LazyExpression::new(arg).compile(stack, state, options)
+                    })
+                } else {
+                    block.append_inner(|stack| arg.compile(stack, state, options))
+                }?;
                 Ok(block)
             })?;
         // Call the compiled lambda function
@@ -424,36 +479,42 @@ impl<A: Arena + Clone> CompileWasm<A> for ConstructorCompiledFunctionCall<A> {
         }?;
         // Yield the value list onto the stack
         // => [ListTerm, ListTerm]
-        let block = if options.lazy_constructors {
-            block.append_inner(|stack| {
-                compile_list(
-                    args.iter()
-                        .map(|value| (LazyExpression::new(value), Strictness::NonStrict)),
-                    stack,
-                    state,
-                    options,
-                )
-            })
+        let block = if let Some(values) = args.as_internable(Eagerness::Eager) {
+            block.append_inner(|stack| values.as_term().compile(stack, state, options))
         } else {
-            block
-                .append_inner(|stack| {
+            if options.lazy_constructors {
+                block.append_inner(|stack| {
                     compile_list(
-                        args.iter().map(|item| {
-                            // Skip signal-testing for list items that are already fully evaluated to a non-signal value
-                            let strictness = if item.is_atomic() && item.as_signal_term().is_none()
-                            {
-                                Strictness::NonStrict
-                            } else {
-                                Strictness::Strict
-                            };
-                            (item, strictness)
-                        }),
+                        args.iter()
+                            .map(|value| (LazyExpression::new(value), Strictness::NonStrict)),
                         stack,
                         state,
                         options,
                     )
                 })
-                .map(|block| block.push(instruction::runtime::BreakOnSignal { target_block: 0 }))
+            } else {
+                block
+                    .append_inner(|stack| {
+                        compile_list(
+                            args.iter().map(|item| {
+                                // Skip signal-testing for list items that are already fully evaluated to a non-signal value
+                                let strictness =
+                                    if item.is_atomic() && item.as_signal_term().is_none() {
+                                        Strictness::NonStrict
+                                    } else {
+                                        Strictness::Strict
+                                    };
+                                (item, strictness)
+                            }),
+                            stack,
+                            state,
+                            options,
+                        )
+                    })
+                    .map(|block| {
+                        block.push(instruction::runtime::BreakOnSignal { target_block: 0 })
+                    })
+            }
         }?;
         // Invoke the term constructor
         // => [RecordTerm]

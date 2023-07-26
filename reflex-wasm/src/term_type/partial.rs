@@ -15,9 +15,9 @@ use serde_json::Value as JsonValue;
 use crate::{
     allocator::Arena,
     compiler::{
-        instruction, runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder,
-        CompilerOptions, CompilerResult, CompilerStack, CompilerState, LazyExpression,
-        MaybeLazyExpression, Strictness,
+        get_compiled_function_arity, instruction, runtime::builtin::RuntimeBuiltin, CompileWasm,
+        CompiledBlockBuilder, CompilerOptions, CompilerResult, CompilerStack, CompilerState,
+        LazyExpression, MaybeLazyExpression, Strictness,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{list::compile_list, ListTerm, TypedTerm, WasmExpression},
@@ -224,41 +224,69 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<PartialTerm, A> {
         let target = self.target();
         let args = self.args();
         let num_partial_args = args.as_inner().len();
-        let arity = target
-            .arity()
-            .unwrap_or(Arity::lazy(num_partial_args, 0, false));
-        let num_partial_args =
-            num_partial_args.min((0..num_partial_args).zip(arity.iter()).count());
-        let args_list = args.as_inner();
-        let args_with_strictness = WithExactSizeIterator::new(
-            num_partial_args,
-            args_list
-                .iter()
-                .zip(arity.iter())
-                .map(|(arg, arg_type)| match arg_type {
-                    ArgType::Strict => {
-                        let strictness = if arg.is_atomic() && arg.as_signal_term().is_none() {
-                            Strictness::Strict
-                        } else {
-                            Strictness::NonStrict
-                        };
-                        (MaybeLazyExpression::Eager(arg), strictness)
-                    }
-                    ArgType::Eager => (MaybeLazyExpression::Eager(arg), Strictness::Strict),
-                    ArgType::Lazy => (
-                        MaybeLazyExpression::Lazy(LazyExpression::new(arg)),
-                        Strictness::Strict,
-                    ),
-                }),
-        );
+        if num_partial_args == 0 {
+            return target.compile(stack, state, options);
+        }
         let block = CompiledBlockBuilder::new(stack);
         // Push the partial application target onto the stack
         // => [Term]
         let block = block.append_inner(|stack| target.compile(stack, state, options))?;
         // Push the partial application arguments onto the stack
         // => [Term, ListTerm]
-        let block = block
-            .append_inner(|stack| compile_list(args_with_strictness, stack, state, options))?;
+        let block = if args.as_term().should_intern(Eagerness::Eager) {
+            block.append_inner(|stack| args.as_term().compile(stack, state, options))
+        } else {
+            // Attempt to determine the application target arity according to the compiler eagerness strategy
+            // (this is only possible for static function calls)
+            let target_arity = get_compiled_function_arity(&target, options);
+            // If the target arity is known, drop any excess partially-applied arguments
+            let num_partial_args = match target_arity {
+                None => num_partial_args,
+                Some(arity) => {
+                    num_partial_args.min((0..num_partial_args).zip(arity.iter()).count())
+                }
+            };
+            // Compile the partial application argumens into a list according to the target arity and compiler eagerness strategy
+            block.append_inner(|stack| {
+                compile_list(
+                    WithExactSizeIterator::new(
+                        num_partial_args,
+                        args.as_inner()
+                            .iter()
+                            .zip(
+                                target_arity
+                                    .unwrap_or(if options.lazy_function_args {
+                                        Arity::lazy(num_partial_args, 0, false)
+                                    } else {
+                                        Arity::strict(num_partial_args, 0, false)
+                                    })
+                                    .iter(),
+                            )
+                            .map(|(arg, arg_type)| match arg_type {
+                                ArgType::Strict => {
+                                    let strictness =
+                                        if arg.is_atomic() && arg.as_signal_term().is_none() {
+                                            Strictness::Strict
+                                        } else {
+                                            Strictness::NonStrict
+                                        };
+                                    (MaybeLazyExpression::Eager(arg), strictness)
+                                }
+                                ArgType::Eager => {
+                                    (MaybeLazyExpression::Eager(arg), Strictness::Strict)
+                                }
+                                ArgType::Lazy => (
+                                    MaybeLazyExpression::Lazy(LazyExpression::new(arg)),
+                                    Strictness::Strict,
+                                ),
+                            }),
+                    ),
+                    stack,
+                    state,
+                    options,
+                )
+            })
+        }?;
         // Invoke the term constructor
         // => [PartialTerm]
         let block = block.push(instruction::runtime::CallRuntimeBuiltin {

@@ -39,6 +39,9 @@ struct Args {
     /// Compile record field values as lazily-evaluated expressions
     #[arg(long)]
     lazy_record_values: bool,
+    /// Compile function arguments as lazily-evaluated expressions
+    #[arg(long)]
+    lazy_function_args: bool,
     /// Compile variable initializer values as lazily-evaluated expressions
     #[arg(long)]
     lazy_variable_initializers: bool,
@@ -90,6 +93,7 @@ fn main() -> Result<()> {
             lazy_record_values: args.lazy_record_values,
             lazy_list_items: args.lazy_list_items,
             lazy_variable_initializers: args.lazy_variable_initializers,
+            lazy_function_args: args.lazy_function_args,
             lazy_constructors: args.lazy_constructors,
         },
         runtime: WasmCompilerRuntimeOptions {

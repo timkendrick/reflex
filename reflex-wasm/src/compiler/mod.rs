@@ -7,7 +7,7 @@ use std::{
 };
 
 use reflex::{
-    core::{Eagerness, GraphNode, Internable, NodeId, StackOffset},
+    core::{Arity, Eagerness, GraphNode, Internable, NodeId, StackOffset},
     hash::IntMap,
 };
 use reflex_utils::Stack;
@@ -348,6 +348,7 @@ pub struct CompilerOptions {
     pub lazy_record_values: bool,
     pub lazy_list_items: bool,
     pub lazy_variable_initializers: bool,
+    pub lazy_function_args: bool,
     pub lazy_constructors: bool,
 }
 
@@ -987,19 +988,30 @@ pub(crate) struct CompiledFunctionCall<'a, A: Arena + Clone, T> {
 
 #[derive(Debug, Clone)]
 pub(crate) struct CompiledFunctionCallArgs<A: Arena + Clone> {
-    pub args: ArenaRef<ListTerm, A>,
-    pub partial_args: Vec<WasmExpression<A>>,
+    /// Combined set of function arguments, taking into account direct call site arguments and all preceding partially-applied arguments
+    pub args: Vec<ArenaRef<TypedTerm<ListTerm>, A>>,
 }
 
 impl<A: Arena + Clone> CompiledFunctionCallArgs<A> {
-    pub fn iter(&self) -> CompiledFunctionCallArgsIter<A> {
-        CompiledFunctionCallArgsIter {
-            arg_list: self,
-            index: 0,
+    /// If this function call comprises a single argument list (taking into account partially-applied arguments),
+    /// determine whether that argument list is eligible for static term inlining
+    pub fn as_internable(&self, eager: Eagerness) -> Option<ArenaRef<TypedTerm<ListTerm>, A>> {
+        if self.args.len() != 1 {
+            return None;
         }
+        let arg_list = self.args.first()?;
+        if !arg_list.as_term().should_intern(eager) {
+            return None;
+        }
+        return Some(arg_list.clone());
+    }
+    pub fn iter(&self) -> CompiledFunctionCallArgsIter<A> {
+        CompiledFunctionCallArgsIter::new(self)
     }
     pub fn len(&self) -> usize {
-        self.partial_args.len() + self.args.len()
+        self.args
+            .iter()
+            .fold(0, |acc, arg_list| acc + arg_list.as_inner().len())
     }
 }
 
@@ -1033,27 +1045,47 @@ impl<A: Arena + Clone> std::fmt::Display for CompiledFunctionCallArgs<A> {
 
 #[derive(Debug, Clone)]
 pub(crate) struct CompiledFunctionCallArgsIter<'a, A: Arena + Clone> {
-    arg_list: &'a CompiledFunctionCallArgs<A>,
+    target: &'a CompiledFunctionCallArgs<A>,
+    num_args: usize,
+    outer_index: usize,
+    inner_index: usize,
     index: usize,
+}
+
+impl<'a, A: Arena + Clone> CompiledFunctionCallArgsIter<'a, A> {
+    fn new(target: &'a CompiledFunctionCallArgs<A>) -> Self {
+        let num_args = target.len();
+        Self {
+            target,
+            num_args,
+            outer_index: 0,
+            inner_index: 0,
+            index: 0,
+        }
+    }
 }
 
 impl<'a, A: Arena + Clone> Iterator for CompiledFunctionCallArgsIter<'a, A> {
     type Item = WasmExpression<A>;
     fn next(&mut self) -> Option<Self::Item> {
-        let item = match self.arg_list.partial_args.get(self.index) {
-            Some(arg) => Some(arg.clone()),
-            None => self
-                .arg_list
-                .args
-                .get(self.index.saturating_sub(self.arg_list.partial_args.len())),
-        };
-        if item.is_some() {
-            self.index += 1;
+        match self.target.args.get(self.outer_index) {
+            None => None,
+            Some(arg_list) => match arg_list.as_inner().get(self.inner_index) {
+                None => {
+                    self.outer_index += 1;
+                    self.inner_index = 0;
+                    self.next()
+                }
+                Some(inner) => {
+                    self.inner_index += 1;
+                    self.index += 1;
+                    Some(inner)
+                }
+            },
         }
-        item
     }
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let length = self.arg_list.len() - self.index;
+        let length = self.num_args - self.index;
         (length, Some(length))
     }
 }
@@ -1067,10 +1099,17 @@ impl<A: Arena + Clone> CompileWasm<A> for CompiledFunctionCallArgs<A> {
         state: &mut CompilerState,
         options: &CompilerOptions,
     ) -> CompilerResult<A> {
-        if self.partial_args.is_empty() {
-            // If there are no partially-applied arguments, delegate to the existing argument list compilation
-            // (this can make use of static term inlining)
-            self.args.compile(stack, state, options)
+        // If there is a single argument list (taking into account partially-applied arguments), and that argument list
+        // can make use of static term inlining, delegate to the existing argument list compilation
+        let internable_arg_list = if self.args.len() == 1 {
+            self.args
+                .first()
+                .filter(|arg_list| arg_list.as_term().should_intern(Eagerness::Eager))
+        } else {
+            None
+        };
+        if let Some(internable_arg_list) = internable_arg_list {
+            internable_arg_list.as_term().compile(stack, state, options)
         } else {
             // Otherwise if there are partially-applied arguments, compile the combined argument sequence into a list
             // TODO: Investigate chained iterators for partially-applied arguments
@@ -1124,6 +1163,34 @@ impl<A: Arena + Clone> CompileWasm<A> for CompiledFunctionCallArgs<A> {
             });
             block.finish()
         }
+    }
+}
+
+/// Attempt to determine the statically-known arity of the provided application target given the provided compiler options
+/// (this will return `None` if the arity cannot be statically determined)
+pub(crate) fn get_compiled_function_arity<A: Arena + Clone>(
+    target: &WasmExpression<A>,
+    options: &CompilerOptions,
+) -> Option<Arity> {
+    if let Some(term) = target.as_builtin_term() {
+        term.as_inner().arity()
+    } else if let Some(term) = target.as_constructor_term() {
+        let num_properties = term.as_inner().keys().as_inner().len();
+        Some(match options.lazy_constructors {
+            true => Arity::lazy(num_properties, 0, false),
+            false => Arity::strict(num_properties, 0, false),
+        })
+    } else if let Some(term) = target.as_lambda_term() {
+        let num_args = term.as_inner().num_args() as usize;
+        Some(match options.lazy_constructors {
+            true => Arity::lazy(num_args, 0, false),
+            false => Arity::strict(num_args, 0, false),
+        })
+    } else if let Some(term) = target.as_partial_term() {
+        get_compiled_function_arity(&term.as_inner().target(), options)
+            .map(|arity| arity.partial(term.as_inner().args().as_inner().len()))
+    } else {
+        None
     }
 }
 
