@@ -1596,6 +1596,9 @@ impl From<reflex_js::stdlib::Stdlib> for reflex_wasm::stdlib::Stdlib {
             reflex_js::stdlib::Stdlib::IsFinite => {
                 reflex_wasm::stdlib::Stdlib::IsFinite(reflex_wasm::stdlib::IsFinite)
             }
+            reflex_js::stdlib::Stdlib::IsTruthy => {
+                reflex_wasm::stdlib::Stdlib::IsTruthy(reflex_wasm::stdlib::IsTruthy)
+            }
             reflex_js::stdlib::Stdlib::Log => {
                 reflex_wasm::stdlib::Stdlib::Log(reflex_wasm::stdlib::Log)
             }
@@ -2032,6 +2035,11 @@ impl From<reflex_js::stdlib::FormatErrorMessage> for reflex_wasm::stdlib::Stdlib
 }
 impl From<reflex_js::stdlib::IsFinite> for reflex_wasm::stdlib::Stdlib {
     fn from(value: reflex_js::stdlib::IsFinite) -> Self {
+        Self::from(reflex_js::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_js::stdlib::IsTruthy> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_js::stdlib::IsTruthy) -> Self {
         Self::from(reflex_js::stdlib::Stdlib::from(value))
     }
 }

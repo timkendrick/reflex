@@ -1651,6 +1651,7 @@ fn parse_runtime_exports(module: &Module) -> Result<RuntimeExportMappings, WasmC
             )?,
             intersperse: get_stdlib_function(&exported_functions, stdlib::Intersperse.into())?,
             is_finite: get_stdlib_function(&exported_functions, stdlib::IsFinite.into())?,
+            is_truthy: get_stdlib_function(&exported_functions, stdlib::IsTruthy.into())?,
             iterate: get_stdlib_function(&exported_functions, stdlib::Iterate.into())?,
             keys: get_stdlib_function(&exported_functions, stdlib::Keys.into())?,
             length: get_stdlib_function(&exported_functions, stdlib::Length.into())?,

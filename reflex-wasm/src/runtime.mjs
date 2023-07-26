@@ -118,6 +118,7 @@ function createStdlib(runtime) {
     IncrementVariable: runtime.__Stdlib_IncrementVariable.value,
     Intersperse: runtime.__Stdlib_Intersperse.value,
     IsFinite: runtime.__Stdlib_IsFinite.value,
+    IsTruthy: runtime.__Stdlib_IsTruthy.value,
     Iterate: runtime.__Stdlib_Iterate.value,
     Keys: runtime.__Stdlib_Keys.value,
     Length: runtime.__Stdlib_Length.value,

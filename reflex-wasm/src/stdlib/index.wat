@@ -51,6 +51,7 @@
   (@include "./js/debug.wat")
   (@include "./js/format_error_message.wat")
   (@include "./js/is_finite.wat")
+  (@include "./js/is_truthy.wat")
   (@include "./js/log.wat")
   (@include "./js/parse_date.wat")
   (@include "./js/parse_float.wat")
@@ -144,6 +145,7 @@
       $Stdlib_IncrementVariable
       $Stdlib_Intersperse
       $Stdlib_IsFinite
+      $Stdlib_IsTruthy
       $Stdlib_Iterate
       $Stdlib_Keys
       $Stdlib_Length

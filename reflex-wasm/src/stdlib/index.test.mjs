@@ -83,6 +83,7 @@ import construct from './js/construct.test.mjs';
 import debug from './js/debug.test.mjs';
 import formatErrorMessage from './js/format_error_message.test.mjs';
 import isFinite from './js/is_finite.test.mjs';
+import isTruthy from './js/is_truthy.test.mjs';
 import log from './js/log.test.mjs';
 import parseDate from './js/parse_date.test.mjs';
 import parseFloat from './js/parse_float.test.mjs';
@@ -139,6 +140,7 @@ export default (describe) => {
   ifError(describe);
   ifPending(describe);
   isFinite(describe);
+  isTruthy(describe);
   iterate(describe);
   keys(describe);
   length(describe);
