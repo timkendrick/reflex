@@ -26,11 +26,26 @@
   (@const $Stdlib_Accessor::method::<iterate>::FILTER i32
     (@depends-on $Term::Variable::INSTANCE_0)
     (@depends-on $Term::Variable::INSTANCE_1)
+    (@depends-on $Stdlib_Accessor::method::<iterate>::FILTER_PREDICATE)
     (call $Term::Lambda::new
       (i32.const 2)
       (call $Term::FilterIterator::new
         (call $Term::Variable::new (i32.const 1))
-        (call $Term::Variable::new (i32.const 0)))))
+        (call $Term::Partial::new
+          (global.get $Stdlib_Accessor::method::<iterate>::FILTER_PREDICATE)
+          (call $Term::List::of (call $Term::Variable::new (i32.const 0)))))))
+
+  (@const $Stdlib_Accessor::method::<iterate>::FILTER_PREDICATE i32
+    (@depends-on $Term::Variable::INSTANCE_0)
+    (@depends-on $Term::Variable::INSTANCE_1)
+    (call $Term::Lambda::new
+      (i32.const 2)
+      (call $Term::Application::new
+        (call $Term::Builtin::new (global.get $Stdlib_IsTruthy))
+        (call $Term::List::of
+          (call $Term::Application::new
+            (call $Term::Variable::new (i32.const 1))
+            (call $Term::List::of (call $Term::Variable::new (i32.const 0))))))))
 
   (@const $Stdlib_Accessor::method::<iterate>::FLAT_MAP i32
     (@depends-on $Term::Variable::INSTANCE_0)

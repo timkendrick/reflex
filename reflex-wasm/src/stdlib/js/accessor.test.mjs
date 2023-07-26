@@ -1076,6 +1076,26 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
+          createBuiltin(Stdlib.ResolveList),
+          createUnitList(
+            createApplication(
+              createApplication(
+                createBuiltin(Stdlib.Accessor),
+                createPair(
+                  createTriple(createInt(0), createInt(1), createInt(2)),
+                  createString('filter'),
+                ),
+              ),
+              createUnitList(createBuiltin(Stdlib.Identity)),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '[1, 2]');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
           createApplication(
             createBuiltin(Stdlib.Accessor),
             createPair(
@@ -1300,6 +1320,23 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '[3, 5]');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.ResolveList),
+          createUnitList(
+            createApplication(
+              createApplication(
+                createBuiltin(Stdlib.Accessor),
+                createPair(createRangeIterator(0, 3), createString('filter')),
+              ),
+              createUnitList(createBuiltin(Stdlib.Identity)),
+            ),
+          ),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), '[1, 2]');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
