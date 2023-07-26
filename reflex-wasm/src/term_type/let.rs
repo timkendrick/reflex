@@ -15,7 +15,8 @@ use crate::{
     allocator::Arena,
     compiler::{
         error::CompilerError, instruction, CompileWasm, CompiledBlockBuilder, CompilerOptions,
-        CompilerResult, CompilerStack, CompilerState, MaybeLazyExpression, Strictness, ValueType,
+        CompilerResult, CompilerStack, CompilerState, LazyExpression, ParamsSignature, Strictness,
+        TypeSignature, ValueType,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{TypedTerm, WasmExpression},
@@ -219,11 +220,37 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<LetTerm, A> {
                 )
             };
             let block = CompiledBlockBuilder::new(stack);
-            // Yield the initializer term onto the stack
+            // Yield the initializer term onto the stack, according to its eagerness and strictness
             // => [Term]
-            let block = block.append_inner(|stack| {
-                MaybeLazyExpression::new(initializer, eagerness).compile(stack, state, options)
-            })?;
+            let block = match eagerness {
+                // If this is a lazy variable initializer, compile it as a lazy thunk within the current block
+                Eagerness::Lazy => block.append_inner(|stack| {
+                    LazyExpression::new(initializer).compile(stack, state, options)
+                }),
+                Eagerness::Eager => match strictness {
+                    // If this is a strict eager variable initializer, compile it directly into the current block
+                    Strictness::Strict => {
+                        block.append_inner(|stack| initializer.compile(stack, state, options))
+                    }
+                    // If this is a non-strict eager variable initializer, compile it within a new control flow block
+                    // (this ensures that any signals encountered when evaluating the variable initializer will not
+                    // break out of the current block; the signal will only short-circuit when the variable is
+                    // referenced in a strict context)
+                    Strictness::NonStrict => block.append_inner(|stack| {
+                        let block_type = TypeSignature {
+                            params: ParamsSignature::Void,
+                            results: ParamsSignature::Single(ValueType::HeapPointer),
+                        };
+                        let inner_stack = stack.enter_block(&block_type)?;
+                        let block = CompiledBlockBuilder::new(stack);
+                        let block = block.push(instruction::core::Block {
+                            block_type,
+                            body: initializer.compile(inner_stack, state, options)?,
+                        });
+                        block.finish::<CompilerError<_>>()
+                    }),
+                },
+            }?;
             // Pop the initializer term and assign it to a lexical scope
             // => []
             let block = block.push(instruction::runtime::DeclareVariable {
