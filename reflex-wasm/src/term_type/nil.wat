@@ -22,9 +22,6 @@
   (func $Term::Nil::traits::is_atomic (param $self i32) (result i32)
     (global.get $TRUE))
 
-  (func $Term::Nil::traits::is_truthy (param $self i32) (result i32)
-    (global.get $FALSE))
-
   (func $Term::Nil::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (global.get $NULL))
 

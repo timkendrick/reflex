@@ -58,9 +58,6 @@
   (func $Term::Signal::traits::is_atomic (param $self i32) (result i32)
     (global.get $TRUE))
 
-  (func $Term::Signal::traits::is_truthy (param $self i32) (result i32)
-    (global.get $TRUE))
-
   (func $Term::Signal::traits::display (param $self i32) (param $offset i32) (result i32)
     (local $conditions i32)
     (local $condition i32)

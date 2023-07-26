@@ -28,9 +28,6 @@
   (func $Term::RangeIterator::traits::is_atomic (param $self i32) (result i32)
     (global.get $TRUE))
 
-  (func $Term::RangeIterator::traits::is_truthy (param $self i32) (result i32)
-    (global.get $TRUE))
-
   (func $Term::RangeIterator::traits::display (param $self i32) (param $offset i32) (result i32)
     (call $TermType::traits::display (global.get $TermType::RangeIterator) (local.get $offset)))
 

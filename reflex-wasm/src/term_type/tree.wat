@@ -54,9 +54,6 @@
         (else
           (call $Term::traits::is_atomic (local.get $branch))))))
 
-  (func $Term::Tree::traits::is_truthy (param $self i32) (result i32)
-    (global.get $TRUE))
-
   (func $Term::Tree::traits::display (param $self i32) (param $offset i32) (result i32)
     (local $branch i32)
     ;; Write the opening parenthesis to the output

@@ -53,9 +53,6 @@
   (func $Term::Int::traits::is_atomic (param $self i32) (result i32)
     (global.get $TRUE))
 
-  (func $Term::Int::traits::is_truthy (param $self i32) (result i32)
-    (global.get $TRUE))
-
   (func $Term::Int::traits::display (param $self i32) (param $offset i32) (result i32)
     (call $Utils::i64::write_string
       (call $Term::Int::get_value (local.get $self))

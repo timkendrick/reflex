@@ -32,9 +32,6 @@
   (func $Term::Hashset::traits::is_atomic (param $self i32) (result i32)
     (call $Term::Hashmap::traits::is_atomic (call $Term::Hashset::get::entries (local.get $self))))
 
-  (func $Term::Hashset::traits::is_truthy (param $self i32) (result i32)
-    (global.get $TRUE))
-
   (func $Term::Hashset::traits::display (param $self i32) (param $offset i32) (result i32)
     (@store-bytes $offset "Set(")
     (local.set $offset (i32.add (local.get $offset)))

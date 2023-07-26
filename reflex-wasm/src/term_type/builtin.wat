@@ -28,9 +28,6 @@
   (func $Term::Builtin::traits::is_atomic (param $self i32) (result i32)
     (global.get $TRUE))
 
-  (func $Term::Builtin::traits::is_truthy (param $self i32) (result i32)
-    (global.get $TRUE))
-
   (func $Term::Builtin::traits::display (param $self i32) (param $offset i32) (result i32)
     (call $Builtin::display (call $Term::Builtin::get::uid (local.get $self)) (local.get $offset)))
 

@@ -56,9 +56,6 @@
   (func $Term::Cell::traits::is_atomic (param $self i32) (result i32)
     (global.get $TRUE))
 
-  (func $Term::Cell::traits::is_truthy (param $self i32) (result i32)
-    (global.get $TRUE))
-
   (func $Term::Cell::traits::substitute (param $self i32) (param $variables i32) (param $scope_offset i32) (result i32)
     (global.get $NULL))
 

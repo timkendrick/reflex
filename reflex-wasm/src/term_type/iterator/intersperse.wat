@@ -25,9 +25,6 @@
       (call $Term::traits::size_hint
         (call $Term::IntersperseIterator::get::source (local.get $self)))))
 
-  (func $Term::IntersperseIterator::traits::is_truthy (param $self i32) (result i32)
-    (global.get $TRUE))
-
   (func $Term::IntersperseIterator::traits::display (param $self i32) (param $offset i32) (result i32)
     (call $TermType::traits::display (global.get $TermType::IntersperseIterator) (local.get $offset)))
 

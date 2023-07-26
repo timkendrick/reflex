@@ -32,9 +32,6 @@
   (func $Term::Float::traits::is_atomic (param $self i32) (result i32)
     (global.get $TRUE))
 
-  (func $Term::Float::traits::is_truthy (param $self i32) (result i32)
-    (global.get $TRUE))
-
   (func $Term::Float::traits::display (param $self i32) (param $offset i32) (result i32)
     (call $Utils::Float::to_string
       (call $Term::Float::get_value (local.get $self))

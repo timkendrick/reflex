@@ -22,10 +22,6 @@
     ;; Invoke the method on the target term
     (call $Term::traits::is_atomic (call $Term::Pointer::dereference (local.get $self))))
 
-  (func $Term::Pointer::traits::is_truthy (param $self i32) (result i32)
-    ;; Invoke the method on the target term
-    (call $Term::traits::is_truthy (call $Term::Pointer::dereference (local.get $self))))
-
   (func $Term::Pointer::traits::display (param $self i32) (param $offset i32) (result i32)
     (@store-bytes $offset "Pointer(")
     (local.set $offset (i32.add (local.get $offset)))

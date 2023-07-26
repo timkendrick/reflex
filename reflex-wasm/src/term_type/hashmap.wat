@@ -173,9 +173,6 @@
         ;; If the entire hashmap was iterated without finding a non-atomic key, return true
         (global.get $TRUE))))
 
-  (func $Term::Hashmap::traits::is_truthy (param $self i32) (result i32)
-    (global.get $TRUE))
-
   (func $Term::Hashmap::traits::display (param $self i32) (param $offset i32) (result i32)
     (@store-bytes $offset "Map(")
     (local.set $offset (i32.add (local.get $offset)))

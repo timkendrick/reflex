@@ -23,9 +23,6 @@
       (call $Term::traits::size_hint
         (call $Term::EvaluateIterator::get::source (local.get $self)))))
 
-  (func $Term::EvaluateIterator::traits::is_truthy (param $self i32) (result i32)
-    (global.get $TRUE))
-
   (func $Term::EvaluateIterator::traits::display (param $self i32) (param $offset i32) (result i32)
     (call $TermType::traits::display (global.get $TermType::EvaluateIterator) (local.get $offset)))
 

@@ -23,9 +23,6 @@
   (func $Term::Let::traits::is_atomic (param $self i32) (result i32)
     (global.get $FALSE))
 
-  (func $Term::Let::traits::is_truthy (param $self i32) (result i32)
-    (global.get $TRUE))
-
   (func $Term::Let::traits::display (param $self i32) (param $offset i32) (result i32)
     (local $branch i32)
     ;; Write the opening brace to the output

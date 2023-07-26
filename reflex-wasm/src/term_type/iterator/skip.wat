@@ -33,9 +33,6 @@
   (func $Term::SkipIterator::traits::is_atomic (param $self i32) (result i32)
     (call $Term::traits::is_atomic (call $Term::SkipIterator::get::source (local.get $self))))
 
-  (func $Term::SkipIterator::traits::is_truthy (param $self i32) (result i32)
-    (global.get $TRUE))
-
   (func $Term::SkipIterator::traits::display (param $self i32) (param $offset i32) (result i32)
     (call $TermType::traits::display (global.get $TermType::SkipIterator) (local.get $offset)))
 

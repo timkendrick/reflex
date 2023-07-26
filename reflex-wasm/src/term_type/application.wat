@@ -25,9 +25,6 @@
   (func $Term::Application::traits::is_atomic (param $self i32) (result i32)
     (global.get $FALSE))
 
-  (func $Term::Application::traits::is_truthy (param $self i32) (result i32)
-    (global.get $TRUE))
-
   (func $Term::Application::traits::display (param $self i32) (param $offset i32) (result i32)
     (local $args i32)
     (local $num_args i32)

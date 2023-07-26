@@ -25,9 +25,6 @@
       (call $Term::traits::size_hint
         (call $Term::FilterIterator::get::source (local.get $self)))))
 
-  (func $Term::FilterIterator::traits::is_truthy (param $self i32) (result i32)
-    (global.get $TRUE))
-
   (func $Term::FilterIterator::traits::display (param $self i32) (param $offset i32) (result i32)
     (call $TermType::traits::display (global.get $TermType::FilterIterator) (local.get $offset)))
 

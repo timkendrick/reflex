@@ -21,9 +21,6 @@
   (func $Term::Effect::traits::is_atomic (param $self i32) (result i32)
     (global.get $FALSE))
 
-  (func $Term::Effect::traits::is_truthy (param $self i32) (result i32)
-    (global.get $TRUE))
-
   (func $Term::Effect::traits::display (param $self i32) (param $offset i32) (result i32)
     (@store-bytes $offset "<!")
     (local.set $offset (i32.add (local.get $offset)))

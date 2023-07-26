@@ -74,9 +74,6 @@
       (call $Term::List::traits::is_atomic (call $Term::Record::get::keys (local.get $self)))
       (call $Term::List::traits::is_atomic (call $Term::Record::get::values (local.get $self)))))
 
-  (func $Term::Record::traits::is_truthy (param $self i32) (result i32)
-    (global.get $TRUE))
-
   (func $Term::Record::traits::display (param $self i32) (param $offset i32) (result i32)
     (local $keys i32)
     (local $values i32)

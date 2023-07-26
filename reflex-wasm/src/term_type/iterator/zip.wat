@@ -28,9 +28,6 @@
       (else
         (global.get $FALSE))))
 
-  (func $Term::ZipIterator::traits::is_truthy (param $self i32) (result i32)
-    (global.get $TRUE))
-
   (func $Term::ZipIterator::traits::display (param $self i32) (param $offset i32) (result i32)
     (call $TermType::traits::display (global.get $TermType::ZipIterator) (local.get $offset)))
 

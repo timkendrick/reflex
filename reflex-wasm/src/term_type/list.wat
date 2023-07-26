@@ -212,9 +212,6 @@
         ;; If no non-atomic items were encountered in the entire list, return true
         (global.get $TRUE))))
 
-  (func $Term::List::traits::is_truthy (param $self i32) (result i32)
-    (global.get $TRUE))
-
   (func $Term::List::traits::display (param $self i32) (param $offset i32) (result i32)
     (local $length i32)
     (local $index i32)

@@ -48,9 +48,6 @@
         ;; If the entire hashmap was iterated without finding a non-atomic key, return true
         (global.get $TRUE))))
 
-  (func $Term::HashmapKeysIterator::traits::is_truthy (param $self i32) (result i32)
-    (global.get $TRUE))
-
   (func $Term::HashmapKeysIterator::traits::display (param $self i32) (param $offset i32) (result i32)
     (call $TermType::traits::display (global.get $TermType::HashmapKeysIterator) (local.get $offset)))
 

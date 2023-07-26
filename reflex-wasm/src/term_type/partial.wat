@@ -25,9 +25,6 @@
       (call $Term::traits::is_atomic (call $Term::Partial::get::target (local.get $self)))
       (call $Term::traits::is_atomic (call $Term::Partial::get::args (local.get $self)))))
 
-  (func $Term::Partial::traits::is_truthy (param $self i32) (result i32)
-    (global.get $TRUE))
-
   (func $Term::Partial::traits::display (param $self i32) (param $offset i32) (result i32)
     (local $args i32)
     (local $num_args i32)

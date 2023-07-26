@@ -140,9 +140,6 @@
   (func $Term::Condition::traits::is_atomic (param $self i32) (result i32)
     (global.get $TRUE))
 
-  (func $Term::Condition::traits::is_truthy (param $self i32) (result i32)
-    (global.get $TRUE))
-
   (func $Term::Condition::traits::display (param $self i32) (param $offset i32) (result i32)
     (local $type i32)
     (@store-bytes $offset "<")

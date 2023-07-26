@@ -21,9 +21,6 @@
   (func $Term::Timestamp::traits::is_atomic (param $self i32) (result i32)
     (global.get $TRUE))
 
-  (func $Term::Timestamp::traits::is_truthy (param $self i32) (result i32)
-    (global.get $TRUE))
-
   (func $Term::Timestamp::traits::display (param $self i32) (param $offset i32) (result i32)
     (call $Utils::Date::to_iso_string
       (call $Term::Timestamp::get::millis (local.get $self))

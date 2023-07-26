@@ -35,9 +35,6 @@
   (func $Term::Constructor::traits::is_atomic (param $self i32) (result i32)
     (call $Term::List::traits::is_atomic (call $Term::Constructor::get::keys (local.get $self))))
 
-  (func $Term::Constructor::traits::is_truthy (param $self i32) (result i32)
-    (global.get $TRUE))
-
   (func $Term::Constructor::traits::display (param $self i32) (param $offset i32) (result i32)
     (local $keys i32)
     (local $num_keys i32)

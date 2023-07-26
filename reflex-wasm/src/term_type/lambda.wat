@@ -21,9 +21,6 @@
   (func $Term::Lambda::traits::is_atomic (param $self i32) (result i32)
     (call $Term::traits::is_atomic (call $Term::Lambda::get::body (local.get $self))))
 
-  (func $Term::Lambda::traits::is_truthy (param $self i32) (result i32)
-    (global.get $TRUE))
-
   (func $Term::Lambda::traits::display (param $self i32) (param $offset i32) (result i32)
     (@store-bytes $offset "(")
     (local.set $offset (i32.add (local.get $offset)))

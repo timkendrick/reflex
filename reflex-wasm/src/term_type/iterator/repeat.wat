@@ -21,9 +21,6 @@
   (func $Term::RepeatIterator::traits::is_atomic (param $self i32) (result i32)
     (call $Term::traits::is_atomic (call $Term::RepeatIterator::get::value (local.get $self))))
 
-  (func $Term::RepeatIterator::traits::is_truthy (param $self i32) (result i32)
-    (global.get $TRUE))
-
   (func $Term::RepeatIterator::traits::display (param $self i32) (param $offset i32) (result i32)
     (call $TermType::traits::display (global.get $TermType::RepeatIterator) (local.get $offset)))
 

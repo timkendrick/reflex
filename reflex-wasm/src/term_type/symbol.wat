@@ -21,9 +21,6 @@
   (func $Term::Symbol::traits::is_atomic (param $self i32) (result i32)
     (global.get $TRUE))
 
-  (func $Term::Symbol::traits::is_truthy (param $self i32) (result i32)
-    (global.get $TRUE))
-
   (func $Term::Symbol::traits::display (param $self i32) (param $offset i32) (result i32)
     (@store-bytes $offset "Symbol(")
     (local.set $offset (i32.add (local.get $offset)))
