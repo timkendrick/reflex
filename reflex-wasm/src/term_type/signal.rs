@@ -15,7 +15,7 @@ use crate::{
     allocator::Arena,
     compiler::{
         instruction, runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder,
-        CompilerOptions, CompilerResult, CompilerStack, CompilerState,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState, ParamsSignature, ValueType,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{TreeTerm, TypedTerm, WasmExpression},
@@ -140,7 +140,7 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<SignalTerm, A> {
 
 impl<A: Arena + Clone> Internable for ArenaRef<SignalTerm, A> {
     fn should_intern(&self, eager: Eagerness) -> bool {
-        self.conditions().as_inner().should_intern(eager)
+        matches!(eager, Eagerness::Lazy) && self.conditions().as_inner().should_intern(eager)
     }
 }
 
@@ -161,6 +161,12 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<SignalTerm, A> {
         // => [SignalTerm]
         let block = block.push(instruction::runtime::CallRuntimeBuiltin {
             target: RuntimeBuiltin::CreateSignal,
+        });
+        // Break out of the current control flow block
+        // => [SignalTerm]
+        let block = block.push(instruction::core::Break {
+            target_block: 0,
+            result_type: ParamsSignature::Single(ValueType::HeapPointer),
         });
         block.finish()
     }
