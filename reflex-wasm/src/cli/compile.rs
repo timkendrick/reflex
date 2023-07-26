@@ -1410,7 +1410,6 @@ fn parse_runtime_exports(module: &Module) -> Result<RuntimeExportMappings, WasmC
                 RuntimeBuiltin::CombineSignals,
             )?,
             is_signal: get_builtin_function(&exported_functions, RuntimeBuiltin::IsSignal)?,
-            is_truthy: get_builtin_function(&exported_functions, RuntimeBuiltin::IsTruthy)?,
             allocate_cell: get_builtin_function(&exported_functions, RuntimeBuiltin::AllocateCell)?,
             allocate_hashmap: get_builtin_function(
                 &exported_functions,
@@ -1557,6 +1556,10 @@ fn parse_runtime_exports(module: &Module) -> Result<RuntimeExportMappings, WasmC
             create_zip_iterator: get_builtin_function(
                 &exported_functions,
                 RuntimeBuiltin::CreateZipIterator,
+            )?,
+            get_boolean_value: get_builtin_function(
+                &exported_functions,
+                RuntimeBuiltin::GetBooleanValue,
             )?,
             get_list_item: get_builtin_function(&exported_functions, RuntimeBuiltin::GetListItem)?,
             get_list_length: get_builtin_function(

@@ -70,10 +70,11 @@ impl<'a, A: Arena + Clone> CompileWasm<A> for CompiledFunctionCall<'a, A, If> {
         // If the condition evaluated to a signal, break out of the current control flow block, otherwise continue
         // => [Term]
         let block = block.push(instruction::runtime::BreakOnSignal { target_block: 0 });
+        // TODO: Break on non-boolean condition terms
         // Invoke the runtime builtin to determine whether the condition is truthy
         // => [bool]
         let block = block.push(instruction::runtime::CallRuntimeBuiltin {
-            target: RuntimeBuiltin::IsTruthy,
+            target: RuntimeBuiltin::GetBooleanValue,
         });
         // If the condition was truthy, apply the consequent branch factory, otherwise apply the alternative branch factory
         // => []

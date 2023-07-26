@@ -13,7 +13,6 @@ pub enum RuntimeBuiltin {
     CombineDependencies,
     CombineSignals,
     IsSignal,
-    IsTruthy,
     AllocateCell,
     AllocateHashmap,
     AllocateList,
@@ -59,6 +58,7 @@ pub enum RuntimeBuiltin {
     CreateSkipIterator,
     CreateTakeIterator,
     CreateZipIterator,
+    GetBooleanValue,
     GetListItem,
     GetListLength,
     GetStateValue,
@@ -91,7 +91,6 @@ impl RuntimeBuiltin {
                 ValueType::HeapPointer,
             ),
             RuntimeBuiltin::IsSignal => TypeSignature::new(ValueType::HeapPointer, ValueType::U32),
-            RuntimeBuiltin::IsTruthy => TypeSignature::new(ValueType::HeapPointer, ValueType::U32),
             RuntimeBuiltin::AllocateCell => {
                 TypeSignature::new(ValueType::U32, ValueType::HeapPointer)
             }
@@ -238,6 +237,9 @@ impl RuntimeBuiltin {
                 (ValueType::HeapPointer, ValueType::HeapPointer),
                 ValueType::HeapPointer,
             ),
+            RuntimeBuiltin::GetBooleanValue => {
+                TypeSignature::new(ValueType::HeapPointer, ValueType::U32)
+            }
             RuntimeBuiltin::GetListItem => TypeSignature::new(
                 (ValueType::HeapPointer, ValueType::U32),
                 ValueType::HeapPointer,
@@ -296,7 +298,6 @@ impl RuntimeBuiltin {
             RuntimeBuiltin::CombineDependencies => "combineDependencies",
             RuntimeBuiltin::CombineSignals => "combineSignals",
             RuntimeBuiltin::IsSignal => "isSignal",
-            RuntimeBuiltin::IsTruthy => "isTruthy",
             RuntimeBuiltin::AllocateCell => "allocateCell",
             RuntimeBuiltin::AllocateHashmap => "allocateHashmap",
             RuntimeBuiltin::AllocateList => "allocateList",
@@ -346,6 +347,7 @@ impl RuntimeBuiltin {
             RuntimeBuiltin::CreateSkipIterator => "createSkipIterator",
             RuntimeBuiltin::CreateTakeIterator => "createTakeIterator",
             RuntimeBuiltin::CreateZipIterator => "createZipIterator",
+            RuntimeBuiltin::GetBooleanValue => "getBooleanValue",
             RuntimeBuiltin::GetListItem => "getListItem",
             RuntimeBuiltin::GetListLength => "getListLength",
             RuntimeBuiltin::GetStateValue => "getStateValue",

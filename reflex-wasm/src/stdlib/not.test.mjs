@@ -14,60 +14,23 @@ export default (describe) => {
       Stdlib,
     }) => {
       (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Not), createUnitList(createBoolean(false)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Not),
+          createUnitList(createBoolean(false)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), 'true');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
       (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Not), createUnitList(createBoolean(true)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Not),
+          createUnitList(createBoolean(true)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), 'false');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });
-
-    test('(Nil)', (assert, {
-      createApplication,
-      createBuiltin,
-      createNil,
-      createUnitList,
-      evaluate,
-      format,
-      NULL,
-      Stdlib,
-    }) => {
-      (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Not), createUnitList(createNil()));
-        const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), 'true');
-        assert.strictEqual(format(dependencies), 'NULL');
-      })();
-    });
-
-    test('(Int)', (assert, {
-      createApplication,
-      createBuiltin,
-      createInt,
-      createUnitList,
-      evaluate,
-      format,
-      NULL,
-      Stdlib,
-    }) => {
-      (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Not), createUnitList(createInt(0)));
-        const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), 'false');
-        assert.strictEqual(format(dependencies), 'NULL');
-      })();
-      (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Not), createUnitList(createInt(3)));
-        const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), 'false');
-        assert.strictEqual(format(dependencies), 'NULL');
-      })();
-    });
-
   });
 };

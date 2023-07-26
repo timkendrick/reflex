@@ -76,10 +76,11 @@ impl<'a, A: Arena + Clone> CompileWasm<A> for CompiledFunctionCall<'a, A, And> {
             scope_offset: 0,
             value_type: ValueType::HeapPointer,
         });
+        // TODO: Break on non-boolean condition terms
         // Invoke the runtime builtin to determine whether the condition is truthy
         // => [bool]
         let block = block.push(instruction::runtime::CallRuntimeBuiltin {
-            target: RuntimeBuiltin::IsTruthy,
+            target: RuntimeBuiltin::GetBooleanValue,
         });
         // If the condition was truthy, evaluate the consequent, otherwise return the falsy condition
         // => []
