@@ -9,8 +9,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
 use reflex::core::{
-    ConditionListType, DependencyList, Eagerness, Expression, GraphNode, Internable, RefType,
-    SerializeJson, SignalTermType, StackOffset,
+    ConditionListType, DependencyList, Expression, GraphNode, RefType, SerializeJson,
+    SignalTermType, StackOffset,
 };
 
 #[derive(Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
@@ -66,12 +66,6 @@ impl<T: Expression> GraphNode for SignalTerm<T> {
     }
     fn is_complex(&self) -> bool {
         false
-    }
-}
-
-impl<T: Expression> Internable for SignalTerm<T> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        true
     }
 }
 

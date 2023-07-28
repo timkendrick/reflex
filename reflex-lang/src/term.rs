@@ -59,9 +59,9 @@ pub use variable::*;
 
 use reflex::{
     core::{
-        Applicable, Arity, CompoundNode, DependencyList, DynamicState, Eagerness, Evaluate,
-        EvaluationCache, EvaluationResult, Expression, ExpressionFactory, GraphNode, HeapAllocator,
-        Internable, Reducible, Rewritable, SerializeJson, StackOffset, Substitutions,
+        Applicable, Arity, CompoundNode, DependencyList, DynamicState, Evaluate, EvaluationCache,
+        EvaluationResult, Expression, ExpressionFactory, GraphNode, HeapAllocator, Reducible,
+        Rewritable, SerializeJson, StackOffset, Substitutions,
     },
     hash::HashId,
 };
@@ -674,37 +674,6 @@ where
     }
 }
 
-impl<T: Expression> Internable for Term<T>
-where
-    T::String: Hash,
-{
-    fn should_intern(&self, eager: Eagerness) -> bool {
-        match self {
-            Self::Nil(term) => term.should_intern(eager),
-            Self::Boolean(term) => term.should_intern(eager),
-            Self::Int(term) => term.should_intern(eager),
-            Self::Float(term) => term.should_intern(eager),
-            Self::String(term) => term.should_intern(eager),
-            Self::Symbol(term) => term.should_intern(eager),
-            Self::Timestamp(term) => term.should_intern(eager),
-            Self::Variable(term) => term.should_intern(eager),
-            Self::Effect(term) => term.should_intern(eager),
-            Self::Let(term) => term.should_intern(eager),
-            Self::Lambda(term) => term.should_intern(eager),
-            Self::Application(term) => term.should_intern(eager),
-            Self::PartialApplication(term) => term.should_intern(eager),
-            Self::Recursive(term) => term.should_intern(eager),
-            Self::CompiledFunction(term) => term.should_intern(eager),
-            Self::Builtin(term) => term.should_intern(eager),
-            Self::Record(term) => term.should_intern(eager),
-            Self::Constructor(term) => term.should_intern(eager),
-            Self::List(term) => term.should_intern(eager),
-            Self::HashMap(term) => term.should_intern(eager),
-            Self::HashSet(term) => term.should_intern(eager),
-            Self::Signal(term) => term.should_intern(eager),
-        }
-    }
-}
 impl<T: Expression> std::fmt::Display for Term<T>
 where
     T::String: Hash,

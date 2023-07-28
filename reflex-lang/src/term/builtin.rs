@@ -12,9 +12,8 @@ use serde::{
 use serde_json::Value as JsonValue;
 
 use reflex::core::{
-    Applicable, Arity, Builtin, BuiltinTermType, DependencyList, Eagerness, EvaluationCache,
-    Expression, ExpressionFactory, GraphNode, HeapAllocator, Internable, SerializeJson,
-    StackOffset, Uid, Uuid,
+    Applicable, Arity, Builtin, BuiltinTermType, DependencyList, EvaluationCache, Expression,
+    ExpressionFactory, GraphNode, HeapAllocator, SerializeJson, StackOffset, Uid, Uuid,
 };
 
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]
@@ -93,12 +92,6 @@ impl<T: Expression + Applicable<T>> Applicable<T> for BuiltinTerm<T> {
     }
     fn should_parallelize(&self, args: &[T]) -> bool {
         self.target.should_parallelize(args)
-    }
-}
-
-impl<T: Expression> Internable for BuiltinTerm<T> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        true
     }
 }
 

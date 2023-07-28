@@ -7,10 +7,10 @@ use std::{collections::HashSet, marker::PhantomData};
 
 use reflex::{
     core::{
-        Applicable, Arity, Builtin, CompoundNode, DependencyList, DynamicState, Eagerness,
-        Evaluate, EvaluationCache, EvaluationResult, Expression, ExpressionFactory, FloatValue,
-        GraphNode, HeapAllocator, InstructionPointer, IntValue, Internable, NodeId, Reducible,
-        Rewritable, SerializeJson, StackOffset, Substitutions, SymbolId, TimestampValue,
+        Applicable, Arity, Builtin, CompoundNode, DependencyList, DynamicState, Evaluate,
+        EvaluationCache, EvaluationResult, Expression, ExpressionFactory, FloatValue, GraphNode,
+        HeapAllocator, InstructionPointer, IntValue, NodeId, Reducible, Rewritable, SerializeJson,
+        StackOffset, Substitutions, SymbolId, TimestampValue,
     },
     hash::HashId,
 };
@@ -572,12 +572,6 @@ impl<TBuiltin: Builtin> Applicable<Self> for CachedSharedTerm<TBuiltin> {
         cache: &mut impl EvaluationCache<Self>,
     ) -> Result<Self, String> {
         self.value.apply(args, factory, allocator, cache)
-    }
-}
-
-impl<TBuiltin: Builtin> Internable for CachedSharedTerm<TBuiltin> {
-    fn should_intern(&self, eager: Eagerness) -> bool {
-        self.value.should_intern(eager)
     }
 }
 

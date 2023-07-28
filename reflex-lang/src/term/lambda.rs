@@ -15,8 +15,8 @@ use reflex::{
     cache::NoopCache,
     core::{
         Applicable, ApplicationTermType, Arity, CompoundNode, DependencyList, DynamicState,
-        Eagerness, EvaluationCache, Expression, ExpressionFactory, ExpressionListType, GraphNode,
-        HeapAllocator, Internable, LambdaTermType, RefType, Rewritable, ScopeOffset, SerializeJson,
+        EvaluationCache, Expression, ExpressionFactory, ExpressionListType, GraphNode,
+        HeapAllocator, LambdaTermType, RefType, Rewritable, ScopeOffset, SerializeJson,
         StackOffset, Substitutions, VariableTermType,
     },
 };
@@ -394,12 +394,6 @@ fn apply_eta_reduction<'a, T: Expression>(
             Some(term.target())
         }
         _ => None,
-    }
-}
-
-impl<T: Expression> Internable for LambdaTerm<T> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        false
     }
 }
 

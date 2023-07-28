@@ -11,11 +11,11 @@ use serde_json::Value as JsonValue;
 use reflex::core::{
     apply_function, create_error_expression, get_combined_short_circuit_signal,
     transform_expression_list, validate_function_application_arity, Applicable,
-    ApplicationTermType, ArgType, Arity, CompoundNode, DependencyList, DynamicState, Eagerness,
-    Evaluate, EvaluationCache, EvaluationResult, Expression, ExpressionFactory, ExpressionListIter,
-    ExpressionListType, GraphNode, HeapAllocator, Internable, LambdaTermType,
-    PartialApplicationTermType, Reducible, RefType, Rewritable, SerializeJson, ShortCircuitCount,
-    StackOffset, StateCache, Substitutions,
+    ApplicationTermType, ArgType, Arity, CompoundNode, DependencyList, DynamicState, Evaluate,
+    EvaluationCache, EvaluationResult, Expression, ExpressionFactory, ExpressionListIter,
+    ExpressionListType, GraphNode, HeapAllocator, LambdaTermType, PartialApplicationTermType,
+    Reducible, RefType, Rewritable, SerializeJson, ShortCircuitCount, StackOffset, StateCache,
+    Substitutions,
 };
 
 use crate::term::lambda::inline_lambda_arg_values;
@@ -282,14 +282,6 @@ impl<T: Expression + Reducible<T> + Applicable<T> + Evaluate<T>> Evaluate<T>
         cache: &mut impl EvaluationCache<T>,
     ) -> Option<EvaluationResult<T>> {
         evaluate_function_application(self, Some(state), factory, allocator, cache)
-    }
-}
-
-impl<T: Expression> Internable for ApplicationTerm<T> {
-    fn should_intern(&self, eager: Eagerness) -> bool {
-        eager == Eagerness::Lazy
-            && self.target.capture_depth() == 0
-            && self.args.capture_depth() == 0
     }
 }
 

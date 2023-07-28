@@ -9,10 +9,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
 use reflex::core::{
-    transform_expression_list, CompoundNode, DependencyList, DynamicState, Eagerness,
-    EvaluationCache, Expression, ExpressionFactory, ExpressionListIter, ExpressionListType,
-    GraphNode, HeapAllocator, Internable, ListTermType, RefType, Rewritable, SerializeJson,
-    StackOffset, Substitutions,
+    transform_expression_list, CompoundNode, DependencyList, DynamicState, EvaluationCache,
+    Expression, ExpressionFactory, ExpressionListIter, ExpressionListType, GraphNode,
+    HeapAllocator, ListTermType, RefType, Rewritable, SerializeJson, StackOffset, Substitutions,
 };
 use reflex_utils::json;
 
@@ -140,12 +139,6 @@ impl<T: Expression + Rewritable<T>> Rewritable<T> for ListTerm<T> {
             item.normalize(factory, allocator, cache)
         })
         .map(|items| factory.create_list_term(items))
-    }
-}
-
-impl<T: Expression> Internable for ListTerm<T> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        self.capture_depth() == 0
     }
 }
 

@@ -14,12 +14,16 @@ use std::{
 use reflex::{
     cache::SubstitutionCache,
     core::{
-        Applicable, Eagerness, Expression, ExpressionFactory, HeapAllocator, InstructionPointer,
-        IntValue, Internable, Reducible, Rewritable, StackOffset, SymbolId, TimestampValue, Uuid,
+        Applicable, Expression, ExpressionFactory, HeapAllocator, InstructionPointer, IntValue,
+        Reducible, Rewritable, StackOffset, SymbolId, TimestampValue, Uuid,
     },
     hash::{hash_object, FnvHashMap, FnvHasher, HashId, IntMap},
 };
 use serde::{Deserialize, Serialize};
+
+pub trait Internable {
+    fn should_intern(&self, eager: Eagerness) -> bool;
+}
 
 pub trait Compile<T: Expression>: Internable {
     fn compile(
@@ -30,6 +34,12 @@ pub trait Compile<T: Expression>: Internable {
         allocator: &impl HeapAllocator<T>,
         compiler: &mut Compiler,
     ) -> Result<Program, String>;
+}
+
+#[derive(Hash, Eq, PartialEq, Clone, Copy, Debug, Serialize)]
+pub enum Eagerness {
+    Eager,
+    Lazy,
 }
 
 #[derive(Hash, PartialEq, Clone, Debug, Serialize, Deserialize, Default)]

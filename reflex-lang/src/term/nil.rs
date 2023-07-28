@@ -8,9 +8,7 @@ use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
-use reflex::core::{
-    DependencyList, Eagerness, GraphNode, Internable, NilTermType, SerializeJson, StackOffset,
-};
+use reflex::core::{DependencyList, GraphNode, NilTermType, SerializeJson, StackOffset};
 
 #[derive(PartialEq, Eq, Clone, Copy, Serialize, Deserialize, Hash)]
 pub struct NilTerm;
@@ -42,12 +40,6 @@ impl GraphNode for NilTerm {
     }
     fn is_complex(&self) -> bool {
         false
-    }
-}
-
-impl Internable for NilTerm {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        true
     }
 }
 

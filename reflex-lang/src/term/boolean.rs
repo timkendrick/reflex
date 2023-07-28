@@ -8,9 +8,7 @@ use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
-use reflex::core::{
-    BooleanTermType, DependencyList, Eagerness, GraphNode, Internable, SerializeJson, StackOffset,
-};
+use reflex::core::{BooleanTermType, DependencyList, GraphNode, SerializeJson, StackOffset};
 
 #[derive(PartialEq, Eq, Clone, Copy, Serialize, Deserialize, Hash)]
 pub struct BooleanTerm {
@@ -53,12 +51,6 @@ impl GraphNode for BooleanTerm {
     }
     fn is_complex(&self) -> bool {
         false
-    }
-}
-
-impl Internable for BooleanTerm {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        true
     }
 }
 

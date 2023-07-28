@@ -8,13 +8,13 @@ use reflex::{
     cache::NoopCache,
     core::{
         Applicable, ApplicationTermType, ArgType, Arity, BooleanTermType, Builtin, BuiltinTermType,
-        CompiledFunctionTermType, ConditionListType, ConditionType, ConstructorTermType, Eagerness,
+        CompiledFunctionTermType, ConditionListType, ConditionType, ConstructorTermType,
         EffectTermType, Expression, ExpressionFactory, ExpressionListType, FloatTermType,
-        HashmapTermType, HashsetTermType, HeapAllocator, InstructionPointer, IntTermType,
-        LambdaTermType, LetTermType, ListTermType, PartialApplicationTermType, RecordTermType,
-        RecursiveTermType, Reducible, RefType, Rewritable, SignalTermType, SignalType, StackOffset,
-        StringTermType, StringValue, StructPrototypeType, Substitutions, SymbolTermType,
-        TimestampTermType, Uid, VariableTermType,
+        GraphNode, HashmapTermType, HashsetTermType, HeapAllocator, InstructionPointer,
+        IntTermType, LambdaTermType, LetTermType, ListTermType, PartialApplicationTermType,
+        RecordTermType, RecursiveTermType, Reducible, RefType, Rewritable, SignalTermType,
+        SignalType, StackOffset, StringTermType, StringValue, StructPrototypeType, Substitutions,
+        SymbolTermType, TimestampTermType, Uid, VariableTermType,
     },
     hash::{hash_object, HashId},
 };
@@ -29,7 +29,18 @@ use reflex_lang::{
     CachedSharedTerm,
 };
 
-use crate::compiler::{compile_expressions, Compile, Compiler, Instruction, Program};
+use crate::compiler::{
+    compile_expressions, Compile, Compiler, Eagerness, Instruction, Internable, Program,
+};
+
+impl<TInner> Internable for CachedExpression<TInner>
+where
+    TInner: Internable,
+{
+    fn should_intern(&self, eager: Eagerness) -> bool {
+        self.value().should_intern(eager)
+    }
+}
 
 impl<TInner, TWrapper> Compile<TWrapper> for CachedExpression<TInner>
 where
@@ -46,6 +57,15 @@ where
     ) -> Result<Program, String> {
         self.value()
             .compile(eager, stack_offset, factory, allocator, compiler)
+    }
+}
+
+impl<TInner> Internable for SharedExpression<TInner>
+where
+    TInner: Internable,
+{
+    fn should_intern(&self, eager: Eagerness) -> bool {
+        self.value().should_intern(eager)
     }
 }
 
@@ -67,6 +87,12 @@ where
     }
 }
 
+impl<TBuiltin: Builtin> Internable for CachedSharedTerm<TBuiltin> {
+    fn should_intern(&self, eager: Eagerness) -> bool {
+        self.value().should_intern(eager)
+    }
+}
+
 impl<TBuiltin: Builtin> Compile<Self> for CachedSharedTerm<TBuiltin> {
     fn compile(
         &self,
@@ -78,6 +104,38 @@ impl<TBuiltin: Builtin> Compile<Self> for CachedSharedTerm<TBuiltin> {
     ) -> Result<Program, String> {
         self.value()
             .compile(eager, stack_offset, factory, allocator, compiler)
+    }
+}
+
+impl<T: Expression> Internable for Term<T>
+where
+    T::String: std::hash::Hash,
+{
+    fn should_intern(&self, eager: Eagerness) -> bool {
+        match self {
+            Self::Nil(term) => term.should_intern(eager),
+            Self::Boolean(term) => term.should_intern(eager),
+            Self::Int(term) => term.should_intern(eager),
+            Self::Float(term) => term.should_intern(eager),
+            Self::String(term) => term.should_intern(eager),
+            Self::Symbol(term) => term.should_intern(eager),
+            Self::Timestamp(term) => term.should_intern(eager),
+            Self::Variable(term) => term.should_intern(eager),
+            Self::Effect(term) => term.should_intern(eager),
+            Self::Let(term) => term.should_intern(eager),
+            Self::Lambda(term) => term.should_intern(eager),
+            Self::Application(term) => term.should_intern(eager),
+            Self::PartialApplication(term) => term.should_intern(eager),
+            Self::Recursive(term) => term.should_intern(eager),
+            Self::CompiledFunction(term) => term.should_intern(eager),
+            Self::Builtin(term) => term.should_intern(eager),
+            Self::Record(term) => term.should_intern(eager),
+            Self::Constructor(term) => term.should_intern(eager),
+            Self::List(term) => term.should_intern(eager),
+            Self::HashMap(term) => term.should_intern(eager),
+            Self::HashSet(term) => term.should_intern(eager),
+            Self::Signal(term) => term.should_intern(eager),
+        }
     }
 }
 
@@ -130,6 +188,14 @@ where
             Self::HashSet(term) => term.compile(eager, stack_offset, factory, allocator, compiler),
             Self::Signal(term) => term.compile(eager, stack_offset, factory, allocator, compiler),
         }
+    }
+}
+
+impl<T: Expression> Internable for ApplicationTerm<T> {
+    fn should_intern(&self, eager: Eagerness) -> bool {
+        eager == Eagerness::Lazy
+            && self.target.capture_depth() == 0
+            && self.args.capture_depth() == 0
     }
 }
 
@@ -219,6 +285,12 @@ impl<T: Expression + Applicable<T> + Compile<T>> Compile<T> for ApplicationTerm<
     }
 }
 
+impl Internable for BooleanTerm {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        true
+    }
+}
+
 impl<T: Expression + Compile<T>> Compile<T> for BooleanTerm {
     fn compile(
         &self,
@@ -231,6 +303,12 @@ impl<T: Expression + Compile<T>> Compile<T> for BooleanTerm {
         Ok(Program::new(once(Instruction::PushBoolean {
             value: self.value(),
         })))
+    }
+}
+
+impl<T: Expression> Internable for BuiltinTerm<T> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        true
     }
 }
 
@@ -249,6 +327,12 @@ impl<T: Expression> Compile<T> for BuiltinTerm<T> {
     }
 }
 
+impl Internable for CompiledFunctionTerm {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        true
+    }
+}
+
 impl<T: Expression + Compile<T>> Compile<T> for CompiledFunctionTerm {
     fn compile(
         &self,
@@ -262,6 +346,12 @@ impl<T: Expression + Compile<T>> Compile<T> for CompiledFunctionTerm {
             target: self.address(),
             hash: self.hash(),
         })))
+    }
+}
+
+impl<T: Expression> Internable for ConstructorTerm<T> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        true
     }
 }
 
@@ -294,6 +384,12 @@ impl<T: Expression + Compile<T>> Compile<T> for ConstructorTerm<T> {
     }
 }
 
+impl<T: Expression> Internable for EffectTerm<T> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        false
+    }
+}
+
 impl<T: Expression + Compile<T>> Compile<T> for EffectTerm<T> {
     fn compile(
         &self,
@@ -313,6 +409,12 @@ impl<T: Expression + Compile<T>> Compile<T> for EffectTerm<T> {
     }
 }
 
+impl Internable for FloatTerm {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        true
+    }
+}
+
 impl<T: Expression + Compile<T>> Compile<T> for FloatTerm {
     fn compile(
         &self,
@@ -325,6 +427,12 @@ impl<T: Expression + Compile<T>> Compile<T> for FloatTerm {
         Ok(Program::new(once(Instruction::PushFloat {
             value: self.value().into(),
         })))
+    }
+}
+
+impl<T: Expression> Internable for HashMapTerm<T> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        self.capture_depth() == 0
     }
 }
 
@@ -363,6 +471,12 @@ impl<T: Expression + Compile<T>> Compile<T> for HashMapTerm<T> {
     }
 }
 
+impl<T: Expression> Internable for HashSetTerm<T> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        self.capture_depth() == 0
+    }
+}
+
 impl<T: Expression + Compile<T>> Compile<T> for HashSetTerm<T> {
     fn compile(
         &self,
@@ -389,6 +503,12 @@ impl<T: Expression + Compile<T>> Compile<T> for HashSetTerm<T> {
     }
 }
 
+impl Internable for IntTerm {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        true
+    }
+}
+
 impl<T: Expression + Compile<T>> Compile<T> for IntTerm {
     fn compile(
         &self,
@@ -401,6 +521,12 @@ impl<T: Expression + Compile<T>> Compile<T> for IntTerm {
         Ok(Program::new(once(Instruction::PushInt {
             value: self.value(),
         })))
+    }
+}
+
+impl<T: Expression> Internable for LambdaTerm<T> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        false
     }
 }
 
@@ -445,6 +571,12 @@ impl<T: Expression + Compile<T>> Compile<T> for LambdaTerm<T> {
             target: target_address,
             hash,
         })))
+    }
+}
+
+impl<T: Expression> Internable for LetTerm<T> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        self.capture_depth() == 0
     }
 }
 
@@ -505,6 +637,12 @@ impl<T: Expression + Rewritable<T> + Reducible<T> + Compile<T>> Compile<T> for L
     }
 }
 
+impl<T: Expression> Internable for ListTerm<T> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        self.capture_depth() == 0
+    }
+}
+
 impl<T: Expression + Compile<T>> Compile<T> for ListTerm<T> {
     fn compile(
         &self,
@@ -531,6 +669,12 @@ impl<T: Expression + Compile<T>> Compile<T> for ListTerm<T> {
     }
 }
 
+impl Internable for NilTerm {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        true
+    }
+}
+
 impl<T: Expression + Compile<T>> Compile<T> for NilTerm {
     fn compile(
         &self,
@@ -541,6 +685,12 @@ impl<T: Expression + Compile<T>> Compile<T> for NilTerm {
         _compiler: &mut Compiler,
     ) -> Result<Program, String> {
         Ok(Program::new(once(Instruction::PushNil)))
+    }
+}
+
+impl<T: Expression> Internable for PartialApplicationTerm<T> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        self.args().as_deref().capture_depth() == 0 && self.target().as_deref().capture_depth() == 0
     }
 }
 
@@ -581,6 +731,12 @@ impl<T: Expression + Applicable<T> + Compile<T>> Compile<T> for PartialApplicati
     }
 }
 
+impl<T: Expression> Internable for RecordTerm<T> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        self.capture_depth() == 0
+    }
+}
+
 impl<T: Expression + Compile<T>> Compile<T> for RecursiveTerm<T> {
     fn compile(
         &self,
@@ -598,6 +754,12 @@ impl<T: Expression + Compile<T>> Compile<T> for RecursiveTerm<T> {
         result.push(Instruction::PushLocal { offset: 0 });
         result.push(Instruction::Apply { num_args: 1 });
         Ok(result)
+    }
+}
+
+impl<T: Expression> Internable for RecursiveTerm<T> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        self.capture_depth() == 0
     }
 }
 
@@ -669,6 +831,12 @@ impl<T: Expression + Rewritable<T> + Reducible<T> + Compile<T>> Compile<T> for R
     }
 }
 
+impl<T: Expression> Internable for SignalTerm<T> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        true
+    }
+}
+
 impl<T: Expression + Compile<T>> Compile<T> for StringTerm<T> {
     fn compile(
         &self,
@@ -683,6 +851,12 @@ impl<T: Expression + Compile<T>> Compile<T> for StringTerm<T> {
         Ok(Program::new(once(Instruction::PushString {
             value: Into::<String>::into(value.as_str()),
         })))
+    }
+}
+
+impl<T: Expression> Internable for StringTerm<T> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        true
     }
 }
 
@@ -701,6 +875,12 @@ impl<T: Expression + Compile<T>> Compile<T> for SymbolTerm {
     }
 }
 
+impl Internable for SymbolTerm {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        true
+    }
+}
+
 impl<T: Expression + Compile<T>> Compile<T> for TimestampTerm {
     fn compile(
         &self,
@@ -716,6 +896,12 @@ impl<T: Expression + Compile<T>> Compile<T> for TimestampTerm {
     }
 }
 
+impl Internable for TimestampTerm {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        true
+    }
+}
+
 impl<T: Expression + Compile<T>> Compile<T> for VariableTerm {
     fn compile(
         &self,
@@ -728,6 +914,12 @@ impl<T: Expression + Compile<T>> Compile<T> for VariableTerm {
         Ok(Program::new(once(Instruction::PushLocal {
             offset: self.offset() + stack_offset,
         })))
+    }
+}
+
+impl Internable for VariableTerm {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        false
     }
 }
 

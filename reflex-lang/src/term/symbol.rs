@@ -9,8 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
 use reflex::core::{
-    DependencyList, Eagerness, GraphNode, Internable, SerializeJson, StackOffset, SymbolId,
-    SymbolTermType,
+    DependencyList, GraphNode, SerializeJson, StackOffset, SymbolId, SymbolTermType,
 };
 
 #[derive(PartialEq, Eq, Clone, Copy, Serialize, Deserialize, Hash)]
@@ -54,12 +53,6 @@ impl GraphNode for SymbolTerm {
     }
     fn is_complex(&self) -> bool {
         false
-    }
-}
-
-impl Internable for SymbolTerm {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        true
     }
 }
 

@@ -11,9 +11,9 @@ use serde_json::Value as JsonValue;
 use reflex::{
     core::{
         build_hashset_lookup_table, transform_expression_list, CompoundNode, DependencyList,
-        DynamicState, Eagerness, EvaluationCache, Expression, ExpressionFactory,
-        ExpressionListIter, ExpressionListType, GraphNode, HashsetTermType, HeapAllocator,
-        Internable, RefType, Rewritable, SerializeJson, StackOffset, Substitutions,
+        DynamicState, EvaluationCache, Expression, ExpressionFactory, ExpressionListIter,
+        ExpressionListType, GraphNode, HashsetTermType, HeapAllocator, RefType, Rewritable,
+        SerializeJson, StackOffset, Substitutions,
     },
     hash::HashId,
 };
@@ -150,12 +150,6 @@ impl<T: Expression + Rewritable<T>> Rewritable<T> for HashSetTerm<T> {
             value.normalize(factory, allocator, cache)
         })
         .map(|values| factory.create_list_term(values))
-    }
-}
-
-impl<T: Expression> Internable for HashSetTerm<T> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        self.capture_depth() == 0
     }
 }
 

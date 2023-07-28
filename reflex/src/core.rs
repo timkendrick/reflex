@@ -619,10 +619,6 @@ pub trait Evaluate<T: Expression> {
     ) -> Option<EvaluationResult<T>>;
 }
 
-pub trait Internable {
-    fn should_intern(&self, eager: Eagerness) -> bool;
-}
-
 pub trait SerializeJson {
     fn to_json(&self) -> Result<serde_json::Value, String>;
     /// Generate a JSON diff object that describes the changes needed for `self` to match `target` (both objects must be the same shape).
@@ -1219,26 +1215,6 @@ pub trait HeapAllocator<T: Expression> {
     fn clone_string<'a>(&self, value: T::StringRef<'a>) -> T::String
     where
         Self: 'a;
-}
-
-#[derive(Hash, Eq, PartialEq, Clone, Copy, Debug, Serialize)]
-pub enum Eagerness {
-    Eager,
-    Lazy,
-}
-impl Eagerness {
-    pub fn is_eager(&self) -> bool {
-        match self {
-            Eagerness::Eager => true,
-            _ => false,
-        }
-    }
-    pub fn is_lazy(&self) -> bool {
-        match self {
-            Eagerness::Lazy => true,
-            _ => false,
-        }
-    }
 }
 
 pub type SignalId = HashId;

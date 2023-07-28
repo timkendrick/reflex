@@ -8,9 +8,9 @@ use std::{collections::HashSet, sync::Arc};
 
 use reflex::{
     core::{
-        Applicable, Arity, CompoundNode, DependencyList, DynamicState, Eagerness, Evaluate,
-        EvaluationCache, EvaluationResult, Expression, ExpressionFactory, GraphNode, HeapAllocator,
-        Internable, NodeId, Reducible, Rewritable, SerializeJson, StackOffset, Substitutions,
+        Applicable, Arity, CompoundNode, DependencyList, DynamicState, Evaluate, EvaluationCache,
+        EvaluationResult, Expression, ExpressionFactory, GraphNode, HeapAllocator, NodeId,
+        Reducible, Rewritable, SerializeJson, StackOffset, Substitutions,
     },
     hash::HashId,
 };
@@ -251,15 +251,6 @@ where
     }
     fn should_parallelize(&self, args: &[TWrapper]) -> bool {
         self.value.should_parallelize(args)
-    }
-}
-
-impl<TInner> Internable for CachedExpression<TInner>
-where
-    TInner: Internable,
-{
-    fn should_intern(&self, eager: Eagerness) -> bool {
-        self.value().should_intern(eager)
     }
 }
 
@@ -517,15 +508,6 @@ where
         cache: &mut impl EvaluationCache<TWrapper>,
     ) -> Option<EvaluationResult<TWrapper>> {
         self.value.evaluate(state, factory, allocator, cache)
-    }
-}
-
-impl<TInner> Internable for SharedExpression<TInner>
-where
-    TInner: Internable,
-{
-    fn should_intern(&self, eager: Eagerness) -> bool {
-        self.value().should_intern(eager)
     }
 }
 

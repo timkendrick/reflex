@@ -9,8 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
 use reflex::core::{
-    as_integer, DependencyList, Eagerness, FloatTermType, FloatValue, GraphNode, Internable,
-    SerializeJson, StackOffset,
+    as_integer, DependencyList, FloatTermType, FloatValue, GraphNode, SerializeJson, StackOffset,
 };
 
 #[derive(PartialEq, Clone, Copy, Serialize, Deserialize)]
@@ -60,12 +59,6 @@ impl GraphNode for FloatTerm {
     }
     fn is_complex(&self) -> bool {
         false
-    }
-}
-
-impl Internable for FloatTerm {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        true
     }
 }
 

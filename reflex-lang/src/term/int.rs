@@ -8,10 +8,7 @@ use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
-use reflex::core::{
-    DependencyList, Eagerness, GraphNode, IntTermType, IntValue, Internable, SerializeJson,
-    StackOffset,
-};
+use reflex::core::{DependencyList, GraphNode, IntTermType, IntValue, SerializeJson, StackOffset};
 
 #[derive(PartialEq, Eq, Clone, Copy, Serialize, Deserialize, Hash)]
 pub struct IntTerm {
@@ -54,12 +51,6 @@ impl GraphNode for IntTerm {
     }
     fn is_complex(&self) -> bool {
         false
-    }
-}
-
-impl Internable for IntTerm {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        true
     }
 }
 
