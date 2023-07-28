@@ -9,9 +9,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
 use reflex::core::{
-    CompoundNode, DependencyList, DynamicState, Eagerness, EvaluationCache, Expression,
-    ExpressionFactory, GraphNode, HeapAllocator, Internable, LetTermType, Reducible, Rewritable,
-    ScopeOffset, SerializeJson, StackOffset, Substitutions,
+    CompoundNode, DependencyList, DynamicState, EvaluationCache, Expression, ExpressionFactory,
+    GraphNode, HeapAllocator, LetTermType, Reducible, Rewritable, ScopeOffset, SerializeJson,
+    StackOffset, Substitutions,
 };
 
 use crate::term::variable::should_inline_value;
@@ -225,12 +225,6 @@ impl<T: Expression + Rewritable<T>> Reducible<T> for LetTerm<T> {
             self.body
                 .substitute_static(&substitutions, factory, allocator, cache)
         }
-    }
-}
-
-impl<T: Expression> Internable for LetTerm<T> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        self.capture_depth() == 0
     }
 }
 

@@ -9,9 +9,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
 use reflex::core::{
-    CompoundNode, DependencyList, DynamicState, Eagerness, EvaluationCache, Expression,
-    ExpressionFactory, GraphNode, HeapAllocator, Internable, RecursiveTermType, Reducible,
-    Rewritable, SerializeJson, StackOffset, Substitutions,
+    CompoundNode, DependencyList, DynamicState, EvaluationCache, Expression, ExpressionFactory,
+    GraphNode, HeapAllocator, RecursiveTermType, Reducible, Rewritable, SerializeJson, StackOffset,
+    Substitutions,
 };
 
 #[derive(Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
@@ -139,12 +139,6 @@ impl<T: Expression + Reducible<T>> Reducible<T> for RecursiveTerm<T> {
                 allocator.create_unit_list(factory.create_recursive_term(self.factory.clone())),
             )
             .reduce(factory, allocator, cache)
-    }
-}
-
-impl<T: Expression> Internable for RecursiveTerm<T> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        self.capture_depth() == 0
     }
 }
 

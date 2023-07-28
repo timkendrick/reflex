@@ -9,9 +9,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
 use reflex::core::{
-    Applicable, Arity, ConstructorTermType, DependencyList, Eagerness, EvaluationCache, Expression,
-    ExpressionFactory, ExpressionListType, GraphNode, HeapAllocator, Internable, RefType,
-    SerializeJson, StackOffset, StructPrototypeType,
+    Applicable, Arity, ConstructorTermType, DependencyList, EvaluationCache, Expression,
+    ExpressionFactory, ExpressionListType, GraphNode, HeapAllocator, RefType, SerializeJson,
+    StackOffset, StructPrototypeType,
 };
 
 #[derive(Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
@@ -90,12 +90,6 @@ impl<T: Expression> Applicable<T> for ConstructorTerm<T> {
     }
     fn should_parallelize(&self, _args: &[T]) -> bool {
         false
-    }
-}
-
-impl<T: Expression> Internable for ConstructorTerm<T> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        true
     }
 }
 

@@ -10,9 +10,9 @@ use serde_json::Value as JsonValue;
 
 use reflex::{
     core::{
-        Applicable, Arity, CompiledFunctionTermType, DependencyList, Eagerness, EvaluationCache,
-        Expression, ExpressionFactory, GraphNode, HeapAllocator, InstructionPointer, Internable,
-        SerializeJson, StackOffset,
+        Applicable, Arity, CompiledFunctionTermType, DependencyList, EvaluationCache, Expression,
+        ExpressionFactory, GraphNode, HeapAllocator, InstructionPointer, SerializeJson,
+        StackOffset,
     },
     hash::HashId,
 };
@@ -106,12 +106,6 @@ impl<T: Expression> Applicable<T> for CompiledFunctionTerm {
     }
     fn should_parallelize(&self, _args: &[T]) -> bool {
         false
-    }
-}
-
-impl Internable for CompiledFunctionTerm {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        true
     }
 }
 

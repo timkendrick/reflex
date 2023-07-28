@@ -9,9 +9,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
 use reflex::core::{
-    ConditionType, DependencyList, DynamicState, Eagerness, EffectTermType, Evaluate,
-    EvaluationCache, EvaluationResult, Expression, ExpressionFactory, GraphNode, HeapAllocator,
-    Internable, Rewritable, SerializeJson, StackOffset, Substitutions,
+    ConditionType, DependencyList, DynamicState, EffectTermType, Evaluate, EvaluationCache,
+    EvaluationResult, Expression, ExpressionFactory, GraphNode, HeapAllocator, Rewritable,
+    SerializeJson, StackOffset, Substitutions,
 };
 
 #[derive(Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
@@ -120,12 +120,6 @@ impl<T: Expression + Rewritable<T>> Rewritable<T> for EffectTerm<T> {
         _cache: &mut impl EvaluationCache<T>,
     ) -> Option<T> {
         None
-    }
-}
-
-impl<T: Expression> Internable for EffectTerm<T> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        false
     }
 }
 

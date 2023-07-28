@@ -8,8 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
 use reflex::core::{
-    DependencyList, Eagerness, GraphNode, Internable, SerializeJson, StackOffset,
-    TimestampTermType, TimestampValue,
+    DependencyList, GraphNode, SerializeJson, StackOffset, TimestampTermType, TimestampValue,
 };
 
 #[derive(PartialEq, Eq, Clone, Copy, Serialize, Deserialize, Hash)]
@@ -53,12 +52,6 @@ impl GraphNode for TimestampTerm {
     }
     fn is_complex(&self) -> bool {
         false
-    }
-}
-
-impl Internable for TimestampTerm {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        true
     }
 }
 

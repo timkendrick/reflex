@@ -9,10 +9,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map as JsonMap, Value as JsonValue};
 
 use reflex::core::{
-    transform_expression_list, CompoundNode, DependencyList, DynamicState, Eagerness,
-    EvaluationCache, Expression, ExpressionFactory, ExpressionListIter, ExpressionListType,
-    GraphNode, HeapAllocator, Internable, RecordTermType, RefType, Rewritable, SerializeJson,
-    StackOffset, StructPrototypeType, Substitutions,
+    transform_expression_list, CompoundNode, DependencyList, DynamicState, EvaluationCache,
+    Expression, ExpressionFactory, ExpressionListIter, ExpressionListType, GraphNode,
+    HeapAllocator, RecordTermType, RefType, Rewritable, SerializeJson, StackOffset,
+    StructPrototypeType, Substitutions,
 };
 use reflex_utils::json::is_empty_json_object;
 
@@ -181,12 +181,6 @@ impl<T: Expression + Rewritable<T>> Rewritable<T> for RecordTerm<T> {
                 fields,
             )
         })
-    }
-}
-
-impl<T: Expression> Internable for RecordTerm<T> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        self.capture_depth() == 0
     }
 }
 

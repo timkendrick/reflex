@@ -10,9 +10,9 @@ use serde_json::Value as JsonValue;
 
 use reflex::core::{
     transform_expression_list, Applicable, ArgType, Arity, CompoundNode, DependencyList,
-    DynamicState, Eagerness, EvaluationCache, Expression, ExpressionFactory, ExpressionListIter,
-    ExpressionListType, GraphNode, HeapAllocator, Internable, LambdaTermType,
-    PartialApplicationTermType, RefType, Rewritable, SerializeJson, StackOffset, Substitutions,
+    DynamicState, EvaluationCache, Expression, ExpressionFactory, ExpressionListIter,
+    ExpressionListType, GraphNode, HeapAllocator, LambdaTermType, PartialApplicationTermType,
+    RefType, Rewritable, SerializeJson, StackOffset, Substitutions,
 };
 
 use crate::term::lambda::inline_lambda_arg_values;
@@ -342,12 +342,6 @@ fn normalize_partial_lambda_application<T: Expression + Rewritable<T>>(
                     None
                 }
             })
-    }
-}
-
-impl<T: Expression> Internable for PartialApplicationTerm<T> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        self.args.capture_depth() == 0 && self.target.capture_depth() == 0
     }
 }
 
