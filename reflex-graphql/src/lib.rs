@@ -1150,16 +1150,6 @@ mod tests {
             Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
         }
     }
-    impl From<reflex_stdlib::stdlib::Car> for GraphQlTestBuiltins {
-        fn from(value: reflex_stdlib::stdlib::Car) -> Self {
-            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
-        }
-    }
-    impl From<reflex_stdlib::stdlib::Cdr> for GraphQlTestBuiltins {
-        fn from(value: reflex_stdlib::stdlib::Cdr) -> Self {
-            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
-        }
-    }
     impl From<reflex_stdlib::stdlib::Ceil> for GraphQlTestBuiltins {
         fn from(value: reflex_stdlib::stdlib::Ceil) -> Self {
             Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
@@ -1202,11 +1192,6 @@ mod tests {
     }
     impl From<reflex_stdlib::stdlib::CollectString> for GraphQlTestBuiltins {
         fn from(value: reflex_stdlib::stdlib::CollectString) -> Self {
-            Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
-        }
-    }
-    impl From<reflex_stdlib::stdlib::Cons> for GraphQlTestBuiltins {
-        fn from(value: reflex_stdlib::stdlib::Cons) -> Self {
             Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
         }
     }

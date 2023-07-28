@@ -19,14 +19,14 @@ use reflex_interpreter::{
     execute, DefaultInterpreterCache, InterpreterOptions,
 };
 use reflex_lang::{allocator::DefaultAllocator, SharedTermFactory};
-use reflex_lisp::parse;
+use reflex_lisp::{parse, LispBuiltins};
 use reflex_stdlib::{Add, CollectList, Map, Stdlib};
 use test::Bencher;
 
 #[bench]
 fn nested_expressions(b: &mut Bencher) {
     let state = StateCache::default();
-    let factory = SharedTermFactory::<Stdlib>::default();
+    let factory = SharedTermFactory::<LispBuiltins>::default();
     let allocator = DefaultAllocator::default();
     let expression = parse("(+ (+ (abs -3) 4) 5)", &factory, &allocator).unwrap();
     b.iter(|| {
@@ -37,7 +37,7 @@ fn nested_expressions(b: &mut Bencher) {
 
 #[bench]
 fn nested_expressions_bytecode(b: &mut Bencher) {
-    let factory = SharedTermFactory::<Stdlib>::default();
+    let factory = SharedTermFactory::<LispBuiltins>::default();
     let allocator = DefaultAllocator::default();
     let program = Program::new(vec![
         Instruction::Function {
@@ -93,7 +93,7 @@ fn nested_expressions_bytecode(b: &mut Bencher) {
 
 #[bench]
 fn nested_expressions_compiled(b: &mut Bencher) {
-    let factory = SharedTermFactory::<Stdlib>::default();
+    let factory = SharedTermFactory::<LispBuiltins>::default();
     let allocator = DefaultAllocator::default();
     let expression = parse("(+ (+ (abs -3) 4) 5)", &factory, &allocator).unwrap();
     let program = Compiler::new(CompilerOptions::unoptimized(), None)
@@ -123,7 +123,7 @@ fn nested_expressions_compiled(b: &mut Bencher) {
 #[bench]
 fn function_application_nullary(b: &mut Bencher) {
     let state = StateCache::default();
-    let factory = SharedTermFactory::<Stdlib>::default();
+    let factory = SharedTermFactory::<LispBuiltins>::default();
     let allocator = DefaultAllocator::default();
     let expression = parse("((lambda () 3))", &factory, &allocator).unwrap();
     b.iter(|| {
@@ -135,7 +135,7 @@ fn function_application_nullary(b: &mut Bencher) {
 #[bench]
 fn function_application_unary(b: &mut Bencher) {
     let state = StateCache::default();
-    let factory = SharedTermFactory::<Stdlib>::default();
+    let factory = SharedTermFactory::<LispBuiltins>::default();
     let allocator = DefaultAllocator::default();
     let expression = parse("((lambda (foo) foo) 3)", &factory, &allocator).unwrap();
     b.iter(|| {
@@ -147,7 +147,7 @@ fn function_application_unary(b: &mut Bencher) {
 #[bench]
 fn function_application_binary(b: &mut Bencher) {
     let state = StateCache::default();
-    let factory = SharedTermFactory::<Stdlib>::default();
+    let factory = SharedTermFactory::<LispBuiltins>::default();
     let allocator = DefaultAllocator::default();
     let expression = parse("((lambda (foo bar) foo) 3 4)", &factory, &allocator).unwrap();
     b.iter(|| {
@@ -159,7 +159,7 @@ fn function_application_binary(b: &mut Bencher) {
 #[bench]
 fn function_application_ternary(b: &mut Bencher) {
     let state = StateCache::default();
-    let factory = SharedTermFactory::<Stdlib>::default();
+    let factory = SharedTermFactory::<LispBuiltins>::default();
     let allocator = DefaultAllocator::default();
     let expression = parse("((lambda (foo bar baz) foo) 3 4 5)", &factory, &allocator).unwrap();
     b.iter(|| {
@@ -171,7 +171,7 @@ fn function_application_ternary(b: &mut Bencher) {
 #[bench]
 fn function_application_unused_args(b: &mut Bencher) {
     let state = StateCache::default();
-    let factory = SharedTermFactory::<Stdlib>::default();
+    let factory = SharedTermFactory::<LispBuiltins>::default();
     let allocator = DefaultAllocator::default();
     let expression = parse("((lambda (foo bar baz) 2) 3 4 5)", &factory, &allocator).unwrap();
     b.iter(|| {
@@ -183,7 +183,7 @@ fn function_application_unused_args(b: &mut Bencher) {
 #[bench]
 fn function_application_argument_scope(b: &mut Bencher) {
     let state = StateCache::default();
-    let factory = SharedTermFactory::<Stdlib>::default();
+    let factory = SharedTermFactory::<LispBuiltins>::default();
     let allocator = DefaultAllocator::default();
     let expression = parse(
             "((lambda (first second third) ((lambda (one two) ((lambda (foo bar) (+ foo bar)) one two)) first third)) 3 4 5)",
@@ -200,7 +200,7 @@ fn function_application_argument_scope(b: &mut Bencher) {
 #[bench]
 fn deeply_nested_function_application(b: &mut Bencher) {
     let state = StateCache::default();
-    let factory = SharedTermFactory::<Stdlib>::default();
+    let factory = SharedTermFactory::<LispBuiltins>::default();
     let allocator = DefaultAllocator::default();
     let expression = (1..=100).fold(factory.create_int_term(0), |acc, i| {
         factory.create_application_term(
@@ -223,7 +223,7 @@ fn deeply_nested_function_application(b: &mut Bencher) {
 #[bench]
 fn function_application_closure(b: &mut Bencher) {
     let state = StateCache::default();
-    let factory = SharedTermFactory::<Stdlib>::default();
+    let factory = SharedTermFactory::<LispBuiltins>::default();
     let allocator = DefaultAllocator::default();
     let expression = parse("(((lambda (foo) (lambda () foo)) 3))", &factory, &allocator).unwrap();
     b.iter(|| {
@@ -235,7 +235,7 @@ fn function_application_closure(b: &mut Bencher) {
 #[bench]
 fn conditional_expressions(b: &mut Bencher) {
     let state = StateCache::default();
-    let factory = SharedTermFactory::<Stdlib>::default();
+    let factory = SharedTermFactory::<LispBuiltins>::default();
     let allocator = DefaultAllocator::default();
     let expression = parse("(if #t 3 4)", &factory, &allocator).unwrap();
     b.iter(|| {
@@ -247,7 +247,7 @@ fn conditional_expressions(b: &mut Bencher) {
 #[bench]
 fn list_transforms(b: &mut Bencher) {
     let state = StateCache::default();
-    let factory = SharedTermFactory::<Stdlib>::default();
+    let factory = SharedTermFactory::<LispBuiltins>::default();
     let allocator = DefaultAllocator::default();
     let collection = factory.create_list_term(allocator.create_list((0..1000usize).map(|index| {
         factory.create_application_term(

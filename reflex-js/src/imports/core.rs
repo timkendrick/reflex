@@ -14,8 +14,6 @@ where
         + From<Add>
         + From<And>
         + From<Apply>
-        + From<Car>
-        + From<Cdr>
         + From<Ceil>
         + From<Chain>
         + From<CollectConstructor>
@@ -25,7 +23,6 @@ where
         + From<CollectRecord>
         + From<CollectSignal>
         + From<CollectString>
-        + From<Cons>
         + From<Contains>
         + From<Divide>
         + From<Effect>
@@ -97,14 +94,6 @@ where
                 factory.create_builtin_term(Apply),
             ),
             (
-                factory.create_string_term(allocator.create_static_string("car")),
-                factory.create_builtin_term(Car),
-            ),
-            (
-                factory.create_string_term(allocator.create_static_string("cdr")),
-                factory.create_builtin_term(Cdr),
-            ),
-            (
                 factory.create_string_term(allocator.create_static_string("ceil")),
                 factory.create_builtin_term(Ceil),
             ),
@@ -139,10 +128,6 @@ where
             (
                 factory.create_string_term(allocator.create_static_string("concat")),
                 factory.create_builtin_term(CollectString),
-            ),
-            (
-                factory.create_string_term(allocator.create_static_string("cons")),
-                factory.create_builtin_term(Cons),
             ),
             (
                 factory.create_string_term(allocator.create_static_string("contains")),

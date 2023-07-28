@@ -11,7 +11,7 @@ pub struct Cons;
 impl Cons {
     pub const UUID: Uuid = uuid!("6dafb566-229c-441d-85e4-951a9e2b5a60");
     const ARITY: FunctionArity<2, 0> = FunctionArity {
-        required: [ArgType::Strict, ArgType::Strict],
+        required: [ArgType::Lazy, ArgType::Lazy],
         optional: [],
         variadic: None,
     };

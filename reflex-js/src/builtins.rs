@@ -122,16 +122,6 @@ impl From<stdlib::Apply> for JsBuiltins {
         Self::from(stdlib::Stdlib::from(value))
     }
 }
-impl From<stdlib::Car> for JsBuiltins {
-    fn from(value: stdlib::Car) -> Self {
-        Self::from(stdlib::Stdlib::from(value))
-    }
-}
-impl From<stdlib::Cdr> for JsBuiltins {
-    fn from(value: stdlib::Cdr) -> Self {
-        Self::from(stdlib::Stdlib::from(value))
-    }
-}
 impl From<stdlib::Ceil> for JsBuiltins {
     fn from(value: stdlib::Ceil) -> Self {
         Self::from(stdlib::Stdlib::from(value))
@@ -174,11 +164,6 @@ impl From<stdlib::CollectSignal> for JsBuiltins {
 }
 impl From<stdlib::CollectString> for JsBuiltins {
     fn from(value: stdlib::CollectString) -> Self {
-        Self::from(stdlib::Stdlib::from(value))
-    }
-}
-impl From<stdlib::Cons> for JsBuiltins {
-    fn from(value: stdlib::Cons) -> Self {
         Self::from(stdlib::Stdlib::from(value))
     }
 }

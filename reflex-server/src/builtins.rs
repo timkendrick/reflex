@@ -18,6 +18,7 @@ pub enum ServerBuiltins {
     Stdlib(reflex_stdlib::stdlib::Stdlib),
     Json(reflex_json::stdlib::Stdlib),
     Js(reflex_js::stdlib::Stdlib),
+    Lisp(reflex_lisp::stdlib::Stdlib),
     GraphQl(reflex_graphql::stdlib::Stdlib),
     Handlers(reflex_handlers::stdlib::Stdlib),
 }
@@ -36,6 +37,11 @@ impl From<reflex_js::stdlib::Stdlib> for ServerBuiltins {
         Self::Js(target)
     }
 }
+impl From<reflex_lisp::stdlib::Stdlib> for ServerBuiltins {
+    fn from(target: reflex_lisp::stdlib::Stdlib) -> Self {
+        Self::Lisp(target)
+    }
+}
 impl From<reflex_graphql::stdlib::Stdlib> for ServerBuiltins {
     fn from(target: reflex_graphql::stdlib::Stdlib) -> Self {
         Self::GraphQl(target)
@@ -52,6 +58,7 @@ impl ServerBuiltins {
             .chain(reflex_stdlib::stdlib::Stdlib::entries().map(Self::Stdlib))
             .chain(reflex_json::stdlib::Stdlib::entries().map(Self::Json))
             .chain(reflex_js::stdlib::Stdlib::entries().map(Self::Js))
+            .chain(reflex_lisp::stdlib::Stdlib::entries().map(Self::Lisp))
             .chain(reflex_graphql::stdlib::Stdlib::entries().map(Self::GraphQl))
             .chain(reflex_handlers::stdlib::Stdlib::entries().map(Self::Handlers))
     }
@@ -62,6 +69,7 @@ impl Uid for ServerBuiltins {
             Self::Stdlib(term) => term.uid(),
             Self::Json(term) => term.uid(),
             Self::Js(term) => term.uid(),
+            Self::Lisp(term) => term.uid(),
             Self::GraphQl(term) => term.uid(),
             Self::Handlers(term) => term.uid(),
         }
@@ -76,6 +84,7 @@ impl TryFrom<Uuid> for ServerBuiltins {
             })
             .or_else(|_| TryInto::<reflex_json::stdlib::Stdlib>::try_into(value).map(Self::Json))
             .or_else(|_| TryInto::<reflex_js::stdlib::Stdlib>::try_into(value).map(Self::Js))
+            .or_else(|_| TryInto::<reflex_lisp::stdlib::Stdlib>::try_into(value).map(Self::Lisp))
             .or_else(|_| {
                 TryInto::<reflex_graphql::stdlib::Stdlib>::try_into(value).map(Self::GraphQl)
             })
@@ -90,6 +99,7 @@ impl Builtin for ServerBuiltins {
             Self::Stdlib(term) => term.arity(),
             Self::Json(term) => term.arity(),
             Self::Js(term) => term.arity(),
+            Self::Lisp(term) => term.arity(),
             Self::GraphQl(term) => term.arity(),
             Self::Handlers(term) => term.arity(),
         }
@@ -105,6 +115,7 @@ impl Builtin for ServerBuiltins {
             Self::Stdlib(term) => term.apply(args, factory, allocator, cache),
             Self::Json(term) => term.apply(args, factory, allocator, cache),
             Self::Js(term) => term.apply(args, factory, allocator, cache),
+            Self::Lisp(term) => term.apply(args, factory, allocator, cache),
             Self::GraphQl(term) => term.apply(args, factory, allocator, cache),
             Self::Handlers(term) => term.apply(args, factory, allocator, cache),
         }
@@ -117,6 +128,7 @@ impl Builtin for ServerBuiltins {
             Self::Stdlib(term) => term.should_parallelize(args),
             Self::Json(term) => term.should_parallelize(args),
             Self::Js(term) => term.should_parallelize(args),
+            Self::Lisp(term) => term.should_parallelize(args),
             Self::GraphQl(term) => term.should_parallelize(args),
             Self::Handlers(term) => term.should_parallelize(args),
         }
@@ -128,6 +140,7 @@ impl std::fmt::Display for ServerBuiltins {
             Self::Stdlib(target) => std::fmt::Display::fmt(target, f),
             Self::Json(target) => std::fmt::Display::fmt(target, f),
             Self::Js(target) => std::fmt::Display::fmt(target, f),
+            Self::Lisp(target) => std::fmt::Display::fmt(target, f),
             Self::GraphQl(target) => std::fmt::Display::fmt(target, f),
             Self::Handlers(target) => std::fmt::Display::fmt(target, f),
         }
@@ -151,16 +164,6 @@ impl From<reflex_stdlib::stdlib::And> for ServerBuiltins {
 }
 impl From<reflex_stdlib::stdlib::Apply> for ServerBuiltins {
     fn from(value: reflex_stdlib::stdlib::Apply) -> Self {
-        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
-    }
-}
-impl From<reflex_stdlib::stdlib::Car> for ServerBuiltins {
-    fn from(value: reflex_stdlib::stdlib::Car) -> Self {
-        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
-    }
-}
-impl From<reflex_stdlib::stdlib::Cdr> for ServerBuiltins {
-    fn from(value: reflex_stdlib::stdlib::Cdr) -> Self {
         Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
     }
 }
@@ -206,11 +209,6 @@ impl From<reflex_stdlib::stdlib::CollectSignal> for ServerBuiltins {
 }
 impl From<reflex_stdlib::stdlib::CollectString> for ServerBuiltins {
     fn from(value: reflex_stdlib::stdlib::CollectString) -> Self {
-        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
-    }
-}
-impl From<reflex_stdlib::stdlib::Cons> for ServerBuiltins {
-    fn from(value: reflex_stdlib::stdlib::Cons) -> Self {
         Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
     }
 }
@@ -544,6 +542,22 @@ impl From<reflex_js::stdlib::Throw> for ServerBuiltins {
 impl From<reflex_js::stdlib::ToString> for ServerBuiltins {
     fn from(value: reflex_js::stdlib::ToString) -> Self {
         Self::from(reflex_js::stdlib::Stdlib::from(value))
+    }
+}
+
+impl From<reflex_lisp::stdlib::Car> for ServerBuiltins {
+    fn from(value: reflex_lisp::stdlib::Car) -> Self {
+        Self::from(reflex_lisp::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_lisp::stdlib::Cdr> for ServerBuiltins {
+    fn from(value: reflex_lisp::stdlib::Cdr) -> Self {
+        Self::from(reflex_lisp::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_lisp::stdlib::Cons> for ServerBuiltins {
+    fn from(value: reflex_lisp::stdlib::Cons) -> Self {
+        Self::from(reflex_lisp::stdlib::Stdlib::from(value))
     }
 }
 

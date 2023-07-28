@@ -2027,6 +2027,9 @@ dependencies = [
  "reflex",
  "reflex-lang",
  "reflex-stdlib",
+ "serde",
+ "strum",
+ "strum_macros",
 ]
 
 [[package]]
@@ -2194,6 +2197,7 @@ dependencies = [
  "reflex-interpreter",
  "reflex-js",
  "reflex-lang",
+ "reflex-lisp",
  "reflex-parser",
  "reflex-scheduler",
  "reflex-server",
