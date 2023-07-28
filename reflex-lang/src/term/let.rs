@@ -14,6 +14,8 @@ use reflex::core::{
     ScopeOffset, SerializeJson, StackOffset, Substitutions,
 };
 
+use crate::term::variable::should_inline_value;
+
 #[derive(Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct LetTerm<T: Expression> {
     initializer: T,
@@ -176,23 +178,25 @@ impl<T: Expression + Rewritable<T> + Reducible<T>> Rewritable<T> for LetTerm<T> 
         let initializer = normalized_initializer.as_ref().unwrap_or(&self.initializer);
         let body = normalized_body.as_ref().unwrap_or(&self.body);
         let can_inline_initializer =
-            !initializer.is_complex() || body.count_variable_usages(0) <= 1;
+            should_inline_value(initializer, factory) || body.count_variable_usages(0) <= 1;
         if can_inline_initializer {
-            body.substitute_static(
-                &Substitutions::named(
-                    &vec![(0, initializer.clone())],
-                    Some(ScopeOffset::Unwrap(1)),
-                ),
-                factory,
-                allocator,
-                cache,
-            )
-            .map(|result| {
-                result
-                    .normalize(factory, allocator, cache)
-                    .unwrap_or(result)
+            let substituted_body = body
+                .substitute_static(
+                    &Substitutions::named(
+                        &vec![(0, initializer.clone())],
+                        Some(ScopeOffset::Unwrap(1)),
+                    ),
+                    factory,
+                    allocator,
+                    cache,
+                )
+                .map(|body| body.normalize(factory, allocator, cache).unwrap_or(body));
+            Some(match substituted_body {
+                Some(body) => body,
+                // An unchanged body after substitution implies the body contains no references to the variable or any
+                // of the parent variable scopes, and can therefore be safely extracted and returned directly
+                None => normalized_body.unwrap_or_else(|| self.body.clone()),
             })
-            .or_else(|| normalized_body.or_else(|| Some(self.body.clone())))
         } else if normalized_initializer.is_some() || normalized_body.is_some() {
             Some(factory.create_let_term(
                 normalized_initializer.unwrap_or_else(|| self.initializer.clone()),
