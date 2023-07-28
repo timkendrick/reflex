@@ -278,12 +278,8 @@ where
                                                                                     ]),
                                                                                 ),
                                                                                 allocator.create_list([
-                                                                                    factory.create_boolean_term(true),
-                                                                                    factory.create_signal_term(
-                                                                                        allocator.create_signal_list( [
-                                                                                            allocator.create_signal(SignalType::Pending),
-                                                                                        ] ),
-                                                                                    ),
+                                                                                    factory.create_boolean_term(false),
+                                                                                    factory.create_nil_term(),
                                                                                     factory.create_int_term(0),
                                                                                 ]),
                                                                             ),
