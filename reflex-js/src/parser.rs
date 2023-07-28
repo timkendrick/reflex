@@ -5284,12 +5284,10 @@ mod tests {
             "
             import { graph } from 'reflex::utils';
             export default graph((foo) => ({
-                get foo() {
-                    return foo;
-                },
+                foo: () => foo,
                 bar: 3,
                 baz: 4,
-            })).foo.foo.foo.bar;
+            })).foo().foo().foo().bar;
         ",
             &env,
             &path,
