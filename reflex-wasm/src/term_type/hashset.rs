@@ -5,8 +5,7 @@
 use std::{collections::HashSet, iter::once};
 
 use reflex::core::{
-    DependencyList, Eagerness, GraphNode, HashmapTermType, HashsetTermType, Internable,
-    SerializeJson, StackOffset,
+    DependencyList, GraphNode, HashmapTermType, HashsetTermType, SerializeJson, StackOffset,
 };
 use reflex_macros::PointerIter;
 use reflex_utils::MapIntoIterator;
@@ -16,7 +15,7 @@ use crate::{
     allocator::Arena,
     compiler::{
         instruction, runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder,
-        CompilerOptions, CompilerResult, CompilerStack, CompilerState,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState, Eagerness, Internable,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{

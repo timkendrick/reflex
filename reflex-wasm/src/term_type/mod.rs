@@ -5,10 +5,7 @@
 use std::{cell::RefCell, collections::HashSet, marker::PhantomData, rc::Rc};
 
 use reflex::{
-    core::{
-        Arity, DependencyList, Eagerness, Expression, GraphNode, Internable, NodeId, SerializeJson,
-        StackOffset,
-    },
+    core::{Arity, DependencyList, Expression, GraphNode, NodeId, SerializeJson, StackOffset},
     hash::HashId,
 };
 use serde_json::Value as JsonValue;
@@ -16,6 +13,7 @@ use strum_macros::EnumDiscriminants;
 
 use crate::{
     allocator::{Arena, ArenaAllocator},
+    compiler::{Eagerness, Internable},
     factory::WasmTermFactory,
     hash::{TermHash, TermHasher, TermSize},
     stdlib::Stdlib,

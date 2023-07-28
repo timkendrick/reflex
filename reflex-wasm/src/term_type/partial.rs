@@ -5,8 +5,8 @@
 use std::collections::HashSet;
 
 use reflex::core::{
-    ArgType, Arity, DependencyList, Eagerness, Expression, GraphNode, Internable,
-    PartialApplicationTermType, SerializeJson, StackOffset,
+    ArgType, Arity, DependencyList, Expression, GraphNode, PartialApplicationTermType,
+    SerializeJson, StackOffset,
 };
 use reflex_macros::PointerIter;
 use reflex_utils::WithExactSizeIterator;
@@ -17,7 +17,7 @@ use crate::{
     compiler::{
         get_compiled_function_arity, instruction, runtime::builtin::RuntimeBuiltin, CompileWasm,
         CompiledBlockBuilder, CompilerOptions, CompilerResult, CompilerStack, CompilerState,
-        LazyExpression, MaybeLazyExpression, Strictness,
+        Eagerness, Internable, LazyExpression, MaybeLazyExpression, Strictness,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{list::compile_list, ListTerm, TypedTerm, WasmExpression},

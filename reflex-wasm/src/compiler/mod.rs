@@ -7,7 +7,7 @@ use std::{
 };
 
 use reflex::{
-    core::{Arity, Eagerness, GraphNode, Internable, NodeId, StackOffset},
+    core::{Arity, GraphNode, NodeId, StackOffset},
     hash::IntMap,
 };
 use reflex_utils::Stack;
@@ -41,13 +41,43 @@ pub trait TypedCompilerBlock {
     fn get_type(&self, stack: &CompilerStack) -> Result<CompilerStack, TypedStackError>;
 }
 
+pub trait Internable {
+    fn should_intern(&self, eager: Eagerness) -> bool;
+}
+
 #[derive(PartialEq, Eq, Clone, Copy, Hash, Debug)]
-pub(crate) enum Strictness {
+pub enum Eagerness {
+    Eager,
+    Lazy,
+}
+impl Eagerness {
+    pub fn is_eager(&self) -> bool {
+        match self {
+            Eagerness::Eager => true,
+            _ => false,
+        }
+    }
+    pub fn is_lazy(&self) -> bool {
+        match self {
+            Eagerness::Lazy => true,
+            _ => false,
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Clone, Copy, Hash, Debug)]
+pub enum Strictness {
     Strict,
     NonStrict,
 }
 impl Strictness {
     pub fn is_strict(&self) -> bool {
+        match self {
+            Self::Strict => true,
+            _ => false,
+        }
+    }
+    pub fn is_non_strict(&self) -> bool {
         match self {
             Self::Strict => true,
             _ => false,

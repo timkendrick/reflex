@@ -5,8 +5,8 @@
 use std::collections::HashSet;
 
 use reflex::core::{
-    DependencyList, Eagerness, Expression, GraphNode, HashmapTermType, Internable, NodeId,
-    RecordTermType, SerializeJson, StackOffset,
+    DependencyList, Expression, GraphNode, HashmapTermType, NodeId, RecordTermType, SerializeJson,
+    StackOffset,
 };
 use reflex_utils::json::is_empty_json_object;
 use serde_json::{Map as JsonMap, Value as JsonValue};
@@ -15,7 +15,8 @@ use crate::{
     allocator::Arena,
     compiler::{
         instruction, runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder,
-        CompilerOptions, CompilerResult, CompilerStack, CompilerState, LazyExpression, Strictness,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState, Eagerness, Internable,
+        LazyExpression, Strictness,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{hashmap::HashmapTerm, list::compile_list, ListTerm, TypedTerm, WasmExpression},

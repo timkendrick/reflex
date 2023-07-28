@@ -4,9 +4,7 @@
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use std::{collections::HashSet, iter::once};
 
-use reflex::core::{
-    DependencyList, Eagerness, GraphNode, Internable, SerializeJson, StackOffset, VariableTermType,
-};
+use reflex::core::{DependencyList, GraphNode, SerializeJson, StackOffset, VariableTermType};
 use reflex_macros::PointerIter;
 use serde_json::Value as JsonValue;
 
@@ -14,7 +12,7 @@ use crate::{
     allocator::Arena,
     compiler::{
         error::CompilerError, instruction, CompileWasm, CompiledBlockBuilder, CompilerOptions,
-        CompilerResult, CompilerStack, CompilerState, ValueType,
+        CompilerResult, CompilerStack, CompilerState, Eagerness, Internable, ValueType,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::TypedTerm,

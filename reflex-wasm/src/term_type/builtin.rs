@@ -6,8 +6,8 @@ use std::collections::HashSet;
 
 use reflex::{
     core::{
-        Arity, BuiltinTermType, CompiledFunctionTermType, DependencyList, Eagerness, Expression,
-        GraphNode, Internable, SerializeJson, StackOffset,
+        Arity, BuiltinTermType, CompiledFunctionTermType, DependencyList, Expression, GraphNode,
+        SerializeJson, StackOffset,
     },
     hash::HashId,
 };
@@ -19,7 +19,7 @@ use crate::{
     compiler::{
         error::CompilerError, instruction, runtime::builtin::RuntimeBuiltin, CompileWasm,
         CompiledBlockBuilder, CompilerOptions, CompilerResult, CompilerStack, CompilerState,
-        ConstValue, FunctionPointer,
+        ConstValue, Eagerness, FunctionPointer, Internable,
     },
     hash::{TermHash, TermHasher, TermSize},
     stdlib::Stdlib,

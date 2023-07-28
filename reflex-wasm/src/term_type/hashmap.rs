@@ -6,8 +6,8 @@ use std::{collections::HashSet, iter::once, marker::PhantomData};
 
 use reflex::{
     core::{
-        DependencyList, Eagerness, Expression, GraphNode, HashmapTermType, HashsetTermType,
-        Internable, NodeId, RefType, SerializeJson, StackOffset,
+        DependencyList, Expression, GraphNode, HashmapTermType, HashsetTermType, NodeId, RefType,
+        SerializeJson, StackOffset,
     },
     hash::HashId,
 };
@@ -19,7 +19,7 @@ use crate::{
     compiler::{
         error::CompilerError, instruction, runtime::builtin::RuntimeBuiltin, CompileWasm,
         CompiledBlockBuilder, CompilerOptions, CompilerResult, CompilerStack, CompilerState,
-        ConstValue, ValueType,
+        ConstValue, Eagerness, Internable, ValueType,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{TermType, TypedTerm, WasmExpression},

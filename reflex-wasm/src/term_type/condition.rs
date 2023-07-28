@@ -5,8 +5,7 @@
 use std::{collections::HashSet, marker::PhantomData};
 
 use reflex::core::{
-    ConditionType, DependencyList, Eagerness, GraphNode, Internable, SerializeJson, SignalType,
-    StackOffset, StateToken,
+    ConditionType, DependencyList, GraphNode, SerializeJson, SignalType, StackOffset, StateToken,
 };
 use serde_json::Value as JsonValue;
 use strum_macros::EnumDiscriminants;
@@ -15,7 +14,8 @@ use crate::{
     allocator::Arena,
     compiler::{
         instruction, runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder,
-        CompilerOptions, CompilerResult, CompilerStack, CompilerState, ConstValue,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState, ConstValue, Eagerness,
+        Internable,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{ListTerm, TermTypeDiscriminants, TypedTerm, WasmExpression},

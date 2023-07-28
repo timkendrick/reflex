@@ -6,8 +6,8 @@ use std::{collections::HashSet, iter::once};
 
 use reflex::{
     core::{
-        DependencyList, Eagerness, Expression, ExpressionListType, GraphNode, Internable,
-        ListTermType, SerializeJson, StackOffset, StructPrototypeType,
+        DependencyList, Expression, ExpressionListType, GraphNode, ListTermType, SerializeJson,
+        StackOffset, StructPrototypeType,
     },
     hash::HashId,
 };
@@ -19,7 +19,8 @@ use crate::{
     compiler::{
         error::CompilerError, instruction, runtime::builtin::RuntimeBuiltin, CompileWasm,
         CompiledBlockBuilder, CompilerOptions, CompilerResult, CompilerStack, CompilerState,
-        ConstValue, LazyExpression, ParamsSignature, Strictness, TypeSignature, ValueType,
+        ConstValue, Eagerness, Internable, LazyExpression, ParamsSignature, Strictness,
+        TypeSignature, ValueType,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{TermType, TypedTerm, WasmExpression},

@@ -5,10 +5,7 @@
 use std::collections::HashSet;
 
 use reflex::{
-    core::{
-        ConditionListType, DependencyList, Eagerness, Expression, GraphNode, Internable,
-        SerializeJson, StackOffset,
-    },
+    core::{ConditionListType, DependencyList, Expression, GraphNode, SerializeJson, StackOffset},
     hash::HashId,
 };
 use reflex_utils::{MapIntoIterator, WithExactSizeIterator};
@@ -18,7 +15,7 @@ use crate::{
     allocator::Arena,
     compiler::{
         instruction, runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder,
-        CompilerOptions, CompilerResult, CompilerStack, CompilerState,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState, Eagerness, Internable,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{ConditionTerm, TermTypeDiscriminants, TypedTerm, WasmExpression},

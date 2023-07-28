@@ -6,8 +6,8 @@ use std::{collections::HashSet, ops::Deref, slice, str::from_utf8_unchecked};
 
 use reflex::{
     core::{
-        DependencyList, Eagerness, Expression, GraphNode, Internable, SerializeJson, StackOffset,
-        StringTermType, StringValue,
+        DependencyList, Expression, GraphNode, SerializeJson, StackOffset, StringTermType,
+        StringValue,
     },
     hash::HashId,
 };
@@ -18,7 +18,8 @@ use crate::{
     allocator::{Arena, ArenaAllocator},
     compiler::{
         instruction, runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder,
-        CompilerOptions, CompilerResult, CompilerStack, CompilerState, ConstValue, ValueType,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState, ConstValue, Eagerness,
+        Internable, ValueType,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{TermType, TypedTerm, WasmExpression},

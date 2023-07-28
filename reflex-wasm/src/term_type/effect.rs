@@ -5,8 +5,7 @@
 use std::collections::HashSet;
 
 use reflex::core::{
-    DependencyList, Eagerness, EffectTermType, Expression, GraphNode, Internable, SerializeJson,
-    StackOffset,
+    DependencyList, EffectTermType, Expression, GraphNode, SerializeJson, StackOffset,
 };
 use reflex_macros::PointerIter;
 use serde_json::Value as JsonValue;
@@ -16,7 +15,7 @@ use crate::{
     compiler::{
         error::CompilerError, instruction, runtime::builtin::RuntimeBuiltin, CompileWasm,
         CompiledBlockBuilder, CompilerOptions, CompilerResult, CompilerStack, CompilerState,
-        ParamsSignature, TypeSignature, ValueType,
+        Eagerness, Internable, ParamsSignature, TypeSignature, ValueType,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{ConditionTerm, TypedTerm, WasmExpression},
