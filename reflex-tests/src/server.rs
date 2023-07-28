@@ -29,6 +29,7 @@ use reflex_handlers::{
 };
 use reflex_js::{globals::JsGlobalsBuiltin, imports::JsImportsBuiltin, JsParserBuiltin};
 use reflex_lang::{allocator::DefaultAllocator, CachedSharedTerm, SharedTermFactory};
+use reflex_lisp::LispParserBuiltin;
 use reflex_parser::{create_parser, syntax::js::default_js_loaders, Syntax, SyntaxParser};
 use reflex_scheduler::threadpool::TokioRuntimeThreadPoolFactory;
 use reflex_server::{
@@ -207,6 +208,7 @@ where
     T::Builtin: JsParserBuiltin
         + JsGlobalsBuiltin
         + JsImportsBuiltin
+        + LispParserBuiltin
         + HandlerImportsBuiltin
         + GraphQlImportsBuiltin
         + Into<reflex_wasm::stdlib::Stdlib>,

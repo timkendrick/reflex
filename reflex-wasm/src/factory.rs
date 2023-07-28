@@ -1365,12 +1365,6 @@ impl From<reflex_stdlib::stdlib::Stdlib> for reflex_wasm::stdlib::Stdlib {
             reflex_stdlib::stdlib::Stdlib::Apply => {
                 reflex_wasm::stdlib::Stdlib::Apply(reflex_wasm::stdlib::Apply)
             }
-            reflex_stdlib::stdlib::Stdlib::Car => {
-                reflex_wasm::stdlib::Stdlib::Car(reflex_wasm::stdlib::Car)
-            }
-            reflex_stdlib::stdlib::Stdlib::Cdr => {
-                reflex_wasm::stdlib::Stdlib::Cdr(reflex_wasm::stdlib::Cdr)
-            }
             reflex_stdlib::stdlib::Stdlib::Ceil => {
                 reflex_wasm::stdlib::Stdlib::Ceil(reflex_wasm::stdlib::Ceil)
             }
@@ -1399,9 +1393,6 @@ impl From<reflex_stdlib::stdlib::Stdlib> for reflex_wasm::stdlib::Stdlib {
             }
             reflex_stdlib::stdlib::Stdlib::CollectString => {
                 reflex_wasm::stdlib::Stdlib::CollectString(reflex_wasm::stdlib::CollectString)
-            }
-            reflex_stdlib::stdlib::Stdlib::Cons => {
-                reflex_wasm::stdlib::Stdlib::Cons(reflex_wasm::stdlib::Cons)
             }
             reflex_stdlib::stdlib::Stdlib::Contains => {
                 reflex_wasm::stdlib::Stdlib::Has(reflex_wasm::stdlib::Has)
@@ -1621,6 +1612,22 @@ impl From<reflex_js::stdlib::Stdlib> for reflex_wasm::stdlib::Stdlib {
     }
 }
 
+impl From<reflex_lisp::stdlib::Stdlib> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_lisp::stdlib::Stdlib) -> Self {
+        match value {
+            reflex_lisp::stdlib::Stdlib::Car => {
+                reflex_wasm::stdlib::Stdlib::Car(reflex_wasm::stdlib::Car)
+            }
+            reflex_lisp::stdlib::Stdlib::Cdr => {
+                reflex_wasm::stdlib::Stdlib::Cdr(reflex_wasm::stdlib::Cdr)
+            }
+            reflex_lisp::stdlib::Stdlib::Cons => {
+                reflex_wasm::stdlib::Stdlib::Cons(reflex_wasm::stdlib::Cons)
+            }
+        }
+    }
+}
+
 impl From<reflex_graphql::stdlib::Stdlib> for reflex_wasm::stdlib::Stdlib {
     fn from(value: reflex_graphql::stdlib::Stdlib) -> Self {
         match value {
@@ -1696,16 +1703,6 @@ impl From<reflex_stdlib::stdlib::Apply> for reflex_wasm::stdlib::Stdlib {
         Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
     }
 }
-impl From<reflex_stdlib::stdlib::Car> for reflex_wasm::stdlib::Stdlib {
-    fn from(value: reflex_stdlib::stdlib::Car) -> Self {
-        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
-    }
-}
-impl From<reflex_stdlib::stdlib::Cdr> for reflex_wasm::stdlib::Stdlib {
-    fn from(value: reflex_stdlib::stdlib::Cdr) -> Self {
-        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
-    }
-}
 impl From<reflex_stdlib::stdlib::Ceil> for reflex_wasm::stdlib::Stdlib {
     fn from(value: reflex_stdlib::stdlib::Ceil) -> Self {
         Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
@@ -1738,11 +1735,6 @@ impl From<reflex_stdlib::stdlib::CollectSignal> for reflex_wasm::stdlib::Stdlib 
 }
 impl From<reflex_stdlib::stdlib::CollectString> for reflex_wasm::stdlib::Stdlib {
     fn from(value: reflex_stdlib::stdlib::CollectString) -> Self {
-        Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
-    }
-}
-impl From<reflex_stdlib::stdlib::Cons> for reflex_wasm::stdlib::Stdlib {
-    fn from(value: reflex_stdlib::stdlib::Cons) -> Self {
         Self::from(reflex_stdlib::stdlib::Stdlib::from(value))
     }
 }
@@ -2076,6 +2068,22 @@ impl From<reflex_js::stdlib::Throw> for reflex_wasm::stdlib::Stdlib {
 impl From<reflex_js::stdlib::ToString> for reflex_wasm::stdlib::Stdlib {
     fn from(value: reflex_js::stdlib::ToString) -> Self {
         Self::from(reflex_js::stdlib::Stdlib::from(value))
+    }
+}
+
+impl From<reflex_lisp::stdlib::Car> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_lisp::stdlib::Car) -> Self {
+        Self::from(reflex_lisp::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_lisp::stdlib::Cdr> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_lisp::stdlib::Cdr) -> Self {
+        Self::from(reflex_lisp::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_lisp::stdlib::Cons> for reflex_wasm::stdlib::Stdlib {
+    fn from(value: reflex_lisp::stdlib::Cons) -> Self {
+        Self::from(reflex_lisp::stdlib::Stdlib::from(value))
     }
 }
 

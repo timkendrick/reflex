@@ -14,6 +14,7 @@ pub enum WasmCompilerBuiltins {
     Stdlib(stdlib::Stdlib),
     Json(reflex_json::stdlib::Stdlib),
     Js(reflex_js::stdlib::Stdlib),
+    Lisp(reflex_lisp::stdlib::Stdlib),
     Handlers(reflex_handlers::stdlib::Stdlib),
     GraphQl(reflex_graphql::stdlib::Stdlib),
 }
@@ -32,6 +33,11 @@ impl From<reflex_js::stdlib::Stdlib> for WasmCompilerBuiltins {
         WasmCompilerBuiltins::Js(target)
     }
 }
+impl From<reflex_lisp::stdlib::Stdlib> for WasmCompilerBuiltins {
+    fn from(target: reflex_lisp::stdlib::Stdlib) -> Self {
+        WasmCompilerBuiltins::Lisp(target)
+    }
+}
 impl From<reflex_handlers::stdlib::Stdlib> for WasmCompilerBuiltins {
     fn from(target: reflex_handlers::stdlib::Stdlib) -> Self {
         WasmCompilerBuiltins::Handlers(target)
@@ -48,6 +54,7 @@ impl Uid for WasmCompilerBuiltins {
             WasmCompilerBuiltins::Stdlib(term) => term.uid(),
             WasmCompilerBuiltins::Json(term) => term.uid(),
             WasmCompilerBuiltins::Js(term) => term.uid(),
+            WasmCompilerBuiltins::Lisp(term) => term.uid(),
             WasmCompilerBuiltins::Handlers(term) => term.uid(),
             WasmCompilerBuiltins::GraphQl(term) => term.uid(),
         }
@@ -60,6 +67,7 @@ impl TryFrom<Uuid> for WasmCompilerBuiltins {
             .map(Self::Stdlib)
             .or_else(|_| TryInto::<reflex_json::stdlib::Stdlib>::try_into(value).map(Self::Json))
             .or_else(|_| TryInto::<reflex_js::stdlib::Stdlib>::try_into(value).map(Self::Js))
+            .or_else(|_| TryInto::<reflex_lisp::stdlib::Stdlib>::try_into(value).map(Self::Lisp))
             .or_else(|_| {
                 TryInto::<reflex_handlers::stdlib::Stdlib>::try_into(value).map(Self::Handlers)
             })
@@ -74,6 +82,7 @@ impl Builtin for WasmCompilerBuiltins {
             WasmCompilerBuiltins::Stdlib(term) => term.arity(),
             WasmCompilerBuiltins::Json(term) => term.arity(),
             WasmCompilerBuiltins::Js(term) => term.arity(),
+            WasmCompilerBuiltins::Lisp(term) => term.arity(),
             WasmCompilerBuiltins::Handlers(term) => term.arity(),
             WasmCompilerBuiltins::GraphQl(term) => term.arity(),
         }
@@ -89,6 +98,7 @@ impl Builtin for WasmCompilerBuiltins {
             WasmCompilerBuiltins::Stdlib(term) => term.apply(args, factory, allocator, cache),
             WasmCompilerBuiltins::Json(term) => term.apply(args, factory, allocator, cache),
             WasmCompilerBuiltins::Js(term) => term.apply(args, factory, allocator, cache),
+            WasmCompilerBuiltins::Lisp(term) => term.apply(args, factory, allocator, cache),
             WasmCompilerBuiltins::Handlers(term) => term.apply(args, factory, allocator, cache),
             WasmCompilerBuiltins::GraphQl(term) => term.apply(args, factory, allocator, cache),
         }
@@ -101,6 +111,7 @@ impl Builtin for WasmCompilerBuiltins {
             WasmCompilerBuiltins::Stdlib(term) => term.should_parallelize(args),
             WasmCompilerBuiltins::Json(term) => term.should_parallelize(args),
             WasmCompilerBuiltins::Js(term) => term.should_parallelize(args),
+            WasmCompilerBuiltins::Lisp(term) => term.should_parallelize(args),
             WasmCompilerBuiltins::Handlers(term) => term.should_parallelize(args),
             WasmCompilerBuiltins::GraphQl(term) => term.should_parallelize(args),
         }
@@ -112,6 +123,7 @@ impl std::fmt::Display for WasmCompilerBuiltins {
             Self::Stdlib(target) => std::fmt::Display::fmt(target, f),
             Self::Json(target) => std::fmt::Display::fmt(target, f),
             Self::Js(target) => std::fmt::Display::fmt(target, f),
+            Self::Lisp(target) => std::fmt::Display::fmt(target, f),
             Self::Handlers(target) => std::fmt::Display::fmt(target, f),
             Self::GraphQl(target) => std::fmt::Display::fmt(target, f),
         }
@@ -124,6 +136,7 @@ impl From<WasmCompilerBuiltins> for crate::stdlib::Stdlib {
             WasmCompilerBuiltins::Stdlib(inner) => inner.into(),
             WasmCompilerBuiltins::Json(inner) => inner.into(),
             WasmCompilerBuiltins::Js(inner) => inner.into(),
+            WasmCompilerBuiltins::Lisp(inner) => inner.into(),
             WasmCompilerBuiltins::Handlers(inner) => inner.into(),
             WasmCompilerBuiltins::GraphQl(inner) => inner.into(),
         }
@@ -147,16 +160,6 @@ impl From<stdlib::And> for WasmCompilerBuiltins {
 }
 impl From<stdlib::Apply> for WasmCompilerBuiltins {
     fn from(value: stdlib::Apply) -> Self {
-        Self::from(stdlib::Stdlib::from(value))
-    }
-}
-impl From<stdlib::Car> for WasmCompilerBuiltins {
-    fn from(value: stdlib::Car) -> Self {
-        Self::from(stdlib::Stdlib::from(value))
-    }
-}
-impl From<stdlib::Cdr> for WasmCompilerBuiltins {
-    fn from(value: stdlib::Cdr) -> Self {
         Self::from(stdlib::Stdlib::from(value))
     }
 }
@@ -202,11 +205,6 @@ impl From<stdlib::CollectSignal> for WasmCompilerBuiltins {
 }
 impl From<stdlib::CollectString> for WasmCompilerBuiltins {
     fn from(value: stdlib::CollectString) -> Self {
-        Self::from(stdlib::Stdlib::from(value))
-    }
-}
-impl From<stdlib::Cons> for WasmCompilerBuiltins {
-    fn from(value: stdlib::Cons) -> Self {
         Self::from(stdlib::Stdlib::from(value))
     }
 }
@@ -540,6 +538,22 @@ impl From<reflex_js::stdlib::Throw> for WasmCompilerBuiltins {
 impl From<reflex_js::stdlib::ToString> for WasmCompilerBuiltins {
     fn from(value: reflex_js::stdlib::ToString) -> Self {
         Self::from(reflex_js::stdlib::Stdlib::from(value))
+    }
+}
+
+impl From<reflex_lisp::stdlib::Car> for WasmCompilerBuiltins {
+    fn from(value: reflex_lisp::stdlib::Car) -> Self {
+        Self::from(reflex_lisp::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_lisp::stdlib::Cdr> for WasmCompilerBuiltins {
+    fn from(value: reflex_lisp::stdlib::Cdr) -> Self {
+        Self::from(reflex_lisp::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_lisp::stdlib::Cons> for WasmCompilerBuiltins {
+    fn from(value: reflex_lisp::stdlib::Cons) -> Self {
+        Self::from(reflex_lisp::stdlib::Stdlib::from(value))
     }
 }
 

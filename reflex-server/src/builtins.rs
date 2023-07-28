@@ -29,6 +29,7 @@ impl From<ServerBuiltins> for reflex_wasm::stdlib::Stdlib {
             ServerBuiltins::Stdlib(inner) => inner.into(),
             ServerBuiltins::Json(inner) => inner.into(),
             ServerBuiltins::Js(inner) => inner.into(),
+            ServerBuiltins::Lisp(inner) => inner.into(),
             ServerBuiltins::GraphQl(inner) => inner.into(),
             ServerBuiltins::Handlers(inner) => inner.into(),
         }

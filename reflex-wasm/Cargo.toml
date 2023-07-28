@@ -13,6 +13,7 @@ reflex-handlers = { path = "../reflex-handlers" }
 reflex-js = { path = "../reflex-js" }
 reflex-json = { path = "../reflex-json" }
 reflex-lang = { path = "../reflex-lang" }
+reflex-lisp = { path = "../reflex-lisp" }
 reflex-macros = { path = "../reflex-macros" }
 reflex-parser = { path = "../reflex-parser" }
 reflex-stdlib = { path = "../reflex-stdlib" }

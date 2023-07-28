@@ -137,6 +137,7 @@ impl From<CliBuiltins> for reflex_wasm::stdlib::Stdlib {
             CliBuiltins::Stdlib(inner) => inner.into(),
             CliBuiltins::Json(inner) => inner.into(),
             CliBuiltins::Js(inner) => inner.into(),
+            CliBuiltins::Lisp(inner) => inner.into(),
             CliBuiltins::Handlers(inner) => inner.into(),
             CliBuiltins::GraphQl(inner) => inner.into(),
         }

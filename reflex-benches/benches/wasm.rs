@@ -12,7 +12,7 @@ use reflex_interpreter::compiler::{
 use reflex_interpreter::{DefaultInterpreterCache, InterpreterOptions};
 use reflex_lang::allocator::DefaultAllocator;
 use reflex_lang::{self, CachedSharedTerm, ExpressionList, SharedTermFactory};
-use reflex_lisp::parse;
+use reflex_lisp::{parse, LispBuiltins};
 use reflex_wasm::allocator::ArenaAllocator;
 
 use reflex_wasm::interpreter::mocks::add_import_stubs;
@@ -66,7 +66,7 @@ fn deep_addition_benchmark(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("Rust interpreted", i), &i, |b, i| {
             b.iter_batched(
                 || {
-                    let mut factory = SharedTermFactory::<reflex_stdlib::Stdlib>::default();
+                    let mut factory = SharedTermFactory::<LispBuiltins>::default();
                     let mut allocator = DefaultAllocator::default();
                     let cache = SubstitutionCache::new();
                     let (input, state) = generate_deep_add_rust(&mut factory, &mut allocator, *i);
@@ -82,7 +82,7 @@ fn deep_addition_benchmark(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("Rust bytecode", i), &i, |b, i| {
             b.iter_batched(
                 || {
-                    let mut factory = SharedTermFactory::<reflex_stdlib::Stdlib>::default();
+                    let mut factory = SharedTermFactory::<LispBuiltins>::default();
                     let mut allocator = DefaultAllocator::default();
                     let (expression, state) =
                         generate_deep_add_rust(&mut factory, &mut allocator, *i);
@@ -136,14 +136,14 @@ const RUNTIME_BYTES: &'static [u8] = include_bytes!("../../reflex-wasm/build/run
 
 fn execute_rust_benchmark(
     query_gen: impl Fn(
-        &mut SharedTermFactory<reflex_stdlib::Stdlib>,
-        &mut DefaultAllocator<CachedSharedTerm<reflex_stdlib::Stdlib>>,
+        &mut SharedTermFactory<LispBuiltins>,
+        &mut DefaultAllocator<CachedSharedTerm<LispBuiltins>>,
     ) -> (
-        CachedSharedTerm<reflex_stdlib::Stdlib>,
-        StateCache<CachedSharedTerm<reflex_stdlib::Stdlib>>,
+        CachedSharedTerm<LispBuiltins>,
+        StateCache<CachedSharedTerm<LispBuiltins>>,
     ),
 ) {
-    let mut factory = SharedTermFactory::<reflex_stdlib::Stdlib>::default();
+    let mut factory = SharedTermFactory::<LispBuiltins>::default();
     let mut allocator = DefaultAllocator::default();
     let mut cache = SubstitutionCache::new();
     let (expression, state) = query_gen(&mut factory, &mut allocator);
@@ -206,17 +206,19 @@ fn generate_deep_add_wasm(
 }
 
 fn generate_deep_add_rust(
-    _factory: &mut SharedTermFactory<reflex_stdlib::Stdlib>,
-    _allocator: &mut DefaultAllocator<CachedSharedTerm<reflex_stdlib::Stdlib>>,
+    _factory: &mut SharedTermFactory<LispBuiltins>,
+    _allocator: &mut DefaultAllocator<CachedSharedTerm<LispBuiltins>>,
     depth: i64,
 ) -> (
-    CachedSharedTerm<reflex_stdlib::Stdlib>,
-    StateCache<CachedSharedTerm<reflex_stdlib::Stdlib>>,
+    CachedSharedTerm<LispBuiltins>,
+    StateCache<CachedSharedTerm<LispBuiltins>>,
 ) {
     use reflex_lang::term::{ApplicationTerm, BuiltinTerm, IntTerm, Term};
 
     let mut current = CachedSharedTerm::new(Term::Int(IntTerm::new(1)));
-    let add = CachedSharedTerm::new(Term::Builtin(BuiltinTerm::new(reflex_stdlib::Stdlib::Add)));
+    let add = CachedSharedTerm::new(Term::Builtin(BuiltinTerm::new(LispBuiltins::Stdlib(
+        reflex_stdlib::Stdlib::Add,
+    ))));
     for i in 2..=depth {
         let new_int = CachedSharedTerm::new(Term::Int(IntTerm::new(i)));
 
@@ -231,11 +233,11 @@ fn generate_deep_add_rust(
 }
 
 fn generate_3_plus_5_rust(
-    factory: &mut SharedTermFactory<reflex_stdlib::Stdlib>,
-    allocator: &mut DefaultAllocator<CachedSharedTerm<reflex_stdlib::Stdlib>>,
+    factory: &mut SharedTermFactory<LispBuiltins>,
+    allocator: &mut DefaultAllocator<CachedSharedTerm<LispBuiltins>>,
 ) -> (
-    CachedSharedTerm<reflex_stdlib::Stdlib>,
-    StateCache<CachedSharedTerm<reflex_stdlib::Stdlib>>,
+    CachedSharedTerm<LispBuiltins>,
+    StateCache<CachedSharedTerm<LispBuiltins>>,
 ) {
     let state = StateCache::default();
     let expression = parse("(+ 3 5)", factory, allocator).unwrap();
