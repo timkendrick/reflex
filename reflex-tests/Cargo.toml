@@ -15,6 +15,7 @@ reflex-grpc = { path = "../reflex-grpc" }
 reflex-handlers = { path = "../reflex-handlers" }
 reflex-js = { path = "../reflex-js" }
 reflex-lang = { path = "../reflex-lang" }
+reflex-lisp = { path = "../reflex-lisp" }
 reflex-parser = { path = "../reflex-parser" }
 reflex-scheduler = { path = "../reflex-scheduler" }
 reflex-utils = { path = "../reflex-utils" }

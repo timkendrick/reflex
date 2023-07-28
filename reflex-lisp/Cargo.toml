@@ -8,6 +8,9 @@ edition = "2021"
 [dependencies]
 reflex = { path = "../reflex" }
 reflex-stdlib = { path = "../reflex-stdlib" }
+serde = { version = "^1.0", features = ["derive"] }
+strum = "0.22"
+strum_macros = "0.22"
 
 [dev-dependencies]
 reflex-lang = { path = "../reflex-lang" }

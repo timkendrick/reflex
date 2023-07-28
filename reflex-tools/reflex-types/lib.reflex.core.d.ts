@@ -10,8 +10,6 @@ declare module 'reflex::core' {
     target: F,
     args: A,
   ): T;
-  export function car<T>(pair: [T, any]): T;
-  export function cdr<T>(pair: [any, T]): T;
   export function ceil(left: number, right: number): number;
   export function chain<T>(left: Array<T>, right: Array<T>): Array<T>;
   export function collectConstructor<K extends PropertyKey, V>(
@@ -22,12 +20,11 @@ declare module 'reflex::core' {
   ): Map<K, V>;
   export function collectHashSet<T>(...values: Array<T>): Set<T>;
   export function collectList<T>(...items: Array<T>): Array<T>;
-  export function collectRecord<K, V>(
+  export function collectRecord<K extends PropertyKey, V>(
     ...keysAndValues: Array<K | V>
   ): Record<K, V>;
   export function collectSignal(...signals: Array<never>): never;
   export function concat(...args: Array<string>): string;
-  export function cons<L, R>(left: L, right: R): [L, R];
   export function constructHashMap<K, V>(
     keys: Array<K>,
     values: Array<V>,

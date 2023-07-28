@@ -15,6 +15,7 @@ pub enum CliBuiltins {
     Stdlib(stdlib::Stdlib),
     Json(reflex_json::stdlib::Stdlib),
     Js(reflex_js::stdlib::Stdlib),
+    Lisp(reflex_lisp::stdlib::Stdlib),
     Handlers(reflex_handlers::stdlib::Stdlib),
     GraphQl(reflex_graphql::stdlib::Stdlib),
 }
@@ -33,6 +34,11 @@ impl From<reflex_js::stdlib::Stdlib> for CliBuiltins {
         CliBuiltins::Js(target)
     }
 }
+impl From<reflex_lisp::stdlib::Stdlib> for CliBuiltins {
+    fn from(target: reflex_lisp::stdlib::Stdlib) -> Self {
+        CliBuiltins::Lisp(target)
+    }
+}
 impl From<reflex_handlers::stdlib::Stdlib> for CliBuiltins {
     fn from(target: reflex_handlers::stdlib::Stdlib) -> Self {
         CliBuiltins::Handlers(target)
@@ -49,6 +55,7 @@ impl Uid for CliBuiltins {
             CliBuiltins::Stdlib(term) => term.uid(),
             CliBuiltins::Json(term) => term.uid(),
             CliBuiltins::Js(term) => term.uid(),
+            CliBuiltins::Lisp(term) => term.uid(),
             CliBuiltins::Handlers(term) => term.uid(),
             CliBuiltins::GraphQl(term) => term.uid(),
         }
@@ -61,6 +68,7 @@ impl TryFrom<Uuid> for CliBuiltins {
             .map(Self::Stdlib)
             .or_else(|_| TryInto::<reflex_json::stdlib::Stdlib>::try_into(value).map(Self::Json))
             .or_else(|_| TryInto::<reflex_js::stdlib::Stdlib>::try_into(value).map(Self::Js))
+            .or_else(|_| TryInto::<reflex_lisp::stdlib::Stdlib>::try_into(value).map(Self::Lisp))
             .or_else(|_| {
                 TryInto::<reflex_handlers::stdlib::Stdlib>::try_into(value).map(Self::Handlers)
             })
@@ -75,6 +83,7 @@ impl Builtin for CliBuiltins {
             CliBuiltins::Stdlib(term) => term.arity(),
             CliBuiltins::Json(term) => term.arity(),
             CliBuiltins::Js(term) => term.arity(),
+            CliBuiltins::Lisp(term) => term.arity(),
             CliBuiltins::Handlers(term) => term.arity(),
             CliBuiltins::GraphQl(term) => term.arity(),
         }
@@ -90,6 +99,7 @@ impl Builtin for CliBuiltins {
             CliBuiltins::Stdlib(term) => term.apply(args, factory, allocator, cache),
             CliBuiltins::Json(term) => term.apply(args, factory, allocator, cache),
             CliBuiltins::Js(term) => term.apply(args, factory, allocator, cache),
+            CliBuiltins::Lisp(term) => term.apply(args, factory, allocator, cache),
             CliBuiltins::Handlers(term) => term.apply(args, factory, allocator, cache),
             CliBuiltins::GraphQl(term) => term.apply(args, factory, allocator, cache),
         }
@@ -102,6 +112,7 @@ impl Builtin for CliBuiltins {
             CliBuiltins::Stdlib(term) => term.should_parallelize(args),
             CliBuiltins::Json(term) => term.should_parallelize(args),
             CliBuiltins::Js(term) => term.should_parallelize(args),
+            CliBuiltins::Lisp(term) => term.should_parallelize(args),
             CliBuiltins::Handlers(term) => term.should_parallelize(args),
             CliBuiltins::GraphQl(term) => term.should_parallelize(args),
         }
@@ -113,6 +124,7 @@ impl std::fmt::Display for CliBuiltins {
             Self::Stdlib(target) => std::fmt::Display::fmt(target, f),
             Self::Json(target) => std::fmt::Display::fmt(target, f),
             Self::Js(target) => std::fmt::Display::fmt(target, f),
+            Self::Lisp(target) => std::fmt::Display::fmt(target, f),
             Self::Handlers(target) => std::fmt::Display::fmt(target, f),
             Self::GraphQl(target) => std::fmt::Display::fmt(target, f),
         }
@@ -148,16 +160,6 @@ impl From<stdlib::And> for CliBuiltins {
 }
 impl From<stdlib::Apply> for CliBuiltins {
     fn from(value: stdlib::Apply) -> Self {
-        Self::from(stdlib::Stdlib::from(value))
-    }
-}
-impl From<stdlib::Car> for CliBuiltins {
-    fn from(value: stdlib::Car) -> Self {
-        Self::from(stdlib::Stdlib::from(value))
-    }
-}
-impl From<stdlib::Cdr> for CliBuiltins {
-    fn from(value: stdlib::Cdr) -> Self {
         Self::from(stdlib::Stdlib::from(value))
     }
 }
@@ -203,11 +205,6 @@ impl From<stdlib::CollectSignal> for CliBuiltins {
 }
 impl From<stdlib::CollectString> for CliBuiltins {
     fn from(value: stdlib::CollectString) -> Self {
-        Self::from(stdlib::Stdlib::from(value))
-    }
-}
-impl From<stdlib::Cons> for CliBuiltins {
-    fn from(value: stdlib::Cons) -> Self {
         Self::from(stdlib::Stdlib::from(value))
     }
 }
@@ -541,6 +538,22 @@ impl From<reflex_js::stdlib::Throw> for CliBuiltins {
 impl From<reflex_js::stdlib::ToString> for CliBuiltins {
     fn from(value: reflex_js::stdlib::ToString) -> Self {
         Self::from(reflex_js::stdlib::Stdlib::from(value))
+    }
+}
+
+impl From<reflex_lisp::stdlib::Car> for CliBuiltins {
+    fn from(value: reflex_lisp::stdlib::Car) -> Self {
+        Self::from(reflex_lisp::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_lisp::stdlib::Cdr> for CliBuiltins {
+    fn from(value: reflex_lisp::stdlib::Cdr) -> Self {
+        Self::from(reflex_lisp::stdlib::Stdlib::from(value))
+    }
+}
+impl From<reflex_lisp::stdlib::Cons> for CliBuiltins {
+    fn from(value: reflex_lisp::stdlib::Cons) -> Self {
+        Self::from(reflex_lisp::stdlib::Stdlib::from(value))
     }
 }
 

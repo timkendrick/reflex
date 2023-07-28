@@ -16,13 +16,15 @@ pub use abs::*;
 pub use add::*;
 pub use and::*;
 pub use apply::*;
-pub use car::*;
-pub use cdr::*;
 pub use ceil::*;
 pub use chain::*;
-pub use collect::*;
+pub use collect_constructor::*;
+pub use collect_hashmap::*;
+pub use collect_hashset::*;
+pub use collect_list::*;
+pub use collect_record::*;
+pub use collect_signal::*;
 pub use collect_string::*;
-pub use cons::*;
 pub use contains::*;
 pub use divide::*;
 pub use effect::*;
@@ -59,9 +61,12 @@ pub use r#if::*;
 pub use raise::*;
 pub use remainder::*;
 pub use replace::*;
-pub use resolve::*;
 pub use resolve_args::*;
 pub use resolve_deep::*;
+pub use resolve_hashmap::*;
+pub use resolve_hashset::*;
+pub use resolve_list::*;
+pub use resolve_record::*;
 pub use round::*;
 pub use sequence::*;
 pub use slice::*;
@@ -76,13 +81,15 @@ mod abs;
 mod add;
 mod and;
 mod apply;
-mod car;
-mod cdr;
 mod ceil;
 mod chain;
-mod collect;
+mod collect_constructor;
+mod collect_hashmap;
+mod collect_hashset;
+mod collect_list;
+mod collect_record;
+mod collect_signal;
 mod collect_string;
-mod cons;
 mod contains;
 mod divide;
 mod effect;
@@ -119,9 +126,12 @@ mod push_front;
 mod raise;
 mod remainder;
 mod replace;
-mod resolve;
 mod resolve_args;
 mod resolve_deep;
+mod resolve_hashmap;
+mod resolve_hashset;
+mod resolve_list;
+mod resolve_record;
 mod round;
 mod sequence;
 mod slice;
@@ -172,8 +182,6 @@ pub enum Stdlib {
     Add,
     And,
     Apply,
-    Car,
-    Cdr,
     Ceil,
     Chain,
     CollectConstructor,
@@ -183,7 +191,6 @@ pub enum Stdlib {
     CollectRecord,
     CollectSignal,
     CollectString,
-    Cons,
     Contains,
     Divide,
     Effect,
@@ -249,8 +256,6 @@ impl TryFrom<Uuid> for Stdlib {
             Add::UUID => Ok(Self::Add),
             And::UUID => Ok(Self::And),
             Apply::UUID => Ok(Self::Apply),
-            Car::UUID => Ok(Self::Car),
-            Cdr::UUID => Ok(Self::Cdr),
             Ceil::UUID => Ok(Self::Ceil),
             Chain::UUID => Ok(Self::Chain),
             CollectConstructor::UUID => Ok(Self::CollectConstructor),
@@ -260,7 +265,6 @@ impl TryFrom<Uuid> for Stdlib {
             CollectRecord::UUID => Ok(Self::CollectRecord),
             CollectSignal::UUID => Ok(Self::CollectSignal),
             CollectString::UUID => Ok(Self::CollectString),
-            Cons::UUID => Ok(Self::Cons),
             Contains::UUID => Ok(Self::Contains),
             Divide::UUID => Ok(Self::Divide),
             Effect::UUID => Ok(Self::Effect),
@@ -323,8 +327,6 @@ impl Uid for Stdlib {
             Self::Add => Uid::uid(&Add {}),
             Self::And => Uid::uid(&And {}),
             Self::Apply => Uid::uid(&Apply {}),
-            Self::Car => Uid::uid(&Car {}),
-            Self::Cdr => Uid::uid(&Cdr {}),
             Self::Ceil => Uid::uid(&Ceil {}),
             Self::Chain => Uid::uid(&Chain {}),
             Self::CollectConstructor => Uid::uid(&CollectConstructor {}),
@@ -334,7 +336,6 @@ impl Uid for Stdlib {
             Self::CollectRecord => Uid::uid(&CollectRecord {}),
             Self::CollectSignal => Uid::uid(&CollectSignal {}),
             Self::CollectString => Uid::uid(&CollectString {}),
-            Self::Cons => Uid::uid(&Cons {}),
             Self::Contains => Uid::uid(&Contains {}),
             Self::Divide => Uid::uid(&Divide {}),
             Self::Effect => Uid::uid(&Effect {}),
@@ -396,8 +397,6 @@ impl Stdlib {
             Self::Add => Add::arity(),
             Self::And => And::arity(),
             Self::Apply => Apply::arity(),
-            Self::Car => Car::arity(),
-            Self::Cdr => Cdr::arity(),
             Self::Ceil => Ceil::arity(),
             Self::Chain => Chain::arity(),
             Self::CollectConstructor => CollectConstructor::arity(),
@@ -407,7 +406,6 @@ impl Stdlib {
             Self::CollectRecord => CollectRecord::arity(),
             Self::CollectSignal => CollectSignal::arity(),
             Self::CollectString => CollectString::arity(),
-            Self::Cons => Cons::arity(),
             Self::Contains => Contains::arity(),
             Self::Divide => Divide::arity(),
             Self::Effect => Effect::arity(),
@@ -476,8 +474,6 @@ impl Stdlib {
             Self::Add => Applicable::<T>::apply(&Add, args, factory, allocator, cache),
             Self::And => Applicable::<T>::apply(&And, args, factory, allocator, cache),
             Self::Apply => Applicable::<T>::apply(&Apply, args, factory, allocator, cache),
-            Self::Car => Applicable::<T>::apply(&Car, args, factory, allocator, cache),
-            Self::Cdr => Applicable::<T>::apply(&Cdr, args, factory, allocator, cache),
             Self::Ceil => Applicable::<T>::apply(&Ceil, args, factory, allocator, cache),
             Self::Chain => Applicable::<T>::apply(&Chain, args, factory, allocator, cache),
             Self::CollectConstructor => {
@@ -501,7 +497,6 @@ impl Stdlib {
             Self::CollectString => {
                 Applicable::<T>::apply(&CollectString, args, factory, allocator, cache)
             }
-            Self::Cons => Applicable::<T>::apply(&Cons, args, factory, allocator, cache),
             Self::Contains => Applicable::<T>::apply(&Contains, args, factory, allocator, cache),
             Self::Divide => Applicable::<T>::apply(&Divide, args, factory, allocator, cache),
             Self::Effect => Applicable::<T>::apply(&Effect, args, factory, allocator, cache),
@@ -580,8 +575,6 @@ impl Stdlib {
             Self::Add => Applicable::<T>::should_parallelize(&Add, args),
             Self::And => Applicable::<T>::should_parallelize(&And, args),
             Self::Apply => Applicable::<T>::should_parallelize(&Apply, args),
-            Self::Car => Applicable::<T>::should_parallelize(&Car, args),
-            Self::Cdr => Applicable::<T>::should_parallelize(&Cdr, args),
             Self::Ceil => Applicable::<T>::should_parallelize(&Ceil, args),
             Self::Chain => Applicable::<T>::should_parallelize(&Chain, args),
             Self::CollectConstructor => {
@@ -593,7 +586,6 @@ impl Stdlib {
             Self::CollectRecord => Applicable::<T>::should_parallelize(&CollectRecord, args),
             Self::CollectSignal => Applicable::<T>::should_parallelize(&CollectSignal, args),
             Self::CollectString => Applicable::<T>::should_parallelize(&CollectString, args),
-            Self::Cons => Applicable::<T>::should_parallelize(&Cons, args),
             Self::Contains => Applicable::<T>::should_parallelize(&Contains, args),
             Self::Divide => Applicable::<T>::should_parallelize(&Divide, args),
             Self::Effect => Applicable::<T>::should_parallelize(&Effect, args),
@@ -691,16 +683,6 @@ impl From<Apply> for Stdlib {
         Self::Apply
     }
 }
-impl From<Car> for Stdlib {
-    fn from(_value: Car) -> Self {
-        Self::Car
-    }
-}
-impl From<Cdr> for Stdlib {
-    fn from(_value: Cdr) -> Self {
-        Self::Cdr
-    }
-}
 impl From<Ceil> for Stdlib {
     fn from(_value: Ceil) -> Self {
         Self::Ceil
@@ -744,11 +726,6 @@ impl From<CollectSignal> for Stdlib {
 impl From<CollectString> for Stdlib {
     fn from(_value: CollectString) -> Self {
         Self::CollectString
-    }
-}
-impl From<Cons> for Stdlib {
-    fn from(_value: Cons) -> Self {
-        Self::Cons
     }
 }
 impl From<Contains> for Stdlib {

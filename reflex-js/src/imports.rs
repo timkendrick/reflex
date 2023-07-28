@@ -19,8 +19,6 @@ pub trait JsImportsBuiltin:
     + From<Add>
     + From<And>
     + From<Apply>
-    + From<Car>
-    + From<Cdr>
     + From<Ceil>
     + From<Chain>
     + From<CollectConstructor>
@@ -30,7 +28,6 @@ pub trait JsImportsBuiltin:
     + From<CollectRecord>
     + From<CollectSignal>
     + From<CollectString>
-    + From<Cons>
     + From<Contains>
     + From<Divide>
     + From<Effect>
@@ -91,8 +88,6 @@ impl<T> JsImportsBuiltin for T where
         + From<Add>
         + From<And>
         + From<Apply>
-        + From<Car>
-        + From<Cdr>
         + From<Ceil>
         + From<Chain>
         + From<CollectConstructor>
@@ -102,7 +97,6 @@ impl<T> JsImportsBuiltin for T where
         + From<CollectRecord>
         + From<CollectSignal>
         + From<CollectString>
-        + From<Cons>
         + From<Contains>
         + From<Divide>
         + From<Effect>

@@ -1691,7 +1691,7 @@ fn resolve_arg_within_new_stack<
 mod tests {
     use reflex::core::{DependencyList, SignalType, StateCache, Uid};
     use reflex_lang::{allocator::DefaultAllocator, term::*, SharedTermFactory};
-    use reflex_lisp::parse;
+    use reflex_lisp::{parse, LispBuiltins};
     use reflex_stdlib::{Add, And, CollectList, If, Stdlib};
 
     use crate::compiler::{hash_compiled_program, Compiler, CompilerMode, CompilerOptions};
@@ -1700,7 +1700,7 @@ mod tests {
 
     #[test]
     fn match_compiled_functions() {
-        let factory = SharedTermFactory::<Stdlib>::default();
+        let factory = SharedTermFactory::<LispBuiltins>::default();
         let allocator = DefaultAllocator::default();
         let compiled_function =
             CompiledFunctionTerm::new(InstructionPointer::default(), 0, 0, 0, false);
@@ -1735,7 +1735,7 @@ mod tests {
 
     #[test]
     fn compiled_functions() {
-        let factory = SharedTermFactory::<Stdlib>::default();
+        let factory = SharedTermFactory::<LispBuiltins>::default();
         let allocator = DefaultAllocator::default();
         let mut cache = DefaultInterpreterCache::default();
         let target = parse("(lambda (foo bar) (+ foo bar))", &factory, &allocator).unwrap();
@@ -1811,7 +1811,7 @@ mod tests {
 
     #[test]
     fn compiled_tail_calls() {
-        let factory = SharedTermFactory::<Stdlib>::default();
+        let factory = SharedTermFactory::<LispBuiltins>::default();
         let allocator = DefaultAllocator::default();
         let mut cache = DefaultInterpreterCache::default();
         let expression = parse(
@@ -1848,7 +1848,7 @@ mod tests {
 
     #[test]
     fn compiled_closures() {
-        let factory = SharedTermFactory::<Stdlib>::default();
+        let factory = SharedTermFactory::<LispBuiltins>::default();
         let allocator = DefaultAllocator::default();
         let mut cache = DefaultInterpreterCache::default();
         let expression = parse(
@@ -1884,7 +1884,7 @@ mod tests {
 
     #[test]
     fn basic_operation() {
-        let factory = SharedTermFactory::<Stdlib>::default();
+        let factory = SharedTermFactory::<LispBuiltins>::default();
         let allocator = DefaultAllocator::default();
         let mut cache = DefaultInterpreterCache::default();
         let program = Program::new(vec![
@@ -1925,7 +1925,7 @@ mod tests {
 
     #[test]
     fn nested_expressions() {
-        let factory = SharedTermFactory::<Stdlib>::default();
+        let factory = SharedTermFactory::<LispBuiltins>::default();
         let allocator = DefaultAllocator::default();
         let mut cache = DefaultInterpreterCache::default();
         let program = Program::new(vec![
@@ -1983,7 +1983,7 @@ mod tests {
 
     #[test]
     fn builtin_function_applications() {
-        let factory = SharedTermFactory::<Stdlib>::default();
+        let factory = SharedTermFactory::<LispBuiltins>::default();
         let allocator = DefaultAllocator::default();
         let mut cache = DefaultInterpreterCache::default();
         let expression = factory.create_application_term(
@@ -2014,7 +2014,7 @@ mod tests {
             EvaluationResult::new(factory.create_int_term(3 + 4), DependencyList::empty(),),
         );
 
-        let factory = SharedTermFactory::<Stdlib>::default();
+        let factory = SharedTermFactory::<LispBuiltins>::default();
         let allocator = DefaultAllocator::default();
         let mut cache = DefaultInterpreterCache::default();
         let expression = factory.create_application_term(
@@ -2047,7 +2047,7 @@ mod tests {
             EvaluationResult::new(factory.create_int_term(3), DependencyList::empty(),),
         );
 
-        let factory = SharedTermFactory::<Stdlib>::default();
+        let factory = SharedTermFactory::<LispBuiltins>::default();
         let allocator = DefaultAllocator::default();
         let mut cache = DefaultInterpreterCache::default();
         let expression = factory.create_application_term(
@@ -2082,7 +2082,7 @@ mod tests {
             EvaluationResult::new(factory.create_int_term(4), DependencyList::empty(),),
         );
 
-        let factory = SharedTermFactory::<Stdlib>::default();
+        let factory = SharedTermFactory::<LispBuiltins>::default();
         let allocator = DefaultAllocator::default();
         let mut cache = DefaultInterpreterCache::default();
         let expression = factory.create_application_term(
@@ -2123,7 +2123,7 @@ mod tests {
             EvaluationResult::new(factory.create_int_term(3), DependencyList::empty(),),
         );
 
-        let factory = SharedTermFactory::<Stdlib>::default();
+        let factory = SharedTermFactory::<LispBuiltins>::default();
         let allocator = DefaultAllocator::default();
         let mut cache = DefaultInterpreterCache::default();
         let expression = factory.create_application_term(
@@ -2167,7 +2167,7 @@ mod tests {
 
     #[test]
     fn chained_functions() {
-        let factory = SharedTermFactory::<Stdlib>::default();
+        let factory = SharedTermFactory::<LispBuiltins>::default();
         let allocator = DefaultAllocator::default();
         let mut cache = DefaultInterpreterCache::default();
         let expression = factory.create_application_term(
@@ -2204,7 +2204,7 @@ mod tests {
             EvaluationResult::new(factory.create_int_term(3 + 4 + 5), DependencyList::empty(),),
         );
 
-        let factory = SharedTermFactory::<Stdlib>::default();
+        let factory = SharedTermFactory::<LispBuiltins>::default();
         let allocator = DefaultAllocator::default();
         let mut cache = DefaultInterpreterCache::default();
         let expression = factory.create_application_term(
@@ -2248,7 +2248,7 @@ mod tests {
 
     #[test]
     fn variadic_functions() {
-        let factory = SharedTermFactory::<Stdlib>::default();
+        let factory = SharedTermFactory::<LispBuiltins>::default();
         let allocator = DefaultAllocator::default();
         let mut cache = DefaultInterpreterCache::default();
         let expression = factory.create_application_term(
@@ -2290,7 +2290,7 @@ mod tests {
             ),
         );
 
-        let factory = SharedTermFactory::<Stdlib>::default();
+        let factory = SharedTermFactory::<LispBuiltins>::default();
         let allocator = DefaultAllocator::default();
         let mut cache = DefaultInterpreterCache::default();
         let expression = factory.create_application_term(
@@ -2344,7 +2344,7 @@ mod tests {
 
     #[test]
     fn intern_static_test() {
-        let factory = SharedTermFactory::<Stdlib>::default();
+        let factory = SharedTermFactory::<LispBuiltins>::default();
         let allocator = DefaultAllocator::default();
         let expression = factory.create_int_term(3);
         let program = Compiler::new(CompilerOptions::debug(), None)
