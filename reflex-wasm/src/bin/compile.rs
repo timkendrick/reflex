@@ -45,6 +45,9 @@ struct Args {
     /// Compile variable initializer values as lazily-evaluated expressions
     #[arg(long)]
     lazy_variable_initializers: bool,
+    /// Compile lambda arguments as lazily-evaluated expressions
+    #[arg(long)]
+    lazy_lambda_args: bool,
     /// Compile constructor arguments as lazily-evaluated expressions
     #[arg(long)]
     lazy_constructors: bool,
@@ -94,6 +97,7 @@ fn main() -> Result<()> {
             lazy_list_items: args.lazy_list_items,
             lazy_variable_initializers: args.lazy_variable_initializers,
             lazy_function_args: args.lazy_function_args,
+            lazy_lambda_args: args.lazy_lambda_args,
             lazy_constructors: args.lazy_constructors,
         },
         runtime: WasmCompilerRuntimeOptions {

@@ -356,6 +356,7 @@ pub struct CompilerOptions {
     pub lazy_list_items: bool,
     pub lazy_variable_initializers: bool,
     pub lazy_function_args: bool,
+    pub lazy_lambda_args: bool,
     pub lazy_constructors: bool,
 }
 
@@ -1189,7 +1190,7 @@ pub(crate) fn get_compiled_function_arity<A: Arena + Clone>(
         })
     } else if let Some(term) = target.as_lambda_term() {
         let num_args = term.as_inner().num_args() as usize;
-        Some(match options.lazy_constructors {
+        Some(match options.lazy_lambda_args {
             true => Arity::lazy(num_args, 0, false),
             false => Arity::strict(num_args, 0, false),
         })
