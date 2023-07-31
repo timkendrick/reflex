@@ -15,7 +15,7 @@ use crate::{
     allocator::Arena,
     compiler::{
         instruction, runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder,
-        CompilerOptions, CompilerResult, CompilerStack, CompilerState, Internable, Strictness,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState, Internable,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{list::compile_list, ListTerm, TypedTerm, WasmExpression},
@@ -158,9 +158,7 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<ConstructorTerm, A> {
         } else {
             block.append_inner(|stack| {
                 compile_list(
-                    keys.as_inner()
-                        .iter()
-                        .map(|key| (key, Strictness::NonStrict)),
+                    keys.as_inner().iter().map(|key| (key, ArgType::Eager)),
                     stack,
                     state,
                     options,

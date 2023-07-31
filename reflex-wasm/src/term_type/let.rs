@@ -14,8 +14,7 @@ use crate::{
     allocator::Arena,
     compiler::{
         error::CompilerError, instruction, CompileWasm, CompiledBlockBuilder, CompilerOptions,
-        CompilerResult, CompilerStack, CompilerState, Eagerness, Internable, LazyExpression,
-        ParamsSignature, Strictness, TypeSignature, ValueType,
+        CompilerResult, CompilerStack, CompilerState, Internable, MaybeLazyExpression, ValueType,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{TypedTerm, WasmExpression},
@@ -205,77 +204,22 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<LetTerm, A> {
             });
             block.finish()
         } else {
-            let (eagerness, strictness) = if options.lazy_variable_initializers {
-                (Eagerness::Lazy, Strictness::NonStrict)
+            let eagerness = if options.lazy_variable_initializers {
+                ArgType::Lazy
             } else {
-                (
-                    Eagerness::Eager,
-                    // Skip signal-testing for variable initializers that are already fully evaluated to a non-signal value
-                    if initializer.is_atomic() && initializer.as_signal_term().is_none() {
-                        Strictness::NonStrict
-                    } else {
-                        Strictness::Strict
-                    },
-                )
+                ArgType::Strict
             };
             let block = CompiledBlockBuilder::new(stack);
-            // Yield the initializer term onto the stack, according to its eagerness and strictness
+            // Yield the initializer term onto the stack
             // => [Term]
-            let block = match eagerness {
-                // If this is a lazy variable initializer, compile it as a lazy thunk within the current block
-                Eagerness::Lazy => block.append_inner(|stack| {
-                    LazyExpression::new(initializer).compile(stack, state, options)
-                }),
-                Eagerness::Eager => match strictness {
-                    // If this is a strict eager variable initializer, compile it directly into the current block
-                    Strictness::Strict => {
-                        block.append_inner(|stack| initializer.compile(stack, state, options))
-                    }
-                    // If this is a non-strict eager variable initializer, compile it within a new control flow block
-                    // (this ensures that any signals encountered when evaluating the variable initializer will not
-                    // break out of the current block; the signal will only short-circuit when the variable is
-                    // referenced in a strict context)
-                    Strictness::NonStrict => block.append_inner(|stack| {
-                        let block_type = TypeSignature {
-                            params: ParamsSignature::Void,
-                            results: ParamsSignature::Single(ValueType::HeapPointer),
-                        };
-                        let inner_stack = stack.enter_block(&block_type)?;
-                        let block = CompiledBlockBuilder::new(stack);
-                        let block = block.push(instruction::core::Block {
-                            block_type,
-                            body: initializer.compile(inner_stack, state, options)?,
-                        });
-                        block.finish::<CompilerError<_>>()
-                    }),
-                },
-            }?;
+            let block = block.append_inner(|stack| {
+                MaybeLazyExpression::new(initializer, eagerness).compile(stack, state, options)
+            })?;
             // Pop the initializer term and assign it to a lexical scope
             // => []
             let block = block.push(instruction::runtime::DeclareVariable {
                 value_type: ValueType::HeapPointer,
             });
-            // If the initializer is being evaluated in strict mode, test for signals
-            // => []
-            let block = if strictness.is_strict() {
-                // Push a copy of the initializer result onto the stack
-                // => [Term]
-                let block = block.push(instruction::core::GetScopeValue {
-                    value_type: ValueType::HeapPointer,
-                    scope_offset: 0,
-                });
-                // If the initializer result is a signal, break out of the current block
-                // => [Term]
-                let block = block.push(instruction::runtime::BreakOnSignal { target_block: 0 });
-                // Otherwise drop the temporary signal-testing value from the operand stack
-                // => []
-                let block = block.push(instruction::core::Drop {
-                    value_type: ValueType::HeapPointer,
-                });
-                block
-            } else {
-                block
-            };
             // Yield the expression body onto the stack (this will be evaluated within the new scope)
             // => [Term]
             let block = block.append_inner(|stack| body.compile(stack, state, options))?;

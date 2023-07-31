@@ -15,8 +15,7 @@ use crate::{
     allocator::Arena,
     compiler::{
         instruction, runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder,
-        CompilerOptions, CompilerResult, CompilerStack, CompilerState, Internable, LazyExpression,
-        Strictness,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState, Internable,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{hashmap::HashmapTerm, list::compile_list, ListTerm, TypedTerm, WasmExpression},
@@ -309,9 +308,7 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<RecordTerm, A> {
         } else {
             block.append_inner(|stack| {
                 compile_list(
-                    keys.as_inner()
-                        .iter()
-                        .map(|key| (key, Strictness::NonStrict)),
+                    keys.as_inner().iter().map(|key| (key, ArgType::Eager)),
                     stack,
                     state,
                     options,
@@ -323,43 +320,19 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<RecordTerm, A> {
         let block = if values.as_term().should_intern(ArgType::Strict) {
             block.append_inner(|stack| values.as_term().compile(stack, state, options))
         } else {
-            if options.lazy_record_values {
-                block.append_inner(|stack| {
-                    compile_list(
-                        values
-                            .as_inner()
-                            .iter()
-                            .map(|item| (LazyExpression::new(item), Strictness::NonStrict)),
-                        stack,
-                        state,
-                        options,
-                    )
-                })
+            let eagerness = if options.lazy_record_values {
+                ArgType::Lazy
             } else {
-                block
-                    .append_inner(|stack| {
-                        compile_list(
-                            values.as_inner().iter().map(|item| {
-                                // Skip signal-testing for record field values that are already fully evaluated to a non-signal value
-                                let strictness =
-                                    if item.is_atomic() && item.as_signal_term().is_none() {
-                                        Strictness::NonStrict
-                                    } else {
-                                        Strictness::Strict
-                                    };
-                                (item, strictness)
-                            }),
-                            stack,
-                            state,
-                            options,
-                        )
-                    })
-                    // Short-circuit if a signal was encountered while processing the property values
-                    // => [ListTerm]
-                    .map(|block| {
-                        block.push(instruction::runtime::BreakOnSignal { target_block: 0 })
-                    })
-            }
+                ArgType::Strict
+            };
+            block.append_inner(|stack| {
+                compile_list(
+                    values.as_inner().iter().map(|item| (item, eagerness)),
+                    stack,
+                    state,
+                    options,
+                )
+            })
         }?;
         // Invoke the term constructor
         // => [RecordTerm]

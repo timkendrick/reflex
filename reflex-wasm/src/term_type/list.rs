@@ -19,8 +19,7 @@ use crate::{
     compiler::{
         error::CompilerError, instruction, runtime::builtin::RuntimeBuiltin, CompileWasm,
         CompiledBlockBuilder, CompilerOptions, CompilerResult, CompilerStack, CompilerState,
-        ConstValue, Internable, LazyExpression, ParamsSignature, Strictness, TypeSignature,
-        ValueType,
+        ConstValue, Internable, MaybeLazyExpression, ParamsSignature, ValueType,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{TermType, TypedTerm, WasmExpression},
@@ -321,33 +320,56 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<ListTerm, A> {
         options: &CompilerOptions,
     ) -> CompilerResult<A> {
         let items = self.iter();
-        if options.lazy_list_items {
-            compile_list(
-                items.map(|item| (LazyExpression::new(item), Strictness::NonStrict)),
-                stack,
-                state,
-                options,
-            )
+        let eagerness = if options.lazy_list_items {
+            ArgType::Lazy
         } else {
-            compile_list(
-                items.map(|item| {
-                    // Skip signal-testing for list items that are already fully evaluated to a non-signal value
-                    let strictness = if item.is_atomic() && item.as_signal_term().is_none() {
-                        Strictness::NonStrict
-                    } else {
-                        Strictness::Strict
-                    };
-                    (item, strictness)
-                }),
-                stack,
-                state,
-                options,
-            )
-        }
+            ArgType::Strict
+        };
+        compile_list(items.map(|item| (item, eagerness)), stack, state, options)
     }
 }
 
-pub(crate) fn compile_list<A: Arena + Clone, T: CompileWasm<A>>(
+pub(crate) fn compile_list<A: Arena + Clone>(
+    items: impl IntoIterator<
+        Item = (WasmExpression<A>, ArgType),
+        IntoIter = impl ExactSizeIterator<Item = (WasmExpression<A>, ArgType)>,
+    >,
+    stack: CompilerStack,
+    state: &mut CompilerState,
+    options: &CompilerOptions,
+) -> CompilerResult<A> {
+    collect_compiled_list_values(
+        items.into_iter().map(|(item, eagerness)| {
+            // All signals encountered when evaluating strict list items must be collected into a single aggregated
+            // signal before short-circuiting (this ensures that if signals are encountered across multiple arguments,
+            // signals will be 'caught' at their respective block boundaries to be combined into a single signal result,
+            // rather than the first signal short-circuiting all the way to the top level)
+            let compiled_eagerness = match eagerness {
+                ArgType::Strict => ArgType::Eager,
+                eagerness => eagerness,
+            };
+            let strictness = match eagerness {
+                ArgType::Strict => Strictness::Strict,
+                ArgType::Eager | ArgType::Lazy => Strictness::NonStrict,
+            };
+            (
+                MaybeLazyExpression::new(item, compiled_eagerness),
+                strictness,
+            )
+        }),
+        stack,
+        state,
+        options,
+    )
+}
+
+#[derive(PartialEq, Eq, Clone, Copy, Hash, Debug)]
+pub(crate) enum Strictness {
+    Strict,
+    NonStrict,
+}
+
+pub(crate) fn collect_compiled_list_values<A: Arena + Clone, T: CompileWasm<A>>(
     items: impl IntoIterator<
         Item = (T, Strictness),
         IntoIter = impl ExactSizeIterator<Item = (T, Strictness)>,
@@ -393,25 +415,10 @@ pub(crate) fn compile_list<A: Arena + Clone, T: CompileWasm<A>>(
             });
             // Yield the list item onto the stack
             // => [ListTerm, ListTerm, index, Term]
-            let block = block.append_inner(|stack| {
-                // Create a wrapper block to surround the list item
-                // (this ensures that any signals encountered when processing the list item will not break out of the
-                // half-constructed list)
-                let block_type = TypeSignature {
-                    params: ParamsSignature::Void,
-                    results: ParamsSignature::Single(ValueType::HeapPointer),
-                };
-                let inner_stack = stack.enter_block(&block_type)?;
-                let block = CompiledBlockBuilder::new(stack);
-                let block = block.push(instruction::core::Block {
-                    block_type,
-                    body: item.compile(inner_stack, state, options)?,
-                });
-                block.finish::<CompilerError<_>>()
-            })?;
+            let block = block.append_inner(|stack| item.compile(stack, state, options))?;
             // If this item needs to be tested for signals, combine the item's signal result with the accumulated signal result
             // => [ListTerm, ListTerm, index, Term]
-            let (block, num_signal_scopes) = if strictness.is_strict() {
+            let (block, num_signal_scopes) = if matches!(strictness, Strictness::Strict) {
                 // Pop the list item from the top of the stack and assign to a temporary lexical scope variable
                 // => [ListTerm, ListTerm, index]
                 let block = block.push(instruction::core::ScopeStart {

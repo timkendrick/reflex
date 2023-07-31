@@ -26,7 +26,10 @@ use crate::{
     serialize::{Serialize, SerializerState},
     stdlib::Stdlib,
     term_type::*,
-    term_type::{list::compile_list, TermType, TermTypeDiscriminants, WasmExpression},
+    term_type::{
+        list::{collect_compiled_list_values, Strictness},
+        TermType, TermTypeDiscriminants, WasmExpression,
+    },
     ArenaPointer, ArenaRef, Array, IntoArenaRefIterator, PointerIter, Term,
 };
 
@@ -57,46 +60,6 @@ pub trait Internable {
     /// when evaluated in a strict context, and therefore should be conditionally inlined depending on the desired
     /// eagerness in order not to lose their additional behavior when evaluated in a strict context
     fn should_intern(&self, eager: ArgType) -> bool;
-}
-
-#[derive(PartialEq, Eq, Clone, Copy, Hash, Debug)]
-pub enum Eagerness {
-    Eager,
-    Lazy,
-}
-impl Eagerness {
-    pub fn is_eager(&self) -> bool {
-        match self {
-            Eagerness::Eager => true,
-            _ => false,
-        }
-    }
-    pub fn is_lazy(&self) -> bool {
-        match self {
-            Eagerness::Lazy => true,
-            _ => false,
-        }
-    }
-}
-
-#[derive(PartialEq, Eq, Clone, Copy, Hash, Debug)]
-pub enum Strictness {
-    Strict,
-    NonStrict,
-}
-impl Strictness {
-    pub fn is_strict(&self) -> bool {
-        match self {
-            Self::Strict => true,
-            _ => false,
-        }
-    }
-    pub fn is_non_strict(&self) -> bool {
-        match self {
-            Self::Strict => true,
-            _ => false,
-        }
-    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -1299,15 +1262,17 @@ pub(crate) fn intern_static_value<A: Arena + Clone>(
 
 #[derive(Debug, Clone)]
 pub(crate) enum MaybeLazyExpression<A: Arena + Clone> {
-    Eager(WasmExpression<A>),
+    Strict(WasmExpression<A>),
+    Eager(EagerExpression<A>),
     Lazy(LazyExpression<A>),
 }
 
 impl<A: Arena + Clone> MaybeLazyExpression<A> {
-    pub fn new(expression: WasmExpression<A>, eagerness: Eagerness) -> Self {
-        match eagerness {
-            Eagerness::Eager => Self::Eager(expression),
-            Eagerness::Lazy => Self::Lazy(LazyExpression::new(expression)),
+    pub fn new(expression: WasmExpression<A>, eager: ArgType) -> Self {
+        match eager {
+            ArgType::Strict => Self::Strict(expression),
+            ArgType::Eager => Self::Eager(EagerExpression::new(expression)),
+            ArgType::Lazy => Self::Lazy(LazyExpression::new(expression)),
         }
     }
 }
@@ -1320,8 +1285,48 @@ impl<A: Arena + Clone> CompileWasm<A> for MaybeLazyExpression<A> {
         options: &CompilerOptions,
     ) -> CompilerResult<A> {
         match self {
+            MaybeLazyExpression::Strict(inner) => inner.compile(stack, state, options),
             MaybeLazyExpression::Eager(inner) => inner.compile(stack, state, options),
             MaybeLazyExpression::Lazy(inner) => inner.compile(stack, state, options),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct EagerExpression<A: Arena + Clone> {
+    inner: WasmExpression<A>,
+}
+
+impl<A: Arena + Clone> EagerExpression<A> {
+    pub fn new(inner: WasmExpression<A>) -> Self {
+        Self { inner }
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm<A> for EagerExpression<A> {
+    fn compile(
+        &self,
+        stack: CompilerStack,
+        state: &mut CompilerState,
+        options: &CompilerOptions,
+    ) -> CompilerResult<A> {
+        if self.inner.should_intern(ArgType::Eager) {
+            intern_static_value(&self.inner, state)
+        } else {
+            // Create a wrapper block to surround the compiled term
+            // (this ensures that any signals encountered when evaluating the term will not break out of the current
+            // control flow block)
+            let block_type = TypeSignature {
+                params: ParamsSignature::Void,
+                results: ParamsSignature::Single(ValueType::HeapPointer),
+            };
+            let inner_stack = stack.enter_block(&block_type)?;
+            let block = CompiledBlockBuilder::new(stack);
+            let block = block.push(instruction::core::Block {
+                block_type,
+                body: self.inner.compile(inner_stack, state, options)?,
+            });
+            block.finish::<CompilerError<_>>()
         }
     }
 }
@@ -1344,9 +1349,6 @@ impl<A: Arena + Clone> CompileWasm<A> for LazyExpression<A> {
         state: &mut CompilerState,
         options: &CompilerOptions,
     ) -> CompilerResult<A> {
-        if self.inner.is_static() {
-            return self.inner.compile(stack, state, options);
-        }
         if self.inner.should_intern(ArgType::Lazy) {
             intern_static_value(&self.inner, state)
         } else {
@@ -1473,7 +1475,7 @@ impl<A: Arena + Clone> CompileWasm<A> for LazyExpression<A> {
                     // Yield a list term containing the captured variable values onto the stack
                     // => [BuiltinTerm, ListTerm]
                     let block = block.append_inner(|stack| {
-                        compile_list(
+                        collect_compiled_list_values(
                             captured_variable_scope_offsets
                                 .into_iter()
                                 .map(|scope_offset| {

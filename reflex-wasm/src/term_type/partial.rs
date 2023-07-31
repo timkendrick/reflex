@@ -17,7 +17,7 @@ use crate::{
     compiler::{
         get_compiled_function_arity, instruction, runtime::builtin::RuntimeBuiltin, CompileWasm,
         CompiledBlockBuilder, CompilerOptions, CompilerResult, CompilerStack, CompilerState,
-        Internable, LazyExpression, MaybeLazyExpression, Strictness,
+        Internable,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{list::compile_list, ListTerm, TypedTerm, WasmExpression},
@@ -245,39 +245,32 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<PartialTerm, A> {
         {
             block.append_inner(|stack| args.as_term().compile(stack, state, options))
         } else {
-            // Compile the partial application argumens into a list according to the target arity and compiler eagerness strategy
+            // Compile the partial application arguments into a list according to the target arity and compiler
+            // eagerness strategy
             block.append_inner(|stack| {
+                let arity = target_arity.unwrap_or({
+                    // If the target is a dynamic expression whose arity cannot be statically determined, fall back to a
+                    // placeholder arity based on the number of provided partial arguments.
+                    // The placeholder signature arguments are all declared as lazy, for maximum compatibility with
+                    // whatever the ultimate runtime function signature happens to be
+                    Arity::lazy(num_args, 0, false)
+                });
                 compile_list(
                     WithExactSizeIterator::new(
                         num_args,
                         args.as_inner()
                             .iter()
-                            .zip(
-                                target_arity
-                                    .unwrap_or(if options.lazy_function_args {
-                                        Arity::lazy(num_args, 0, false)
-                                    } else {
-                                        Arity::strict(num_args, 0, false)
-                                    })
-                                    .iter(),
-                            )
-                            .map(|(arg, arg_type)| match arg_type {
-                                ArgType::Strict => {
-                                    let strictness =
-                                        if arg.is_atomic() && arg.as_signal_term().is_none() {
-                                            Strictness::Strict
-                                        } else {
-                                            Strictness::NonStrict
-                                        };
-                                    (MaybeLazyExpression::Eager(arg), strictness)
-                                }
-                                ArgType::Eager => {
-                                    (MaybeLazyExpression::Eager(arg), Strictness::Strict)
-                                }
-                                ArgType::Lazy => (
-                                    MaybeLazyExpression::Lazy(LazyExpression::new(arg)),
-                                    Strictness::Strict,
-                                ),
+                            .zip(arity.iter())
+                            .map(|(arg, arg_type)| {
+                                // If the function signature specifies a lazy argument, however the compiler options
+                                // define function arguments as non-lazy, 'upgrade' the argument to be evaluated eagerly
+                                // (note that we cannot safely upgrade the argument to strict, as this would change the
+                                // behavior of any functions that rely on handling intercepted signal arguments)
+                                let compiled_arg_type = match arg_type {
+                                    ArgType::Lazy if !options.lazy_function_args => ArgType::Eager,
+                                    _ => arg_type,
+                                };
+                                (arg, compiled_arg_type)
                             }),
                     ),
                     stack,

@@ -16,9 +16,8 @@ use crate::{
     compiler::{
         error::CompilerError, instruction, runtime::builtin::RuntimeBuiltin, CompileWasm,
         CompiledBlockBuilder, CompiledFunctionCall, CompiledFunctionCallArgs, CompiledFunctionId,
-        CompilerOptions, CompilerResult, CompilerStack, CompilerState, ConstValue, Eagerness,
-        Internable, LazyExpression, MaybeLazyExpression, ParamsSignature, Strictness,
-        TypeSignature, ValueType,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState, ConstValue, Internable,
+        MaybeLazyExpression, ParamsSignature, TypeSignature, ValueType,
     },
     hash::{TermHash, TermHasher, TermSize},
     stdlib::Stdlib,
@@ -341,36 +340,22 @@ impl<A: Arena + Clone> CompileWasm<A> for GenericCompiledFunctionCall<A> {
             if let Some(args) = args.as_internable(ArgType::Strict) {
                 block.append_inner(|stack| args.as_term().compile(stack, state, options))
             } else {
-                // Otherwise compile the combined argument sequence into a list according to the compiler eagerness strategy
-                if options.lazy_function_args {
-                    block.append_inner(|stack| {
-                        compile_list(
-                            args.iter()
-                                .map(|arg| (LazyExpression::new(arg), Strictness::NonStrict)),
-                            stack,
-                            state,
-                            options,
-                        )
-                    })
+                // Otherwise compile the combined argument sequence into a list according to the compiler eagerness
+                // (note that we cannot safely declare the arguments as strict, as this would change the behavior of any
+                // functions that rely on handling intercepted signal arguments)
+                let eagerness = if options.lazy_function_args {
+                    ArgType::Lazy
                 } else {
-                    block.append_inner(|stack| {
-                        compile_list(
-                            args.iter().map(|item| {
-                                // Skip signal-testing for list items that are already fully evaluated to a non-signal value
-                                let strictness =
-                                    if item.is_atomic() && item.as_signal_term().is_none() {
-                                        Strictness::NonStrict
-                                    } else {
-                                        Strictness::Strict
-                                    };
-                                (item, strictness)
-                            }),
-                            stack,
-                            state,
-                            options,
-                        )
-                    })
-                }
+                    ArgType::Eager
+                };
+                block.append_inner(|stack| {
+                    compile_list(
+                        args.iter().map(|arg| (arg, eagerness)),
+                        stack,
+                        state,
+                        options,
+                    )
+                })
             }
         }?;
         // Apply the target to the arguments
@@ -420,19 +405,29 @@ impl<A: Arena + Clone> CompileWasm<A> for LambdaCompiledFunctionCall<A> {
         // => [Term...]
         let block = args
             .iter()
-            .fold(Result::<_, CompilerError<_>>::Ok(block), |block, arg| {
-                let block = block?;
-                // Push the argument onto the stack
-                // => [Term...]
-                let block = if options.lazy_function_args {
-                    block.append_inner(|stack| {
-                        LazyExpression::new(arg).compile(stack, state, options)
-                    })
+            .map(|arg| {
+                // Determine the argument eagerness based on the compiler options
+                // (note that we cannot safely declare lambda arguments as strict, as this would change the behavior of
+                // lambdas that pass their arguments to functions that rely on handling intercepted signal arguments)
+                let eagerness = if options.lazy_function_args {
+                    ArgType::Lazy
                 } else {
-                    block.append_inner(|stack| arg.compile(stack, state, options))
-                }?;
-                Ok(block)
-            })?;
+                    ArgType::Eager
+                };
+                (arg, eagerness)
+            })
+            .fold(
+                Result::<_, CompilerError<_>>::Ok(block),
+                |block, (arg, eagerness)| {
+                    let block = block?;
+                    // Push the argument onto the stack
+                    // => [Term...]
+                    let block = block.append_inner(|stack| {
+                        MaybeLazyExpression::new(arg, eagerness).compile(stack, state, options)
+                    })?;
+                    Ok(block)
+                },
+            )?;
         // Call the compiled lambda function
         // => [Term]
         let block = block.push(instruction::runtime::CallCompiledFunction {
@@ -473,9 +468,7 @@ impl<A: Arena + Clone> CompileWasm<A> for ConstructorCompiledFunctionCall<A> {
         } else {
             block.append_inner(|stack| {
                 compile_list(
-                    keys.as_inner()
-                        .iter()
-                        .map(|key| (key, Strictness::NonStrict)),
+                    keys.as_inner().iter().map(|key| (key, ArgType::Eager)),
                     stack,
                     state,
                     options,
@@ -487,39 +480,19 @@ impl<A: Arena + Clone> CompileWasm<A> for ConstructorCompiledFunctionCall<A> {
         let block = if let Some(values) = args.as_internable(ArgType::Strict) {
             block.append_inner(|stack| values.as_term().compile(stack, state, options))
         } else {
-            if options.lazy_constructors {
-                block.append_inner(|stack| {
-                    compile_list(
-                        args.iter()
-                            .map(|value| (LazyExpression::new(value), Strictness::NonStrict)),
-                        stack,
-                        state,
-                        options,
-                    )
-                })
+            let eagerness = if options.lazy_constructors {
+                ArgType::Lazy
             } else {
-                block
-                    .append_inner(|stack| {
-                        compile_list(
-                            args.iter().map(|item| {
-                                // Skip signal-testing for list items that are already fully evaluated to a non-signal value
-                                let strictness =
-                                    if item.is_atomic() && item.as_signal_term().is_none() {
-                                        Strictness::NonStrict
-                                    } else {
-                                        Strictness::Strict
-                                    };
-                                (item, strictness)
-                            }),
-                            stack,
-                            state,
-                            options,
-                        )
-                    })
-                    .map(|block| {
-                        block.push(instruction::runtime::BreakOnSignal { target_block: 0 })
-                    })
-            }
+                ArgType::Strict
+            };
+            block.append_inner(|stack| {
+                compile_list(
+                    args.iter().map(|value| (value, eagerness)),
+                    stack,
+                    state,
+                    options,
+                )
+            })
         }?;
         // Invoke the term constructor
         // => [RecordTerm]
@@ -607,11 +580,6 @@ impl<'a, A: Arena + Clone> CompileWasm<A> for CompiledFunctionCall<'a, A, Stdlib
         let num_positional_args = arity.required().len() + arity.optional().len();
         let num_variadic_args = num_provided_args.saturating_sub(num_positional_args);
         let variadic_args_offset = arity.variadic().map(|_| num_positional_args);
-        let num_strict_args = args_with_eagerness
-            .clone()
-            .filter(|(_, arg_type)| arg_type.is_strict())
-            .count();
-        let has_multiple_strict_args = num_strict_args > 1;
         let block = CompiledBlockBuilder::new(stack);
         // Any strict arguments need to be tested for signals, so while assigning the arguments we keep track of a
         // combined signal term pointer (or null pointer) containing the aggregate of all signals encountered amongst the
@@ -625,23 +593,6 @@ impl<'a, A: Arena + Clone> CompileWasm<A> for CompiledFunctionCall<'a, A, Stdlib
         let (block, num_signal_scopes) = args_with_eagerness
             .enumerate()
             .map(|(index, (arg, arg_type))| {
-                // Determine whether the argument should be evaluated before being being passed into the function
-                let eagerness = match arg_type {
-                    ArgType::Strict | ArgType::Eager => Eagerness::Eager,
-                    ArgType::Lazy => Eagerness::Lazy,
-                };
-                // Determine whether to short-circuit any signals encountered when evaluating this argument
-                let strictness = match arg_type {
-                    ArgType::Strict => {
-                        // Skip signal-testing for arguments that are already fully evaluated to a non-signal value
-                        if arg.is_atomic() && arg.as_signal_term().is_none() {
-                            Strictness::NonStrict
-                        } else {
-                            Strictness::Strict
-                        }
-                    }
-                    ArgType::Eager | ArgType::Lazy => Strictness::NonStrict,
-                };
                 // Determine the index of this argument within the set of variadic arguments
                 let variadic_arg_index = variadic_args_offset.and_then(|variadic_args_offset| {
                     if index >= variadic_args_offset {
@@ -650,15 +601,11 @@ impl<'a, A: Arena + Clone> CompileWasm<A> for CompiledFunctionCall<'a, A, Stdlib
                         None
                     }
                 });
-                (
-                    MaybeLazyExpression::new(arg, eagerness),
-                    strictness,
-                    variadic_arg_index,
-                )
+                (arg, arg_type, variadic_arg_index)
             })
             .fold(
                 Result::<_, CompilerError<_>>::Ok((block, 0usize)),
-                |result, (arg, strictness, variadic_arg_index)| {
+                |result, (arg, arg_type, variadic_arg_index)| {
                     let (block, num_signal_scopes) = result?;
                     // If this is a variadic argument, we need to add it to an argument list rather than leaving it on the stack
                     let block = if let Some(variadic_arg_index) = variadic_arg_index {
@@ -696,39 +643,26 @@ impl<'a, A: Arena + Clone> CompileWasm<A> for CompiledFunctionCall<'a, A, Stdlib
                     // Yield the argument onto the stack
                     // => [Term..., {ListTerm, ListTerm, u32}, Term]
                     let block = block.append_inner(|stack| {
-                        let should_create_signal_boundary = match strictness {
-                            // If the argument is not strict, we need to add a block boundary around this argument to
-                            // prevent any inner signals from breaking out of the current scope
-                            Strictness::NonStrict => true,
-                            // Otherwise if this is a strict argument, if this is the only strict argument it can bubble
-                            // directly to the call site, however if there are multiple strict arguments, we need to add
-                            // a block boundary around each strict argument to allow combining signals before bubbling
-                            // (this ensures that if signals are encountered across multiple arguments, signals will be
-                            // 'caught' at their respective block boundaries, to be combined into a single signal result,
-                            // rather than the first signal short-circuiting all the way to the top level)
-                            Strictness::Strict => has_multiple_strict_args,
-                            // Variadic arguments also need a block boundary to prevent inner signals from breaking out
-                            // of a half-constructed variadic argument list
-                        } || variadic_arg_index.is_some();
-                        if should_create_signal_boundary {
-                            let block_type = TypeSignature {
-                                params: ParamsSignature::Void,
-                                results: ParamsSignature::Single(ValueType::HeapPointer),
-                            };
-                            let inner_stack = stack.enter_block(&block_type)?;
-                            let block = CompiledBlockBuilder::new(stack);
-                            let block = block.push(instruction::core::Block {
-                                block_type,
-                                body: arg.compile(inner_stack, state, options)?,
-                            });
-                            block.finish()
-                        } else {
-                            arg.compile(stack, state, options)
-                        }
+                        let compiled_arg_type = match arg_type {
+                            // All signals encountered when evaluating strict list items must be collected into a single
+                            // aggregated signal before short-circuiting (this ensures that if signals are encountered
+                            // across multiple arguments, signals will be 'caught' at their respective block boundaries
+                            // to be combined into a single signal result, rather than the first signal short-circuiting
+                            // all the way to the top level)
+                            ArgType::Strict => ArgType::Eager,
+                            // If the function signature specifies a lazy argument, however the compiler options define
+                            // function arguments as non-lazy, 'upgrade' the argument to be evaluated eagerly
+                            // (note that we cannot safely upgrade the argument to strict, as this would change the
+                            // behavior of any functions that rely on handling intercepted signal arguments)
+                            ArgType::Lazy if !options.lazy_function_args => ArgType::Eager,
+                            _ => arg_type,
+                        };
+                        MaybeLazyExpression::new(arg, compiled_arg_type)
+                            .compile(stack, state, options)
                     })?;
                     // If this argument needs to be tested for signals, combine the argument's signal result with the accumulated signal result
                     // => [Term..., {ListTerm, ListTerm, u32}, Term]
-                    let (block, num_signal_scopes) = if strictness.is_strict() {
+                    let (block, num_signal_scopes) = if matches!(arg_type, ArgType::Strict) {
                         // Pop the argument from the top of the stack and assign to a temporary lexical scope variable
                         // => [Term..., {ListTerm, ListTerm, u32}]
                         let block = block.push(instruction::core::ScopeStart {
