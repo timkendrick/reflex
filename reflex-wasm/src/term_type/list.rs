@@ -376,6 +376,13 @@ pub(crate) fn collect_compiled_list_values<A: Arena + Clone, T: CompileWasm<A>>(
 ) -> CompilerResult<A> {
     let items = items.into_iter();
     let num_items = items.len();
+    if num_items == 0 {
+        let block = CompiledBlockBuilder::new(stack);
+        let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+            target: RuntimeBuiltin::CreateEmptyList,
+        });
+        return block.finish();
+    }
     let block = CompiledBlockBuilder::new(stack);
     // Push the list capacity onto the stack
     // => [u32]
