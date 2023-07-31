@@ -1013,6 +1013,14 @@ pub(crate) struct CompiledFunctionCallArgs<A: Arena + Clone> {
     pub args: Vec<ArenaRef<TypedTerm<ListTerm>, A>>,
 }
 
+impl<A: Arena + Clone> Default for CompiledFunctionCallArgs<A> {
+    fn default() -> Self {
+        Self {
+            args: Default::default(),
+        }
+    }
+}
+
 impl<A: Arena + Clone> CompiledFunctionCallArgs<A> {
     /// If this function call comprises a single argument list (taking into account partially-applied arguments),
     /// determine whether that argument list is eligible for static term inlining

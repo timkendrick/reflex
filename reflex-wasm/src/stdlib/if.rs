@@ -8,10 +8,12 @@ use crate::{
     compiler::{
         compile_variable_declarations, error::CompilerError, instruction,
         runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder, CompiledFunctionCall,
-        CompilerOptions, CompilerResult, CompilerStack, CompilerState, ParamsSignature,
-        TypeSignature, ValueType,
+        CompiledFunctionCallArgs, CompilerOptions, CompilerResult, CompilerStack, CompilerState,
+        ParamsSignature, TypeSignature, ValueType,
     },
-    term_type::{LambdaTerm, ListTerm, TypedTerm, WasmExpression},
+    term_type::{
+        application::ApplicationFunctionCall, LambdaTerm, ListTerm, TypedTerm, WasmExpression,
+    },
     ArenaRef,
 };
 
@@ -112,9 +114,9 @@ pub(crate) fn compile_conditional_branch<A: Arena + Clone>(
     options: &CompilerOptions,
 ) -> CompilerResult<A> {
     if let Some(factory) = match_nullary_lambda_branch(factory) {
-        compile_lambda_branch(&factory.as_inner().body(), stack, state, options)
+        compile_lambda_conditional_branch(&factory.as_inner().body(), stack, state, options)
     } else if let Some((closure_args, closure)) = match_nullary_closure_branch(factory) {
-        compile_closure_branch(
+        compile_closure_conditional_branch(
             closure_args.as_inner().iter(),
             &closure.as_inner().body(),
             stack,
@@ -152,7 +154,7 @@ fn match_nullary_closure_branch<A: Arena + Clone>(
     })
 }
 
-fn compile_lambda_branch<A: Arena + Clone>(
+fn compile_lambda_conditional_branch<A: Arena + Clone>(
     body: &WasmExpression<A>,
     stack: CompilerStack,
     state: &mut CompilerState,
@@ -163,7 +165,7 @@ fn compile_lambda_branch<A: Arena + Clone>(
     body.compile(stack, state, options)
 }
 
-fn compile_closure_branch<A: Arena + Clone>(
+fn compile_closure_conditional_branch<A: Arena + Clone>(
     closure_initializers: impl IntoIterator<
         Item = WasmExpression<A>,
         IntoIter = impl Iterator<Item = WasmExpression<A>> + ExactSizeIterator,
@@ -207,18 +209,6 @@ fn compile_generic_factory_branch<A: Arena + Clone>(
     state: &mut CompilerState,
     options: &CompilerOptions,
 ) -> CompilerResult<A> {
-    let block = CompiledBlockBuilder::new(stack);
-    // Yield the factory onto the stack
-    // => [Term]
-    let block = block.append_inner(|stack| factory.compile(stack, state, options))?;
-    // Yield a zero-length argument list onto the stack
-    // => [Term, ListTerm]
-    let block = block.push(instruction::runtime::CallRuntimeBuiltin {
-        target: RuntimeBuiltin::CreateEmptyList,
-    });
-    // Apply the factory, leaving the result on the stack
-    // => [Term]
-    let block = block.push(instruction::runtime::Apply);
-    // Return the completed block
-    block.finish()
+    ApplicationFunctionCall::from((factory.clone(), CompiledFunctionCallArgs::default()))
+        .compile(stack, state, options)
 }

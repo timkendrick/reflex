@@ -241,7 +241,7 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<ApplicationTerm, A> {
 }
 
 #[derive(Debug, Clone)]
-enum ApplicationFunctionCall<A: Arena + Clone> {
+pub(crate) enum ApplicationFunctionCall<A: Arena + Clone> {
     /// Unknown application target (e.g. return value of another application)
     Generic(GenericCompiledFunctionCall<A>),
     /// Stdlib application target
@@ -282,6 +282,15 @@ impl<A: Arena + Clone> ApplicationFunctionCall<A> {
         let args = CompiledFunctionCallArgs {
             args: combined_args,
         };
+        Self::from((target, args))
+    }
+}
+
+impl<A: Arena + Clone> From<(WasmExpression<A>, CompiledFunctionCallArgs<A>)>
+    for ApplicationFunctionCall<A>
+{
+    fn from(value: (WasmExpression<A>, CompiledFunctionCallArgs<A>)) -> Self {
+        let (target, args) = value;
         if let Some(target) = target.as_builtin_term().cloned() {
             ApplicationFunctionCall::Builtin(BuiltinCompiledFunctionCall { target, args })
         } else if let Some(target) = target.as_constructor_term().cloned() {
