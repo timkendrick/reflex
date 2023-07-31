@@ -6,8 +6,8 @@ use std::{collections::HashSet, iter::once, marker::PhantomData};
 
 use reflex::{
     core::{
-        DependencyList, Expression, GraphNode, HashmapTermType, HashsetTermType, NodeId, RefType,
-        SerializeJson, StackOffset,
+        ArgType, DependencyList, Expression, GraphNode, HashmapTermType, HashsetTermType, NodeId,
+        RefType, SerializeJson, StackOffset,
     },
     hash::HashId,
 };
@@ -19,7 +19,7 @@ use crate::{
     compiler::{
         error::CompilerError, instruction, runtime::builtin::RuntimeBuiltin, CompileWasm,
         CompiledBlockBuilder, CompilerOptions, CompilerResult, CompilerStack, CompilerState,
-        ConstValue, Eagerness, Internable, ValueType,
+        ConstValue, Internable, ValueType,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{TermType, TypedTerm, WasmExpression},
@@ -575,7 +575,7 @@ impl<TInner: Iterator<Item = HashmapBucket>> ExactSizeIterator for HashmapBucket
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<HashmapTerm, A> {
-    fn should_intern(&self, eager: Eagerness) -> bool {
+    fn should_intern(&self, eager: ArgType) -> bool {
         self.keys().all(|term| term.should_intern(eager))
             && self.values().all(|term| term.should_intern(eager))
     }

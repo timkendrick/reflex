@@ -7,7 +7,7 @@ use std::{
 };
 
 use reflex::{
-    core::{Arity, GraphNode, NodeId, StackOffset},
+    core::{ArgType, Arity, GraphNode, NodeId, StackOffset},
     hash::IntMap,
 };
 use reflex_utils::Stack;
@@ -42,7 +42,21 @@ pub trait TypedCompilerBlock {
 }
 
 pub trait Internable {
-    fn should_intern(&self, eager: Eagerness) -> bool;
+    /// Many terms are capable of being serialized directly into a heap memory snapshot, allowing them to be referenced
+    /// directly from the VM heap at runtime via a static pointer address rather than having to be dynamically
+    /// constructed at runtime via a potentially costly sequence of compiled interpreter instructions.
+    ///
+    /// This method determines whether the current term should be serialized into a memory snapshot, or compiled into a
+    /// sequence of interpreter instructions.
+    ///
+    /// - Atomic 'pure data' terms whose evaluation does not affect control flow should always be inlined, as this will
+    /// give the same result as constructing them dynamically via compiled interpreter instructions
+    /// - Terms such as lambdas or variable declarations can take advantage of compiler optimizations and are therefore
+    /// typically not inlined
+    /// - Some terms such as signals or function applications can cause control flow to break out of the current scope
+    /// when evaluated in a strict context, and therefore should be conditionally inlined depending on the desired
+    /// eagerness in order not to lose their additional behavior when evaluated in a strict context
+    fn should_intern(&self, eager: ArgType) -> bool;
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Hash, Debug)]
@@ -1025,7 +1039,7 @@ pub(crate) struct CompiledFunctionCallArgs<A: Arena + Clone> {
 impl<A: Arena + Clone> CompiledFunctionCallArgs<A> {
     /// If this function call comprises a single argument list (taking into account partially-applied arguments),
     /// determine whether that argument list is eligible for static term inlining
-    pub fn as_internable(&self, eager: Eagerness) -> Option<ArenaRef<TypedTerm<ListTerm>, A>> {
+    pub fn as_internable(&self, eager: ArgType) -> Option<ArenaRef<TypedTerm<ListTerm>, A>> {
         if self.args.len() != 1 {
             return None;
         }
@@ -1134,7 +1148,7 @@ impl<A: Arena + Clone> CompileWasm<A> for CompiledFunctionCallArgs<A> {
         let internable_arg_list = if self.args.len() == 1 {
             self.args
                 .first()
-                .filter(|arg_list| arg_list.as_term().should_intern(Eagerness::Eager))
+                .filter(|arg_list| arg_list.as_term().should_intern(ArgType::Strict))
         } else {
             None
         };
@@ -1333,7 +1347,7 @@ impl<A: Arena + Clone> CompileWasm<A> for LazyExpression<A> {
         if self.inner.is_static() {
             return self.inner.compile(stack, state, options);
         }
-        if self.inner.should_intern(Eagerness::Lazy) {
+        if self.inner.should_intern(ArgType::Lazy) {
             intern_static_value(&self.inner, state)
         } else {
             // Compile the thunk
@@ -1551,7 +1565,7 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<Term, A> {
         state: &mut CompilerState,
         options: &CompilerOptions,
     ) -> CompilerResult<A> {
-        if self.should_intern(Eagerness::Eager) {
+        if self.should_intern(ArgType::Strict) {
             let compiled_heap_pointer = intern_static_value(self, state)?;
             let result = if self.is_static() {
                 Ok(compiled_heap_pointer)

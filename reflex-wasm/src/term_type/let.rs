@@ -5,7 +5,7 @@
 use std::collections::HashSet;
 
 use reflex::core::{
-    DependencyList, Expression, GraphNode, LetTermType, SerializeJson, StackOffset,
+    ArgType, DependencyList, Expression, GraphNode, LetTermType, SerializeJson, StackOffset,
 };
 use reflex_macros::PointerIter;
 use serde_json::Value as JsonValue;
@@ -161,7 +161,7 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<LetTerm, A> {
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<LetTerm, A> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
+    fn should_intern(&self, _eager: ArgType) -> bool {
         false
     }
 }

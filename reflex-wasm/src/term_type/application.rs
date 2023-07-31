@@ -212,11 +212,15 @@ fn get_eager_args<T>(args: impl IntoIterator<Item = T>, arity: &Arity) -> impl I
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<ApplicationTerm, A> {
-    fn should_intern(&self, eager: Eagerness) -> bool {
-        matches!(eager, Eagerness::Lazy)
-            && self.target().is_static()
-            && self.target().should_intern(eager)
-            && self.args().as_inner().should_intern(eager)
+    fn should_intern(&self, eager: ArgType) -> bool {
+        match eager {
+            ArgType::Strict | ArgType::Eager => false,
+            ArgType::Lazy => {
+                self.target().is_static()
+                    && self.target().should_intern(eager)
+                    && self.args().as_inner().should_intern(eager)
+            }
+        }
     }
 }
 
@@ -334,7 +338,7 @@ impl<A: Arena + Clone> CompileWasm<A> for GenericCompiledFunctionCall<A> {
         let block = {
             // If this function call comprises a single argument list (taking into account partially-applied arguments),
             // and that argument list is eligible for static term inlining, delegate to the underlying implementation
-            if let Some(args) = args.as_internable(Eagerness::Eager) {
+            if let Some(args) = args.as_internable(ArgType::Strict) {
                 block.append_inner(|stack| args.as_term().compile(stack, state, options))
             } else {
                 // Otherwise compile the combined argument sequence into a list according to the compiler eagerness strategy
@@ -464,7 +468,7 @@ impl<A: Arena + Clone> CompileWasm<A> for ConstructorCompiledFunctionCall<A> {
         let block = CompiledBlockBuilder::new(stack);
         // Yield the key list onto the stack
         // => [ListTerm]
-        let block = if keys.as_term().should_intern(Eagerness::Eager) {
+        let block = if keys.as_term().should_intern(ArgType::Strict) {
             block.append_inner(|stack| keys.as_term().compile(stack, state, options))
         } else {
             block.append_inner(|stack| {
@@ -480,7 +484,7 @@ impl<A: Arena + Clone> CompileWasm<A> for ConstructorCompiledFunctionCall<A> {
         }?;
         // Yield the value list onto the stack
         // => [ListTerm, ListTerm]
-        let block = if let Some(values) = args.as_internable(Eagerness::Eager) {
+        let block = if let Some(values) = args.as_internable(ArgType::Strict) {
             block.append_inner(|stack| values.as_term().compile(stack, state, options))
         } else {
             if options.lazy_constructors {

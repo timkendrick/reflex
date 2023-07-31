@@ -6,7 +6,7 @@ use std::{collections::HashSet, ops::Deref, slice, str::from_utf8_unchecked};
 
 use reflex::{
     core::{
-        DependencyList, Expression, GraphNode, SerializeJson, StackOffset, StringTermType,
+        ArgType, DependencyList, Expression, GraphNode, SerializeJson, StackOffset, StringTermType,
         StringValue,
     },
     hash::HashId,
@@ -18,8 +18,8 @@ use crate::{
     allocator::{Arena, ArenaAllocator},
     compiler::{
         instruction, runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder,
-        CompilerOptions, CompilerResult, CompilerStack, CompilerState, ConstValue, Eagerness,
-        Internable, ValueType,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState, ConstValue, Internable,
+        ValueType,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{TermType, TypedTerm, WasmExpression},
@@ -270,7 +270,7 @@ fn get_string_chunks(value: &str) -> Vec<u32> {
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<StringTerm, A> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
+    fn should_intern(&self, _eager: ArgType) -> bool {
         true
     }
 }

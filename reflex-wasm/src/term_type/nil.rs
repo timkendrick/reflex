@@ -5,7 +5,7 @@
 use std::collections::HashSet;
 
 use reflex::core::{
-    DependencyList, Expression, GraphNode, NilTermType, RecursiveTermType, SerializeJson,
+    ArgType, DependencyList, Expression, GraphNode, NilTermType, RecursiveTermType, SerializeJson,
     StackOffset,
 };
 use reflex_macros::PointerIter;
@@ -15,7 +15,7 @@ use crate::{
     allocator::Arena,
     compiler::{
         instruction, runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder,
-        CompilerOptions, CompilerResult, CompilerStack, CompilerState, Eagerness, Internable,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState, Internable,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{TypedTerm, WasmExpression},
@@ -109,7 +109,7 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<NilTerm, A> {
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<NilTerm, A> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
+    fn should_intern(&self, _eager: ArgType) -> bool {
         true
     }
 }

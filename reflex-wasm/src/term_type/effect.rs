@@ -5,7 +5,7 @@
 use std::collections::HashSet;
 
 use reflex::core::{
-    DependencyList, EffectTermType, Expression, GraphNode, SerializeJson, StackOffset,
+    ArgType, DependencyList, EffectTermType, Expression, GraphNode, SerializeJson, StackOffset,
 };
 use reflex_macros::PointerIter;
 use serde_json::Value as JsonValue;
@@ -15,7 +15,7 @@ use crate::{
     compiler::{
         error::CompilerError, instruction, runtime::builtin::RuntimeBuiltin, CompileWasm,
         CompiledBlockBuilder, CompilerOptions, CompilerResult, CompilerStack, CompilerState,
-        Eagerness, Internable, ParamsSignature, TypeSignature, ValueType,
+        Internable, ParamsSignature, TypeSignature, ValueType,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{ConditionTerm, TypedTerm, WasmExpression},
@@ -130,8 +130,8 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<EffectTerm, A> {
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<EffectTerm, A> {
-    fn should_intern(&self, eager: Eagerness) -> bool {
-        matches!(eager, Eagerness::Lazy) && self.condition().as_inner().should_intern(eager)
+    fn should_intern(&self, eager: ArgType) -> bool {
+        matches!(eager, ArgType::Lazy) && self.condition().as_inner().should_intern(eager)
     }
 }
 

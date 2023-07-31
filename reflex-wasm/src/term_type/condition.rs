@@ -5,7 +5,8 @@
 use std::{collections::HashSet, marker::PhantomData};
 
 use reflex::core::{
-    ConditionType, DependencyList, GraphNode, SerializeJson, SignalType, StackOffset, StateToken,
+    ArgType, ConditionType, DependencyList, GraphNode, SerializeJson, SignalType, StackOffset,
+    StateToken,
 };
 use serde_json::Value as JsonValue;
 use strum_macros::EnumDiscriminants;
@@ -14,8 +15,7 @@ use crate::{
     allocator::Arena,
     compiler::{
         instruction, runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder,
-        CompilerOptions, CompilerResult, CompilerStack, CompilerState, ConstValue, Eagerness,
-        Internable,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState, ConstValue, Internable,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{ListTerm, TermTypeDiscriminants, TypedTerm, WasmExpression},
@@ -585,7 +585,7 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<ConditionTerm, A> {
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<ConditionTerm, A> {
-    fn should_intern(&self, eager: Eagerness) -> bool {
+    fn should_intern(&self, eager: ArgType) -> bool {
         match self.condition_type() {
             ConditionTermDiscriminants::Custom => self
                 .as_typed_condition::<CustomCondition>()
@@ -830,10 +830,10 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<CustomCondition, A> {
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<CustomCondition, A> {
-    fn should_intern(&self, eager: Eagerness) -> bool {
-        self.effect_type().should_intern(eager)
-            && self.payload().should_intern(eager)
-            && self.token().should_intern(eager)
+    fn should_intern(&self, _eager: ArgType) -> bool {
+        self.effect_type().should_intern(ArgType::Lazy)
+            && self.payload().should_intern(ArgType::Lazy)
+            && self.token().should_intern(ArgType::Lazy)
     }
 }
 
@@ -915,7 +915,7 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<PendingCondition, A> {
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<PendingCondition, A> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
+    fn should_intern(&self, _eager: ArgType) -> bool {
         true
     }
 }
@@ -1008,8 +1008,8 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<ErrorCondition, A> {
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<ErrorCondition, A> {
-    fn should_intern(&self, eager: Eagerness) -> bool {
-        self.payload().should_intern(eager)
+    fn should_intern(&self, _eager: ArgType) -> bool {
+        self.payload().should_intern(ArgType::Lazy)
     }
 }
 
@@ -1103,8 +1103,8 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<TypeErrorCondition, A> {
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<TypeErrorCondition, A> {
-    fn should_intern(&self, eager: Eagerness) -> bool {
-        self.payload().should_intern(eager)
+    fn should_intern(&self, _eager: ArgType) -> bool {
+        self.payload().should_intern(ArgType::Lazy)
     }
 }
 
@@ -1194,8 +1194,8 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<InvalidFunctionTargetCondition, A>
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<InvalidFunctionTargetCondition, A> {
-    fn should_intern(&self, eager: Eagerness) -> bool {
-        self.target().should_intern(eager)
+    fn should_intern(&self, _eager: ArgType) -> bool {
+        self.target().should_intern(ArgType::Lazy)
     }
 }
 
@@ -1307,11 +1307,11 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<InvalidFunctionArgsCondition, A> {
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<InvalidFunctionArgsCondition, A> {
-    fn should_intern(&self, eager: Eagerness) -> bool {
+    fn should_intern(&self, _eager: ArgType) -> bool {
         self.target()
-            .map(|term| term.should_intern(eager))
+            .map(|term| term.should_intern(ArgType::Lazy))
             .unwrap_or(true)
-            && self.args().as_inner().should_intern(eager)
+            && self.args().as_inner().should_intern(ArgType::Lazy)
     }
 }
 
@@ -1393,7 +1393,7 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<InvalidPointerCondition, A> {
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<InvalidPointerCondition, A> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
+    fn should_intern(&self, _eager: ArgType) -> bool {
         true
     }
 }

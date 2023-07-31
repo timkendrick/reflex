@@ -5,7 +5,7 @@
 use std::collections::HashSet;
 
 use reflex::core::{
-    DependencyList, GraphNode, SerializeJson, StackOffset, SymbolId, SymbolTermType,
+    ArgType, DependencyList, GraphNode, SerializeJson, StackOffset, SymbolId, SymbolTermType,
 };
 use reflex_macros::PointerIter;
 use serde_json::Value as JsonValue;
@@ -14,8 +14,7 @@ use crate::{
     allocator::Arena,
     compiler::{
         instruction, runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder,
-        CompilerOptions, CompilerResult, CompilerStack, CompilerState, ConstValue, Eagerness,
-        Internable,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState, ConstValue, Internable,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::TypedTerm,
@@ -118,7 +117,7 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<SymbolTerm, A> {
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<SymbolTerm, A> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
+    fn should_intern(&self, _eager: ArgType) -> bool {
         true
     }
 }

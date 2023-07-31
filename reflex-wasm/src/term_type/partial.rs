@@ -17,7 +17,7 @@ use crate::{
     compiler::{
         get_compiled_function_arity, instruction, runtime::builtin::RuntimeBuiltin, CompileWasm,
         CompiledBlockBuilder, CompilerOptions, CompilerResult, CompilerStack, CompilerState,
-        Eagerness, Internable, LazyExpression, MaybeLazyExpression, Strictness,
+        Internable, LazyExpression, MaybeLazyExpression, Strictness,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{list::compile_list, ListTerm, TypedTerm, WasmExpression},
@@ -209,7 +209,7 @@ fn get_eager_args<T>(args: impl IntoIterator<Item = T>, arity: &Arity) -> impl I
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<PartialTerm, A> {
-    fn should_intern(&self, eager: Eagerness) -> bool {
+    fn should_intern(&self, eager: ArgType) -> bool {
         self.target().should_intern(eager) && self.args().as_inner().should_intern(eager)
     }
 }
@@ -227,38 +227,37 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<PartialTerm, A> {
         if num_partial_args == 0 {
             return target.compile(stack, state, options);
         }
+        // Attempt to determine the application target arity according to the compiler eagerness strategy
+        // (this is only possible for static function calls)
+        let target_arity = get_compiled_function_arity(&target, options);
+        // If the target arity is known, drop any excess partially-applied arguments
+        let num_args = match target_arity {
+            None => num_partial_args,
+            Some(arity) => num_partial_args.min((0..num_partial_args).zip(arity.iter()).count()),
+        };
         let block = CompiledBlockBuilder::new(stack);
         // Push the partial application target onto the stack
         // => [Term]
         let block = block.append_inner(|stack| target.compile(stack, state, options))?;
         // Push the partial application arguments onto the stack
         // => [Term, ListTerm]
-        let block = if args.as_term().should_intern(Eagerness::Eager) {
+        let block = if num_args == num_partial_args && args.as_term().should_intern(ArgType::Strict)
+        {
             block.append_inner(|stack| args.as_term().compile(stack, state, options))
         } else {
-            // Attempt to determine the application target arity according to the compiler eagerness strategy
-            // (this is only possible for static function calls)
-            let target_arity = get_compiled_function_arity(&target, options);
-            // If the target arity is known, drop any excess partially-applied arguments
-            let num_partial_args = match target_arity {
-                None => num_partial_args,
-                Some(arity) => {
-                    num_partial_args.min((0..num_partial_args).zip(arity.iter()).count())
-                }
-            };
             // Compile the partial application argumens into a list according to the target arity and compiler eagerness strategy
             block.append_inner(|stack| {
                 compile_list(
                     WithExactSizeIterator::new(
-                        num_partial_args,
+                        num_args,
                         args.as_inner()
                             .iter()
                             .zip(
                                 target_arity
                                     .unwrap_or(if options.lazy_function_args {
-                                        Arity::lazy(num_partial_args, 0, false)
+                                        Arity::lazy(num_args, 0, false)
                                     } else {
-                                        Arity::strict(num_partial_args, 0, false)
+                                        Arity::strict(num_args, 0, false)
                                     })
                                     .iter(),
                             )

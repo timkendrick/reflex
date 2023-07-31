@@ -5,7 +5,9 @@
 use std::{cell::RefCell, collections::HashSet, marker::PhantomData, rc::Rc};
 
 use reflex::{
-    core::{Arity, DependencyList, Expression, GraphNode, NodeId, SerializeJson, StackOffset},
+    core::{
+        ArgType, Arity, DependencyList, Expression, GraphNode, NodeId, SerializeJson, StackOffset,
+    },
     hash::HashId,
 };
 use serde_json::Value as JsonValue;
@@ -13,7 +15,7 @@ use strum_macros::EnumDiscriminants;
 
 use crate::{
     allocator::{Arena, ArenaAllocator},
-    compiler::{Eagerness, Internable},
+    compiler::Internable,
     factory::WasmTermFactory,
     hash::{TermHash, TermHasher, TermSize},
     stdlib::Stdlib,
@@ -591,7 +593,7 @@ impl<A: Arena + Clone> PointerIter for ArenaRef<Term, A> {
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<Term, A> {
-    fn should_intern(&self, eager: Eagerness) -> bool {
+    fn should_intern(&self, eager: ArgType) -> bool {
         match self.read_value(|term| term.type_id()) {
             TermTypeDiscriminants::Application => self
                 .as_typed_term::<ApplicationTerm>()

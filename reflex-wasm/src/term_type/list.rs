@@ -6,8 +6,8 @@ use std::{collections::HashSet, iter::once};
 
 use reflex::{
     core::{
-        DependencyList, Expression, ExpressionListType, GraphNode, ListTermType, SerializeJson,
-        StackOffset, StructPrototypeType,
+        ArgType, DependencyList, Expression, ExpressionListType, GraphNode, ListTermType,
+        SerializeJson, StackOffset, StructPrototypeType,
     },
     hash::HashId,
 };
@@ -19,8 +19,8 @@ use crate::{
     compiler::{
         error::CompilerError, instruction, runtime::builtin::RuntimeBuiltin, CompileWasm,
         CompiledBlockBuilder, CompilerOptions, CompilerResult, CompilerStack, CompilerState,
-        ConstValue, Eagerness, Internable, LazyExpression, ParamsSignature, Strictness,
-        TypeSignature, ValueType,
+        ConstValue, Internable, LazyExpression, ParamsSignature, Strictness, TypeSignature,
+        ValueType,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{TermType, TypedTerm, WasmExpression},
@@ -308,7 +308,7 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<ListTerm, A> {
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<ListTerm, A> {
-    fn should_intern(&self, eager: Eagerness) -> bool {
+    fn should_intern(&self, eager: ArgType) -> bool {
         self.iter().all(|item| item.should_intern(eager))
     }
 }

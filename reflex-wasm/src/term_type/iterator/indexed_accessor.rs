@@ -3,7 +3,7 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 use std::collections::HashSet;
 
-use reflex::core::{DependencyList, GraphNode, SerializeJson, StackOffset};
+use reflex::core::{ArgType, DependencyList, GraphNode, SerializeJson, StackOffset};
 use reflex_macros::PointerIter;
 use serde_json::Value as JsonValue;
 
@@ -11,8 +11,7 @@ use crate::{
     allocator::Arena,
     compiler::{
         instruction, runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder,
-        CompilerOptions, CompilerResult, CompilerStack, CompilerState, ConstValue, Eagerness,
-        Internable,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState, ConstValue, Internable,
     },
     hash::{TermHash, TermHasher, TermSize},
     ArenaPointer, ArenaRef, Term,
@@ -116,8 +115,8 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<IndexedAccessorIteratorTerm, A> {
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<IndexedAccessorIteratorTerm, A> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
-        self.capture_depth() == 0
+    fn should_intern(&self, eager: ArgType) -> bool {
+        self.source().should_intern(eager)
     }
 }
 

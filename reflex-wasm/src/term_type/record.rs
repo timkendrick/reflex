@@ -5,8 +5,8 @@
 use std::collections::HashSet;
 
 use reflex::core::{
-    DependencyList, Expression, GraphNode, HashmapTermType, NodeId, RecordTermType, SerializeJson,
-    StackOffset,
+    ArgType, DependencyList, Expression, GraphNode, HashmapTermType, NodeId, RecordTermType,
+    SerializeJson, StackOffset,
 };
 use reflex_utils::json::is_empty_json_object;
 use serde_json::{Map as JsonMap, Value as JsonValue};
@@ -15,8 +15,8 @@ use crate::{
     allocator::Arena,
     compiler::{
         instruction, runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder,
-        CompilerOptions, CompilerResult, CompilerStack, CompilerState, Eagerness, Internable,
-        LazyExpression, Strictness,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState, Internable, LazyExpression,
+        Strictness,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{hashmap::HashmapTerm, list::compile_list, ListTerm, TypedTerm, WasmExpression},
@@ -287,7 +287,7 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<RecordTerm, A> {
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<RecordTerm, A> {
-    fn should_intern(&self, eager: Eagerness) -> bool {
+    fn should_intern(&self, eager: ArgType) -> bool {
         self.keys().as_inner().should_intern(eager) && self.values().as_inner().should_intern(eager)
     }
 }
@@ -304,7 +304,7 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<RecordTerm, A> {
         let block = CompiledBlockBuilder::new(stack);
         // Collect the property keys list onto the stack
         // => [ListTerm]
-        let block = if keys.as_term().should_intern(Eagerness::Eager) {
+        let block = if keys.as_term().should_intern(ArgType::Strict) {
             block.append_inner(|stack| keys.as_term().compile(stack, state, options))
         } else {
             block.append_inner(|stack| {
@@ -320,7 +320,7 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<RecordTerm, A> {
         }?;
         // Collect the property values list onto the stack
         // => [ListTerm]
-        let block = if values.as_term().should_intern(Eagerness::Eager) {
+        let block = if values.as_term().should_intern(ArgType::Strict) {
             block.append_inner(|stack| values.as_term().compile(stack, state, options))
         } else {
             if options.lazy_record_values {

@@ -5,7 +5,8 @@
 use std::{collections::HashSet, iter::once};
 
 use reflex::core::{
-    DependencyList, GraphNode, HashmapTermType, HashsetTermType, SerializeJson, StackOffset,
+    ArgType, DependencyList, GraphNode, HashmapTermType, HashsetTermType, SerializeJson,
+    StackOffset,
 };
 use reflex_macros::PointerIter;
 use reflex_utils::MapIntoIterator;
@@ -15,7 +16,7 @@ use crate::{
     allocator::Arena,
     compiler::{
         instruction, runtime::builtin::RuntimeBuiltin, CompileWasm, CompiledBlockBuilder,
-        CompilerOptions, CompilerResult, CompilerStack, CompilerState, Eagerness, Internable,
+        CompilerOptions, CompilerResult, CompilerStack, CompilerState, Internable,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{
@@ -214,7 +215,7 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<HashsetTerm, A> {
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<HashsetTerm, A> {
-    fn should_intern(&self, eager: Eagerness) -> bool {
+    fn should_intern(&self, eager: ArgType) -> bool {
         self.entries().as_inner().should_intern(eager)
     }
 }

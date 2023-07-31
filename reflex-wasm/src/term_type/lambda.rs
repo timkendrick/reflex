@@ -5,7 +5,8 @@
 use std::collections::HashSet;
 
 use reflex::core::{
-    Arity, DependencyList, Expression, GraphNode, LambdaTermType, SerializeJson, StackOffset,
+    ArgType, Arity, DependencyList, Expression, GraphNode, LambdaTermType, SerializeJson,
+    StackOffset,
 };
 use reflex_macros::PointerIter;
 use serde_json::Value as JsonValue;
@@ -15,8 +16,8 @@ use crate::{
     compiler::{
         error::CompilerError, instruction, runtime::builtin::RuntimeBuiltin, CompileWasm,
         CompiledBlockBuilder, CompiledFunctionId, CompiledLambda, CompilerOptions, CompilerResult,
-        CompilerStack, CompilerState, ConstValue, Eagerness, FunctionPointer, Internable,
-        ParamsSignature, TypeSignature, ValueType,
+        CompilerStack, CompilerState, ConstValue, FunctionPointer, Internable, ParamsSignature,
+        TypeSignature, ValueType,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{TypedTerm, WasmExpression},
@@ -157,7 +158,7 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<LambdaTerm, A> {
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<LambdaTerm, A> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
+    fn should_intern(&self, _eager: ArgType) -> bool {
         false
     }
 }

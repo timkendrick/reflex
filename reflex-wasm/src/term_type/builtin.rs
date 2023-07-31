@@ -6,8 +6,8 @@ use std::collections::HashSet;
 
 use reflex::{
     core::{
-        Arity, BuiltinTermType, CompiledFunctionTermType, DependencyList, Expression, GraphNode,
-        SerializeJson, StackOffset,
+        ArgType, Arity, BuiltinTermType, CompiledFunctionTermType, DependencyList, Expression,
+        GraphNode, SerializeJson, StackOffset,
     },
     hash::HashId,
 };
@@ -19,7 +19,7 @@ use crate::{
     compiler::{
         error::CompilerError, instruction, runtime::builtin::RuntimeBuiltin, CompileWasm,
         CompiledBlockBuilder, CompilerOptions, CompilerResult, CompilerStack, CompilerState,
-        ConstValue, Eagerness, FunctionPointer, Internable,
+        ConstValue, FunctionPointer, Internable,
     },
     hash::{TermHash, TermHasher, TermSize},
     stdlib::Stdlib,
@@ -200,7 +200,7 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<BuiltinTerm, A> {
 }
 
 impl<A: Arena + Clone> Internable for ArenaRef<BuiltinTerm, A> {
-    fn should_intern(&self, _eager: Eagerness) -> bool {
+    fn should_intern(&self, _eager: ArgType) -> bool {
         true
     }
 }
