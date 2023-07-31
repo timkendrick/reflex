@@ -709,7 +709,7 @@ impl<'a, A: Arena + Clone> CompileWasm<A> for CompiledFunctionCall<'a, A, Stdlib
                         let block = block.push(instruction::runtime::CallRuntimeBuiltin {
                             target: RuntimeBuiltin::IsSignal,
                         });
-                        // Determine whether the argument is a signal term
+                        // Select either the argument value or the null pointer, depending on whether the argument is a signal term
                         // => [Term..., {ListTerm, ListTerm, u32}, Term, {Option<SignalTerm>}, Option<SignalTerm>]
                         let block = block.push(instruction::core::Select {
                             value_type: ValueType::HeapPointer,
