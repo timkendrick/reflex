@@ -20,8 +20,8 @@ use pin_project::pin_project;
 use reflex::{
     cache::SubstitutionCache,
     core::{
-        Applicable, ConditionType, Expression, ExpressionFactory, HeapAllocator, Reducible,
-        Rewritable, StateCache,
+        Applicable, ArgType, ConditionType, Expression, ExpressionFactory, HeapAllocator,
+        Reducible, Rewritable, StateCache,
     },
 };
 use reflex_cli::{builtins::CliBuiltins, format_signal_result, repl};
@@ -101,8 +101,9 @@ use reflex_wasm::{
     cli::compile::{
         parse_and_compile_module, CompilerRootConfig, ExpressionFactoryEntryPoint,
         JavaScriptCompilerRootConfig, JsonCompilerRootConfig, LispCompilerRootConfig,
-        ModuleEntryPoint, RuntimeEntryPointSyntax, WasmCompilerOptions,
+        ModuleEntryPoint, RuntimeEntryPointSyntax, WasmCompilerOptions, WasmCompilerRuntimeOptions,
     },
+    compiler::CompilerOptions,
     interpreter::WasmProgram,
 };
 
@@ -134,6 +135,27 @@ struct Args {
     /// Skip compiler optimizations
     #[clap(long)]
     unoptimized: bool,
+    /// Compile array items as lazily-evaluated expressions
+    #[clap(long)]
+    lazy_list_items: bool,
+    /// Compile record field values as lazily-evaluated expressions
+    #[clap(long)]
+    lazy_record_values: bool,
+    /// Compile function call arguments as lazily-evaluated expressions
+    #[clap(long)]
+    lazy_function_args: bool,
+    /// Compile variable initializer values as lazily-evaluated expressions
+    #[clap(long)]
+    lazy_variable_initializers: bool,
+    /// Compile lambda arguments as lazily-evaluated expressions
+    #[clap(long)]
+    lazy_lambda_args: bool,
+    /// Compile constructor arguments as lazily-evaluated expressions
+    #[clap(long)]
+    lazy_constructors: bool,
+    /// Wrap compiled lambdas in argument memoization wrappers
+    #[clap(long)]
+    memoize_lambdas: bool,
     /// Dump heap snapshots for any queries that return error results
     #[clap(long)]
     dump_heap_snapshot: Option<WasmHeapDumpMode>,
@@ -171,6 +193,49 @@ pub async fn main() -> Result<()> {
                 .map(Some),
             _ => Ok(None),
         }?;
+    let compiler_options = {
+        let defaults = WasmCompilerOptions::default();
+        WasmCompilerOptions {
+            compiler: {
+                let defaults = CompilerOptions::default();
+                CompilerOptions {
+                    lazy_record_values: match args.lazy_record_values {
+                        true => ArgType::Lazy,
+                        false => defaults.lazy_record_values,
+                    },
+                    lazy_list_items: match args.lazy_list_items {
+                        true => ArgType::Lazy,
+                        false => defaults.lazy_list_items,
+                    },
+                    lazy_variable_initializers: match args.lazy_variable_initializers {
+                        true => ArgType::Lazy,
+                        false => defaults.lazy_variable_initializers,
+                    },
+                    lazy_function_args: match args.lazy_function_args {
+                        true => true,
+                        false => defaults.lazy_function_args,
+                    },
+                    lazy_lambda_args: match args.lazy_lambda_args {
+                        true => ArgType::Lazy,
+                        false => defaults.lazy_lambda_args,
+                    },
+                    lazy_constructors: match args.lazy_constructors {
+                        true => ArgType::Lazy,
+                        false => defaults.lazy_constructors,
+                    },
+                    ..defaults
+                }
+            },
+            runtime: {
+                let defaults = WasmCompilerRuntimeOptions::default();
+                WasmCompilerRuntimeOptions {
+                    memoize_lambdas: args.memoize_lambdas,
+                    ..defaults
+                }
+            },
+            ..defaults
+        }
+    };
     match input_path {
         None => {
             let syntax = args
@@ -239,7 +304,7 @@ pub async fn main() -> Result<()> {
                         RUNTIME_BYTES,
                         &factory,
                         &allocator,
-                        &WasmCompilerOptions::default(),
+                        &compiler_options,
                         unoptimized,
                     )
                     .with_context(|| "Failed to compile entry point: {input_path}")

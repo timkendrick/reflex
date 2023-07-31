@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use reflex::core::{Expression, ExpressionFactory, HeapAllocator, SignalType};
+use reflex::core::{ArgType, Expression, ExpressionFactory, HeapAllocator, SignalType};
 use reflex_wasm::{compiler::CompilerOptions, stdlib};
 
 use crate::{compiler::runner::run_scenario, WasmTestScenario};
@@ -42,8 +42,8 @@ where
 {
     fn options(&self) -> CompilerOptions {
         CompilerOptions {
-            lazy_record_values: true,
-            lazy_variable_initializers: false,
+            lazy_record_values: ArgType::Lazy,
+            lazy_variable_initializers: ArgType::Eager,
             ..Default::default()
         }
     }
@@ -86,8 +86,8 @@ where
 {
     fn options(&self) -> CompilerOptions {
         CompilerOptions {
-            lazy_record_values: true,
-            lazy_variable_initializers: false,
+            lazy_record_values: ArgType::Lazy,
+            lazy_variable_initializers: ArgType::Eager,
             ..Default::default()
         }
     }
@@ -133,8 +133,8 @@ where
 {
     fn options(&self) -> CompilerOptions {
         CompilerOptions {
-            lazy_record_values: true,
-            lazy_variable_initializers: false,
+            lazy_record_values: ArgType::Lazy,
+            lazy_variable_initializers: ArgType::Eager,
             ..Default::default()
         }
     }
@@ -213,8 +213,8 @@ where
 {
     fn options(&self) -> CompilerOptions {
         CompilerOptions {
-            lazy_record_values: true,
-            lazy_variable_initializers: false,
+            lazy_record_values: ArgType::Lazy,
+            lazy_variable_initializers: ArgType::Eager,
             ..Default::default()
         }
     }
@@ -318,8 +318,8 @@ where
 {
     fn options(&self) -> CompilerOptions {
         CompilerOptions {
-            lazy_record_values: true,
-            lazy_variable_initializers: false,
+            lazy_record_values: ArgType::Lazy,
+            lazy_variable_initializers: ArgType::Eager,
             ..Default::default()
         }
     }
@@ -380,8 +380,8 @@ where
 {
     fn options(&self) -> CompilerOptions {
         CompilerOptions {
-            lazy_record_values: true,
-            lazy_variable_initializers: false,
+            lazy_record_values: ArgType::Lazy,
+            lazy_variable_initializers: ArgType::Eager,
             ..Default::default()
         }
     }
@@ -446,8 +446,8 @@ where
 {
     fn options(&self) -> CompilerOptions {
         CompilerOptions {
-            lazy_record_values: true,
-            lazy_variable_initializers: false,
+            lazy_record_values: ArgType::Lazy,
+            lazy_variable_initializers: ArgType::Eager,
             ..Default::default()
         }
     }

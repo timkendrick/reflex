@@ -320,11 +320,7 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<RecordTerm, A> {
         let block = if values.as_term().should_intern(ArgType::Strict) {
             block.append_inner(|stack| values.as_term().compile(stack, state, options))
         } else {
-            let eagerness = if options.lazy_record_values {
-                ArgType::Lazy
-            } else {
-                ArgType::Strict
-            };
+            let eagerness = options.lazy_record_values;
             block.append_inner(|stack| {
                 compile_list(
                     values.as_inner().iter().map(|item| (item, eagerness)),

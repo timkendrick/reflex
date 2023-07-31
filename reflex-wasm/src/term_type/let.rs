@@ -204,11 +204,7 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<LetTerm, A> {
             });
             block.finish()
         } else {
-            let eagerness = if options.lazy_variable_initializers {
-                ArgType::Lazy
-            } else {
-                ArgType::Strict
-            };
+            let eagerness = options.lazy_variable_initializers;
             let block = CompiledBlockBuilder::new(stack);
             // Yield the initializer term onto the stack
             // => [Term]

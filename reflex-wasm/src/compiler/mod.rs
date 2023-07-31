@@ -350,14 +350,27 @@ impl std::fmt::Display for ValueType {
     }
 }
 
-#[derive(Default, Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct CompilerOptions {
-    pub lazy_record_values: bool,
-    pub lazy_list_items: bool,
-    pub lazy_variable_initializers: bool,
+    pub lazy_record_values: ArgType,
+    pub lazy_list_items: ArgType,
+    pub lazy_variable_initializers: ArgType,
     pub lazy_function_args: bool,
-    pub lazy_lambda_args: bool,
-    pub lazy_constructors: bool,
+    pub lazy_lambda_args: ArgType,
+    pub lazy_constructors: ArgType,
+}
+
+impl Default for CompilerOptions {
+    fn default() -> Self {
+        Self {
+            lazy_record_values: ArgType::Strict,
+            lazy_list_items: ArgType::Strict,
+            lazy_variable_initializers: ArgType::Eager,
+            lazy_function_args: false,
+            lazy_lambda_args: ArgType::Strict,
+            lazy_constructors: ArgType::Strict,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -1185,14 +1198,16 @@ pub(crate) fn get_compiled_function_arity<A: Arena + Clone>(
     } else if let Some(term) = target.as_constructor_term() {
         let num_properties = term.as_inner().keys().as_inner().len();
         Some(match options.lazy_constructors {
-            true => Arity::lazy(num_properties, 0, false),
-            false => Arity::strict(num_properties, 0, false),
+            ArgType::Lazy => Arity::lazy(num_properties, 0, false),
+            ArgType::Eager => Arity::eager(num_properties, 0, false),
+            ArgType::Strict => Arity::strict(num_properties, 0, false),
         })
     } else if let Some(term) = target.as_lambda_term() {
         let num_args = term.as_inner().num_args() as usize;
         Some(match options.lazy_lambda_args {
-            true => Arity::lazy(num_args, 0, false),
-            false => Arity::strict(num_args, 0, false),
+            ArgType::Lazy => Arity::lazy(num_args, 0, false),
+            ArgType::Eager => Arity::eager(num_args, 0, false),
+            ArgType::Strict => Arity::strict(num_args, 0, false),
         })
     } else if let Some(term) = target.as_partial_term() {
         get_compiled_function_arity(&term.as_inner().target(), options)

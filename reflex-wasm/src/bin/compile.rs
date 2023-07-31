@@ -6,6 +6,7 @@ use std::{io::Write, iter::empty, path::PathBuf};
 
 use anyhow::{Context, Result};
 use clap::Parser;
+use reflex::core::ArgType;
 use reflex_lang::{allocator::DefaultAllocator, SharedTermFactory};
 use reflex_parser::syntax::js::default_js_loaders;
 use reflex_wasm::{
@@ -33,13 +34,13 @@ struct Args {
     /// Whether to skip compile-time evaluation where applicable
     #[arg(long)]
     unoptimized: bool,
-    #[arg(long)]
     /// Compile array items as lazily-evaluated expressions
+    #[arg(long)]
     lazy_list_items: bool,
     /// Compile record field values as lazily-evaluated expressions
     #[arg(long)]
     lazy_record_values: bool,
-    /// Compile function arguments as lazily-evaluated expressions
+    /// Compile function call arguments as lazily-evaluated expressions
     #[arg(long)]
     lazy_function_args: bool,
     /// Compile variable initializer values as lazily-evaluated expressions
@@ -91,19 +92,48 @@ fn main() -> Result<()> {
     let runtime_bytes =
         std::fs::read(&runtime_path).with_context(|| "Failed to load runtime library")?;
 
-    let compiler_options = WasmCompilerOptions {
-        compiler: CompilerOptions {
-            lazy_record_values: args.lazy_record_values,
-            lazy_list_items: args.lazy_list_items,
-            lazy_variable_initializers: args.lazy_variable_initializers,
-            lazy_function_args: args.lazy_function_args,
-            lazy_lambda_args: args.lazy_lambda_args,
-            lazy_constructors: args.lazy_constructors,
-        },
-        runtime: WasmCompilerRuntimeOptions {
-            memoize_lambdas: args.memoize_lambdas,
-        },
-        ..Default::default()
+    let compiler_options = {
+        let defaults = WasmCompilerOptions::default();
+        WasmCompilerOptions {
+            compiler: {
+                let defaults = CompilerOptions::default();
+                CompilerOptions {
+                    lazy_record_values: match args.lazy_record_values {
+                        true => ArgType::Lazy,
+                        false => defaults.lazy_record_values,
+                    },
+                    lazy_list_items: match args.lazy_list_items {
+                        true => ArgType::Lazy,
+                        false => defaults.lazy_list_items,
+                    },
+                    lazy_variable_initializers: match args.lazy_variable_initializers {
+                        true => ArgType::Lazy,
+                        false => defaults.lazy_variable_initializers,
+                    },
+                    lazy_function_args: match args.lazy_function_args {
+                        true => true,
+                        false => defaults.lazy_function_args,
+                    },
+                    lazy_lambda_args: match args.lazy_lambda_args {
+                        true => ArgType::Lazy,
+                        false => defaults.lazy_lambda_args,
+                    },
+                    lazy_constructors: match args.lazy_constructors {
+                        true => ArgType::Lazy,
+                        false => defaults.lazy_constructors,
+                    },
+                    ..defaults
+                }
+            },
+            runtime: {
+                let defaults = WasmCompilerRuntimeOptions::default();
+                WasmCompilerRuntimeOptions {
+                    memoize_lambdas: args.memoize_lambdas,
+                    ..defaults
+                }
+            },
+            ..defaults
+        }
     };
 
     let entry_points = entry_points

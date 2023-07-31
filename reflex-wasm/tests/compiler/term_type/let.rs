@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use reflex::core::{Expression, ExpressionFactory, HeapAllocator, SignalType};
+use reflex::core::{ArgType, Expression, ExpressionFactory, HeapAllocator, SignalType};
 use reflex_wasm::{compiler::CompilerOptions, stdlib};
 
 use crate::{compiler::runner::run_scenario, WasmTestScenario};
@@ -16,11 +16,19 @@ fn let_term() {
     let (actual, expected) = run_scenario(&scenario).unwrap();
     assert_eq!(actual, expected);
 
+    let scenario = LetTermLocalVariableStrictScenario;
+    let (actual, expected) = run_scenario(&scenario).unwrap();
+    assert_eq!(actual, expected);
+
     let scenario = LetTermAliasedVariableLazyScenario;
     let (actual, expected) = run_scenario(&scenario).unwrap();
     assert_eq!(actual, expected);
 
     let scenario = LetTermAliasedVariableEagerScenario;
+    let (actual, expected) = run_scenario(&scenario).unwrap();
+    assert_eq!(actual, expected);
+
+    let scenario = LetTermAliasedVariableStrictScenario;
     let (actual, expected) = run_scenario(&scenario).unwrap();
     assert_eq!(actual, expected);
 
@@ -32,11 +40,19 @@ fn let_term() {
     let (actual, expected) = run_scenario(&scenario).unwrap();
     assert_eq!(actual, expected);
 
+    let scenario = LetTermNestedVariablesStrictScenario;
+    let (actual, expected) = run_scenario(&scenario).unwrap();
+    assert_eq!(actual, expected);
+
     let scenario = LetTermSignalInitializerLazyScenario;
     let (actual, expected) = run_scenario(&scenario).unwrap();
     assert_eq!(actual, expected);
 
     let scenario = LetTermSignalInitializerEagerScenario;
+    let (actual, expected) = run_scenario(&scenario).unwrap();
+    assert_eq!(actual, expected);
+
+    let scenario = LetTermSignalInitializerStrictScenario;
     let (actual, expected) = run_scenario(&scenario).unwrap();
     assert_eq!(actual, expected);
 }
@@ -50,7 +66,7 @@ where
 {
     fn options(&self) -> CompilerOptions {
         CompilerOptions {
-            lazy_variable_initializers: true,
+            lazy_variable_initializers: ArgType::Lazy,
             ..Default::default()
         }
     }
@@ -79,7 +95,36 @@ where
 {
     fn options(&self) -> CompilerOptions {
         CompilerOptions {
-            lazy_variable_initializers: false,
+            lazy_variable_initializers: ArgType::Eager,
+            ..Default::default()
+        }
+    }
+
+    fn input(&self, factory: &TFactory, _allocator: &impl HeapAllocator<T>) -> T {
+        factory.create_let_term(factory.create_int_term(3), factory.create_variable_term(0))
+    }
+
+    fn expected(
+        &self,
+        factory: &TFactory,
+        _allocator: &impl HeapAllocator<T>,
+    ) -> (T, Vec<T::Signal>) {
+        let result = factory.create_int_term(3);
+        let dependencies = Default::default();
+        (result, dependencies)
+    }
+}
+
+struct LetTermLocalVariableStrictScenario;
+
+impl<T, TFactory> WasmTestScenario<T, TFactory> for LetTermLocalVariableStrictScenario
+where
+    T: Expression<Builtin = stdlib::Stdlib>,
+    TFactory: ExpressionFactory<T>,
+{
+    fn options(&self) -> CompilerOptions {
+        CompilerOptions {
+            lazy_variable_initializers: ArgType::Strict,
             ..Default::default()
         }
     }
@@ -108,7 +153,7 @@ where
 {
     fn options(&self) -> CompilerOptions {
         CompilerOptions {
-            lazy_variable_initializers: true,
+            lazy_variable_initializers: ArgType::Lazy,
             ..Default::default()
         }
     }
@@ -143,7 +188,42 @@ where
 {
     fn options(&self) -> CompilerOptions {
         CompilerOptions {
-            lazy_variable_initializers: false,
+            lazy_variable_initializers: ArgType::Eager,
+            ..Default::default()
+        }
+    }
+
+    fn input(&self, factory: &TFactory, _allocator: &impl HeapAllocator<T>) -> T {
+        factory.create_let_term(
+            factory.create_int_term(3),
+            factory.create_let_term(
+                factory.create_variable_term(0),
+                factory.create_variable_term(0),
+            ),
+        )
+    }
+
+    fn expected(
+        &self,
+        factory: &TFactory,
+        _allocator: &impl HeapAllocator<T>,
+    ) -> (T, Vec<T::Signal>) {
+        let result = factory.create_int_term(3);
+        let dependencies = Default::default();
+        (result, dependencies)
+    }
+}
+
+struct LetTermAliasedVariableStrictScenario;
+
+impl<T, TFactory> WasmTestScenario<T, TFactory> for LetTermAliasedVariableStrictScenario
+where
+    T: Expression<Builtin = stdlib::Stdlib>,
+    TFactory: ExpressionFactory<T>,
+{
+    fn options(&self) -> CompilerOptions {
+        CompilerOptions {
+            lazy_variable_initializers: ArgType::Strict,
             ..Default::default()
         }
     }
@@ -178,7 +258,7 @@ where
 {
     fn options(&self) -> CompilerOptions {
         CompilerOptions {
-            lazy_variable_initializers: true,
+            lazy_variable_initializers: ArgType::Lazy,
             ..Default::default()
         }
     }
@@ -231,7 +311,60 @@ where
 {
     fn options(&self) -> CompilerOptions {
         CompilerOptions {
-            lazy_variable_initializers: false,
+            lazy_variable_initializers: ArgType::Eager,
+            ..Default::default()
+        }
+    }
+
+    fn input(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> T {
+        factory.create_let_term(
+            factory.create_int_term(3),
+            factory.create_let_term(
+                factory.create_int_term(4),
+                factory.create_let_term(
+                    factory.create_int_term(5),
+                    factory.create_let_term(
+                        factory.create_variable_term(2),
+                        factory.create_let_term(
+                            factory.create_variable_term(2),
+                            factory.create_let_term(
+                                factory.create_variable_term(2),
+                                factory.create_application_term(
+                                    factory.create_builtin_term(stdlib::Subtract),
+                                    allocator.create_pair(
+                                        factory.create_variable_term(0),
+                                        factory.create_variable_term(2),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+    }
+
+    fn expected(
+        &self,
+        factory: &TFactory,
+        _allocator: &impl HeapAllocator<T>,
+    ) -> (T, Vec<T::Signal>) {
+        let result = factory.create_int_term(5 - 3);
+        let dependencies = Default::default();
+        (result, dependencies)
+    }
+}
+
+struct LetTermNestedVariablesStrictScenario;
+
+impl<T, TFactory> WasmTestScenario<T, TFactory> for LetTermNestedVariablesStrictScenario
+where
+    T: Expression<Builtin = stdlib::Stdlib>,
+    TFactory: ExpressionFactory<T>,
+{
+    fn options(&self) -> CompilerOptions {
+        CompilerOptions {
+            lazy_variable_initializers: ArgType::Strict,
             ..Default::default()
         }
     }
@@ -284,7 +417,7 @@ where
 {
     fn options(&self) -> CompilerOptions {
         CompilerOptions {
-            lazy_variable_initializers: true,
+            lazy_variable_initializers: ArgType::Lazy,
             ..Default::default()
         }
     }
@@ -320,7 +453,43 @@ where
 {
     fn options(&self) -> CompilerOptions {
         CompilerOptions {
-            lazy_variable_initializers: false,
+            lazy_variable_initializers: ArgType::Eager,
+            ..Default::default()
+        }
+    }
+
+    fn input(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> T {
+        factory.create_let_term(
+            factory.create_effect_term(allocator.create_signal(SignalType::Custom {
+                effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+                payload: factory.create_int_term(3),
+                token: factory.create_nil_term(),
+            })),
+            factory.create_int_term(3),
+        )
+    }
+
+    fn expected(
+        &self,
+        factory: &TFactory,
+        _allocator: &impl HeapAllocator<T>,
+    ) -> (T, Vec<T::Signal>) {
+        let result = factory.create_int_term(3);
+        let dependencies = Default::default();
+        (result, dependencies)
+    }
+}
+
+struct LetTermSignalInitializerStrictScenario;
+
+impl<T, TFactory> WasmTestScenario<T, TFactory> for LetTermSignalInitializerStrictScenario
+where
+    T: Expression<Builtin = stdlib::Stdlib>,
+    TFactory: ExpressionFactory<T>,
+{
+    fn options(&self) -> CompilerOptions {
+        CompilerOptions {
+            lazy_variable_initializers: ArgType::Strict,
             ..Default::default()
         }
     }

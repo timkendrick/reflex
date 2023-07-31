@@ -262,11 +262,15 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<PartialTerm, A> {
                             .iter()
                             .zip(arity.iter())
                             .map(|(arg, arg_type)| {
-                                // If the function signature specifies a lazy argument, however the compiler options
-                                // define function arguments as non-lazy, 'upgrade' the argument to be evaluated eagerly
-                                // (note that we cannot safely upgrade the argument to strict, as this would change the
-                                // behavior of any functions that rely on handling intercepted signal arguments)
                                 let compiled_arg_type = match arg_type {
+                                    // If the function signature (or fallback placeholder arity) specifies a lazy
+                                    // argument, however the compiler options define function arguments as non-lazy,
+                                    // 'upgrade' the argument to be evaluated eagerly
+                                    // (note that we cannot evaluate the argument strictly without knowing the exact
+                                    // target function signature, as this would change the behavior of any functions
+                                    // that choose not to short-circuit incoming signal arguments, so we evaluate the
+                                    // argument eagerly and defer any signal short-circuiting to the underlying function
+                                    // implementation)
                                     ArgType::Lazy if !options.lazy_function_args => ArgType::Eager,
                                     _ => arg_type,
                                 };

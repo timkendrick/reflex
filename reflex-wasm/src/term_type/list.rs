@@ -320,11 +320,7 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<ListTerm, A> {
         options: &CompilerOptions,
     ) -> CompilerResult<A> {
         let items = self.iter();
-        let eagerness = if options.lazy_list_items {
-            ArgType::Lazy
-        } else {
-            ArgType::Strict
-        };
+        let eagerness = options.lazy_list_items;
         compile_list(items.map(|item| (item, eagerness)), stack, state, options)
     }
 }

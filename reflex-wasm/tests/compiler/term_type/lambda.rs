@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 use reflex::core::{Expression, ExpressionFactory, HeapAllocator};
-use reflex_wasm::{compiler::CompilerOptions, stdlib};
+use reflex_wasm::stdlib;
 
 use crate::{compiler::runner::run_scenario, WasmTestScenario};
 
@@ -28,13 +28,6 @@ where
     T: Expression<Builtin = stdlib::Stdlib>,
     TFactory: ExpressionFactory<T>,
 {
-    fn options(&self) -> CompilerOptions {
-        CompilerOptions {
-            lazy_variable_initializers: false,
-            ..Default::default()
-        }
-    }
-
     fn input(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> T {
         factory.create_let_term(
             factory.create_lambda_term(0, factory.create_int_term(3)),
@@ -63,13 +56,6 @@ where
     T: Expression<Builtin = stdlib::Stdlib>,
     TFactory: ExpressionFactory<T>,
 {
-    fn options(&self) -> CompilerOptions {
-        CompilerOptions {
-            lazy_variable_initializers: false,
-            ..Default::default()
-        }
-    }
-
     fn input(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> T {
         factory.create_let_term(
             factory.create_lambda_term(1, factory.create_variable_term(0)),
@@ -98,13 +84,6 @@ where
     T: Expression<Builtin = stdlib::Stdlib>,
     TFactory: ExpressionFactory<T>,
 {
-    fn options(&self) -> CompilerOptions {
-        CompilerOptions {
-            lazy_variable_initializers: false,
-            ..Default::default()
-        }
-    }
-
     fn input(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> T {
         factory.create_let_term(
             factory.create_lambda_term(

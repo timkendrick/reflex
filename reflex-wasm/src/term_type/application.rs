@@ -341,11 +341,13 @@ impl<A: Arena + Clone> CompileWasm<A> for GenericCompiledFunctionCall<A> {
                 block.append_inner(|stack| args.as_term().compile(stack, state, options))
             } else {
                 // Otherwise compile the combined argument sequence into a list according to the compiler eagerness
-                // (note that we cannot safely declare the arguments as strict, as this would change the behavior of any
-                // functions that rely on handling intercepted signal arguments)
                 let eagerness = if options.lazy_function_args {
                     ArgType::Lazy
                 } else {
+                    // Note that we cannot evaluate the arguments strictly without knowing the exact target function
+                    // signature, as this would change the behavior of functions that choose not to short-circuit
+                    // incoming signal arguments, so we evaluate the arguments eagerly and defer any signal
+                    // short-circuiting to the underlying function implementation
                     ArgType::Eager
                 };
                 block.append_inner(|stack| {
@@ -407,12 +409,18 @@ impl<A: Arena + Clone> CompileWasm<A> for LambdaCompiledFunctionCall<A> {
             .iter()
             .map(|arg| {
                 // Determine the argument eagerness based on the compiler options
-                // (note that we cannot safely declare lambda arguments as strict, as this would change the behavior of
-                // lambdas that pass their arguments to functions that rely on handling intercepted signal arguments)
-                let eagerness = if options.lazy_function_args {
-                    ArgType::Lazy
-                } else {
-                    ArgType::Eager
+                let eagerness = match options.lazy_lambda_args {
+                    // If lambdas are compiled with strict arguments enabled, the lambda body implementation will handle
+                    // short-circuiting a combined signal argument, so there is no need for strict evaluation of the
+                    // argument here at the call site (that will happen immediately after the indirect lambda call)
+                    ArgType::Strict => ArgType::Eager,
+                    // If lambdas are defined as having lazy arguments, however the compiler options define function
+                    // arguments as non-lazy, 'upgrade' the argument to be evaluated eagerly
+                    // (note that we cannot evaluate the argument strictly, as this would change the behavior of lambdas
+                    // that contain no references to their signal arguments, so we evaluate the argument eagerly and
+                    // defer any signal short-circuiting to the underlying lambda implementation)
+                    ArgType::Lazy if !options.lazy_function_args => ArgType::Eager,
+                    arg_type => arg_type,
                 };
                 (arg, eagerness)
             })
@@ -480,11 +488,7 @@ impl<A: Arena + Clone> CompileWasm<A> for ConstructorCompiledFunctionCall<A> {
         let block = if let Some(values) = args.as_internable(ArgType::Strict) {
             block.append_inner(|stack| values.as_term().compile(stack, state, options))
         } else {
-            let eagerness = if options.lazy_constructors {
-                ArgType::Lazy
-            } else {
-                ArgType::Strict
-            };
+            let eagerness = options.lazy_constructors;
             block.append_inner(|stack| {
                 compile_list(
                     args.iter().map(|value| (value, eagerness)),
@@ -651,9 +655,11 @@ impl<'a, A: Arena + Clone> CompileWasm<A> for CompiledFunctionCall<'a, A, Stdlib
                             // all the way to the top level)
                             ArgType::Strict => ArgType::Eager,
                             // If the function signature specifies a lazy argument, however the compiler options define
-                            // function arguments as non-lazy, 'upgrade' the argument to be evaluated eagerly
-                            // (note that we cannot safely upgrade the argument to strict, as this would change the
-                            // behavior of any functions that rely on handling intercepted signal arguments)
+                            // function call arguments as non-lazy, 'upgrade' the argument to be evaluated eagerly
+                            // (note that we cannot evaluate the argument strictly, as this would change the
+                            // behavior of any functions that choose not to short-circuit incoming signal arguments, so
+                            // we evaluate the argument eagerly and defer any signal short-circuiting to the underlying
+                            // function implementation)
                             ArgType::Lazy if !options.lazy_function_args => ArgType::Eager,
                             _ => arg_type,
                         };

@@ -185,7 +185,8 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<LambdaTerm, A> {
             let num_args = self.num_args() as StackOffset;
             let body = self.body();
             let params = ParamsSignature::from_iter((0..num_args).map(|_| ValueType::HeapPointer));
-            let block = if options.lazy_lambda_args {
+            let arg_type = options.lazy_lambda_args;
+            let block = if matches!(arg_type, ArgType::Lazy) {
                 // Create a new compiler stack to be used for the function body,
                 // with all the lambda arguments declared as scoped variables
                 // and a block wrapper to catch short-circuiting signals
@@ -250,7 +251,7 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<LambdaTerm, A> {
                     let arg_scope_offset = num_arg_scopes - 1 - index;
                     arg_scope_offset
                 });
-                let has_strict_args = num_arg_scopes > 0;
+                let has_strict_args = num_arg_scopes > 0 && matches!(arg_type, ArgType::Strict);
                 let block = if has_strict_args {
                     // Iterate over each of the evaluated arguments to determine whether the argument evaluated to a signal term,
                     // combining all signal results into an accumuated signal result
