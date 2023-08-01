@@ -73,7 +73,7 @@ export default (describe) => {
           createTriple(createString('foo'), createString('bar'), createString('foo')),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), 'Constructor({"foo", "bar", "foo"})');
+        assert.strictEqual(format(result), 'Constructor({"foo", "bar"})');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });
