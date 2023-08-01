@@ -89,7 +89,7 @@ export default (describe) => {
           ]),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '{ "foo": 3, "bar": 4, "foo": 5 }');
+        assert.strictEqual(format(result), '{ "foo": 5, "bar": 4 }');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });
