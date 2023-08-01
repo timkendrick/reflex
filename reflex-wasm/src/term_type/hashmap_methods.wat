@@ -37,6 +37,41 @@
           ;; Return 0 if the key already existed, or 1 if a new key was added to the hashmap
           (i32.eqz (local.get $key_already_exists)))
 
+        (func (@concat "$" (@get $name) "::delete") (param $self i32) (param $key (@get $key_type))
+          ;; Note that this does not decrease the allocated hashmap capacity, it merely deletes an entry from an
+          ;; already-allocated bucket if one already exists and updates the hashmap length if necessary.
+          (if
+            (call (@concat "$" (@get $name) "::delete_entry") (local.get $self) (local.get $key))
+            (then
+              ;; If the deletion method returned a non-zero result, decrement the stored number of hashmap entries
+              (call (@concat "$" (@get $name) "::set::num_entries")
+                (local.get $self)
+                (i32.sub (call (@concat "$" (@get $name) "::get::num_entries") (local.get $self)) (i32.const 1))))))
+
+        (func (@concat "$" (@get $name) "::delete_entry") (param $self i32) (param $key (@get $key_type)) (result i32)
+          ;; Note that this does not decrease the allocated hashmap capacity or update the length, it merely deletes an entry
+          ;; from an already-allocated bucket if one already exists.
+          ;; This will return 0 if the key was not present in the hashmap, or 1 if an entry was deleted from the hashmap
+          (local $bucket_index i32)
+          ;; Determine whether a corresponding bucket exists for the given key
+          (if (result i32)
+            (i32.eq
+              (global.get $NULL)
+              (local.tee $bucket_index
+                (call (@concat "$" (@get $name) "::find_bucket_index") (local.get $self) (local.get $key))))
+            (then
+              ;; If the key was not already present in the hashmap, return 0
+              (i32.const 0))
+            (else
+              ;; Otherwise clear the entry at the provided bucket index
+              (call (@concat "$" (@get $name) "::update_bucket")
+                (local.get $self)
+                (local.get $bucket_index)
+                (@instruction (@concat (@get $key_type) ".const") 0)
+                (@instruction (@concat (@get $value_type) ".const") 0))
+              ;; Return 1 to indicate that a key was removed from the hashmap
+              (i32.const 1))))
+
         (func (@concat "$" (@get $name) "::contains_key") (param $self i32) (param $key (@get $key_type)) (result i32)
           (i32.ne
             (global.get $NULL)
