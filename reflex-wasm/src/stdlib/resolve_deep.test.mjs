@@ -385,7 +385,6 @@ export default (describe) => {
             ]),
           ),
         );
-        debugger;
         const [result, dependencies] = evaluate(expression, NULL);
         assert.ok(isHashmap(result));
         assert.strictEqual(getHashmapNumEntries(result), 3);

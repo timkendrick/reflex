@@ -65,7 +65,6 @@ export default (describe) => {
             createBuiltin(Stdlib.Identity),
           ),
         );
-        debugger;
         const [result, dependencies] = evaluate(
           expression,
           createHashmap([

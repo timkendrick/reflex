@@ -75,7 +75,6 @@ export default (describe) => {
             ),
           ),
         );
-        debugger;
         const [result, dependencies] = evaluate(expression, NULL);
         assert.ok(isString(result));
         assert.strictEqual(getStringValue(result), 'Error: foo');
