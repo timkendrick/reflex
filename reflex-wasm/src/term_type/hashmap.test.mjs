@@ -205,10 +205,21 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.ok(isList(result));
-        assert.strictEqual(
-          `[${getListItems(result).map(format).sort().join(', ')}]`,
-          '[["bar", 4], ["baz", 5], ["foo", 3]]',
-        );
+        const items = getListItems(result).map(format);
+        assert.strictEqual(items.length, 6);
+        const entries = items
+          .reduce((items, item, index) => {
+            if (index % 2 === 0) {
+              items.push([item, null]);
+            } else {
+              items[(index - 1) / 2][1] = item;
+            }
+            return items;
+          }, [])
+          .map(([key, value]) => `[${key}, ${value}]`);
+        assert.ok(entries.includes('["foo", 3]'));
+        assert.ok(entries.includes('["bar", 4]'));
+        assert.ok(entries.includes('["baz", 5]'));
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });

@@ -23,6 +23,14 @@
   (@const-string $Stdlib_Accessor::STARTS_WITH "startsWith")
   (@const-string $Stdlib_Accessor::VALUES "values")
 
+  (@const $Stdlib_Accessor::method::Hashmap::ENTRIES i32
+    (@depends-on $Term::Variable::INSTANCE_0)
+    (call $Term::Lambda::new
+      (i32.const 1)
+      (call $Term::ZipIterator::new
+        (call $Term::HashmapKeysIterator::new (call $Term::Variable::new (i32.const 0)))
+        (call $Term::HashmapValuesIterator::new (call $Term::Variable::new (i32.const 0))))))
+
   (@const $Stdlib_Accessor::method::<iterate>::FILTER i32
     (@depends-on $Term::Variable::INSTANCE_0)
     (@depends-on $Term::Variable::INSTANCE_1)
@@ -368,8 +376,8 @@
               (call $Term::traits::equals (local.get $key) (global.get $Stdlib_Accessor::ENTRIES))
               (return
                 (call $Term::Partial::new
-                  (call $Term::Builtin::new (global.get $Stdlib_Identity))
-                  (call $Term::List::of (call $Term::Hashmap::traits::iterate (local.get $self))))
+                  (global.get $Stdlib_Accessor::method::Hashmap::ENTRIES)
+                  (call $Term::List::of (local.get $self)))
                 (global.get $NULL)))
             (@list
               (call $Term::traits::equals (local.get $key) (global.get $Stdlib_Accessor::GET))

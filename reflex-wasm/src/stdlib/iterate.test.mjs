@@ -171,10 +171,20 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.ok(isList(result));
         const items = getListItems(result).map(format);
-        assert.strictEqual(items.length, 3);
-        assert.ok(items.includes('[3, 6]'));
-        assert.ok(items.includes('[4, 7]'));
-        assert.ok(items.includes('[5, 8]'));
+        assert.strictEqual(items.length, 6);
+        const entries = items
+          .reduce((items, item, index) => {
+            if (index % 2 === 0) {
+              items.push([item, null]);
+            } else {
+              items[(index - 1) / 2][1] = item;
+            }
+            return items;
+          }, [])
+          .map(([key, value]) => `[${key}, ${value}]`);
+        assert.ok(entries.includes('[3, 6]'));
+        assert.ok(entries.includes('[4, 7]'));
+        assert.ok(entries.includes('[5, 8]'));
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });

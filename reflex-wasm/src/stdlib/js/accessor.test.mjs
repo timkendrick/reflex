@@ -607,6 +607,7 @@ export default (describe) => {
       createUnitList,
       evaluate,
       format,
+      getHashmapEntries,
       getListItems,
       isList,
       NULL,
@@ -762,28 +763,26 @@ export default (describe) => {
       })();
       (() => {
         const expression = createApplication(
-          createBuiltin(Stdlib.ResolveList),
-          createUnitList(
-            createApplication(
-              createApplication(
-                createBuiltin(Stdlib.Accessor),
-                createPair(
-                  createHashmap([
-                    [createString('foo'), createInt(3)],
-                    [createString('bar'), createInt(4)],
-                    [createString('baz'), createInt(5)],
-                  ]),
-                  createString('set'),
-                ),
-              ),
-              createPair(createString('bar'), createInt(6)),
+          createApplication(
+            createBuiltin(Stdlib.Accessor),
+            createPair(
+              createHashmap([
+                [createString('foo'), createInt(3)],
+                [createString('bar'), createInt(4)],
+                [createString('baz'), createInt(5)],
+              ]),
+              createString('set'),
             ),
           ),
+          createPair(createString('bar'), createInt(6)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.ok(isList(result));
+        assert.strictEqual(format(result), 'Map(3)');
         assert.strictEqual(
-          `[${getListItems(result).map(format).sort().join(', ')}]`,
+          `[${getHashmapEntries(result)
+            .map(([key, value]) => `[${format(key)}, ${format(value)}]`)
+            .sort()
+            .join(', ')}]`,
           '[["bar", 6], ["baz", 5], ["foo", 3]]',
         );
         assert.strictEqual(format(dependencies), 'NULL');

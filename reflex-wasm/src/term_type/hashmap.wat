@@ -323,10 +323,11 @@
     (local.get $self))
 
   (func $Term::Hashmap::traits::size_hint (param $self i32) (result i32)
-    (call $Term::Hashmap::traits::length (local.get $self)))
+    (i32.mul (i32.const 2) (call $Term::Hashmap::traits::length (local.get $self))))
 
   (func $Term::Hashmap::traits::next (param $self i32) (param $iterator_state i32) (param $state i32) (result i32 i32 i32)
     (local $index i32)
+    (local $bucket_index i32)
     (local $key i32)
     (if (result i32 i32 i32)
       ;; If we have iterated through all the buckets, return the complete marker
@@ -337,23 +338,34 @@
             (i32.const 0)
             (local.get $iterator_state)
             (i32.eq (global.get $NULL) (local.get $iterator_state))))
-        (call $Term::Hashmap::get::buckets::capacity (local.get $self)))
+        (i32.mul
+          (i32.const 2)
+          (call $Term::Hashmap::get::buckets::capacity (local.get $self))))
       (then
         (global.get $NULL)
         (global.get $NULL)
         (global.get $NULL))
       (else
-        ;; Otherwise inspect the next bucket
+        ;; Determine whether the current item is a key or a value
         (if (result i32 i32 i32)
-          (i32.eqz (local.tee $key (call $Term::Hashmap::get_bucket_key (local.get $self) (local.get $index))))
+          (i32.eq
+            (local.get $index)
+            (i32.mul (i32.const 2) (local.tee $bucket_index (i32.div_u (local.get $index) (i32.const 2)))))
           (then
-            ;; If this is an empty bucket, skip to the next bucket
-            (call $Term::Hashmap::traits::next (local.get $self) (i32.add (local.get $index) (i32.const 1)) (local.get $state)))
+            ;; If the current item is a key, inspect the next bucket to determine whether it is unoccupied
+            (if (result i32 i32 i32)
+              (i32.eqz (local.tee $key (call $Term::Hashmap::get_bucket_key (local.get $self) (local.get $bucket_index))))
+              (then
+                ;; If this is an empty bucket, skip to the next bucket
+                (call $Term::Hashmap::traits::next (local.get $self) (i32.add (local.get $index) (i32.const 2)) (local.get $state)))
+              (else
+                ;; Otherwise emit the key and the incremented iterator state
+                (local.get $key)
+                (i32.add (local.get $index) (i32.const 1))
+                (global.get $NULL))))
           (else
-            ;; Otherwise emit a key/value entry and the incremented iterator state
-            (call $Term::List::create_pair
-              (local.get $key)
-              (call $Term::Hashmap::get_bucket_value (local.get $self) (local.get $index)))
+            ;; Otherwise if the current item is a value, emit the value and the incremented iterator state
+            (call $Term::Hashmap::get_bucket_value (local.get $self) (local.get $bucket_index))
             (i32.add (local.get $index) (i32.const 1))
             (global.get $NULL))))))
 
