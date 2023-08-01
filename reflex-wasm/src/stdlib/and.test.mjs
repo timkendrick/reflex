@@ -3,12 +3,10 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 export default (describe) => {
   describe('Stdlib_And', (test) => {
-    test('(Boolean, Lambda)', (assert, {
+    test('(Boolean, Boolean)', (assert, {
       createApplication,
       createBoolean,
       createBuiltin,
-      createInt,
-      createLambda,
       createPair,
       evaluate,
       format,
@@ -18,7 +16,7 @@ export default (describe) => {
       (() => {
         const expression = createApplication(
           createBuiltin(Stdlib.And),
-          createPair(createBoolean(false), createLambda(0, createInt(3))),
+          createPair(createBoolean(false), createBoolean(false)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), 'false');
@@ -27,10 +25,28 @@ export default (describe) => {
       (() => {
         const expression = createApplication(
           createBuiltin(Stdlib.And),
-          createPair(createBoolean(true), createLambda(0, createInt(3))),
+          createPair(createBoolean(false), createBoolean(true)),
         );
         const [result, dependencies] = evaluate(expression, NULL);
-        assert.strictEqual(format(result), '3');
+        assert.strictEqual(format(result), 'false');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.And),
+          createPair(createBoolean(true), createBoolean(false)),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), 'false');
+        assert.strictEqual(format(dependencies), 'NULL');
+      })();
+      (() => {
+        const expression = createApplication(
+          createBuiltin(Stdlib.And),
+          createPair(createBoolean(true), createBoolean(true)),
+        );
+        const [result, dependencies] = evaluate(expression, NULL);
+        assert.strictEqual(format(result), 'true');
         assert.strictEqual(format(dependencies), 'NULL');
       })();
     });

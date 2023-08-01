@@ -538,19 +538,7 @@ impl<A: Arena + Clone> CompileWasm<A> for BuiltinCompiledFunctionCall<A> {
         let target = target.as_term().clone();
         match builtin {
             // Certain builtin stdlib functions have special-case compilation strategies
-            Stdlib::And(builtin) => CompiledFunctionCall {
-                builtin,
-                target,
-                args,
-            }
-            .compile(stack, state, options),
             Stdlib::If(builtin) => CompiledFunctionCall {
-                builtin,
-                target,
-                args,
-            }
-            .compile(stack, state, options),
-            Stdlib::Or(builtin) => CompiledFunctionCall {
                 builtin,
                 target,
                 args,
