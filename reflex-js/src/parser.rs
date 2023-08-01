@@ -14,8 +14,8 @@ use reflex::core::{
     HeapAllocator, IntTermType, IntValue, ModuleLoader, RefType, StringTermType, StringValue,
 };
 use reflex_stdlib::{
-    Add, And, Apply, Chain, CollectHashMap, CollectHashSet, CollectList, CollectString, Contains,
-    Divide, Eq, Flatten, Get, Gt, Gte, If, IfError, Lt, Lte, Merge, Multiply, Not, Or, Pow, Push,
+    Add, Apply, Chain, CollectHashMap, CollectHashSet, CollectList, CollectString, Contains,
+    Divide, Eq, Flatten, Get, Gt, Gte, If, IfError, Lt, Lte, Merge, Multiply, Not, Pow, Push,
     PushFront, Remainder, ResolveDeep, ResolveHashMap, ResolveList, Subtract,
 };
 use swc_common::{source_map::Pos, sync::Lrc, FileName, SourceMap, Span, Spanned};
@@ -41,7 +41,6 @@ pub trait JsParserBuiltin:
     Builtin
     + From<Accessor>
     + From<Add>
-    + From<And>
     + From<Apply>
     + From<Chain>
     + From<CollectHashMap>
@@ -65,7 +64,6 @@ pub trait JsParserBuiltin:
     + From<Merge>
     + From<Multiply>
     + From<Not>
-    + From<Or>
     + From<Pow>
     + From<Push>
     + From<PushFront>
@@ -82,7 +80,6 @@ impl<T> JsParserBuiltin for T where
     T: Builtin
         + From<Accessor>
         + From<Add>
-        + From<And>
         + From<Apply>
         + From<Chain>
         + From<CollectHashMap>
@@ -106,7 +103,6 @@ impl<T> JsParserBuiltin for T where
         + From<Merge>
         + From<Multiply>
         + From<Not>
-        + From<Or>
         + From<Pow>
         + From<Push>
         + From<PushFront>
@@ -1644,15 +1640,22 @@ where
     T::Builtin: JsParserBuiltin,
 {
     let left = parse_expression(&node.left, scope, env, factory, allocator)?;
-    let right = parse_expression(&node.right, scope, env, factory, allocator)?;
-    Ok(factory.create_application_term(
-        factory.create_builtin_term(And),
-        allocator.create_pair(
-            factory.create_application_term(
-                factory.create_builtin_term(IsTruthy),
-                allocator.create_unit_list(left),
+    let right = {
+        let inner_scope = scope.create_child([None]);
+        parse_expression(&node.right, &inner_scope, env, factory, allocator)
+    }?;
+    Ok(factory.create_let_term(
+        left,
+        factory.create_application_term(
+            factory.create_builtin_term(If),
+            allocator.create_triple(
+                factory.create_application_term(
+                    factory.create_builtin_term(IsTruthy),
+                    allocator.create_unit_list(factory.create_variable_term(0)),
+                ),
+                factory.create_lambda_term(0, right),
+                factory.create_lambda_term(0, factory.create_variable_term(0)),
             ),
-            factory.create_lambda_term(0, right),
         ),
     ))
 }
@@ -1668,15 +1671,22 @@ where
     T::Builtin: JsParserBuiltin,
 {
     let left = parse_expression(&node.left, scope, env, factory, allocator)?;
-    let right = parse_expression(&node.right, scope, env, factory, allocator)?;
-    Ok(factory.create_application_term(
-        factory.create_builtin_term(Or),
-        allocator.create_pair(
-            factory.create_application_term(
-                factory.create_builtin_term(IsTruthy),
-                allocator.create_unit_list(left),
+    let right = {
+        let inner_scope = scope.create_child([None]);
+        parse_expression(&node.right, &inner_scope, env, factory, allocator)
+    }?;
+    Ok(factory.create_let_term(
+        left,
+        factory.create_application_term(
+            factory.create_builtin_term(If),
+            allocator.create_triple(
+                factory.create_application_term(
+                    factory.create_builtin_term(IsTruthy),
+                    allocator.create_unit_list(factory.create_variable_term(0)),
+                ),
+                factory.create_lambda_term(0, factory.create_variable_term(0)),
+                factory.create_lambda_term(0, right),
             ),
-            factory.create_lambda_term(0, right),
         ),
     ))
 }
@@ -2144,6 +2154,7 @@ mod tests {
         loader::create_default_module_export,
         static_module_loader, Env,
     };
+    use pretty_assertions::assert_eq;
     use reflex::{
         cache::SubstitutionCache,
         core::{
@@ -4064,54 +4075,150 @@ mod tests {
     }
 
     #[test]
-    fn logical_expression() {
+    fn and_expression() {
         let factory = SharedTermFactory::<JsBuiltins>::default();
         let allocator = DefaultAllocator::default();
         let env = Env::new();
         assert_eq!(
-            parse("true && false", &env, &factory, &allocator),
-            Ok(factory.create_application_term(
-                factory.create_builtin_term(And),
-                allocator.create_pair(
-                    factory.create_application_term(
-                        factory.create_builtin_term(IsTruthy),
-                        allocator.create_unit_list(factory.create_boolean_term(true)),
+            parse("true && 3", &env, &factory, &allocator),
+            Ok(factory.create_let_term(
+                factory.create_boolean_term(true),
+                factory.create_application_term(
+                    factory.create_builtin_term(If),
+                    allocator.create_triple(
+                        factory.create_application_term(
+                            factory.create_builtin_term(IsTruthy),
+                            allocator.create_unit_list(factory.create_variable_term(0)),
+                        ),
+                        factory.create_lambda_term(0, factory.create_float_term(3.0)),
+                        factory.create_lambda_term(0, factory.create_variable_term(0)),
                     ),
-                    factory.create_lambda_term(0, factory.create_boolean_term(false)),
                 ),
             )),
         );
         assert_eq!(
-            parse("true || false", &env, &factory, &allocator),
-            Ok(factory.create_application_term(
-                factory.create_builtin_term(Or),
-                allocator.create_pair(
-                    factory.create_application_term(
-                        factory.create_builtin_term(IsTruthy),
-                        allocator.create_unit_list(factory.create_boolean_term(true)),
+            parse("(() => true)() && 3", &env, &factory, &allocator),
+            Ok(factory.create_let_term(
+                factory.create_application_term(
+                    factory.create_lambda_term(0, factory.create_boolean_term(true)),
+                    allocator.create_empty_list(),
+                ),
+                factory.create_application_term(
+                    factory.create_builtin_term(If),
+                    allocator.create_triple(
+                        factory.create_application_term(
+                            factory.create_builtin_term(IsTruthy),
+                            allocator.create_unit_list(factory.create_variable_term(0)),
+                        ),
+                        factory.create_lambda_term(0, factory.create_float_term(3.0)),
+                        factory.create_lambda_term(0, factory.create_variable_term(0)),
                     ),
-                    factory.create_lambda_term(0, factory.create_boolean_term(false)),
+                ),
+            )),
+        );
+        assert_eq!(
+            parse(
+                "const foo = 3; const bar = 4; const baz = 5; foo && bar",
+                &env,
+                &factory,
+                &allocator
+            ),
+            Ok(factory.create_let_term(
+                factory.create_float_term(3.0),
+                factory.create_let_term(
+                    factory.create_float_term(4.0),
+                    factory.create_let_term(
+                        factory.create_float_term(5.0),
+                        factory.create_let_term(
+                            factory.create_variable_term(2),
+                            factory.create_application_term(
+                                factory.create_builtin_term(If),
+                                allocator.create_triple(
+                                    factory.create_application_term(
+                                        factory.create_builtin_term(IsTruthy),
+                                        allocator.create_unit_list(factory.create_variable_term(0)),
+                                    ),
+                                    factory.create_lambda_term(0, factory.create_variable_term(2)),
+                                    factory.create_lambda_term(0, factory.create_variable_term(0)),
+                                ),
+                            ),
+                        ),
+                    ),
                 ),
             )),
         );
     }
 
     #[test]
-    fn conditional_expression() {
+    fn or_expression() {
         let factory = SharedTermFactory::<JsBuiltins>::default();
         let allocator = DefaultAllocator::default();
         let env = Env::new();
         assert_eq!(
-            parse("true ? 3 : 4", &env, &factory, &allocator),
-            Ok(factory.create_application_term(
-                factory.create_builtin_term(If),
-                allocator.create_triple(
-                    factory.create_application_term(
-                        factory.create_builtin_term(IsTruthy),
-                        allocator.create_unit_list(factory.create_boolean_term(true)),
+            parse("true || 3", &env, &factory, &allocator),
+            Ok(factory.create_let_term(
+                factory.create_boolean_term(true),
+                factory.create_application_term(
+                    factory.create_builtin_term(If),
+                    allocator.create_triple(
+                        factory.create_application_term(
+                            factory.create_builtin_term(IsTruthy),
+                            allocator.create_unit_list(factory.create_variable_term(0)),
+                        ),
+                        factory.create_lambda_term(0, factory.create_variable_term(0)),
+                        factory.create_lambda_term(0, factory.create_float_term(3.0)),
                     ),
-                    factory.create_lambda_term(0, factory.create_float_term(3.0)),
-                    factory.create_lambda_term(0, factory.create_float_term(4.0)),
+                ),
+            )),
+        );
+        assert_eq!(
+            parse("(() => true)() || 3", &env, &factory, &allocator),
+            Ok(factory.create_let_term(
+                factory.create_application_term(
+                    factory.create_lambda_term(0, factory.create_boolean_term(true)),
+                    allocator.create_empty_list(),
+                ),
+                factory.create_application_term(
+                    factory.create_builtin_term(If),
+                    allocator.create_triple(
+                        factory.create_application_term(
+                            factory.create_builtin_term(IsTruthy),
+                            allocator.create_unit_list(factory.create_variable_term(0)),
+                        ),
+                        factory.create_lambda_term(0, factory.create_variable_term(0)),
+                        factory.create_lambda_term(0, factory.create_float_term(3.0)),
+                    ),
+                )
+            )),
+        );
+        assert_eq!(
+            parse(
+                "const foo = 3; const bar = 4; const baz = 5; foo || bar",
+                &env,
+                &factory,
+                &allocator
+            ),
+            Ok(factory.create_let_term(
+                factory.create_float_term(3.0),
+                factory.create_let_term(
+                    factory.create_float_term(4.0),
+                    factory.create_let_term(
+                        factory.create_float_term(5.0),
+                        factory.create_let_term(
+                            factory.create_variable_term(2),
+                            factory.create_application_term(
+                                factory.create_builtin_term(If),
+                                allocator.create_triple(
+                                    factory.create_application_term(
+                                        factory.create_builtin_term(IsTruthy),
+                                        allocator.create_unit_list(factory.create_variable_term(0)),
+                                    ),
+                                    factory.create_lambda_term(0, factory.create_variable_term(0)),
+                                    factory.create_lambda_term(0, factory.create_variable_term(2)),
+                                ),
+                            ),
+                        ),
+                    ),
                 ),
             )),
         );
@@ -4312,6 +4419,27 @@ mod tests {
                     ),
                 ),
                 allocator.create_empty_list(),
+            )),
+        );
+    }
+
+    #[test]
+    fn conditional_expression() {
+        let factory = SharedTermFactory::<JsBuiltins>::default();
+        let allocator = DefaultAllocator::default();
+        let env = Env::new();
+        assert_eq!(
+            parse("true ? 3 : 4", &env, &factory, &allocator),
+            Ok(factory.create_application_term(
+                factory.create_builtin_term(If),
+                allocator.create_triple(
+                    factory.create_application_term(
+                        factory.create_builtin_term(IsTruthy),
+                        allocator.create_unit_list(factory.create_boolean_term(true)),
+                    ),
+                    factory.create_lambda_term(0, factory.create_float_term(3.0)),
+                    factory.create_lambda_term(0, factory.create_float_term(4.0)),
+                ),
             )),
         );
     }
