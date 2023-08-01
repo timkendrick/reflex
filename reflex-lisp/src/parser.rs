@@ -330,6 +330,7 @@ where
         "/" => Some(factory.create_builtin_term(stdlib::Divide)),
         "=" => Some(factory.create_builtin_term(stdlib::Equal)),
         "abs" => Some(factory.create_builtin_term(stdlib::Abs)),
+        "and" => Some(factory.create_builtin_term(stdlib::And)),
         "car" => Some(factory.create_builtin_term(crate::stdlib::Car)),
         "cdr" => Some(factory.create_builtin_term(crate::stdlib::Cdr)),
         "concat" => Some(factory.create_builtin_term(stdlib::CollectString)),
@@ -340,6 +341,7 @@ where
         "lt" => Some(factory.create_builtin_term(stdlib::Lt)),
         "lte" => Some(factory.create_builtin_term(stdlib::Lte)),
         "not" => Some(factory.create_builtin_term(stdlib::Not)),
+        "or" => Some(factory.create_builtin_term(stdlib::Or)),
         "pow" => Some(factory.create_builtin_term(stdlib::Pow)),
         "remainder" => Some(factory.create_builtin_term(stdlib::Remainder)),
         _ => None,
@@ -395,26 +397,6 @@ where
             )
             .map(Some),
             "if" => parse_if_expression(
-                input,
-                args,
-                scope,
-                symbol_cache,
-                evaluation_cache,
-                factory,
-                allocator,
-            )
-            .map(Some),
-            "and" => parse_and_expression(
-                input,
-                args,
-                scope,
-                symbol_cache,
-                evaluation_cache,
-                factory,
-                allocator,
-            )
-            .map(Some),
-            "or" => parse_or_expression(
                 input,
                 args,
                 scope,
@@ -974,92 +956,6 @@ where
             factory.create_lambda_term(0, consequent),
             factory.create_lambda_term(0, alternate),
         ),
-    ))
-}
-
-fn parse_and_expression<'src, T: Expression + Rewritable<T>>(
-    input: &SyntaxDatum<'src>,
-    args: &[SyntaxDatum<'src>],
-    scope: &LexicalScope<'src>,
-    symbol_cache: &mut SymbolCache<'src>,
-    evaluation_cache: &mut impl EvaluationCache<T>,
-    factory: &impl ExpressionFactory<T>,
-    allocator: &impl HeapAllocator<T>,
-) -> ParserResult<'src, T>
-where
-    T::Builtin: LispParserBuiltin,
-{
-    if args.len() != 2 {
-        return Err(ParserError::new(
-            String::from("Invalid and expression"),
-            input,
-        ));
-    }
-    let mut args = args.iter();
-    let left = args.next().unwrap();
-    let right = args.next().unwrap();
-    let left = parse_expression(
-        left,
-        scope,
-        symbol_cache,
-        evaluation_cache,
-        factory,
-        allocator,
-    )?;
-    let right = parse_expression(
-        right,
-        scope,
-        symbol_cache,
-        evaluation_cache,
-        factory,
-        allocator,
-    )?;
-    Ok(factory.create_application_term(
-        factory.create_builtin_term(stdlib::And),
-        allocator.create_pair(left, factory.create_lambda_term(0, right)),
-    ))
-}
-
-fn parse_or_expression<'src, T: Expression + Rewritable<T>>(
-    input: &SyntaxDatum<'src>,
-    args: &[SyntaxDatum<'src>],
-    scope: &LexicalScope<'src>,
-    symbol_cache: &mut SymbolCache<'src>,
-    evaluation_cache: &mut impl EvaluationCache<T>,
-    factory: &impl ExpressionFactory<T>,
-    allocator: &impl HeapAllocator<T>,
-) -> ParserResult<'src, T>
-where
-    T::Builtin: LispParserBuiltin,
-{
-    if args.len() != 2 {
-        return Err(ParserError::new(
-            String::from("Invalid or expression"),
-            input,
-        ));
-    }
-    let mut args = args.iter();
-    let left = args.next().unwrap();
-    let right = args.next().unwrap();
-    let left = parse_expression(
-        left,
-        scope,
-        symbol_cache,
-        evaluation_cache,
-        factory,
-        allocator,
-    )?;
-    let right = parse_expression(
-        right,
-        scope,
-        symbol_cache,
-        evaluation_cache,
-        factory,
-        allocator,
-    )?;
-    Ok(factory.create_application_term(
-        factory.create_builtin_term(stdlib::Or),
-        allocator.create_pair(left, factory.create_lambda_term(0, right)),
     ))
 }
 
