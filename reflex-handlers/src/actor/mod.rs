@@ -11,7 +11,6 @@ use reflex_dispatcher::{
 };
 use reflex_macros::blanket_trait;
 use reflex_runtime::{AsyncExpression, AsyncExpressionFactory, AsyncHeapAllocator};
-use reflex_stdlib::ResolveDeep;
 use reflex_utils::reconnect::ReconnectTimeout;
 
 use crate::task::{
@@ -78,7 +77,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T>,
     TAllocator: AsyncHeapAllocator<T>,
-    T::Builtin: From<ResolveDeep>,
+    T::Builtin: HandlerActorBuiltin,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
 {
@@ -102,7 +101,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T>,
     TAllocator: AsyncHeapAllocator<T>,
-    T::Builtin: From<ResolveDeep>,
+    T::Builtin: HandlerActorBuiltin,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
 {
@@ -131,7 +130,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T>,
     TAllocator: AsyncHeapAllocator<T>,
-    T::Builtin: From<ResolveDeep>,
+    T::Builtin: HandlerActorBuiltin,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TAction: Action + HandlerAction<T> + Send + 'static,
@@ -283,7 +282,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T>,
     TAllocator: AsyncHeapAllocator<T>,
-    T::Builtin: From<ResolveDeep>,
+    T::Builtin: HandlerActorBuiltin,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TAction: Action + HandlerAction<T> + Send + 'static,
@@ -318,7 +317,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T>,
     TAllocator: AsyncHeapAllocator<T>,
-    T::Builtin: From<ResolveDeep>,
+    T::Builtin: HandlerActorBuiltin,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TInbox: TaskInbox<TAction>,
@@ -364,7 +363,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T>,
     TAllocator: AsyncHeapAllocator<T>,
-    T::Builtin: From<ResolveDeep>,
+    T::Builtin: HandlerActorBuiltin,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TInbox: TaskInbox<TAction>,
@@ -411,7 +410,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T>,
     TAllocator: AsyncHeapAllocator<T>,
-    T::Builtin: From<ResolveDeep>,
+    T::Builtin: HandlerActorBuiltin,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TAction: Action + HandlerAction<T> + Send + 'static,
@@ -453,7 +452,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T>,
     TAllocator: AsyncHeapAllocator<T>,
-    T::Builtin: From<ResolveDeep>,
+    T::Builtin: HandlerActorBuiltin,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TAction: Action + HandlerAction<T> + Send + 'static,
@@ -489,7 +488,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T>,
     TAllocator: AsyncHeapAllocator<T>,
-    T::Builtin: From<ResolveDeep>,
+    T::Builtin: HandlerActorBuiltin,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TAction: Action + HandlerAction<T> + Send + 'static,
@@ -595,7 +594,7 @@ where
     T::ExpressionList: Send,
     TFactory: AsyncExpressionFactory<T>,
     TAllocator: AsyncHeapAllocator<T>,
-    T::Builtin: From<ResolveDeep>,
+    T::Builtin: HandlerActorBuiltin,
     TConnect: hyper::client::connect::Connect + Clone + Send + Sync + 'static,
     TReconnect: ReconnectTimeout + Send + Clone + 'static,
     TAction: Action + HandlerAction<T> + Send + 'static,
