@@ -2092,7 +2092,7 @@ mod tests {
                     factory.create_builtin_term(And),
                     allocator.create_pair(
                         factory.create_boolean_term(true),
-                        factory.create_lambda_term(0, factory.create_boolean_term(true)),
+                        factory.create_boolean_term(true),
                     ),
                 ),
                 factory.create_lambda_term(0, factory.create_int_term(3)),
@@ -2133,7 +2133,7 @@ mod tests {
                     factory.create_builtin_term(And),
                     allocator.create_pair(
                         factory.create_boolean_term(true),
-                        factory.create_lambda_term(0, factory.create_boolean_term(false)),
+                        factory.create_boolean_term(false),
                     ),
                 ),
                 factory.create_lambda_term(0, factory.create_int_term(3)),
@@ -2214,7 +2214,7 @@ mod tests {
                     factory.create_builtin_term(And),
                     allocator.create_pair(
                         factory.create_boolean_term(true),
-                        factory.create_lambda_term(0, factory.create_boolean_term(false)),
+                        factory.create_boolean_term(false),
                     ),
                 ),
                 factory.create_lambda_term(0, factory.create_int_term(3)),

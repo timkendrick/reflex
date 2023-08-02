@@ -38,8 +38,9 @@ impl<T: Expression> Applicable<T> for Not {
         _cache: &mut impl EvaluationCache<T>,
     ) -> Result<T, String> {
         let operand = args.next().unwrap();
-        if let Some(value) = factory.match_boolean_term(&operand) {
-            Ok(factory.create_boolean_term(!value.value()))
+        if let Some(term) = factory.match_boolean_term(&operand) {
+            let value = term.value();
+            Ok(factory.create_boolean_term(!value))
         } else {
             Err(format!("Expected Boolean, received {}", operand))
         }

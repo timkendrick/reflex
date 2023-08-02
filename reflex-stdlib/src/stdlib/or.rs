@@ -34,19 +34,21 @@ impl<T: Expression> Applicable<T> for Or {
         &self,
         mut args: impl ExactSizeIterator<Item = T>,
         factory: &impl ExpressionFactory<T>,
-        allocator: &impl HeapAllocator<T>,
+        _allocator: &impl HeapAllocator<T>,
         _cache: &mut impl EvaluationCache<T>,
     ) -> Result<T, String> {
         let left = args.next().unwrap();
         let right = args.next().unwrap();
-        if let Some(value) = factory.match_boolean_term(&left) {
-            Ok(match value.value() {
-                true => left,
-                false => factory.create_application_term(right, allocator.create_empty_list()),
-            })
+        if let (Some(left_term), Some(right_term)) = (
+            factory.match_boolean_term(&left),
+            factory.match_boolean_term(&right),
+        ) {
+            let left_value = left_term.value();
+            let right_value = right_term.value();
+            Ok(factory.create_boolean_term(left_value || right_value))
         } else {
             Err(format!(
-                "Expected (Boolean, <function:0>), received ({}, {})",
+                "Expected (Boolean, Boolean), received ({}, {})",
                 left, right
             ))
         }
