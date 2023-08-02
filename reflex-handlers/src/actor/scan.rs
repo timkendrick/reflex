@@ -30,12 +30,12 @@ use reflex_runtime::{
     AsyncExpression, AsyncExpressionFactory, AsyncHeapAllocator, QueryEvaluationMode,
     QueryInvalidationStrategy,
 };
-use reflex_stdlib::ResolveDeep;
+use reflex_stdlib::{Apply, CollectList, ResolveDeep};
 
 pub const EFFECT_TYPE_SCAN: &'static str = "reflex::scan";
 
 blanket_trait!(
-    pub trait ScanHandlerBuiltin: From<ResolveDeep> {}
+    pub trait ScanHandlerBuiltin: From<Apply> + From<ResolveDeep> + From<CollectList> {}
 );
 
 pub fn is_scan_effect_type<T: Expression>(
@@ -506,14 +506,23 @@ where
                     reducer_label,
                     self.factory.create_application_term(
                         self.factory.create_builtin_term(ResolveDeep),
-                        self.allocator
-                            .create_unit_list(self.factory.create_application_term(
-                                iteratee,
+                        self.allocator.create_unit_list(
+                            self.factory.create_application_term(
+                                self.factory.create_builtin_term(Apply),
                                 self.allocator.create_pair(
-                                    self.factory.create_effect_term(state_value_effect.clone()),
-                                    self.factory.create_effect_term(source_value_effect.clone()),
+                                    iteratee,
+                                    self.factory.create_application_term(
+                                        self.factory.create_builtin_term(CollectList),
+                                        self.allocator.create_pair(
+                                            self.factory
+                                                .create_effect_term(state_value_effect.clone()),
+                                            self.factory
+                                                .create_effect_term(source_value_effect.clone()),
+                                        ),
+                                    ),
                                 ),
-                            )),
+                            ),
+                        ),
                     ),
                     QueryEvaluationMode::Standalone,
                     QueryInvalidationStrategy::Exact,
