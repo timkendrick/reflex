@@ -15,10 +15,10 @@ use reflex::{
         ConditionListType, ConditionType, ConstructorTermType, EffectTermType, Expression,
         ExpressionFactory, ExpressionListType, FloatTermType, FloatValue, HashmapTermType,
         HashsetTermType, HeapAllocator, InstructionPointer, IntTermType, IntValue, LambdaTermType,
-        LetTermType, ListTermType, PartialApplicationTermType, RecordTermType, RecursiveTermType,
-        RefType, SignalTermType, SignalType, StackOffset, StringTermType, StringValue,
-        StructPrototypeType, SymbolId, SymbolTermType, TimestampTermType, TimestampValue,
-        VariableTermType,
+        LazyResultTermType, LetTermType, ListTermType, PartialApplicationTermType, RecordTermType,
+        RecursiveTermType, RefType, SignalTermType, SignalType, StackOffset, StringTermType,
+        StringValue, StructPrototypeType, SymbolId, SymbolTermType, TimestampTermType,
+        TimestampValue, VariableTermType,
     },
     hash::HashId,
 };
@@ -31,9 +31,9 @@ use crate::{
     term_type::{
         ApplicationTerm, BooleanTerm, BuiltinTerm, ConditionTerm, ConstructorTerm, CustomCondition,
         EffectTerm, ErrorCondition, FloatTerm, HashmapTerm, HashsetTerm, IntTerm, LambdaTerm,
-        LetTerm, ListTerm, NilTerm, PartialTerm, PendingCondition, RecordTerm, SignalTerm,
-        StringTerm, SymbolTerm, TermType, TermTypeDiscriminants, TimestampTerm, TreeTerm,
-        TypedTerm, VariableTerm, WasmExpression,
+        LazyResultTerm, LetTerm, ListTerm, NilTerm, PartialTerm, PendingCondition, RecordTerm,
+        SignalTerm, StringTerm, SymbolTerm, TermType, TermTypeDiscriminants, TimestampTerm,
+        TreeTerm, TypedTerm, VariableTerm, WasmExpression,
     },
     ArenaPointer, ArenaRef, FunctionIndex, Term,
 };
@@ -90,6 +90,16 @@ where
             let num_args = term.num_args();
             let body = self.import(term.body().as_deref(), factory)?;
             Ok(self.create_lambda_term(num_args, body))
+        } else if let Some(term) = factory.match_lazy_result_term(expression) {
+            let value = self.import(term.value().as_deref(), factory)?;
+            let conditions = term
+                .dependencies()
+                .as_deref()
+                .iter()
+                .map(|condition| self.import_condition(condition.as_deref().deref(), factory))
+                .collect::<Result<Vec<_>, _>>()?;
+            let dependencies = self.create_signal_list(conditions);
+            Ok(self.create_lazy_result_term(value, dependencies))
         } else if let Some(term) = factory.match_application_term(expression) {
             let target = self.import(term.target().as_deref(), factory)?;
             let args = term
@@ -891,6 +901,30 @@ where
         ArenaRef::<Term, Self>::new(self.clone(), pointer)
     }
 
+    fn create_lazy_result_term(
+        &self,
+        value: ArenaRef<Term, Self>,
+        dependencies: <ArenaRef<Term, Self> as Expression>::SignalList,
+    ) -> ArenaRef<Term, Self> {
+        debug_assert!(std::ptr::eq(
+            &*value.arena.arena.borrow(),
+            &*self.arena.borrow()
+        ));
+        debug_assert!(std::ptr::eq(
+            &*dependencies.arena.arena.borrow(),
+            &*self.arena.borrow()
+        ));
+        let term = Term::new(
+            TermType::LazyResult(LazyResultTerm {
+                value: value.as_pointer(),
+                dependencies: dependencies.as_pointer(),
+            }),
+            &*self.arena.borrow(),
+        );
+        let pointer = self.arena.borrow_mut().deref_mut().allocate(term);
+        ArenaRef::<Term, Self>::new(self.clone(), pointer)
+    }
+
     fn create_application_term(
         &self,
         target: ArenaRef<Term, Self>,
@@ -1234,6 +1268,16 @@ where
     ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::LambdaTerm> {
         match expression.read_value(|term| term.type_id()) {
             TermTypeDiscriminants::Lambda => Some(expression.as_typed_term::<LambdaTerm>()),
+            _ => None,
+        }
+    }
+
+    fn match_lazy_result_term<'a>(
+        &self,
+        expression: &'a ArenaRef<Term, Self>,
+    ) -> Option<&'a <ArenaRef<Term, Self> as Expression>::LazyResultTerm> {
+        match expression.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::LazyResult => Some(expression.as_typed_term::<LazyResultTerm>()),
             _ => None,
         }
     }

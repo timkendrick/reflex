@@ -1476,6 +1476,10 @@ fn parse_runtime_exports(module: &Module) -> Result<RuntimeExportMappings, WasmC
             )?,
             create_int: get_builtin_function(&exported_functions, RuntimeBuiltin::CreateInt)?,
             create_lambda: get_builtin_function(&exported_functions, RuntimeBuiltin::CreateLambda)?,
+            create_lazy_result: get_builtin_function(
+                &exported_functions,
+                RuntimeBuiltin::CreateLazyResult,
+            )?,
             create_nil: get_builtin_function(&exported_functions, RuntimeBuiltin::CreateNil)?,
             create_partial: get_builtin_function(
                 &exported_functions,

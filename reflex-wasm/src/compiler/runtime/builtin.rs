@@ -34,6 +34,7 @@ pub enum RuntimeBuiltin {
     CreateHashset,
     CreateInt,
     CreateLambda,
+    CreateLazyResult,
     CreateNil,
     CreatePartial,
     CreatePointer,
@@ -157,6 +158,10 @@ impl RuntimeBuiltin {
             RuntimeBuiltin::CreateInt => TypeSignature::new(ValueType::F64, ValueType::HeapPointer),
             RuntimeBuiltin::CreateLambda => TypeSignature::new(
                 (ValueType::U32, ValueType::HeapPointer),
+                ValueType::HeapPointer,
+            ),
+            RuntimeBuiltin::CreateLazyResult => TypeSignature::new(
+                (ValueType::HeapPointer, ValueType::HeapPointer),
                 ValueType::HeapPointer,
             ),
             RuntimeBuiltin::CreateNil => TypeSignature::new((), ValueType::HeapPointer),
@@ -323,6 +328,7 @@ impl RuntimeBuiltin {
             RuntimeBuiltin::CreateHashset => "createHashset",
             RuntimeBuiltin::CreateInt => "createInt",
             RuntimeBuiltin::CreateLambda => "createLambda",
+            RuntimeBuiltin::CreateLazyResult => "createLazyResult",
             RuntimeBuiltin::CreateNil => "createNil",
             RuntimeBuiltin::CreatePartial => "createPartial",
             RuntimeBuiltin::CreatePointer => "createPointer",

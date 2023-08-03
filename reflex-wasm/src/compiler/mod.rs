@@ -1654,6 +1654,10 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<Term, A> {
                 .as_typed_term::<LambdaTerm>()
                 .as_inner()
                 .compile(stack, state, options),
+            TermTypeDiscriminants::LazyResult => self
+                .as_typed_term::<LazyResultTerm>()
+                .as_inner()
+                .compile(stack, state, options),
             TermTypeDiscriminants::Let => self
                 .as_typed_term::<LetTerm>()
                 .as_inner()

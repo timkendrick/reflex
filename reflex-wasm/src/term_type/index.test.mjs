@@ -14,6 +14,7 @@ import hashset from './hashset.test.mjs';
 import int from './int.test.mjs';
 import iterator from './iterator/index.test.mjs';
 import lambda from './lambda.test.mjs';
+import lazyResult from './lazy_result.test.mjs';
 import _let from './let.test.mjs';
 import list from './list.test.mjs';
 import nil from './nil.test.mjs';
@@ -40,6 +41,7 @@ export default (describe) => {
   hashset(describe);
   int(describe);
   lambda(describe);
+  lazyResult(describe);
   _let(describe);
   list(describe);
   nil(describe);

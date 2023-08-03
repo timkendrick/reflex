@@ -394,6 +394,18 @@ export function createRuntime(runtime) {
     getLambdaBody(value) {
       return runtime.getLambdaBody(value);
     },
+    createLazyResult(numArgs, body) {
+      return runtime.createLazyResult(numArgs, body);
+    },
+    isLazyResult(value) {
+      return runtime.isLazyResult(value);
+    },
+    getLazyResultValue(value) {
+      return runtime.getLazyResultValue(value);
+    },
+    getLazyResultDependencies(value) {
+      return runtime.getLazyResultDependencies(value);
+    },
     createVariable(stackOffset) {
       return runtime.createVariable(stackOffset);
     },

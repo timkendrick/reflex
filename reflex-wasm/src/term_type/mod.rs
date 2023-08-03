@@ -35,6 +35,7 @@ pub mod hashset;
 pub mod int;
 pub mod iterator;
 pub mod lambda;
+pub mod lazy_result;
 pub mod r#let;
 pub mod list;
 pub mod nil;
@@ -61,6 +62,7 @@ pub use hashset::*;
 pub use int::*;
 pub use iterator::*;
 pub use lambda::*;
+pub use lazy_result::*;
 pub use list::*;
 pub use nil::*;
 pub use partial::*;
@@ -91,6 +93,7 @@ pub enum TermType {
     Hashset(HashsetTerm),
     Int(IntTerm),
     Lambda(LambdaTerm),
+    LazyResult(LazyResultTerm),
     Let(LetTerm),
     List(ListTerm),
     Nil(NilTerm),
@@ -137,6 +140,7 @@ impl TryFrom<u32> for TermTypeDiscriminants {
             value if value == Self::Hashset as u32 => Ok(Self::Hashset),
             value if value == Self::Int as u32 => Ok(Self::Int),
             value if value == Self::Lambda as u32 => Ok(Self::Lambda),
+            value if value == Self::LazyResult as u32 => Ok(Self::LazyResult),
             value if value == Self::Let as u32 => Ok(Self::Let),
             value if value == Self::List as u32 => Ok(Self::List),
             value if value == Self::Nil as u32 => Ok(Self::Nil),
@@ -188,6 +192,7 @@ impl TermSize for TermType {
             Self::Hashset(term) => term.size_of(),
             Self::Int(term) => term.size_of(),
             Self::Lambda(term) => term.size_of(),
+            Self::LazyResult(term) => term.size_of(),
             Self::Let(term) => term.size_of(),
             Self::List(term) => term.size_of(),
             Self::Nil(term) => term.size_of(),
@@ -259,6 +264,9 @@ impl TermHash for TermType {
                 .hash(term, arena),
             Self::Lambda(term) => hasher
                 .write_u8(TermTypeDiscriminants::Lambda as u8)
+                .hash(term, arena),
+            Self::LazyResult(term) => hasher
+                .write_u8(TermTypeDiscriminants::LazyResult as u8)
                 .hash(term, arena),
             Self::Let(term) => hasher
                 .write_u8(TermTypeDiscriminants::Let as u8)
@@ -362,6 +370,7 @@ pub enum TermPointerIterator {
     Hashset(HashsetTermPointerIter),
     Int(IntTermPointerIter),
     Lambda(LambdaTermPointerIter),
+    LazyResult(LazyResultTermPointerIter),
     Let(LetTermPointerIter),
     List(ListTermPointerIter),
     Nil(NilTermPointerIter),
@@ -408,6 +417,7 @@ impl Iterator for TermPointerIterator {
             TermPointerIterator::Hashset(inner) => inner.next(),
             TermPointerIterator::Int(inner) => inner.next(),
             TermPointerIterator::Lambda(inner) => inner.next(),
+            TermPointerIterator::LazyResult(inner) => inner.next(),
             TermPointerIterator::Let(inner) => inner.next(),
             TermPointerIterator::List(inner) => inner.next(),
             TermPointerIterator::Nil(inner) => inner.next(),
@@ -486,6 +496,9 @@ impl<A: Arena + Clone> PointerIter for ArenaRef<Term, A> {
             TermTypeDiscriminants::Lambda => {
                 TermPointerIterator::Lambda(self.as_typed_term::<LambdaTerm>().as_inner().iter())
             }
+            TermTypeDiscriminants::LazyResult => TermPointerIterator::LazyResult(
+                self.as_typed_term::<LazyResultTerm>().as_inner().iter(),
+            ),
             TermTypeDiscriminants::Let => {
                 TermPointerIterator::Let(self.as_typed_term::<LetTerm>().as_inner().iter())
             }
@@ -641,6 +654,10 @@ impl<A: Arena + Clone> Internable for ArenaRef<Term, A> {
                 .should_intern(eager),
             TermTypeDiscriminants::Lambda => self
                 .as_typed_term::<LambdaTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::LazyResult => self
+                .as_typed_term::<LazyResultTerm>()
                 .as_inner()
                 .should_intern(eager),
             TermTypeDiscriminants::Let => self
@@ -970,6 +987,14 @@ impl<'a> Into<Option<&'a LambdaTerm>> for &'a TermType {
         }
     }
 }
+impl<'a> Into<Option<&'a LazyResultTerm>> for &'a TermType {
+    fn into(self) -> Option<&'a LazyResultTerm> {
+        match self {
+            TermType::LazyResult(term) => Some(term),
+            _ => None,
+        }
+    }
+}
 impl<'a> Into<Option<&'a LetTerm>> for &'a TermType {
     fn into(self) -> Option<&'a LetTerm> {
         match self {
@@ -1272,6 +1297,10 @@ impl<A: Arena + Clone> PartialEq for ArenaRef<Term, A> {
                 self.as_typed_term::<LambdaTerm>().as_inner()
                     == other.as_typed_term::<LambdaTerm>().as_inner()
             }
+            (TermTypeDiscriminants::LazyResult, TermTypeDiscriminants::LazyResult) => {
+                self.as_typed_term::<LazyResultTerm>().as_inner()
+                    == other.as_typed_term::<LazyResultTerm>().as_inner()
+            }
             (TermTypeDiscriminants::Let, TermTypeDiscriminants::Let) => {
                 self.as_typed_term::<LetTerm>().as_inner()
                     == other.as_typed_term::<LetTerm>().as_inner()
@@ -1428,6 +1457,7 @@ impl<A: Arena + Clone> Expression for ArenaRef<Term, A> {
     type EffectTerm = ArenaRef<TypedTerm<EffectTerm>, A>;
     type LetTerm = ArenaRef<TypedTerm<LetTerm>, A>;
     type LambdaTerm = ArenaRef<TypedTerm<LambdaTerm>, A>;
+    type LazyResultTerm = ArenaRef<TypedTerm<LazyResultTerm>, A>;
     type ApplicationTerm = ArenaRef<TypedTerm<ApplicationTerm>, A>;
     type PartialApplicationTerm = ArenaRef<TypedTerm<PartialTerm>, A>;
     // FIXME: implement recursive term type
@@ -1488,6 +1518,9 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             }
             TermTypeDiscriminants::Lambda => {
                 GraphNode::size(&self.as_typed_term::<LambdaTerm>().as_inner())
+            }
+            TermTypeDiscriminants::LazyResult => {
+                GraphNode::size(&self.as_typed_term::<LazyResultTerm>().as_inner())
             }
             TermTypeDiscriminants::Let => {
                 GraphNode::size(&self.as_typed_term::<LetTerm>().as_inner())
@@ -1615,6 +1648,9 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             TermTypeDiscriminants::Lambda => {
                 GraphNode::capture_depth(&self.as_typed_term::<LambdaTerm>().as_inner())
             }
+            TermTypeDiscriminants::LazyResult => {
+                GraphNode::capture_depth(&self.as_typed_term::<LazyResultTerm>().as_inner())
+            }
             TermTypeDiscriminants::Let => {
                 GraphNode::capture_depth(&self.as_typed_term::<LetTerm>().as_inner())
             }
@@ -1740,6 +1776,9 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             }
             TermTypeDiscriminants::Lambda => {
                 GraphNode::free_variables(&self.as_typed_term::<LambdaTerm>().as_inner())
+            }
+            TermTypeDiscriminants::LazyResult => {
+                GraphNode::free_variables(&self.as_typed_term::<LazyResultTerm>().as_inner())
             }
             TermTypeDiscriminants::Let => {
                 GraphNode::free_variables(&self.as_typed_term::<LetTerm>().as_inner())
@@ -1877,6 +1916,10 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             ),
             TermTypeDiscriminants::Lambda => GraphNode::count_variable_usages(
                 &self.as_typed_term::<LambdaTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::LazyResult => GraphNode::count_variable_usages(
+                &self.as_typed_term::<LazyResultTerm>().as_inner(),
                 offset,
             ),
             TermTypeDiscriminants::Let => GraphNode::count_variable_usages(
@@ -2042,6 +2085,10 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
                 &self.as_typed_term::<LambdaTerm>().as_inner(),
                 deep,
             ),
+            TermTypeDiscriminants::LazyResult => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<LazyResultTerm>().as_inner(),
+                deep,
+            ),
             TermTypeDiscriminants::Let => {
                 GraphNode::dynamic_dependencies(&self.as_typed_term::<LetTerm>().as_inner(), deep)
             }
@@ -2204,6 +2251,10 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
                 &self.as_typed_term::<LambdaTerm>().as_inner(),
                 deep,
             ),
+            TermTypeDiscriminants::LazyResult => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<LazyResultTerm>().as_inner(),
+                deep,
+            ),
             TermTypeDiscriminants::Let => GraphNode::has_dynamic_dependencies(
                 &self.as_typed_term::<LetTerm>().as_inner(),
                 deep,
@@ -2358,6 +2409,9 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             TermTypeDiscriminants::Lambda => {
                 GraphNode::is_static(&self.as_typed_term::<LambdaTerm>().as_inner())
             }
+            TermTypeDiscriminants::LazyResult => {
+                GraphNode::is_static(&self.as_typed_term::<LazyResultTerm>().as_inner())
+            }
             TermTypeDiscriminants::Let => {
                 GraphNode::is_static(&self.as_typed_term::<LetTerm>().as_inner())
             }
@@ -2484,6 +2538,9 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             TermTypeDiscriminants::Lambda => {
                 GraphNode::is_atomic(&self.as_typed_term::<LambdaTerm>().as_inner())
             }
+            TermTypeDiscriminants::LazyResult => {
+                GraphNode::is_atomic(&self.as_typed_term::<LazyResultTerm>().as_inner())
+            }
             TermTypeDiscriminants::Let => {
                 GraphNode::is_atomic(&self.as_typed_term::<LetTerm>().as_inner())
             }
@@ -2609,6 +2666,9 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             }
             TermTypeDiscriminants::Lambda => {
                 GraphNode::is_complex(&self.as_typed_term::<LambdaTerm>().as_inner())
+            }
+            TermTypeDiscriminants::LazyResult => {
+                GraphNode::is_complex(&self.as_typed_term::<LazyResultTerm>().as_inner())
             }
             TermTypeDiscriminants::Let => {
                 GraphNode::is_complex(&self.as_typed_term::<LetTerm>().as_inner())
@@ -2738,6 +2798,9 @@ impl<A: Arena + Clone> SerializeJson for ArenaRef<Term, A> {
             }
             TermTypeDiscriminants::Lambda => {
                 SerializeJson::to_json(&self.as_typed_term::<LambdaTerm>().as_inner())
+            }
+            TermTypeDiscriminants::LazyResult => {
+                SerializeJson::to_json(&self.as_typed_term::<LazyResultTerm>().as_inner())
             }
             TermTypeDiscriminants::Let => {
                 SerializeJson::to_json(&self.as_typed_term::<LetTerm>().as_inner())
@@ -2897,6 +2960,12 @@ impl<A: Arena + Clone> SerializeJson for ArenaRef<Term, A> {
                 &self.as_typed_term::<LambdaTerm>().as_inner(),
                 &target.as_typed_term::<LambdaTerm>().as_inner(),
             ),
+            (TermTypeDiscriminants::LazyResult, TermTypeDiscriminants::LazyResult) => {
+                SerializeJson::patch(
+                    &self.as_typed_term::<LazyResultTerm>().as_inner(),
+                    &target.as_typed_term::<LazyResultTerm>().as_inner(),
+                )
+            }
             (TermTypeDiscriminants::Let, TermTypeDiscriminants::Let) => SerializeJson::patch(
                 &self.as_typed_term::<LetTerm>().as_inner(),
                 &target.as_typed_term::<LetTerm>().as_inner(),
@@ -3100,6 +3169,9 @@ impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<Term, A> {
             TermTypeDiscriminants::Lambda => {
                 std::fmt::Debug::fmt(&self.as_typed_term::<LambdaTerm>().as_inner(), f)
             }
+            TermTypeDiscriminants::LazyResult => {
+                std::fmt::Debug::fmt(&self.as_typed_term::<LazyResultTerm>().as_inner(), f)
+            }
             TermTypeDiscriminants::Let => {
                 std::fmt::Debug::fmt(&self.as_typed_term::<LetTerm>().as_inner(), f)
             }
@@ -3233,6 +3305,9 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<Term, A> {
             TermTypeDiscriminants::Lambda => {
                 std::fmt::Display::fmt(&self.as_typed_term::<LambdaTerm>().as_inner(), f)
             }
+            TermTypeDiscriminants::LazyResult => {
+                std::fmt::Display::fmt(&self.as_typed_term::<LazyResultTerm>().as_inner(), f)
+            }
             TermTypeDiscriminants::Let => {
                 std::fmt::Display::fmt(&self.as_typed_term::<LetTerm>().as_inner(), f)
             }
@@ -3363,6 +3438,9 @@ impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<TermType, A> {
             TermTypeDiscriminants::Lambda => {
                 std::fmt::Debug::fmt(&self.read_value(|value| *value), f)
             }
+            TermTypeDiscriminants::LazyResult => {
+                std::fmt::Debug::fmt(&self.read_value(|value| *value), f)
+            }
             TermTypeDiscriminants::Let => std::fmt::Debug::fmt(&self.read_value(|value| *value), f),
             TermTypeDiscriminants::List => {
                 std::fmt::Debug::fmt(&self.read_value(|value| *value), f)
@@ -3479,6 +3557,7 @@ impl<V> TypedTerm<V> {
                 TermType::Hashset(inner) => std::mem::transmute::<&HashsetTerm, &V>(inner),
                 TermType::Int(inner) => std::mem::transmute::<&IntTerm, &V>(inner),
                 TermType::Lambda(inner) => std::mem::transmute::<&LambdaTerm, &V>(inner),
+                TermType::LazyResult(inner) => std::mem::transmute::<&LazyResultTerm, &V>(inner),
                 TermType::Let(inner) => std::mem::transmute::<&LetTerm, &V>(inner),
                 TermType::List(inner) => std::mem::transmute::<&ListTerm, &V>(inner),
                 TermType::Nil(inner) => std::mem::transmute::<&NilTerm, &V>(inner),
@@ -3711,6 +3790,18 @@ impl<A: Arena + Clone> ArenaRef<Term, A> {
     pub fn into_lambda_term(self) -> Option<ArenaRef<TypedTerm<LambdaTerm>, A>> {
         match self.read_value(|term| term.type_id()) {
             TermTypeDiscriminants::Lambda => Some(self.into_typed_term::<LambdaTerm>()),
+            _ => None,
+        }
+    }
+    pub fn as_lazy_result_term(&self) -> Option<&ArenaRef<TypedTerm<LazyResultTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::LazyResult => Some(self.as_typed_term::<LazyResultTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_lazy_result_term(self) -> Option<ArenaRef<TypedTerm<LazyResultTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::LazyResult => Some(self.into_typed_term::<LazyResultTerm>()),
             _ => None,
         }
     }
@@ -4205,33 +4296,34 @@ mod tests {
         assert_eq!(TermTypeDiscriminants::Hashset as u32, 9);
         assert_eq!(TermTypeDiscriminants::Int as u32, 10);
         assert_eq!(TermTypeDiscriminants::Lambda as u32, 11);
-        assert_eq!(TermTypeDiscriminants::Let as u32, 12);
-        assert_eq!(TermTypeDiscriminants::List as u32, 13);
-        assert_eq!(TermTypeDiscriminants::Nil as u32, 14);
-        assert_eq!(TermTypeDiscriminants::Partial as u32, 15);
-        assert_eq!(TermTypeDiscriminants::Pointer as u32, 16);
-        assert_eq!(TermTypeDiscriminants::Record as u32, 17);
-        assert_eq!(TermTypeDiscriminants::Signal as u32, 18);
-        assert_eq!(TermTypeDiscriminants::String as u32, 19);
-        assert_eq!(TermTypeDiscriminants::Symbol as u32, 20);
-        assert_eq!(TermTypeDiscriminants::Timestamp as u32, 21);
-        assert_eq!(TermTypeDiscriminants::Tree as u32, 22);
-        assert_eq!(TermTypeDiscriminants::Variable as u32, 23);
-        assert_eq!(TermTypeDiscriminants::EmptyIterator as u32, 24);
-        assert_eq!(TermTypeDiscriminants::EvaluateIterator as u32, 25);
-        assert_eq!(TermTypeDiscriminants::FilterIterator as u32, 26);
-        assert_eq!(TermTypeDiscriminants::FlattenIterator as u32, 27);
-        assert_eq!(TermTypeDiscriminants::HashmapKeysIterator as u32, 28);
-        assert_eq!(TermTypeDiscriminants::HashmapValuesIterator as u32, 29);
-        assert_eq!(TermTypeDiscriminants::IndexedAccessorIterator as u32, 30);
-        assert_eq!(TermTypeDiscriminants::IntegersIterator as u32, 31);
-        assert_eq!(TermTypeDiscriminants::IntersperseIterator as u32, 32);
-        assert_eq!(TermTypeDiscriminants::MapIterator as u32, 33);
-        assert_eq!(TermTypeDiscriminants::OnceIterator as u32, 34);
-        assert_eq!(TermTypeDiscriminants::RangeIterator as u32, 35);
-        assert_eq!(TermTypeDiscriminants::RepeatIterator as u32, 36);
-        assert_eq!(TermTypeDiscriminants::SkipIterator as u32, 37);
-        assert_eq!(TermTypeDiscriminants::TakeIterator as u32, 38);
-        assert_eq!(TermTypeDiscriminants::ZipIterator as u32, 39);
+        assert_eq!(TermTypeDiscriminants::LazyResult as u32, 12);
+        assert_eq!(TermTypeDiscriminants::Let as u32, 13);
+        assert_eq!(TermTypeDiscriminants::List as u32, 14);
+        assert_eq!(TermTypeDiscriminants::Nil as u32, 15);
+        assert_eq!(TermTypeDiscriminants::Partial as u32, 16);
+        assert_eq!(TermTypeDiscriminants::Pointer as u32, 17);
+        assert_eq!(TermTypeDiscriminants::Record as u32, 18);
+        assert_eq!(TermTypeDiscriminants::Signal as u32, 19);
+        assert_eq!(TermTypeDiscriminants::String as u32, 20);
+        assert_eq!(TermTypeDiscriminants::Symbol as u32, 21);
+        assert_eq!(TermTypeDiscriminants::Timestamp as u32, 22);
+        assert_eq!(TermTypeDiscriminants::Tree as u32, 23);
+        assert_eq!(TermTypeDiscriminants::Variable as u32, 24);
+        assert_eq!(TermTypeDiscriminants::EmptyIterator as u32, 25);
+        assert_eq!(TermTypeDiscriminants::EvaluateIterator as u32, 26);
+        assert_eq!(TermTypeDiscriminants::FilterIterator as u32, 27);
+        assert_eq!(TermTypeDiscriminants::FlattenIterator as u32, 28);
+        assert_eq!(TermTypeDiscriminants::HashmapKeysIterator as u32, 29);
+        assert_eq!(TermTypeDiscriminants::HashmapValuesIterator as u32, 30);
+        assert_eq!(TermTypeDiscriminants::IndexedAccessorIterator as u32, 31);
+        assert_eq!(TermTypeDiscriminants::IntegersIterator as u32, 32);
+        assert_eq!(TermTypeDiscriminants::IntersperseIterator as u32, 33);
+        assert_eq!(TermTypeDiscriminants::MapIterator as u32, 34);
+        assert_eq!(TermTypeDiscriminants::OnceIterator as u32, 35);
+        assert_eq!(TermTypeDiscriminants::RangeIterator as u32, 36);
+        assert_eq!(TermTypeDiscriminants::RepeatIterator as u32, 37);
+        assert_eq!(TermTypeDiscriminants::SkipIterator as u32, 38);
+        assert_eq!(TermTypeDiscriminants::TakeIterator as u32, 39);
+        assert_eq!(TermTypeDiscriminants::ZipIterator as u32, 40);
     }
 }

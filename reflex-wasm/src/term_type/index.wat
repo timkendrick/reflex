@@ -30,6 +30,7 @@
   (@include "./iterator/take.wat")
   (@include "./iterator/zip.wat")
   (@include "./lambda.wat")
+  (@include "./lazy_result.wat")
   (@include "./let.wat")
   (@include "./list.wat")
   (@include "./nil.wat")
@@ -57,6 +58,7 @@
       (@import $Hashset "./hashset.wat")
       (@import $Int "./int.wat")
       (@import $Lambda "./lambda.wat")
+      (@import $LazyResult "./lazy_result.wat")
       (@import $Let "./let.wat")
       (@import $List "./list.wat")
       (@import $Nil "./nil.wat")
@@ -170,6 +172,7 @@
       (@list
         $Application
         $Effect
+        $LazyResult
         $Let)
 
       (func $TermType::implements::evaluate (param $type i32) (result i32)
