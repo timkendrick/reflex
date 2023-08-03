@@ -493,6 +493,7 @@ pub(crate) fn generate_stateful_function(
         dependencies_id,
         temp_id,
         stack: arg_stack,
+        enclosing_blocks: Default::default(),
         compiled_function_mappings,
         export_mappings,
     };
@@ -517,8 +518,17 @@ pub(crate) fn generate_stateful_function(
                 },
                 body,
             };
-            // Generate the WASM instructions for the block
-            let instructions = block.emit_wasm(module, &mut bindings, options)?;
+            // Generate the WASM instructions within the control flow block
+            let instructions = {
+                // Enter the control flow block
+                bindings.enclosing_blocks.push(WasmBlockType::Explicit);
+                // Generate the WASM instructions within the block context
+                let compiled_instructions = block.emit_wasm(module, &mut bindings, options);
+                // Leave the control flow block
+                bindings.enclosing_blocks.pop();
+                // Return the generated instructions
+                compiled_instructions
+            }?;
             // Inject the generated instructions into the function body
             let _ = assemble_wasm(&mut function_body, Default::default(), instructions)?;
         };
@@ -915,6 +925,41 @@ pub struct WasmGeneratorBindings<'a> {
     export_mappings: &'a RuntimeExportMappings,
     /// Locals currrently accessible on the lexical scope stack (this list will grow and shrink as new lexical scopes are created and disposed)
     stack: Vec<LocalId>,
+    /// Stack of parent blocks
+    enclosing_blocks: Vec<WasmBlockType>,
+}
+
+#[derive(PartialEq, Eq, Clone, Copy, Hash, Debug)]
+pub enum WasmBlockType {
+    /// Block that has been explicitly created via a `block` or `loop` instruction
+    Explicit,
+    /// Block that has been implicitly created via e.g. an `else` / `then` instruction
+    Implicit,
+}
+
+struct NonEmptyStack<T> {
+    /// The value currently at the top of the stack
+    current: T,
+    /// Stack of parent values
+    parents: Vec<T>,
+}
+
+impl<T> NonEmptyStack<T> {
+    fn new(current: T) -> Self {
+        Self {
+            current,
+            parents: Default::default(),
+        }
+    }
+    fn push(&mut self, value: T) {
+        let existing_value = std::mem::replace(&mut self.current, value);
+        self.parents.push(existing_value);
+    }
+    fn pop(&mut self) -> Option<T> {
+        let parent_value = self.parents.pop()?;
+        let existing_value = std::mem::replace(&mut self.current, parent_value);
+        Some(existing_value)
+    }
 }
 
 impl<'a> WasmGeneratorBindings<'a> {
@@ -964,6 +1009,31 @@ impl<'a> WasmGeneratorBindings<'a> {
     pub fn leave_scope(&mut self) -> Option<LocalId> {
         self.stack.pop()
     }
+    pub fn enter_block(&mut self, block_type: WasmBlockType) {
+        self.enclosing_blocks.push(block_type);
+    }
+    pub fn leave_block(&mut self) -> Option<WasmBlockType> {
+        self.enclosing_blocks.pop()
+    }
+    pub fn get_target_block_offset(&self, target_block: usize) -> Option<usize> {
+        let blocks = &self.enclosing_blocks;
+        let num_blocks = blocks.len();
+        let num_hidden_blocks = (0..=target_block).fold(Some(0), |result, target_block| {
+            let mut num_hidden_blocks = result?;
+            while let WasmBlockType::Implicit = {
+                if target_block + num_hidden_blocks >= num_blocks {
+                    None
+                } else {
+                    self.enclosing_blocks
+                        .get(num_blocks - 1 - (target_block + num_hidden_blocks))
+                }
+            }? {
+                num_hidden_blocks += 1;
+            }
+            Some(num_hidden_blocks)
+        })?;
+        Some(target_block + num_hidden_blocks)
+    }
     pub fn get_local(&self, offset: StackOffset) -> Result<LocalId, WasmGeneratorError> {
         if offset < self.stack.len() {
             Ok(self.stack[self.stack.len() - 1 - offset])
@@ -983,144 +1053,94 @@ impl WasmGeneratorOutput {
         self.instructions
             .push(WasmInstruction::Instruction(instruction.into()));
     }
+    #[must_use]
     pub fn block(
         &mut self,
         block_type: &TypeSignature,
-        body: WasmGeneratorOutput,
+        body: &impl GenerateWasm,
         module: &mut Module,
-        bindings: &WasmGeneratorBindings,
+        bindings: &mut WasmGeneratorBindings,
         options: &WasmGeneratorOptions,
-    ) {
-        // If the compiler output format does not support block input params, emulate this feature by using locals to
-        // save the stack values before branching, then once within the child block we can load the stack values back
-        // out from the locals (these temporary locals are typically compiled away in a later optimization pass)
-        if options.disable_block_params && (block_type.params.len() > 0) {
-            // First create temporary locals to hold the stack values
-            let param_ids = block_type
-                .params
-                .iter()
-                .map(|param_type| module.locals.add(parse_value_type(param_type)))
-                .collect::<Vec<_>>();
-            // Temporarily pop the branch condition into the temporary local
-            self.push(ir::LocalSet {
-                local: bindings.temp_id,
-            });
-            // Pop all the captured operand stack values into their respective locals
-            for param_id in param_ids.iter().rev() {
-                self.push(ir::LocalSet { local: *param_id });
-            }
-            // Push the branch condition back onto the operand stack
-            self.push(ir::LocalGet {
-                local: bindings.temp_id,
-            });
-            // Prepare the child block header that pushes the captured values back onto the operand stack
-            let block_header =
-                WasmGeneratorOutput::from_iter(param_ids.into_iter().map(|param_id| {
-                    WasmInstruction::Instruction(ir::Instr::LocalGet(ir::LocalGet {
-                        local: param_id,
-                    }))
-                }));
-            let block_type = parse_block_type_signature(
-                &TypeSignature {
-                    params: ParamsSignature::Void,
-                    results: block_type.results.clone(),
-                },
-                &mut module.types,
-            );
-            let body = {
-                let mut instructions = block_header;
-                instructions.push_chunk(body);
-                instructions
-            };
-            // Emit the rewritten branch instruction
-            self.instructions
-                .push(WasmInstruction::Block { block_type, body });
-        } else {
-            // Otherwise if we are not manually capturing any stack values, emit the branch instruction as-is
-            let block_type = parse_block_type_signature(block_type, &mut module.types);
-            self.instructions
-                .push(WasmInstruction::Block { block_type, body });
-        };
+    ) -> Result<(), WasmGeneratorError> {
+        let instructions = generate_control_flow_instructions(
+            &WasmBlockControlFlowGenerator { body },
+            block_type,
+            module,
+            bindings,
+            options,
+        )?;
+        self.instructions.extend(instructions);
+        Ok(())
     }
-    pub fn br(&mut self, target_block: usize) {
-        self.instructions
-            .push(WasmInstruction::Break { target_block });
-    }
-    pub fn br_if(&mut self, target_block: usize) {
-        self.instructions
-            .push(WasmInstruction::ConditionalBreak { target_block });
-    }
-    pub fn if_else(
+    #[must_use]
+    pub fn r#loop(
         &mut self,
         block_type: &TypeSignature,
-        consequent: WasmGeneratorOutput,
-        alternative: WasmGeneratorOutput,
+        body: &impl GenerateWasm,
         module: &mut Module,
-        bindings: &WasmGeneratorBindings,
+        bindings: &mut WasmGeneratorBindings,
         options: &WasmGeneratorOptions,
-    ) {
-        // If the compiler output format does not support block input params, emulate this feature by using locals to
-        // save the stack values before branching, then once within the child block we can load the stack values back
-        // out from the locals (these temporary locals are typically compiled away in a later optimization pass)
-        if options.disable_block_params && (block_type.params.len() > 0) {
-            // First create temporary locals to hold the stack values
-            let param_ids = block_type
-                .params
-                .iter()
-                .map(|param_type| module.locals.add(parse_value_type(param_type)))
-                .collect::<Vec<_>>();
-            // Temporarily pop the branch condition into the temporary local
-            self.push(ir::LocalSet {
-                local: bindings.temp_id,
-            });
-            // Pop all the captured operand stack values into their respective locals
-            for param_id in param_ids.iter().rev() {
-                self.push(ir::LocalSet { local: *param_id });
-            }
-            // Push the branch condition back onto the operand stack
-            self.push(ir::LocalGet {
-                local: bindings.temp_id,
-            });
-            // Prepare the child block header that pushes the captured values back onto the operand stack
-            let block_header =
-                WasmGeneratorOutput::from_iter(param_ids.into_iter().map(|param_id| {
-                    WasmInstruction::Instruction(ir::Instr::LocalGet(ir::LocalGet {
-                        local: param_id,
-                    }))
-                }));
-            let block_type = parse_block_type_signature(
-                &TypeSignature {
-                    params: ParamsSignature::Void,
-                    results: block_type.results.clone(),
-                },
-                &mut module.types,
-            );
-            let (consequent_header, alternative_header) = (block_header.clone(), block_header);
-            let consequent = {
-                let mut instructions = consequent_header;
-                instructions.push_chunk(consequent);
-                instructions
-            };
-            let alternative = {
-                let mut instructions = alternative_header;
-                instructions.push_chunk(alternative);
-                instructions
-            };
-            // Emit the rewritten branch instruction
-            self.instructions.push(WasmInstruction::IfElse {
-                block_type,
+    ) -> Result<(), WasmGeneratorError> {
+        let instructions = generate_control_flow_instructions(
+            &WasmLoopControlFlowGenerator { body },
+            block_type,
+            module,
+            bindings,
+            options,
+        )?;
+        self.instructions.extend(instructions);
+        Ok(())
+    }
+    #[must_use]
+    pub fn if_else<T: GenerateWasm>(
+        &mut self,
+        block_type: &TypeSignature,
+        consequent: &T,
+        alternative: &T,
+        module: &mut Module,
+        bindings: &mut WasmGeneratorBindings,
+        options: &WasmGeneratorOptions,
+    ) -> Result<(), WasmGeneratorError> {
+        let instructions = generate_control_flow_instructions(
+            &WasmIfElseControlFlowGenerator {
                 consequent,
                 alternative,
-            });
-        } else {
-            // Otherwise if we are not manually capturing any stack values, emit the branch instruction as-is
-            let block_type = parse_block_type_signature(block_type, &mut module.types);
-            self.instructions.push(WasmInstruction::IfElse {
-                block_type,
-                consequent,
-                alternative,
-            });
-        };
+            },
+            block_type,
+            module,
+            bindings,
+            options,
+        )?;
+        self.instructions.extend(instructions);
+        Ok(())
+    }
+    #[must_use]
+    pub fn br(
+        &mut self,
+        target_block: usize,
+        bindings: &WasmGeneratorBindings,
+    ) -> Result<(), WasmGeneratorError> {
+        let target_block_offset = bindings
+            .get_target_block_offset(target_block)
+            .ok_or_else(|| WasmGeneratorError::InvalidBlockOffset(target_block))?;
+        self.instructions.push(WasmInstruction::Break {
+            target_block: target_block_offset,
+        });
+        Ok(())
+    }
+    #[must_use]
+    pub fn br_if(
+        &mut self,
+        target_block: usize,
+        bindings: &WasmGeneratorBindings,
+    ) -> Result<(), WasmGeneratorError> {
+        let target_block_offset = bindings
+            .get_target_block_offset(target_block)
+            .ok_or_else(|| WasmGeneratorError::InvalidBlockOffset(target_block))?;
+        self.instructions.push(WasmInstruction::ConditionalBreak {
+            target_block: target_block_offset,
+        });
+        Ok(())
     }
     pub fn iter(&self) -> std::slice::Iter<'_, WasmInstruction> {
         self.instructions.iter()
@@ -1128,6 +1148,176 @@ impl WasmGeneratorOutput {
     fn push_chunk(&mut self, chunk: WasmGeneratorOutput) {
         self.instructions.extend(chunk);
     }
+}
+
+/// Generic helper used when generating structured control flow that combines one or more child blocks
+trait WasmControlFlowGenerator<T: GenerateWasm, const N: usize> {
+    /// Produce a list of child branches to be compiled within their own control flow blocks
+    fn blocks(&self) -> [(WasmBlockType, &T); N];
+    /// Combine the compiled child branches into the current control flow block
+    fn generate(
+        &self,
+        block_type: ir::InstrSeqType,
+        compiled_blocks: [WasmGeneratorResult; N],
+    ) -> WasmGeneratorResult;
+}
+
+struct WasmBlockControlFlowGenerator<'a, T: GenerateWasm> {
+    body: &'a T,
+}
+
+impl<'a, T: GenerateWasm> WasmControlFlowGenerator<T, 1> for WasmBlockControlFlowGenerator<'a, T> {
+    fn blocks(&self) -> [(WasmBlockType, &T); 1] {
+        [(WasmBlockType::Explicit, self.body)]
+    }
+    fn generate(
+        &self,
+        block_type: ir::InstrSeqType,
+        compiled_blocks: [WasmGeneratorResult; 1],
+    ) -> WasmGeneratorResult {
+        let [body] = compiled_blocks;
+        let body = body?;
+        let mut instructions = WasmGeneratorOutput::default();
+        instructions
+            .instructions
+            .push(WasmInstruction::Block { block_type, body });
+        Ok(instructions)
+    }
+}
+
+struct WasmLoopControlFlowGenerator<'a, T: GenerateWasm> {
+    body: &'a T,
+}
+
+impl<'a, T: GenerateWasm> WasmControlFlowGenerator<T, 1> for WasmLoopControlFlowGenerator<'a, T> {
+    fn blocks(&self) -> [(WasmBlockType, &T); 1] {
+        [(WasmBlockType::Explicit, self.body)]
+    }
+    fn generate(
+        &self,
+        block_type: ir::InstrSeqType,
+        compiled_blocks: [WasmGeneratorResult; 1],
+    ) -> WasmGeneratorResult {
+        let [body] = compiled_blocks;
+        let body = body?;
+        let mut instructions = WasmGeneratorOutput::default();
+        instructions
+            .instructions
+            .push(WasmInstruction::Loop { block_type, body });
+        Ok(instructions)
+    }
+}
+
+struct WasmIfElseControlFlowGenerator<'a, T: GenerateWasm> {
+    consequent: &'a T,
+    alternative: &'a T,
+}
+
+impl<'a, T: GenerateWasm> WasmControlFlowGenerator<T, 2> for WasmIfElseControlFlowGenerator<'a, T> {
+    fn blocks(&self) -> [(WasmBlockType, &T); 2] {
+        [
+            (WasmBlockType::Implicit, self.consequent),
+            (WasmBlockType::Implicit, self.alternative),
+        ]
+    }
+    fn generate(
+        &self,
+        block_type: ir::InstrSeqType,
+        compiled_blocks: [WasmGeneratorResult; 2],
+    ) -> WasmGeneratorResult {
+        let [consequent, alternative] = compiled_blocks;
+        let consequent = consequent?;
+        let alternative = alternative?;
+        let mut instructions = WasmGeneratorOutput::default();
+        instructions.instructions.push(WasmInstruction::IfElse {
+            block_type,
+            consequent,
+            alternative,
+        });
+        Ok(instructions)
+    }
+}
+
+/// Generate structured control flow that combines one or more child blocks
+fn generate_control_flow_instructions<T: GenerateWasm, const N: usize>(
+    generator: &impl WasmControlFlowGenerator<T, N>,
+    block_type: &TypeSignature,
+    module: &mut Module,
+    bindings: &mut WasmGeneratorBindings,
+    options: &WasmGeneratorOptions,
+) -> WasmGeneratorResult {
+    let blocks = generator.blocks();
+    let (prelude, block_type, block_header) = {
+        // If the compiler output format does not support block input params, emulate this feature by using locals to
+        // save the stack values before branching, then once within the child block we can load the stack values back
+        // out from the locals (these temporary locals are typically compiled away in a later optimization pass)
+        if options.disable_block_params && (block_type.params.len() > 0) {
+            let mut prelude = WasmGeneratorOutput::default();
+            // First create temporary locals to hold the stack values
+            let param_ids = block_type
+                .params
+                .iter()
+                .map(|param_type| module.locals.add(parse_value_type(param_type)))
+                .collect::<Vec<_>>();
+            // Temporarily pop the branch condition into the temporary local
+            prelude.push(ir::LocalSet {
+                local: bindings.temp_id,
+            });
+            // Pop all the captured operand stack values into their respective locals
+            for param_id in param_ids.iter().rev() {
+                prelude.push(ir::LocalSet { local: *param_id });
+            }
+            // Push the branch condition back onto the operand stack
+            prelude.push(ir::LocalGet {
+                local: bindings.temp_id,
+            });
+            let block_type = parse_block_type_signature(
+                &TypeSignature {
+                    params: ParamsSignature::Void,
+                    results: block_type.results.clone(),
+                },
+                &mut module.types,
+            );
+            // Prepare the child block header that pushes the captured values back onto the operand stack
+            let block_header = Some(WasmGeneratorOutput::from_iter(param_ids.into_iter().map(
+                |param_id| {
+                    WasmInstruction::Instruction(ir::Instr::LocalGet(ir::LocalGet {
+                        local: param_id,
+                    }))
+                },
+            )));
+            (Some(prelude), block_type, block_header)
+        } else {
+            // Otherwise if we are not manually capturing any stack values, emit the branch instruction as-is
+            let prelude = None;
+            let block_type = parse_block_type_signature(block_type, &mut module.types);
+            let block_header = None;
+            (prelude, block_type, block_header)
+        }
+    };
+    let compiled_blocks = blocks.map(|(block_type, body)| {
+        // Compile the block body within the correct block scope
+        let body_instructions = {
+            bindings.enter_block(block_type);
+            let instructions = body.emit_wasm(module, bindings, options);
+            bindings.leave_block();
+            instructions
+        }?;
+        // Prepend the block body with the block header
+        let block_instructions = if let Some(block_header) = block_header.as_ref() {
+            let mut block_instructions = block_header.clone();
+            block_instructions.push_chunk(body_instructions);
+            block_instructions
+        } else {
+            body_instructions
+        };
+        Ok(block_instructions)
+    });
+    // Emit the top-level instructions
+    let mut instructions = prelude.unwrap_or_default();
+    let compiled_instructions = generator.generate(block_type, compiled_blocks)?;
+    instructions.push_chunk(compiled_instructions);
+    Ok(instructions)
 }
 
 impl FromIterator<WasmInstruction> for WasmGeneratorOutput {
@@ -1166,6 +1356,11 @@ pub enum WasmInstruction {
     Instruction(ir::Instr),
     /// Control flow block
     Block {
+        block_type: ir::InstrSeqType,
+        body: WasmGeneratorOutput,
+    },
+    /// Control flow loop
+    Loop {
         block_type: ir::InstrSeqType,
         body: WasmGeneratorOutput,
     },
@@ -1212,6 +1407,16 @@ fn assemble_wasm(
                         block_id
                     };
                     builder.instr(ir::Block { seq: block_id });
+                    Ok(())
+                }
+                WasmInstruction::Loop { block_type, body } => {
+                    let block_id = {
+                        let mut block_builder = builder.dangling_instr_seq(block_type);
+                        let block_id = block_builder.id();
+                        assemble_wasm(&mut block_builder, enclosing_blocks.push(block_id), body)?;
+                        block_id
+                    };
+                    builder.instr(ir::Loop { seq: block_id });
                     Ok(())
                 }
                 WasmInstruction::Break { target_block } => {

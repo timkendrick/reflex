@@ -61,6 +61,7 @@ pub enum TypedStackError {
     InvalidOperandStackValueTypes(InvalidOperandStackValueTypesError),
     InvalidLexicalScopeValueType(InvalidLexicalScopeValueTypeError),
     InvalidBlockResultType(InvalidBlockResultTypeError),
+    InvalidBlockReference(InvalidBlockReferenceError),
 }
 
 impl std::fmt::Display for TypedStackError {
@@ -69,6 +70,7 @@ impl std::fmt::Display for TypedStackError {
             Self::InvalidOperandStackValueTypes(inner) => std::fmt::Display::fmt(inner, f),
             Self::InvalidLexicalScopeValueType(inner) => std::fmt::Display::fmt(inner, f),
             Self::InvalidBlockResultType(inner) => std::fmt::Display::fmt(inner, f),
+            Self::InvalidBlockReference(inner) => std::fmt::Display::fmt(inner, f),
         }
     }
 }
@@ -132,7 +134,7 @@ impl std::fmt::Display for InvalidBlockResultTypeError {
             f,
             "Invalid block result type: Expected {}, received ",
             self.expected,
-        );
+        )?;
         let _ = if let Some(received) = self.received.as_ref() {
             write!(f, "{received}")
         } else {
@@ -145,5 +147,16 @@ impl std::fmt::Display for InvalidBlockResultTypeError {
                 let _ = result?;
                 write!(f, "\n {block_offset}: {result_type}")
             })
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct InvalidBlockReferenceError {
+    pub target_block: usize,
+}
+
+impl std::fmt::Display for InvalidBlockReferenceError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Invalid enclosing block depth: {}", self.target_block)
     }
 }

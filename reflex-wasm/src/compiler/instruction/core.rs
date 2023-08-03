@@ -282,9 +282,8 @@ impl GenerateWasm for Block {
         options: &WasmGeneratorOptions,
     ) -> WasmGeneratorResult {
         let Self { block_type, body } = self;
-        let body_instructions = body.emit_wasm(module, bindings, options)?;
         let mut instructions = WasmGeneratorOutput::default();
-        instructions.block(block_type, body_instructions, module, bindings, options);
+        instructions.block(block_type, body, module, bindings, options)?;
         Ok(instructions)
     }
 }
@@ -328,12 +327,12 @@ impl GenerateWasm for Break {
     fn emit_wasm(
         &self,
         _module: &mut Module,
-        _bindings: &mut WasmGeneratorBindings,
+        bindings: &mut WasmGeneratorBindings,
         _options: &WasmGeneratorOptions,
     ) -> WasmGeneratorResult {
         let Self { target_block, .. } = self;
         let mut instructions = WasmGeneratorOutput::default();
-        instructions.br(*target_block);
+        instructions.br(*target_block, bindings)?;
         Ok(instructions)
     }
 }
@@ -372,12 +371,12 @@ impl GenerateWasm for ConditionalBreak {
     fn emit_wasm(
         &self,
         _module: &mut Module,
-        _bindings: &mut WasmGeneratorBindings,
+        bindings: &mut WasmGeneratorBindings,
         _options: &WasmGeneratorOptions,
     ) -> WasmGeneratorResult {
         let Self { target_block, .. } = self;
         let mut instructions = WasmGeneratorOutput::default();
-        instructions.br_if(*target_block);
+        instructions.br_if(*target_block, bindings)?;
         Ok(instructions)
     }
 }
@@ -430,17 +429,15 @@ impl GenerateWasm for If {
             consequent,
             alternative,
         } = self;
-        let consequent_block = consequent.emit_wasm(module, bindings, options)?;
-        let alternative_block = alternative.emit_wasm(module, bindings, options)?;
         let mut instructions = WasmGeneratorOutput::default();
         instructions.if_else(
             block_type,
-            consequent_block,
-            alternative_block,
+            consequent,
+            alternative,
             module,
             bindings,
             options,
-        );
+        )?;
         Ok(instructions)
     }
 }

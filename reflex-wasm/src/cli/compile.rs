@@ -617,7 +617,7 @@ pub fn compile_module<'a>(
     options: &WasmCompilerOptions,
     unoptimized: bool,
 ) -> Result<Vec<u8>, WasmCompilerError> {
-    // wasm-opt doesn't currently support block params
+    // wasm-opt doesn't currently support block input parameters: https://github.com/WebAssembly/binaryen/issues/3994#issuecomment-882870778
     let overridden_options = if !unoptimized && !options.generator.disable_block_params {
         Some(WasmCompilerOptions {
             generator: WasmGeneratorOptions {
