@@ -339,7 +339,6 @@ fn evaluate_compiled<T: Expression>(
 where
     T::Builtin: Into<Stdlib>,
 {
-    let export_name = "__root__";
     let initial_heap_snapshot = parse_inline_memory_snapshot(RUNTIME_BYTES).unwrap();
     let mut allocator = VecAllocator::from_bytes(&initial_heap_snapshot);
     let mut arena = Rc::new(RefCell::new(&mut allocator));
@@ -378,8 +377,9 @@ where
         HashmapTerm::allocate(state_entries, &mut arena)
     };
     let linear_memory = Vec::from(arena.deref().borrow().deref().deref().as_bytes());
+    let entry_point_name = ModuleEntryPoint::default();
     let wasm_module = compile_module(
-        [(&ModuleEntryPoint::from(export_name), entry_point)],
+        [(&entry_point_name, entry_point)],
         &RUNTIME_BYTES,
         Some(&linear_memory),
         compiler_options,
@@ -391,7 +391,7 @@ where
     let (interpreter, result, dependencies) = WasmInterpreter::instantiate(&wasm_program, "memory")
         .and_then(|mut interpreter| {
             interpreter
-                .call::<u32, (u32, u32)>(export_name, u32::from(state))
+                .call::<u32, (u32, u32)>(entry_point_name.as_str(), u32::from(state))
                 .map(|(result, dependencies)| (interpreter, result, dependencies))
         })
         .map_err(|err| CompilerTestError::Interpreter(err, wasm_program.into()))?;

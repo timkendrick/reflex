@@ -190,7 +190,7 @@ impl<T: Expression, TFactory: ExpressionFactory<T>, TAllocator: HeapAllocator<T>
 pub struct ModuleEntryPoint(String);
 
 impl ModuleEntryPoint {
-    fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> &str {
         let Self(value) = self;
         value.as_str()
     }
