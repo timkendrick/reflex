@@ -1286,8 +1286,14 @@ pub(crate) fn intern_static_value<A: Arena + Clone>(
 
 #[derive(Debug, Clone)]
 pub(crate) enum MaybeLazyExpression<A: Arena + Clone> {
+    /// Expression is evaluated immediately and its dependencies will be added to the current control flow block's
+    /// dependencies. Signal results will short-circuit the current control flow block.
     Strict(WasmExpression<A>),
+    /// Expression is evaluated immediately and its dependencies will be added to the current control flow block's
+    /// dependencies. Signal results will be caught within a new control flow block and will not short-circuit the
+    /// current control flow block.
     Eager(EagerExpression<A>),
+    /// Expression is not evaluated; dynamic expressions will be wrapped in a heap-allocated closure application thunk.
     Lazy(LazyExpression<A>),
 }
 
