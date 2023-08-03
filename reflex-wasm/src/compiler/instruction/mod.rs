@@ -47,6 +47,8 @@ pub enum CompiledInstruction {
     WriteHeapValue(core::WriteHeapValue),
     NullPointer(runtime::NullPointer),
     DeclareVariable(runtime::DeclareVariable),
+    DeclareDependenciesVariable(runtime::DeclareDependenciesVariable),
+    GetDependenciesValue(runtime::GetDependenciesValue),
     LoadStateValue(runtime::LoadStateValue),
     CallRuntimeBuiltin(runtime::CallRuntimeBuiltin),
     CallStdlib(runtime::CallStdlib),
@@ -78,6 +80,8 @@ impl TypedCompilerBlock for CompiledInstruction {
             Self::WriteHeapValue(inner) => inner.get_type(stack),
             Self::NullPointer(inner) => inner.get_type(stack),
             Self::DeclareVariable(inner) => inner.get_type(stack),
+            Self::DeclareDependenciesVariable(inner) => inner.get_type(stack),
+            Self::GetDependenciesValue(inner) => inner.get_type(stack),
             Self::LoadStateValue(inner) => inner.get_type(stack),
             Self::CallRuntimeBuiltin(inner) => inner.get_type(stack),
             Self::CallStdlib(inner) => inner.get_type(stack),
@@ -116,6 +120,8 @@ impl GenerateWasm for CompiledInstruction {
             Self::WriteHeapValue(inner) => inner.emit_wasm(module, bindings, options),
             Self::NullPointer(inner) => inner.emit_wasm(module, bindings, options),
             Self::DeclareVariable(inner) => inner.emit_wasm(module, bindings, options),
+            Self::DeclareDependenciesVariable(inner) => inner.emit_wasm(module, bindings, options),
+            Self::GetDependenciesValue(inner) => inner.emit_wasm(module, bindings, options),
             Self::LoadStateValue(inner) => inner.emit_wasm(module, bindings, options),
             Self::CallRuntimeBuiltin(inner) => inner.emit_wasm(module, bindings, options),
             Self::CallStdlib(inner) => inner.emit_wasm(module, bindings, options),
@@ -149,6 +155,8 @@ impl std::fmt::Display for CompiledInstruction {
             Self::Ne(inner) => std::fmt::Debug::fmt(inner, f),
             Self::NullPointer(inner) => std::fmt::Debug::fmt(inner, f),
             Self::DeclareVariable(inner) => std::fmt::Debug::fmt(inner, f),
+            Self::DeclareDependenciesVariable(inner) => std::fmt::Debug::fmt(inner, f),
+            Self::GetDependenciesValue(inner) => std::fmt::Debug::fmt(inner, f),
             Self::LoadStateValue(inner) => std::fmt::Debug::fmt(inner, f),
             Self::CallRuntimeBuiltin(inner) => std::fmt::Debug::fmt(inner, f),
             Self::CallStdlib(inner) => std::fmt::Debug::fmt(inner, f),
@@ -245,6 +253,16 @@ impl From<self::runtime::NullPointer> for CompiledInstruction {
 impl From<self::runtime::DeclareVariable> for CompiledInstruction {
     fn from(value: self::runtime::DeclareVariable) -> Self {
         Self::DeclareVariable(value)
+    }
+}
+impl From<self::runtime::DeclareDependenciesVariable> for CompiledInstruction {
+    fn from(value: self::runtime::DeclareDependenciesVariable) -> Self {
+        Self::DeclareDependenciesVariable(value)
+    }
+}
+impl From<self::runtime::GetDependenciesValue> for CompiledInstruction {
+    fn from(value: self::runtime::GetDependenciesValue) -> Self {
+        Self::GetDependenciesValue(value)
     }
 }
 impl From<self::runtime::LoadStateValue> for CompiledInstruction {

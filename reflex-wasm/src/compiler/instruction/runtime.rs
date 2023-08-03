@@ -88,6 +88,71 @@ impl GenerateWasm for DeclareVariable {
     }
 }
 
+/// Enter a new lexical scope whose variable will capture any dependencies acumulated within the lexical scope
+/// (note that this will add an entry to the lexical scope stack that can be treated as a normal lexical scope variable
+/// and will continue to be used to accumulate dependencies until the lexical scope is ended).
+/// Any dependencies accumulated within the capture scope will be discarded once the scope is ended, so the value must
+/// be retrieved and assigned somewhere in order to retain a record of the dependencies.
+#[derive(PartialEq, Clone, Hash, Debug)]
+pub struct DeclareDependenciesVariable;
+
+impl TypedCompilerBlock for DeclareDependenciesVariable {
+    fn get_type(&self, stack: &CompilerStack) -> Result<CompilerStack, TypedStackError> {
+        Ok(stack
+            // Enter a new lexical scope with the correct variable type
+            .enter_scope(ValueType::HeapPointer))
+    }
+}
+
+impl GenerateWasm for DeclareDependenciesVariable {
+    fn emit_wasm(
+        &self,
+        module: &mut Module,
+        bindings: &mut WasmGeneratorBindings,
+        _options: &WasmGeneratorOptions,
+    ) -> WasmGeneratorResult {
+        let scope_local_id = module.locals.add(parse_value_type(ValueType::HeapPointer));
+        let mut instructions = WasmGeneratorOutput::default();
+        // Initialize the variable to the null pointer
+        instructions.push(ir::GlobalGet {
+            global: bindings.null_pointer(),
+        });
+        instructions.push(ir::LocalSet {
+            local: scope_local_id,
+        });
+        // Declare a new lexical scope that uses the local variable to store its dependencies
+        bindings.enter_dependencies_scope(scope_local_id);
+        Ok(instructions)
+    }
+}
+
+/// Push a copy of the value of the current dependencies variable onto the operand stack
+#[derive(PartialEq, Clone, Hash, Debug)]
+pub struct GetDependenciesValue;
+
+impl TypedCompilerBlock for GetDependenciesValue {
+    fn get_type(&self, stack: &CompilerStack) -> Result<CompilerStack, TypedStackError> {
+        Ok(stack
+            // Push the dependencies term onto the operand stack
+            .push_operand(ValueType::HeapPointer))
+    }
+}
+
+impl GenerateWasm for GetDependenciesValue {
+    fn emit_wasm(
+        &self,
+        _module: &mut Module,
+        bindings: &mut WasmGeneratorBindings,
+        _options: &WasmGeneratorOptions,
+    ) -> WasmGeneratorResult {
+        let mut instructions = WasmGeneratorOutput::default();
+        instructions.push(ir::LocalGet {
+            local: bindings.dependencies_id(),
+        });
+        Ok(instructions)
+    }
+}
+
 /// Pop a term pointer from the operand stack, look that key up in the global state object,
 /// and push either the corresponding value term reference or a null pointer depending on whether the key exists
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]

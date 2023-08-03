@@ -490,7 +490,7 @@ pub(crate) fn generate_stateful_function(
         memory_id,
         main_function_table_id,
         state_id,
-        dependencies_id,
+        dependencies_id: NonEmptyStack::new(dependencies_id),
         temp_id,
         stack: arg_stack,
         enclosing_blocks: Default::default(),
@@ -915,8 +915,8 @@ pub struct WasmGeneratorBindings<'a> {
     main_function_table_id: TableId,
     /// Global state argument parameter ID
     state_id: LocalId,
-    /// Variable to keep track of any dependencies encountered during this evaluation
-    dependencies_id: LocalId,
+    /// Stack of variables to keep track of any dependencies encountered during this evaluation
+    dependencies_id: NonEmptyStack<LocalId>,
     /// Temporary free-use register
     temp_id: LocalId,
     /// Lookup table mapping term hashes to compiled function ids
@@ -973,7 +973,7 @@ impl<'a> WasmGeneratorBindings<'a> {
         self.state_id
     }
     pub fn dependencies_id(&self) -> LocalId {
-        self.dependencies_id
+        self.dependencies_id.current
     }
     pub fn temp_id(&self) -> LocalId {
         self.temp_id
@@ -1006,8 +1006,16 @@ impl<'a> WasmGeneratorBindings<'a> {
         self.stack.push(local_id);
         local_id
     }
+    pub fn enter_dependencies_scope(&mut self, local_id: LocalId) -> LocalId {
+        self.dependencies_id.push(local_id);
+        self.enter_scope(local_id)
+    }
     pub fn leave_scope(&mut self) -> Option<LocalId> {
-        self.stack.pop()
+        let local_id = self.stack.pop()?;
+        if self.dependencies_id.current == local_id {
+            self.dependencies_id.pop();
+        }
+        Some(local_id)
     }
     pub fn enter_block(&mut self, block_type: WasmBlockType) {
         self.enclosing_blocks.push(block_type);
