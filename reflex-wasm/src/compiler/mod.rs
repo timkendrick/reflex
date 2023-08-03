@@ -1289,9 +1289,9 @@ pub(crate) enum MaybeLazyExpression<A: Arena + Clone> {
     /// Expression is evaluated immediately and its dependencies will be added to the current control flow block's
     /// dependencies. Signal results will short-circuit the current control flow block.
     Strict(WasmExpression<A>),
-    /// Expression is evaluated immediately and its dependencies will be added to the current control flow block's
-    /// dependencies. Signal results will be caught within a new control flow block and will not short-circuit the
-    /// current control flow block.
+    /// Expression is evaluated immediately and its dependencies will be captured in a lazy result wrapper and will not
+    /// be added to the current control flow block's dependencies. Signal results will be caught within a new control
+    /// flow block and wrapped in a lazy result wrapper and will not short-circuit the current control flow block.
     Eager(EagerExpression<A>),
     /// Expression is not evaluated; dynamic expressions will be wrapped in a heap-allocated closure application thunk.
     Lazy(LazyExpression<A>),
@@ -1322,6 +1322,9 @@ impl<A: Arena + Clone> CompileWasm<A> for MaybeLazyExpression<A> {
     }
 }
 
+/// Expression is evaluated immediately and its dependencies will be captured in a lazy result wrapper and will not be
+/// added to the current control flow block's dependencies. Signal results will be caught within a new control flow
+/// block and wrapped in a lazy result wrapper and will not short-circuit the current control flow block.
 #[derive(Debug, Clone)]
 pub(crate) struct EagerExpression<A: Arena + Clone> {
     inner: WasmExpression<A>,
@@ -1329,53 +1332,11 @@ pub(crate) struct EagerExpression<A: Arena + Clone> {
 
 impl<A: Arena + Clone> EagerExpression<A> {
     pub fn new(inner: WasmExpression<A>) -> Self {
-        Self { inner }
-    }
-}
-
-impl<A: Arena + Clone> CompileWasm<A> for EagerExpression<A> {
-    fn compile(
-        &self,
-        stack: CompilerStack,
-        state: &mut CompilerState,
-        options: &CompilerOptions,
-    ) -> CompilerResult<A> {
-        if self.inner.should_intern(ArgType::Eager) {
-            intern_static_value(&self.inner, state)
-        } else {
-            // Create a wrapper block to surround the compiled term
-            // (this ensures that any signals encountered when evaluating the term will not break out of the current
-            // control flow block)
-            let block_type = TypeSignature {
-                params: ParamsSignature::Void,
-                results: ParamsSignature::Single(ValueType::HeapPointer),
-            };
-            let inner_stack = stack.enter_block(&block_type)?;
-            let block = CompiledBlockBuilder::new(stack);
-            let block = block.push(instruction::core::Block {
-                block_type,
-                body: self.inner.compile(inner_stack, state, options)?,
-            });
-            block.finish::<CompilerError<_>>()
-        }
-    }
-}
-
-/// Expression is evaluated immediately and its dependencies will be captured in a lazy result wrapper and will not be
-/// added to the current control flow block's dependencies. Signal results will be caught within a new control flow
-/// block and wrapped in a lazy result wrapper and will not short-circuit the current control flow block.
-#[derive(Debug, Clone)]
-pub(crate) struct DeferredExpression<A: Arena + Clone> {
-    inner: WasmExpression<A>,
-}
-
-impl<A: Arena + Clone> DeferredExpression<A> {
-    pub fn new(inner: WasmExpression<A>) -> Self {
         Self { inner: inner }
     }
 }
 
-impl<A: Arena + Clone> CompileWasm<A> for DeferredExpression<A> {
+impl<A: Arena + Clone> CompileWasm<A> for EagerExpression<A> {
     fn compile(
         &self,
         stack: CompilerStack,
@@ -1490,6 +1451,7 @@ impl<A: Arena + Clone> CompileWasm<A> for DeferredExpression<A> {
     }
 }
 
+/// Expression is not evaluated; dynamic expressions will be wrapped in a heap-allocated closure application thunk.
 #[derive(Debug, Clone)]
 pub(crate) struct LazyExpression<A: Arena + Clone> {
     inner: WasmExpression<A>,
@@ -1654,6 +1616,84 @@ impl<A: Arena + Clone> CompileWasm<A> for LazyExpression<A> {
                 }
             }
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum MaybeBlockWrappedExpression<A: Arena, T: CompileWasm<A>> {
+    /// Expression is evaluated immediately and its dependencies will be added to the current control flow block's
+    /// dependencies. Signal results will be caught within a new control flow block and will not short-circuit the
+    /// current control flow block
+    Wrapped(BlockWrappedExpression<A, T>),
+    /// Expression is evaluated immediately and its dependencies will be added to the current control flow block's
+    /// dependencies. Signal results will short-circuit the current control flow block.
+    Unwrapped(T),
+}
+
+impl<A: Arena, T: CompileWasm<A>> MaybeBlockWrappedExpression<A, T> {
+    pub fn wrapped(expression: T) -> Self {
+        Self::Wrapped(BlockWrappedExpression::new(expression))
+    }
+    pub fn unwrapped(expression: T) -> Self {
+        Self::Unwrapped(expression)
+    }
+}
+
+impl<A: Arena, T: CompileWasm<A>> CompileWasm<A> for MaybeBlockWrappedExpression<A, T> {
+    fn compile(
+        &self,
+        stack: CompilerStack,
+        state: &mut CompilerState,
+        options: &CompilerOptions,
+    ) -> CompilerResult<A> {
+        match self {
+            MaybeBlockWrappedExpression::Wrapped(inner) => inner.compile(stack, state, options),
+            MaybeBlockWrappedExpression::Unwrapped(inner) => inner.compile(stack, state, options),
+        }
+    }
+}
+
+/// Expression is evaluated immediately and its dependencies will be added to the current control flow block's
+/// dependencies. Signal results will be caught within a new control flow block and will not short-circuit the current
+/// control flow block
+#[derive(Debug, Clone)]
+pub(crate) struct BlockWrappedExpression<A: Arena, T: CompileWasm<A>> {
+    inner: T,
+    _arena: PhantomData<A>,
+}
+
+impl<A: Arena, T: CompileWasm<A>> BlockWrappedExpression<A, T> {
+    pub fn new(inner: T) -> Self {
+        Self {
+            inner: inner,
+            _arena: PhantomData,
+        }
+    }
+}
+
+impl<A: Arena, T: CompileWasm<A>> CompileWasm<A> for BlockWrappedExpression<A, T> {
+    fn compile(
+        &self,
+        stack: CompilerStack,
+        state: &mut CompilerState,
+        options: &CompilerOptions,
+    ) -> CompilerResult<A> {
+        // Create a wrapper block to surround the compiled term
+        // (this ensures that any signals encountered when evaluating the term will not break out of the current
+        // control flow block)
+        let block_type = TypeSignature {
+            params: ParamsSignature::Void,
+            results: ParamsSignature::Single(ValueType::HeapPointer),
+        };
+        let inner_stack = stack.enter_block(&block_type)?;
+        let block = CompiledBlockBuilder::new(stack);
+        // Compile the instruction into the wrapper block
+        // => [Term]
+        let block = block.push(instruction::core::Block {
+            block_type,
+            body: self.inner.compile(inner_stack, state, options)?,
+        });
+        block.finish::<CompilerError<_>>()
     }
 }
 
