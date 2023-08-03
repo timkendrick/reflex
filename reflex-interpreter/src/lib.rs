@@ -18,8 +18,8 @@ pub use interpreter::stack::{CallStack, VariableStack};
 
 use reflex::core::{
     ApplicationTermType, CompiledFunctionTermType, ConditionListType, ConditionType,
-    EffectTermType, InstructionPointer, PartialApplicationTermType, RecursiveTermType, RefType,
-    SignalTermType, SignalType, StateCache, VariableTermType,
+    EffectTermType, InstructionPointer, LazyResultTermType, PartialApplicationTermType,
+    RecursiveTermType, RefType, SignalTermType, SignalType, StateCache, VariableTermType,
 };
 use reflex::hash::{hash_iter, FnvHasher, IntSet};
 use reflex::{
@@ -897,6 +897,28 @@ fn evaluate_instruction<'a, T: Expression + Rewritable<T> + Reducible<T> + Appli
                 Ok((ExecutionResult::Advance, DependencyList::empty()))
             }
         }
+        Instruction::ConstructLazyResult => {
+            trace!(instruction = "Instruction::ConstructLazyResult");
+            if stack.len() < 2 {
+                Err(String::from(
+                    "Unable to create lazy result: insufficient arguments on stack",
+                ))
+            } else {
+                let value = stack.pop().unwrap();
+                let dependencies = stack.pop().unwrap();
+                if let Some(term) = factory.match_signal_term(&dependencies) {
+                    let conditions = term.signals().as_deref().clone();
+                    let expression = factory.create_lazy_result_term(value, conditions);
+                    stack.push(expression);
+                    Ok((ExecutionResult::Advance, DependencyList::empty()))
+                } else {
+                    Err(format!(
+                        "Unable to create lazy result: expected dependency list, received {}",
+                        dependencies
+                    ))
+                }
+            }
+        }
         Instruction::ConstructConstructor { num_fields } => {
             trace!(instruction = "Instruction::ConstructConstructor");
             let num_fields = *num_fields;
@@ -1168,6 +1190,19 @@ fn evaluate_expression<T: Expression + Applicable<T>>(
             Ok((
                 ExecutionResult::ResolveExpression,
                 DependencyList::of(condition.id()),
+            ))
+        } else if let Some(term) = factory.match_lazy_result_term(expression) {
+            let value = term.value();
+            let dependencies = term.dependencies();
+            stack.push(value.as_deref().clone());
+            Ok((
+                ExecutionResult::ResolveExpression,
+                DependencyList::from_iter(
+                    dependencies
+                        .as_deref()
+                        .iter()
+                        .map(|condition| condition.as_deref().id()),
+                ),
             ))
         } else if let Some(term) = factory.match_recursive_term(expression) {
             stack.push(factory.create_application_term(

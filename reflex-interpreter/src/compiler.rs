@@ -189,6 +189,7 @@ pub enum Instruction {
     ConstructPartialApplication {
         num_args: usize,
     },
+    ConstructLazyResult,
     ConstructConstructor {
         num_fields: usize,
     },
