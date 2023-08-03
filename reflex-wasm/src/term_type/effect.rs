@@ -148,25 +148,26 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<EffectTerm, A> {
         // => [ConditionTerm]
         let block =
             block.append_inner(|stack| condition.as_term().compile(stack, state, options))?;
-        // Duplicate the condition on the stack so that it can be assigned to a local variable
-        // => [ConditionTerm, ConditionTerm]
-        let block = block.push(instruction::core::Duplicate {
-            value_type: ValueType::HeapPointer,
-        });
-        // Enter a new temporary scope with the key assigned to a variable
-        // => [ConditionTerm]
-        let block = block.push(instruction::core::ScopeStart {
-            value_type: ValueType::HeapPointer,
-        });
-        // Attempt to load the corresponding value from global state
-        // => [Option<Term>]
-        let block = block.push(instruction::runtime::LoadStateValue);
-        // Enter a new temporary scope with the result assigned to a variable
+        // Assign the condition to a new temporary lexical scope
         // => []
         let block = block.push(instruction::core::ScopeStart {
             value_type: ValueType::HeapPointer,
         });
-        // Load the result back from the temporary scope variable
+        // Push a copy of the condition back onto the operand stack
+        // => [ConditionTerm]
+        let block = block.push(instruction::core::GetScopeValue {
+            value_type: ValueType::HeapPointer,
+            scope_offset: 0,
+        });
+        // Attempt to load the corresponding value from global state
+        // => [Option<Term>]
+        let block = block.push(instruction::runtime::LoadStateValue);
+        // Assign the value to a new temporary lexical scope
+        // => []
+        let block = block.push(instruction::core::ScopeStart {
+            value_type: ValueType::HeapPointer,
+        });
+        // Push a copy of the value back onto the operand stack
         // => [Option<Term>]
         let block = block.push(instruction::core::GetScopeValue {
             value_type: ValueType::HeapPointer,
@@ -181,7 +182,8 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<EffectTerm, A> {
             value_type: ValueType::HeapPointer,
         });
         // Branch based on whether a corresponding state value exists,
-        // pushing the value onto the stack if the key was present, or a signal term if not
+        // pushing the value onto the stack if the key was present,
+        // or constructing a signal term containing the effect condition if not
         // => [Term]
         let block = block.append_inner(|stack| {
             let block_type = TypeSignature {
@@ -207,6 +209,12 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<EffectTerm, A> {
                         let block = block.push(instruction::runtime::CallRuntimeBuiltin {
                             target: RuntimeBuiltin::CreateSignal,
                         });
+                        // Break out of the current control flow block
+                        // => [SignalTerm]
+                        let block = block.push(instruction::core::Break {
+                            target_block: 0,
+                            result_type: ParamsSignature::Single(ValueType::HeapPointer),
+                        });
                         block.finish::<CompilerError<_>>()
                     }?,
                     // Otherwise if there was a corresponding value for the given key, return the value
@@ -231,7 +239,7 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<EffectTerm, A> {
         let block = block.push(instruction::core::ScopeEnd {
             value_type: ValueType::HeapPointer,
         });
-        // Drop the outer temporary scope that was used to store the key
+        // Drop the outer temporary scope that was used to store the condition
         // => [Term]
         let block = block.push(instruction::core::ScopeEnd {
             value_type: ValueType::HeapPointer,
