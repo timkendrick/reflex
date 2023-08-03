@@ -4,6 +4,7 @@
 use std::{
     collections::{hash_map::Entry, HashMap, LinkedList},
     iter::once,
+    marker::PhantomData,
 };
 
 use reflex::{
@@ -902,66 +903,45 @@ impl CompilerVariableBindings {
             free_variables,
             local_scopes,
         } = self;
-        enum ScopeResult {
-            /// Iteration has terminated successfully with the given target stack machine stack offset
-            Ok(usize),
-            /// Iteration has not yet terminated successfully
-            Pending {
-                /// Application variable scope offset of desired target variable
-                target_offset: StackOffset,
-                /// Target stack machine stack offset accumulated so far during the iteration
-                num_scopes: usize,
-            },
-        }
-        // Iterate backwards through the local scopes to find a potential match
-        let result = local_scopes.rev().fold(
-            ScopeResult::Pending {
-                target_offset: scope_offset,
-                num_scopes: 0,
-            },
-            |result, local_binding| match result {
-                // If we have already found our result, nothing more to do
-                ScopeResult::Ok(_) => result,
-                // Otherwise process the current scope
-                ScopeResult::Pending {
-                    target_offset,
-                    num_scopes,
-                } => {
-                    match local_binding {
-                        // If this is a 'gap' created by an intermediate stack machine scope, continue iterating
-                        CompilerVariableStackFrame::Internal(..) => ScopeResult::Pending {
-                            target_offset,
-                            num_scopes: num_scopes + 1,
-                        },
-                        CompilerVariableStackFrame::Variable(..) => {
-                            // If we have reached the target offset, we have figured out our desired scope offset
-                            if target_offset == 0 {
-                                return ScopeResult::Ok(num_scopes);
-                            }
-                            // This is an unrelated local variable declaration, decrement the target scope offset accordingly and continue iterating
-                            ScopeResult::Pending {
-                                target_offset: target_offset - 1,
-                                num_scopes: num_scopes + 1,
-                            }
-                        }
+        // Iterate backwards through the local variable scope definitions, locating the concrete scope stack offset for
+        // each variable declaration up to the given offset
+        // (this is necessary because we need to skip over 'internal' scopes that were created for bookkeeping purposes
+        // and therefore do not have a corresponding variable)
+        // If all local scopes have been exhausted, produce an error result containing the remaining free variable offset
+        let local_scope_offset = (0..=scope_offset)
+            .fold(
+                Ok((local_scopes.rev().copied(), 0usize)),
+                |result, num_processed_offsets| {
+                    let (mut local_scope_stack, mut num_hidden_scopes) = result?;
+                    // Skip over any 'internal' scopes that do not declare a variable
+                    while let CompilerVariableStackFrame::Internal(..) =
+                        local_scope_stack.next().ok_or_else(|| {
+                            // If we have exhausted the stack of local scopes, return the remaining free variable offset
+                            let num_unprocessed_offsets = scope_offset - num_processed_offsets;
+                            num_unprocessed_offsets
+                        })?
+                    {
+                        // Keep track of how many internal scopes we have skipped over
+                        num_hidden_scopes += 1;
                     }
-                }
-            },
-        );
-        match result {
-            // If the result yielded the stack offset of a local stack machine stack entry, return the result
-            ScopeResult::Ok(stack_offset) => Some(stack_offset),
-            // Otherwise if all local stack values have been exhausted, look up the variable in the global scope
-            ScopeResult::Pending {
-                target_offset,
-                num_scopes,
-            } => free_variables.as_ref().and_then(|free_variables| {
-                free_variables
-                    .mappings
-                    .get(&target_offset)
-                    .copied()
-                    .map(|free_variable_offset| free_variable_offset + num_scopes)
-            }),
+                    Ok((local_scope_stack, num_hidden_scopes))
+                },
+            )
+            .map(|(_, num_hidden_scopes)| {
+                // If we successfully located a local variable scope at the given depth, return its concrete scope stack
+                // offset by adding the number of internal scopes that we skipped over
+                scope_offset + num_hidden_scopes
+            });
+        match local_scope_offset {
+            // If the result yielded the stack offset of a local variable scope, return the result
+            Ok(scope_offset) => Some(scope_offset),
+            // Otherwise if all local variable scopes have been exhausted, look up the variable in the global scope
+            Err(remaining_offset) => free_variables
+                .as_ref()?
+                .mappings
+                .get(&remaining_offset)
+                .copied()
+                .map(|free_variable_offset| local_scopes.len() + free_variable_offset),
         }
     }
     fn lexical_scopes(&self) -> impl Iterator<Item = ValueType> + '_ {
