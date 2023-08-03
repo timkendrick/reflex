@@ -14,10 +14,11 @@ use serde_json::Value as JsonValue;
 use crate::{
     allocator::Arena,
     compiler::{
-        error::CompilerError, instruction, runtime::builtin::RuntimeBuiltin, CompileWasm,
-        CompiledBlockBuilder, CompiledFunctionCall, CompiledFunctionCallArgs, CompiledFunctionId,
-        CompilerOptions, CompilerResult, CompilerStack, CompilerState, ConstValue, Internable,
-        MaybeLazyExpression, ParamsSignature, TypeSignature, ValueType,
+        error::CompilerError, instruction, runtime::builtin::RuntimeBuiltin,
+        BlockWrappedExpression, CompileWasm, CompiledBlockBuilder, CompiledFunctionCall,
+        CompiledFunctionCallArgs, CompiledFunctionId, CompilerOptions, CompilerResult,
+        CompilerStack, CompilerState, ConstValue, EagerExpression, Internable, MaybeLazyExpression,
+        ParamsSignature, TypeSignature, ValueType,
     },
     hash::{TermHash, TermHasher, TermSize},
     stdlib::Stdlib,
@@ -416,35 +417,36 @@ impl<A: Arena + Clone> CompileWasm<A> for LambdaCompiledFunctionCall<A> {
         // => [Term...]
         let block = args
             .iter()
-            .map(|arg| {
+            .fold(Result::<_, CompilerError<_>>::Ok(block), |block, arg| {
+                let block = block?;
                 // Determine the argument eagerness based on the compiler options
-                let eagerness = match options.lazy_lambda_args {
-                    // If lambdas are compiled with strict arguments enabled, the lambda body implementation will handle
-                    // short-circuiting a combined signal argument, so there is no need for strict evaluation of the
-                    // argument here at the call site (that will happen immediately after the indirect lambda call)
-                    ArgType::Strict => ArgType::Eager,
+                let eagerness = options.lazy_lambda_args;
+                // Push the argument onto the stack
+                // => [Term...]
+                let block = match eagerness {
+                    // If lambdas are compiled with strict arguments enabled, the lambda body implementation will
+                    // handle short-circuiting a combined signal argument, so we evaluate the argument strictly here
+                    // at the call site but wrap it in a signal-catching boundary to ensure that multiple signals
+                    // can be combined within the lambda body (this will happen immediately after the indirect
+                    // lambda call)
+                    ArgType::Strict => block.append_inner(|stack| {
+                        BlockWrappedExpression::new(arg).compile(stack, state, options)
+                    }),
                     // If lambdas are defined as having lazy arguments, however the compiler options define function
                     // arguments as non-lazy, 'upgrade' the argument to be evaluated eagerly
                     // (note that we cannot evaluate the argument strictly, as this would change the behavior of lambdas
                     // that contain no references to their signal arguments, so we evaluate the argument eagerly and
                     // defer any signal short-circuiting to the underlying lambda implementation)
-                    ArgType::Lazy if !options.lazy_function_args => ArgType::Eager,
-                    arg_type => arg_type,
-                };
-                (arg, eagerness)
-            })
-            .fold(
-                Result::<_, CompilerError<_>>::Ok(block),
-                |block, (arg, eagerness)| {
-                    let block = block?;
-                    // Push the argument onto the stack
-                    // => [Term...]
-                    let block = block.append_inner(|stack| {
+                    ArgType::Lazy if !options.lazy_function_args => block.append_inner(|stack| {
+                        EagerExpression::new(arg).compile(stack, state, options)
+                    }),
+                    // Otherwise compile the argument as determined by the compiler eagerness options
+                    eagerness => block.append_inner(|stack| {
                         MaybeLazyExpression::new(arg, eagerness).compile(stack, state, options)
-                    })?;
-                    Ok(block)
-                },
-            )?;
+                    }),
+                }?;
+                Ok(block)
+            })?;
         // Call the compiled lambda function
         // => [Term]
         let block = block.push(instruction::runtime::CallCompiledFunction {
@@ -497,6 +499,7 @@ impl<A: Arena + Clone> CompileWasm<A> for ConstructorCompiledFunctionCall<A> {
         let block = if let Some(values) = args.as_internable(ArgType::Strict) {
             block.append_inner(|stack| values.as_term().compile(stack, state, options))
         } else {
+            // Determine the argument eagerness based on the compiler options
             let eagerness = options.lazy_constructors;
             block.append_inner(|stack| {
                 compile_list(
@@ -643,26 +646,31 @@ impl<'a, A: Arena + Clone> CompileWasm<A> for CompiledFunctionCall<'a, A, Stdlib
                     };
                     // Yield the argument onto the stack
                     // => [Term..., {ListTerm, ListTerm, u32}, Term]
-                    let block = block.append_inner(|stack| {
-                        let compiled_arg_type = match arg_type {
-                            // All signals encountered when evaluating strict list items must be collected into a single
-                            // aggregated signal before short-circuiting (this ensures that if signals are encountered
-                            // across multiple arguments, signals will be 'caught' at their respective block boundaries
-                            // to be combined into a single signal result, rather than the first signal short-circuiting
-                            // all the way to the top level)
-                            ArgType::Strict => ArgType::Eager,
-                            // If the function signature specifies a lazy argument, however the compiler options define
-                            // function call arguments as non-lazy, 'upgrade' the argument to be evaluated eagerly
-                            // (note that we cannot evaluate the argument strictly, as this would change the
-                            // behavior of any functions that choose not to short-circuit incoming signal arguments, so
-                            // we evaluate the argument eagerly and defer any signal short-circuiting to the underlying
-                            // function implementation)
-                            ArgType::Lazy if !options.lazy_function_args => ArgType::Eager,
-                            _ => arg_type,
-                        };
-                        MaybeLazyExpression::new(arg, compiled_arg_type)
-                            .compile(stack, state, options)
-                    })?;
+                    let block = match arg_type {
+                        // All signals encountered when evaluating strict function arguments must be collected into a
+                        // single aggregated signal before short-circuiting (this ensures that if signals are
+                        // encountered across multiple arguments, signals will be 'caught' at their respective block
+                        // boundaries to be combined into a single signal result, rather than the first signal
+                        // short-circuiting all the way to the top level)
+                        ArgType::Strict => block.append_inner(|stack| {
+                            BlockWrappedExpression::new(arg).compile(stack, state, options)
+                        }),
+                        // If the function signature specifies a lazy argument, however the compiler options define
+                        // function call arguments as non-lazy, 'upgrade' the argument to be evaluated eagerly
+                        // (note that we cannot evaluate the argument strictly, as this would change the behavior of any
+                        // functions that choose not to short-circuit incoming signal arguments, so we evaluate the
+                        // argument eagerly and defer any signal short-circuiting to the underlying function
+                        // implementation)
+                        ArgType::Lazy if !options.lazy_function_args => {
+                            block.append_inner(|stack| {
+                                EagerExpression::new(arg).compile(stack, state, options)
+                            })
+                        }
+                        // Otherwise compile the argument as determined by the function signature argument eagerness
+                        eagerness => block.append_inner(|stack| {
+                            MaybeLazyExpression::new(arg, eagerness).compile(stack, state, options)
+                        }),
+                    }?;
                     // If this argument needs to be tested for signals, combine the argument's signal result with the accumulated signal result
                     // => [Term..., {ListTerm, ListTerm, u32}, Term]
                     let (block, num_signal_scopes) = if matches!(arg_type, ArgType::Strict) {

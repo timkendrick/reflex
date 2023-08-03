@@ -44,15 +44,19 @@ fn let_term() {
     let (actual, expected) = run_scenario(&scenario).unwrap();
     assert_eq!(actual, expected);
 
-    let scenario = LetTermSignalInitializerLazyScenario;
+    let scenario = LetTermUnusuedSignalInitializerLazyScenario;
     let (actual, expected) = run_scenario(&scenario).unwrap();
     assert_eq!(actual, expected);
 
-    let scenario = LetTermSignalInitializerEagerScenario;
+    let scenario = LetTermUnreferencedSignalInitializerEagerScenario;
     let (actual, expected) = run_scenario(&scenario).unwrap();
     assert_eq!(actual, expected);
 
-    let scenario = LetTermSignalInitializerStrictScenario;
+    let scenario = LetTermUnreferencedSignalInitializerStrictScenario;
+    let (actual, expected) = run_scenario(&scenario).unwrap();
+    assert_eq!(actual, expected);
+
+    let scenario = LetTermReferencedSignalInitializerLazyScenario;
     let (actual, expected) = run_scenario(&scenario).unwrap();
     assert_eq!(actual, expected);
 }
@@ -408,9 +412,9 @@ where
     }
 }
 
-struct LetTermSignalInitializerLazyScenario;
+struct LetTermUnusuedSignalInitializerLazyScenario;
 
-impl<T, TFactory> WasmTestScenario<T, TFactory> for LetTermSignalInitializerLazyScenario
+impl<T, TFactory> WasmTestScenario<T, TFactory> for LetTermUnusuedSignalInitializerLazyScenario
 where
     T: Expression<Builtin = stdlib::Stdlib>,
     TFactory: ExpressionFactory<T>,
@@ -444,9 +448,10 @@ where
     }
 }
 
-struct LetTermSignalInitializerEagerScenario;
+struct LetTermUnreferencedSignalInitializerEagerScenario;
 
-impl<T, TFactory> WasmTestScenario<T, TFactory> for LetTermSignalInitializerEagerScenario
+impl<T, TFactory> WasmTestScenario<T, TFactory>
+    for LetTermUnreferencedSignalInitializerEagerScenario
 where
     T: Expression<Builtin = stdlib::Stdlib>,
     TFactory: ExpressionFactory<T>,
@@ -480,9 +485,10 @@ where
     }
 }
 
-struct LetTermSignalInitializerStrictScenario;
+struct LetTermUnreferencedSignalInitializerStrictScenario;
 
-impl<T, TFactory> WasmTestScenario<T, TFactory> for LetTermSignalInitializerStrictScenario
+impl<T, TFactory> WasmTestScenario<T, TFactory>
+    for LetTermUnreferencedSignalInitializerStrictScenario
 where
     T: Expression<Builtin = stdlib::Stdlib>,
     TFactory: ExpressionFactory<T>,
@@ -502,6 +508,147 @@ where
                 token: factory.create_nil_term(),
             })),
             factory.create_int_term(3),
+        )
+    }
+
+    fn expected(
+        &self,
+        factory: &TFactory,
+        allocator: &impl HeapAllocator<T>,
+    ) -> (T, Vec<T::Signal>) {
+        let result =
+            factory.create_signal_term(allocator.create_signal_list([allocator.create_signal(
+                SignalType::Custom {
+                    effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+                    payload: factory.create_int_term(3),
+                    token: factory.create_nil_term(),
+                },
+            )]));
+        let dependencies = vec![allocator.create_signal(SignalType::Custom {
+            effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+            payload: factory.create_int_term(3),
+            token: factory.create_nil_term(),
+        })];
+        (result, dependencies)
+    }
+}
+
+struct LetTermReferencedSignalInitializerLazyScenario;
+
+impl<T, TFactory> WasmTestScenario<T, TFactory> for LetTermReferencedSignalInitializerLazyScenario
+where
+    T: Expression<Builtin = stdlib::Stdlib>,
+    TFactory: ExpressionFactory<T>,
+{
+    fn options(&self) -> CompilerOptions {
+        CompilerOptions {
+            lazy_variable_initializers: ArgType::Lazy,
+            ..Default::default()
+        }
+    }
+
+    fn input(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> T {
+        factory.create_let_term(
+            factory.create_effect_term(allocator.create_signal(SignalType::Custom {
+                effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+                payload: factory.create_int_term(3),
+                token: factory.create_nil_term(),
+            })),
+            factory.create_variable_term(0),
+        )
+    }
+
+    fn expected(
+        &self,
+        factory: &TFactory,
+        allocator: &impl HeapAllocator<T>,
+    ) -> (T, Vec<T::Signal>) {
+        let result =
+            factory.create_signal_term(allocator.create_signal_list([allocator.create_signal(
+                SignalType::Custom {
+                    effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+                    payload: factory.create_int_term(3),
+                    token: factory.create_nil_term(),
+                },
+            )]));
+        let dependencies = vec![allocator.create_signal(SignalType::Custom {
+            effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+            payload: factory.create_int_term(3),
+            token: factory.create_nil_term(),
+        })];
+        (result, dependencies)
+    }
+}
+
+struct LetTermReferencedSignalInitializerEagerScenario;
+
+impl<T, TFactory> WasmTestScenario<T, TFactory> for LetTermReferencedSignalInitializerEagerScenario
+where
+    T: Expression<Builtin = stdlib::Stdlib>,
+    TFactory: ExpressionFactory<T>,
+{
+    fn options(&self) -> CompilerOptions {
+        CompilerOptions {
+            lazy_variable_initializers: ArgType::Eager,
+            ..Default::default()
+        }
+    }
+
+    fn input(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> T {
+        factory.create_let_term(
+            factory.create_effect_term(allocator.create_signal(SignalType::Custom {
+                effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+                payload: factory.create_int_term(3),
+                token: factory.create_nil_term(),
+            })),
+            factory.create_variable_term(0),
+        )
+    }
+
+    fn expected(
+        &self,
+        factory: &TFactory,
+        allocator: &impl HeapAllocator<T>,
+    ) -> (T, Vec<T::Signal>) {
+        let result =
+            factory.create_signal_term(allocator.create_signal_list([allocator.create_signal(
+                SignalType::Custom {
+                    effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+                    payload: factory.create_int_term(3),
+                    token: factory.create_nil_term(),
+                },
+            )]));
+        let dependencies = vec![allocator.create_signal(SignalType::Custom {
+            effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+            payload: factory.create_int_term(3),
+            token: factory.create_nil_term(),
+        })];
+        (result, dependencies)
+    }
+}
+
+struct LetTermReferencedSignalInitializerStrictScenario;
+
+impl<T, TFactory> WasmTestScenario<T, TFactory> for LetTermReferencedSignalInitializerStrictScenario
+where
+    T: Expression<Builtin = stdlib::Stdlib>,
+    TFactory: ExpressionFactory<T>,
+{
+    fn options(&self) -> CompilerOptions {
+        CompilerOptions {
+            lazy_variable_initializers: ArgType::Strict,
+            ..Default::default()
+        }
+    }
+
+    fn input(&self, factory: &TFactory, allocator: &impl HeapAllocator<T>) -> T {
+        factory.create_let_term(
+            factory.create_effect_term(allocator.create_signal(SignalType::Custom {
+                effect_type: factory.create_string_term(allocator.create_static_string("foo")),
+                payload: factory.create_int_term(3),
+                token: factory.create_nil_term(),
+            })),
+            factory.create_variable_term(0),
         )
     }
 

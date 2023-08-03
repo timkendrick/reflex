@@ -19,7 +19,8 @@ use crate::{
     compiler::{
         error::CompilerError, instruction, runtime::builtin::RuntimeBuiltin, CompileWasm,
         CompiledBlockBuilder, CompilerOptions, CompilerResult, CompilerStack, CompilerState,
-        ConstValue, Internable, MaybeLazyExpression, ParamsSignature, ValueType,
+        ConstValue, Internable, MaybeBlockWrappedExpression, MaybeLazyExpression, ParamsSignature,
+        ValueType,
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{TermType, TypedTerm, WasmExpression},
@@ -336,22 +337,23 @@ pub(crate) fn compile_list<A: Arena + Clone>(
 ) -> CompilerResult<A> {
     collect_compiled_list_values(
         items.into_iter().map(|(item, eagerness)| {
-            // All signals encountered when evaluating strict list items must be collected into a single aggregated
-            // signal before short-circuiting (this ensures that if signals are encountered across multiple arguments,
-            // signals will be 'caught' at their respective block boundaries to be combined into a single signal result,
-            // rather than the first signal short-circuiting all the way to the top level)
-            let compiled_eagerness = match eagerness {
-                ArgType::Strict => ArgType::Eager,
-                eagerness => eagerness,
-            };
             let strictness = match eagerness {
                 ArgType::Strict => Strictness::Strict,
                 ArgType::Eager | ArgType::Lazy => Strictness::NonStrict,
             };
-            (
-                MaybeLazyExpression::new(item, compiled_eagerness),
-                strictness,
-            )
+            let expression = match eagerness {
+                // All signals encountered when evaluating strict list items must be collected into a single aggregated
+                // signal before short-circuiting (this ensures that if signals are encountered across multiple
+                // arguments, signals will be 'caught' at their respective block boundaries to be combined into a single
+                // signal result, rather than the first signal short-circuiting all the way to the top level)
+                ArgType::Strict => {
+                    MaybeBlockWrappedExpression::wrapped(MaybeLazyExpression::Strict(item))
+                }
+                eagerness => MaybeBlockWrappedExpression::unwrapped(MaybeLazyExpression::new(
+                    item, eagerness,
+                )),
+            };
+            (expression, strictness)
         }),
         stack,
         state,

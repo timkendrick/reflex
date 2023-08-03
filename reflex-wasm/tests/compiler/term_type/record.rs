@@ -515,30 +515,54 @@ where
                 factory.create_string_term(allocator.create_static_string("baz")),
             )),
             allocator.create_triple(
-                factory.create_signal_term(allocator.create_signal_list([
-                    allocator.create_signal(SignalType::Custom {
-                        effect_type:
-                            factory.create_string_term(allocator.create_static_string("foo")),
+                factory.create_lazy_result_term(
+                    factory.create_signal_term(allocator.create_signal_list([
+                        allocator.create_signal(SignalType::Custom {
+                            effect_type:
+                                factory.create_string_term(allocator.create_static_string("foo")),
+                            payload: factory.create_int_term(3),
+                            token: factory.create_nil_term(),
+                        }),
+                    ])),
+                    allocator.create_signal_list([allocator.create_signal(SignalType::Custom {
+                        effect_type: factory
+                            .create_string_term(allocator.create_static_string("foo")),
                         payload: factory.create_int_term(3),
                         token: factory.create_nil_term(),
-                    }),
-                ])),
-                factory.create_signal_term(allocator.create_signal_list([
-                    allocator.create_signal(SignalType::Custom {
-                        effect_type:
-                            factory.create_string_term(allocator.create_static_string("bar")),
+                    })]),
+                ),
+                factory.create_lazy_result_term(
+                    factory.create_signal_term(allocator.create_signal_list([
+                        allocator.create_signal(SignalType::Custom {
+                            effect_type:
+                                factory.create_string_term(allocator.create_static_string("bar")),
+                            payload: factory.create_int_term(4),
+                            token: factory.create_nil_term(),
+                        }),
+                    ])),
+                    allocator.create_signal_list([allocator.create_signal(SignalType::Custom {
+                        effect_type: factory
+                            .create_string_term(allocator.create_static_string("bar")),
                         payload: factory.create_int_term(4),
                         token: factory.create_nil_term(),
-                    }),
-                ])),
-                factory.create_signal_term(allocator.create_signal_list([
-                    allocator.create_signal(SignalType::Custom {
-                        effect_type:
-                            factory.create_string_term(allocator.create_static_string("baz")),
+                    })]),
+                ),
+                factory.create_lazy_result_term(
+                    factory.create_signal_term(allocator.create_signal_list([
+                        allocator.create_signal(SignalType::Custom {
+                            effect_type:
+                                factory.create_string_term(allocator.create_static_string("baz")),
+                            payload: factory.create_int_term(5),
+                            token: factory.create_nil_term(),
+                        }),
+                    ])),
+                    allocator.create_signal_list([allocator.create_signal(SignalType::Custom {
+                        effect_type: factory
+                            .create_string_term(allocator.create_static_string("baz")),
                         payload: factory.create_int_term(5),
                         token: factory.create_nil_term(),
-                    }),
-                ])),
+                    })]),
+                ),
             ),
         );
         let dependencies = Default::default();
