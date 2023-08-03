@@ -337,7 +337,7 @@ impl From<u32> for ArenaPointer {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 pub struct Array<T> {
     pub capacity: u32,
@@ -428,6 +428,16 @@ impl<T: Sized> Array<T> {
             arena,
             _item: PhantomData,
         }
+    }
+}
+
+impl<T: std::fmt::Debug> std::fmt::Debug for Array<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Array")
+            .field("capacity", &self.capacity)
+            .field("length", &self.length)
+            .field("items", &self.items().collect::<Vec<_>>())
+            .finish()
     }
 }
 
