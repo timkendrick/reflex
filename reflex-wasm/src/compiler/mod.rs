@@ -1361,6 +1361,135 @@ impl<A: Arena + Clone> CompileWasm<A> for EagerExpression<A> {
     }
 }
 
+/// Expression is evaluated immediately and its dependencies will be captured in a lazy result wrapper and will not be
+/// added to the current control flow block's dependencies. Signal results will be caught within a new control flow
+/// block and wrapped in a lazy result wrapper and will not short-circuit the current control flow block.
+#[derive(Debug, Clone)]
+pub(crate) struct DeferredExpression<A: Arena + Clone> {
+    inner: WasmExpression<A>,
+}
+
+impl<A: Arena + Clone> DeferredExpression<A> {
+    pub fn new(inner: WasmExpression<A>) -> Self {
+        Self { inner: inner }
+    }
+}
+
+impl<A: Arena + Clone> CompileWasm<A> for DeferredExpression<A> {
+    fn compile(
+        &self,
+        stack: CompilerStack,
+        state: &mut CompilerState,
+        options: &CompilerOptions,
+    ) -> CompilerResult<A> {
+        if self.inner.should_intern(ArgType::Eager) {
+            intern_static_value(&self.inner, state)
+        } else {
+            let block = CompiledBlockBuilder::new(stack);
+            // Declare a new lexical scope used to capture dependencies accumulated when evaluating the term
+            // => []
+            let block = block.push(instruction::runtime::DeclareDependenciesVariable);
+            // Create a wrapper block to surround the compiled term
+            // (this ensures that any signals encountered when evaluating the term will not break out of the current
+            // control flow block)
+            // => [Term]
+            let block = block.append_inner(|stack| {
+                CompiledBlockBuilder::new(stack.clone())
+                    // Compile the instruction into the wrapper block
+                    // => [Term]
+                    .push({
+                        let block_type = TypeSignature {
+                            params: ParamsSignature::Void,
+                            results: ParamsSignature::Single(ValueType::HeapPointer),
+                        };
+                        let body = self.inner.compile(stack.clone(), state, options)?;
+                        instruction::core::Block { block_type, body }
+                    })
+                    .finish::<CompilerError<_>>()
+            })?;
+            // Pop the evaluation result off the operand stack and assign it as the variable for a temporary lexical scope
+            // => []
+            let block = block.push(instruction::core::ScopeStart {
+                value_type: ValueType::HeapPointer,
+            });
+            // Push a boolean value onto the operand stack that signifies whether any dependencies were encountered during evaluation
+            // => [bool]
+            let block = {
+                // Push the dependencies accumulated during evaluation onto the operand stack
+                // => [Option<TreeTerm>]
+                let block = block.push(instruction::runtime::GetDependenciesValue);
+                // Push a null pointer onto the stack
+                // => [Option<TreeTerm>, NULL]
+                let block = block.push(instruction::runtime::NullPointer);
+                // Compare the two to determine whether any dependencies were encountered during evaluation
+                // => [bool]
+                let block = block.push(instruction::core::Ne {
+                    value_type: ValueType::HeapPointer,
+                });
+                block
+            };
+            // Return either a lazy result wrapper or the evaluation result itself, based on whether any dependencies
+            // were encountered during evaluation
+            // => [Term]
+            let block = block.append_inner(|stack| {
+                let block_type = TypeSignature {
+                    params: ParamsSignature::Void,
+                    results: ParamsSignature::Single(ValueType::HeapPointer),
+                };
+                let inner_stack = stack.enter_block(&block_type)?;
+                let (consequent_stack, alternative_stack) = (inner_stack.clone(), inner_stack);
+                CompiledBlockBuilder::new(stack)
+                    .push(instruction::core::If {
+                        block_type,
+                        // If dependencies were encountered during evaluation, return a lazy result wrapper comprising
+                        // the evaluation result combined with the accumulated dependencies
+                        consequent: {
+                            let block = CompiledBlockBuilder::new(consequent_stack);
+                            // Load the evaluation result from the temporary scope and push onto the stack
+                            // => [Term]
+                            let block = block.push(instruction::core::GetScopeValue {
+                                value_type: ValueType::HeapPointer,
+                                scope_offset: 0,
+                            });
+                            // Push a copy of the accumulated dependencies onto the stack
+                            // => [Term]
+                            let block = block.push(instruction::runtime::GetDependenciesValue);
+                            // Construct a new lazy result wrapper comprising the evaluation result and accumulated dependencies
+                            // => [LazyResultTerm]
+                            let block = block.push(instruction::runtime::CallRuntimeBuiltin {
+                                target: RuntimeBuiltin::CreateLazyResult,
+                            });
+                            block.finish::<CompilerError<_>>()
+                        }?,
+                        // Otherwise if no dependencies were encountered during evaluation, return the evaluation result
+                        alternative: {
+                            let block = CompiledBlockBuilder::new(alternative_stack);
+                            // Load the evaluation result from the temporary scope and push onto the stack
+                            // => [Term]
+                            let block = block.push(instruction::core::GetScopeValue {
+                                value_type: ValueType::HeapPointer,
+                                scope_offset: 0,
+                            });
+                            block.finish::<CompilerError<_>>()
+                        }?,
+                    })
+                    .finish::<CompilerError<_>>()
+            })?;
+            // End the lexical scope block used to store the evaluation result
+            // => [Term]
+            let block = block.push(instruction::core::ScopeEnd {
+                value_type: ValueType::HeapPointer,
+            });
+            // End the lexical scope block used to capture dependencies
+            // => [Term]
+            let block = block.push(instruction::core::ScopeEnd {
+                value_type: ValueType::HeapPointer,
+            });
+            block.finish::<CompilerError<_>>()
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct LazyExpression<A: Arena + Clone> {
     inner: WasmExpression<A>,
