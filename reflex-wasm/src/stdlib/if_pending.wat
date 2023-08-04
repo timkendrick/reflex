@@ -33,7 +33,17 @@
                   (call $Term::List::traits::iterate (local.get $remaining_conditions))
                   (local.get $state))))))))
 
+    (@impl
+      (i32.or (i32.const 0xFFFFFFFF))
+      (call $TermType::implements::apply)
+      (func $Stdlib_IfPending::impl::any::<apply> (param $self i32) (param $fallback i32) (param $state i32) (result i32 i32)
+        (local.get $self)
+        (global.get $NULL)))
+
     (@default
       (func $Stdlib_IfPending::impl::default (param $self i32) (param $fallback i32) (param $state i32) (result i32 i32)
-        (local.get $self)
+        (call $Term::Signal::of
+          (call $Term::Condition::invalid_builtin_function_args
+            (global.get $Stdlib_IfPending)
+            (call $Term::List::create_pair (local.get $self) (local.get $fallback))))
         (global.get $NULL)))))
