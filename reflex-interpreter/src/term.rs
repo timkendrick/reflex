@@ -774,10 +774,9 @@ impl<T: Expression + Rewritable<T> + Reducible<T> + Compile<T>> Compile<T> for S
     ) -> Result<Program, String> {
         let signals = self.signals();
         let signals = signals.as_deref();
-        signals
-            .iter()
-            .enumerate()
-            .fold(Ok(Program::new(empty())), |program, (index, signal)| {
+        let compiled_conditions = signals.iter().enumerate().fold(
+            Ok(Program::new(empty())),
+            |program, (index, signal)| {
                 let mut program = program?;
                 match compile_signal(
                     signal.as_deref(),
@@ -792,9 +791,16 @@ impl<T: Expression + Rewritable<T> + Reducible<T> + Compile<T>> Compile<T> for S
                         Ok(program)
                     }
                 }
-            })
+            },
+        )?;
+        let mut result = compiled_conditions;
+        result.push(Instruction::CombineSignals {
+            count: signals.len(),
+        });
+        Ok(result)
     }
 }
+
 impl<T: Expression + Rewritable<T> + Reducible<T> + Compile<T>> Compile<T> for RecordTerm<T> {
     fn compile(
         &self,
