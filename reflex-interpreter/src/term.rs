@@ -11,10 +11,11 @@ use reflex::{
         CompiledFunctionTermType, ConditionListType, ConditionType, ConstructorTermType,
         EffectTermType, Expression, ExpressionFactory, ExpressionListType, FloatTermType,
         GraphNode, HashmapTermType, HashsetTermType, HeapAllocator, InstructionPointer,
-        IntTermType, LambdaTermType, LetTermType, ListTermType, PartialApplicationTermType,
-        RecordTermType, RecursiveTermType, Reducible, RefType, Rewritable, SignalTermType,
-        SignalType, StackOffset, StringTermType, StringValue, StructPrototypeType, Substitutions,
-        SymbolTermType, TimestampTermType, Uid, VariableTermType,
+        IntTermType, LambdaTermType, LazyResultTermType, LetTermType, ListTermType,
+        PartialApplicationTermType, RecordTermType, RecursiveTermType, Reducible, RefType,
+        Rewritable, SignalTermType, SignalType, StackOffset, StringTermType, StringValue,
+        StructPrototypeType, Substitutions, SymbolTermType, TimestampTermType, Uid,
+        VariableTermType,
     },
     hash::{hash_object, HashId},
 };
@@ -22,9 +23,9 @@ use reflex_lang::{
     expression::{CachedExpression, SharedExpression},
     term::{
         ApplicationTerm, BooleanTerm, BuiltinTerm, CompiledFunctionTerm, ConstructorTerm,
-        EffectTerm, FloatTerm, HashMapTerm, HashSetTerm, IntTerm, LambdaTerm, LetTerm, ListTerm,
-        NilTerm, PartialApplicationTerm, RecordTerm, RecursiveTerm, SignalTerm, StringTerm,
-        SymbolTerm, Term, TimestampTerm, VariableTerm,
+        EffectTerm, FloatTerm, HashMapTerm, HashSetTerm, IntTerm, LambdaTerm, LazyResultTerm,
+        LetTerm, ListTerm, NilTerm, PartialApplicationTerm, RecordTerm, RecursiveTerm, SignalTerm,
+        StringTerm, SymbolTerm, Term, TimestampTerm, VariableTerm,
     },
     CachedSharedTerm,
 };
@@ -124,6 +125,7 @@ where
             Self::Effect(term) => term.should_intern(eager),
             Self::Let(term) => term.should_intern(eager),
             Self::Lambda(term) => term.should_intern(eager),
+            Self::LazyResult(term) => term.should_intern(eager),
             Self::Application(term) => term.should_intern(eager),
             Self::PartialApplication(term) => term.should_intern(eager),
             Self::Recursive(term) => term.should_intern(eager),
@@ -166,6 +168,9 @@ where
             Self::Effect(term) => term.compile(eager, stack_offset, factory, allocator, compiler),
             Self::Let(term) => term.compile(eager, stack_offset, factory, allocator, compiler),
             Self::Lambda(term) => term.compile(eager, stack_offset, factory, allocator, compiler),
+            Self::LazyResult(term) => {
+                term.compile(eager, stack_offset, factory, allocator, compiler)
+            }
             Self::Application(term) => {
                 term.compile(eager, stack_offset, factory, allocator, compiler)
             }
@@ -571,6 +576,50 @@ impl<T: Expression + Compile<T>> Compile<T> for LambdaTerm<T> {
             target: target_address,
             hash,
         })))
+    }
+}
+
+impl<T: Expression> Internable for LazyResultTerm<T> {
+    fn should_intern(&self, _eager: Eagerness) -> bool {
+        self.value.capture_depth() == 0
+    }
+}
+
+impl<T: Expression + Compile<T>> Compile<T> for LazyResultTerm<T> {
+    fn compile(
+        &self,
+        _eager: Eagerness,
+        stack_offset: StackOffset,
+        factory: &impl ExpressionFactory<T>,
+        allocator: &impl HeapAllocator<T>,
+        compiler: &mut Compiler,
+    ) -> Result<Program, String> {
+        let dependencies = self.dependencies();
+        let dependencies = dependencies.as_deref();
+        let mut program = dependencies.iter().enumerate().fold(
+            Ok(Program::new(empty())),
+            |program, (index, signal)| {
+                let mut program = program?;
+                match compile_signal(
+                    signal.as_deref(),
+                    stack_offset + index,
+                    factory,
+                    allocator,
+                    compiler,
+                ) {
+                    Err(error) => Err(error),
+                    Ok(compiled_signal) => {
+                        program.extend(compiled_signal);
+                        Ok(program)
+                    }
+                }
+            },
+        )?;
+        program.push(Instruction::CombineSignals {
+            count: dependencies.len(),
+        });
+        program.push(Instruction::ConstructLazyResult);
+        Ok(program)
     }
 }
 

@@ -128,6 +128,15 @@ pub trait LambdaTermType<T: Expression>: Clone {
         T: 'a;
 }
 
+pub trait LazyResultTermType<T: Expression>: Clone {
+    fn value<'a>(&'a self) -> T::ExpressionRef<'a>
+    where
+        T: 'a;
+    fn dependencies<'a>(&'a self) -> T::SignalListRef<'a>
+    where
+        T: 'a;
+}
+
 pub trait ApplicationTermType<T: Expression>: Clone {
     fn target<'a>(&'a self) -> T::ExpressionRef<'a>
     where
@@ -457,6 +466,7 @@ where
     type EffectTerm: EffectTermType<Self>;
     type LetTerm: LetTermType<Self>;
     type LambdaTerm: LambdaTermType<Self>;
+    type LazyResultTerm: LazyResultTermType<Self>;
     type ApplicationTerm: ApplicationTermType<Self>;
     type PartialApplicationTerm: PartialApplicationTermType<Self>;
     type RecursiveTerm: RecursiveTermType<Self>;
@@ -1125,6 +1135,7 @@ pub trait ExpressionFactory<T: Expression> {
     fn create_effect_term(&self, condition: T::Signal) -> T;
     fn create_let_term(&self, initializer: T, body: T) -> T;
     fn create_lambda_term(&self, num_args: StackOffset, body: T) -> T;
+    fn create_lazy_result_term(&self, value: T, dependencies: T::SignalList) -> T;
     fn create_application_term(&self, target: T, args: T::ExpressionList) -> T;
     fn create_partial_application_term(&self, target: T, args: T::ExpressionList) -> T;
     fn create_recursive_term(&self, factory: T) -> T;
@@ -1161,6 +1172,7 @@ pub trait ExpressionFactory<T: Expression> {
     fn match_effect_term<'a>(&self, expression: &'a T) -> Option<&'a T::EffectTerm>;
     fn match_let_term<'a>(&self, expression: &'a T) -> Option<&'a T::LetTerm>;
     fn match_lambda_term<'a>(&self, expression: &'a T) -> Option<&'a T::LambdaTerm>;
+    fn match_lazy_result_term<'a>(&self, expression: &'a T) -> Option<&'a T::LazyResultTerm>;
     fn match_application_term<'a>(&self, expression: &'a T) -> Option<&'a T::ApplicationTerm>;
     fn match_partial_application_term<'a>(
         &self,

@@ -93,6 +93,13 @@ impl<TBuiltin: Builtin> ExpressionFactory<CachedSharedTerm<TBuiltin>>
     ) -> CachedSharedTerm<TBuiltin> {
         self.create_expression(Term::Lambda(LambdaTerm::new(num_args, body)))
     }
+    fn create_lazy_result_term(
+        &self,
+        value: CachedSharedTerm<TBuiltin>,
+        dependencies: <CachedSharedTerm<TBuiltin> as Expression>::SignalList,
+    ) -> CachedSharedTerm<TBuiltin> {
+        self.create_expression(Term::LazyResult(LazyResultTerm::new(value, dependencies)))
+    }
     fn create_application_term(
         &self,
         target: CachedSharedTerm<TBuiltin>,
@@ -282,6 +289,15 @@ impl<TBuiltin: Builtin> ExpressionFactory<CachedSharedTerm<TBuiltin>>
             _ => None,
         }
     }
+    fn match_lazy_result_term<'a>(
+        &self,
+        expression: &'a CachedSharedTerm<TBuiltin>,
+    ) -> Option<&'a LazyResultTerm<CachedSharedTerm<TBuiltin>>> {
+        match expression.inner_term() {
+            Term::LazyResult(term) => Some(term),
+            _ => None,
+        }
+    }
     fn match_application_term<'a>(
         &self,
         expression: &'a CachedSharedTerm<TBuiltin>,
@@ -420,6 +436,7 @@ impl<TBuiltin: Builtin> Expression for CachedSharedTerm<TBuiltin> {
     type EffectTerm = EffectTerm<Self>;
     type LetTerm = LetTerm<Self>;
     type LambdaTerm = LambdaTerm<Self>;
+    type LazyResultTerm = LazyResultTerm<Self>;
     type ApplicationTerm = ApplicationTerm<Self>;
     type PartialApplicationTerm = PartialApplicationTerm<Self>;
     type RecursiveTerm = RecursiveTerm<Self>;

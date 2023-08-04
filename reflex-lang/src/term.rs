@@ -22,6 +22,7 @@ mod hashmap;
 mod hashset;
 mod int;
 mod lambda;
+mod lazy_result;
 mod r#let;
 mod list;
 mod nil;
@@ -45,6 +46,7 @@ pub use hashmap::*;
 pub use hashset::*;
 pub use int::*;
 pub use lambda::*;
+pub use lazy_result::*;
 pub use list::*;
 pub use nil::*;
 pub use partial::*;
@@ -87,6 +89,7 @@ where
     Effect(EffectTerm<T>),
     Let(LetTerm<T>),
     Lambda(LambdaTerm<T>),
+    LazyResult(LazyResultTerm<T>),
     Application(ApplicationTerm<T>),
     PartialApplication(PartialApplicationTerm<T>),
     Recursive(RecursiveTerm<T>),
@@ -122,6 +125,7 @@ where
     type EffectTerm = EffectTerm<Self>;
     type LetTerm = LetTerm<Self>;
     type LambdaTerm = LambdaTerm<Self>;
+    type LazyResultTerm = LazyResultTerm<Self>;
     type ApplicationTerm = ApplicationTerm<Self>;
     type PartialApplicationTerm = PartialApplicationTerm<Self>;
     type RecursiveTerm = RecursiveTerm<Self>;
@@ -189,6 +193,7 @@ where
             Self::Effect(term) => term.size(),
             Self::Let(term) => term.size(),
             Self::Lambda(term) => term.size(),
+            Self::LazyResult(term) => term.size(),
             Self::Application(term) => term.size(),
             Self::PartialApplication(term) => term.size(),
             Self::Recursive(term) => term.size(),
@@ -215,6 +220,7 @@ where
             Self::Effect(term) => term.capture_depth(),
             Self::Let(term) => term.capture_depth(),
             Self::Lambda(term) => term.capture_depth(),
+            Self::LazyResult(term) => term.capture_depth(),
             Self::Application(term) => term.capture_depth(),
             Self::PartialApplication(term) => term.capture_depth(),
             Self::Recursive(term) => term.capture_depth(),
@@ -241,6 +247,7 @@ where
             Self::Effect(term) => term.free_variables(),
             Self::Let(term) => term.free_variables(),
             Self::Lambda(term) => term.free_variables(),
+            Self::LazyResult(term) => term.free_variables(),
             Self::Application(term) => term.free_variables(),
             Self::PartialApplication(term) => term.free_variables(),
             Self::Recursive(term) => term.free_variables(),
@@ -267,6 +274,7 @@ where
             Self::Effect(term) => term.count_variable_usages(offset),
             Self::Let(term) => term.count_variable_usages(offset),
             Self::Lambda(term) => term.count_variable_usages(offset),
+            Self::LazyResult(term) => term.count_variable_usages(offset),
             Self::Application(term) => term.count_variable_usages(offset),
             Self::PartialApplication(term) => term.count_variable_usages(offset),
             Self::Recursive(term) => term.count_variable_usages(offset),
@@ -293,6 +301,7 @@ where
             Self::Effect(term) => term.dynamic_dependencies(deep),
             Self::Let(term) => term.dynamic_dependencies(deep),
             Self::Lambda(term) => term.dynamic_dependencies(deep),
+            Self::LazyResult(term) => term.dynamic_dependencies(deep),
             Self::Application(term) => term.dynamic_dependencies(deep),
             Self::PartialApplication(term) => term.dynamic_dependencies(deep),
             Self::Recursive(term) => term.dynamic_dependencies(deep),
@@ -319,6 +328,7 @@ where
             Self::Effect(term) => term.has_dynamic_dependencies(deep),
             Self::Let(term) => term.has_dynamic_dependencies(deep),
             Self::Lambda(term) => term.has_dynamic_dependencies(deep),
+            Self::LazyResult(term) => term.has_dynamic_dependencies(deep),
             Self::Application(term) => term.has_dynamic_dependencies(deep),
             Self::PartialApplication(term) => term.has_dynamic_dependencies(deep),
             Self::Recursive(term) => term.has_dynamic_dependencies(deep),
@@ -345,6 +355,7 @@ where
             Self::Effect(term) => term.is_static(),
             Self::Let(term) => term.is_static(),
             Self::Lambda(term) => term.is_static(),
+            Self::LazyResult(term) => term.is_static(),
             Self::Application(term) => term.is_static(),
             Self::PartialApplication(term) => term.is_static(),
             Self::Recursive(term) => term.is_static(),
@@ -371,6 +382,7 @@ where
             Self::Effect(term) => term.is_atomic(),
             Self::Let(term) => term.is_atomic(),
             Self::Lambda(term) => term.is_atomic(),
+            Self::LazyResult(term) => term.is_atomic(),
             Self::Application(term) => term.is_atomic(),
             Self::PartialApplication(term) => term.is_atomic(),
             Self::Recursive(term) => term.is_atomic(),
@@ -397,6 +409,7 @@ where
             Self::Effect(term) => term.is_complex(),
             Self::Let(term) => term.is_complex(),
             Self::Lambda(term) => term.is_complex(),
+            Self::LazyResult(term) => term.is_complex(),
             Self::Application(term) => term.is_complex(),
             Self::PartialApplication(term) => term.is_complex(),
             Self::Recursive(term) => term.is_complex(),
@@ -414,6 +427,7 @@ where
 pub enum TermChildren<'a, T: Expression + 'a> {
     Let(<LetTerm<T> as CompoundNode<T>>::Children<'a>),
     Lambda(<LambdaTerm<T> as CompoundNode<T>>::Children<'a>),
+    LazyResult(<LazyResultTerm<T> as CompoundNode<T>>::Children<'a>),
     Application(<ApplicationTerm<T> as CompoundNode<T>>::Children<'a>),
     PartialApplication(<PartialApplicationTerm<T> as CompoundNode<T>>::Children<'a>),
     Recursive(<RecursiveTerm<T> as CompoundNode<T>>::Children<'a>),
@@ -429,6 +443,7 @@ impl<'a, T: Expression + 'a> Iterator for TermChildren<'a, T> {
         match self {
             Self::Let(iter) => iter.next(),
             Self::Lambda(iter) => iter.next(),
+            Self::LazyResult(iter) => iter.next(),
             Self::Application(iter) => iter.next(),
             Self::PartialApplication(iter) => iter.next(),
             Self::Recursive(iter) => iter.next(),
@@ -456,6 +471,7 @@ where
         match self {
             Self::Let(term) => TermChildren::Let(term.children()),
             Self::Lambda(term) => TermChildren::Lambda(term.children()),
+            Self::LazyResult(term) => TermChildren::LazyResult(term.children()),
             Self::Application(term) => TermChildren::Application(term.children()),
             Self::PartialApplication(term) => TermChildren::PartialApplication(term.children()),
             Self::Recursive(term) => TermChildren::Recursive(term.children()),
@@ -486,6 +502,9 @@ where
             Self::Effect(term) => term.substitute_static(substitutions, factory, allocator, cache),
             Self::Let(term) => term.substitute_static(substitutions, factory, allocator, cache),
             Self::Lambda(term) => term.substitute_static(substitutions, factory, allocator, cache),
+            Self::LazyResult(term) => {
+                term.substitute_static(substitutions, factory, allocator, cache)
+            }
             Self::Application(term) => {
                 term.substitute_static(substitutions, factory, allocator, cache)
             }
@@ -515,6 +534,9 @@ where
             Self::Effect(term) => term.substitute_dynamic(deep, state, factory, allocator, cache),
             Self::Let(term) => term.substitute_dynamic(deep, state, factory, allocator, cache),
             Self::Lambda(term) => term.substitute_dynamic(deep, state, factory, allocator, cache),
+            Self::LazyResult(term) => {
+                term.substitute_dynamic(deep, state, factory, allocator, cache)
+            }
             Self::Application(term) => {
                 term.substitute_dynamic(deep, state, factory, allocator, cache)
             }
@@ -542,6 +564,7 @@ where
             Self::Effect(term) => term.normalize(factory, allocator, cache),
             Self::Let(term) => term.normalize(factory, allocator, cache),
             Self::Lambda(term) => term.normalize(factory, allocator, cache),
+            Self::LazyResult(term) => term.normalize(factory, allocator, cache),
             Self::Application(term) => term.normalize(factory, allocator, cache),
             Self::PartialApplication(term) => term.normalize(factory, allocator, cache),
             Self::Recursive(term) => term.normalize(factory, allocator, cache),
@@ -562,6 +585,7 @@ where
             Self::Effect(term) => term.hoist_free_variables(factory, allocator),
             Self::Let(term) => term.hoist_free_variables(factory, allocator),
             Self::Lambda(term) => term.hoist_free_variables(factory, allocator),
+            Self::LazyResult(term) => term.hoist_free_variables(factory, allocator),
             Self::Application(term) => term.hoist_free_variables(factory, allocator),
             Self::PartialApplication(term) => term.hoist_free_variables(factory, allocator),
             Self::Recursive(term) => term.hoist_free_variables(factory, allocator),
@@ -656,6 +680,7 @@ where
     ) -> Option<EvaluationResult<T>> {
         match self {
             Self::Effect(term) => term.evaluate(state, factory, allocator, cache),
+            Self::LazyResult(term) => term.evaluate(state, factory, allocator, cache),
             Self::Application(term) => term.evaluate(state, factory, allocator, cache),
             _ => {
                 if self.is_reducible() {
@@ -691,6 +716,7 @@ where
             Self::Effect(term) => std::fmt::Display::fmt(term, f),
             Self::Let(term) => std::fmt::Display::fmt(term, f),
             Self::Lambda(term) => std::fmt::Display::fmt(term, f),
+            Self::LazyResult(term) => std::fmt::Display::fmt(term, f),
             Self::Application(term) => std::fmt::Display::fmt(term, f),
             Self::PartialApplication(term) => std::fmt::Display::fmt(term, f),
             Self::Recursive(term) => std::fmt::Display::fmt(term, f),
@@ -723,6 +749,7 @@ where
             Self::Effect(term) => term.to_json(),
             Self::Let(term) => term.to_json(),
             Self::Lambda(term) => term.to_json(),
+            Self::LazyResult(term) => term.to_json(),
             Self::Application(term) => term.to_json(),
             Self::PartialApplication(term) => term.to_json(),
             Self::Recursive(term) => term.to_json(),
@@ -750,6 +777,7 @@ where
             (Self::Effect(term), Self::Effect(other)) => term.patch(other),
             (Self::Let(term), Self::Let(other)) => term.patch(other),
             (Self::Lambda(term), Self::Lambda(other)) => term.patch(other),
+            (Self::LazyResult(term), Self::LazyResult(other)) => term.patch(other),
             (Self::Application(term), Self::Application(other)) => term.patch(other),
             (Self::PartialApplication(term), Self::PartialApplication(other)) => term.patch(other),
             (Self::Recursive(term), Self::Recursive(other)) => term.patch(other),
