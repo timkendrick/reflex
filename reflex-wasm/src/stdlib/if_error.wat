@@ -60,7 +60,17 @@
                   (call $Term::List::traits::iterate (local.get $remaining_conditions))
                   (local.get $state))))))))
 
+    (@impl
+      (i32.or (i32.const 0xFFFFFFFF))
+      (call $TermType::implements::apply)
+      (func $Stdlib_IfError::impl::any::<apply> (param $self i32) (param $fallback i32) (param $state i32) (result i32 i32)
+        (local.get $self)
+        (global.get $NULL)))
+
     (@default
       (func $Stdlib_IfError::impl::default (param $self i32) (param $handler i32) (param $state i32) (result i32 i32)
-        (local.get $self)
+        (call $Term::Signal::of
+          (call $Term::Condition::invalid_builtin_function_args
+            (global.get $Stdlib_IfError)
+            (call $Term::List::create_pair (local.get $self) (local.get $handler))))
         (global.get $NULL)))))
