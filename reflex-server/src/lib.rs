@@ -3,6 +3,7 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 // SPDX-FileContributor: Chris Campbell <c.campbell@mwam.com> https://github.com/c-campbell-mwam
 use std::{
+    path::PathBuf,
     sync::{Arc, Mutex},
     time::{Duration, SystemTime},
 };
@@ -14,6 +15,7 @@ use opentelemetry::trace::Tracer;
 use reflex::core::{ExpressionFactory, HeapAllocator};
 use reflex_graphql::GraphQlParserBuiltin;
 use reflex_runtime::{actor::RuntimeMetricNames, runtime_actors, AsyncExpression};
+use reflex_utils::FileWriterFormat;
 use server::{
     GraphQlServerOperationMetricLabels, GraphQlServerQueryLabel,
     HttpGraphQlServerQueryMetricLabels, WebSocketGraphQlServerConnectionMetricLabels,
@@ -255,10 +257,10 @@ where
     })
 }
 
-pub fn generate_session_recording_filename(suffix: Option<&str>) -> String {
-    format!(
-        "{}{}.session",
+pub fn generate_session_recording_filename(format: FileWriterFormat) -> PathBuf {
+    PathBuf::from(format!(
+        "{}.session.{}",
         format_datetime_utc(SystemTime::now(), "%Y-%m-%d-%s"),
-        suffix.unwrap_or("")
-    )
+        format.extension()
+    ))
 }

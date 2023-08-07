@@ -10,7 +10,7 @@ use std::{
     ops::Deref,
     path::{Path, PathBuf},
     pin::Pin,
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 use anyhow::{anyhow, Context, Result};
@@ -96,8 +96,8 @@ use reflex_runtime::{
 };
 use reflex_scheduler::threadpool::TokioRuntimeThreadPoolFactory;
 use reflex_scheduler::tokio::{
-    AsyncMessage, NoopTokioSchedulerInstrumentation, TokioCommand, TokioSchedulerBuilder,
-    TokioSchedulerLogger,
+    AsyncMessage, AsyncMessageTimestamp, NoopTokioSchedulerInstrumentation, TokioCommand,
+    TokioSchedulerBuilder, TokioSchedulerLogger,
 };
 use reflex_utils::reconnect::{NoopReconnectTimeout, ReconnectTimeout};
 
@@ -465,7 +465,7 @@ where
     fn log_scheduler_command(
         &mut self,
         command: &TokioCommand<Self::Action, Self::Task>,
-        _enqueue_time: Instant,
+        _enqueue_time: AsyncMessageTimestamp,
     ) {
         match command {
             TokioCommand::Send { pid: _, message } if message.redispatched_from().is_none() => {

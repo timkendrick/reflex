@@ -6,6 +6,7 @@ mod file_writer;
 mod iter;
 mod partition_results;
 
+pub mod event;
 pub mod json;
 pub mod reconnect;
 pub mod serialize;

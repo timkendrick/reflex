@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use std::{net::SocketAddr, time::Duration};
+use std::{net::SocketAddr, path::PathBuf, time::Duration};
 
 use reflex_dispatcher::{Action, Named, SerializableAction, SerializedAction};
 use reflex_json::{JsonMap, JsonValue};
@@ -16,6 +16,7 @@ pub enum InitActions {
     OpenTelemetry(InitOpenTelemetryAction),
     GraphRoot(InitGraphRootAction),
     HttpServer(InitHttpServerAction),
+    SessionRecording(InitSessionRecordingAction),
 }
 impl Named for InitActions {
     fn name(&self) -> &'static str {
@@ -24,6 +25,7 @@ impl Named for InitActions {
             Self::OpenTelemetry(action) => action.name(),
             Self::GraphRoot(action) => action.name(),
             Self::HttpServer(action) => action.name(),
+            Self::SessionRecording(action) => action.name(),
         }
     }
 }
@@ -35,6 +37,7 @@ impl SerializableAction for InitActions {
             Self::OpenTelemetry(action) => action.to_json(),
             Self::GraphRoot(action) => action.to_json(),
             Self::HttpServer(action) => action.to_json(),
+            Self::SessionRecording(action) => action.to_json(),
         }
     }
 }
@@ -122,6 +125,28 @@ impl<'a> From<&'a InitActions> for Option<&'a InitHttpServerAction> {
     fn from(value: &'a InitActions) -> Self {
         match value {
             InitActions::HttpServer(value) => Some(value),
+            _ => None,
+        }
+    }
+}
+
+impl From<InitSessionRecordingAction> for InitActions {
+    fn from(value: InitSessionRecordingAction) -> Self {
+        Self::SessionRecording(value)
+    }
+}
+impl From<InitActions> for Option<InitSessionRecordingAction> {
+    fn from(value: InitActions) -> Self {
+        match value {
+            InitActions::SessionRecording(value) => Some(value),
+            _ => None,
+        }
+    }
+}
+impl<'a> From<&'a InitActions> for Option<&'a InitSessionRecordingAction> {
+    fn from(value: &'a InitActions) -> Self {
+        match value {
+            InitActions::SessionRecording(value) => Some(value),
             _ => None,
         }
     }
@@ -234,5 +259,19 @@ impl SerializableAction for InitHttpServerAction {
             ("host", JsonValue::from(self.address.ip().to_string())),
             ("port", JsonValue::from(self.address.port())),
         ])
+    }
+}
+
+#[derive(Named, PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+pub struct InitSessionRecordingAction {
+    pub output_path: PathBuf,
+}
+impl Action for InitSessionRecordingAction {}
+impl SerializableAction for InitSessionRecordingAction {
+    fn to_json(&self) -> SerializedAction {
+        SerializedAction::from_iter([(
+            "outputPath",
+            JsonValue::from(self.output_path.to_string_lossy()),
+        )])
     }
 }

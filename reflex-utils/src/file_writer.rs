@@ -12,6 +12,15 @@ pub enum FileWriterFormat {
     MessagePack,
 }
 
+impl FileWriterFormat {
+    pub fn extension(&self) -> &str {
+        match self {
+            Self::Json => "jsonl",
+            Self::MessagePack => "mp",
+        }
+    }
+}
+
 trait WriteMessage {
     fn write(
         &self,

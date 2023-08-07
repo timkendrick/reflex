@@ -6,7 +6,9 @@ use std::{marker::PhantomData, ops::Deref, time::Instant};
 use chrono::{DateTime, Duration, SecondsFormat, Utc};
 use reflex_dispatcher::{Action, MessageOffset, ProcessId, SerializableAction, TaskFactory};
 use reflex_json::{JsonMap, JsonValue};
-use reflex_scheduler::tokio::{AsyncMessage, TokioCommand, TokioSchedulerLogger};
+use reflex_scheduler::tokio::{
+    AsyncMessage, AsyncMessageTimestamp, TokioCommand, TokioSchedulerLogger,
+};
 
 use crate::{logger::ActionLogger, utils::sanitize::sanitize_json_value};
 
@@ -154,7 +156,7 @@ where
     fn log_scheduler_command(
         &mut self,
         command: &TokioCommand<Self::Action, Self::Task>,
-        _enqueue_time: Instant,
+        _enqueue_time: AsyncMessageTimestamp,
     ) {
         match command {
             TokioCommand::Send { pid, message } => {
@@ -163,7 +165,7 @@ where
                 let caller_offset = caller.map(|(caller_offset, _)| caller_offset);
                 let action = message.deref();
                 let offset = message.offset();
-                let timestamp = message.enqueue_time();
+                let timestamp = message.enqueue_time().map(|timestamp| timestamp.time());
                 JsonActionLogger::log(
                     self,
                     &action,

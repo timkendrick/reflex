@@ -4,16 +4,14 @@
 use std::{marker::PhantomData, ops::Deref};
 
 use reflex_dispatcher::{Action, ProcessId, TaskFactory};
-use reflex_scheduler::tokio::{AsyncMessage, TokioCommand, TokioSchedulerLogger};
-
-pub trait ActionRecorder {
-    type Action: Action;
-    fn record(&mut self, action: &Self::Action);
-}
+use reflex_scheduler::tokio::{
+    AsyncMessage, AsyncMessageTimestamp, TokioCommand, TokioSchedulerLogger,
+};
+use reflex_utils::event::EventSink;
 
 pub struct SessionRecorder<TRecorder, TAction, TTask>
 where
-    TRecorder: ActionRecorder,
+    TRecorder: EventSink<Event = TAction>,
     TAction: Action,
     TTask: TaskFactory<TAction, TTask>,
 {
@@ -21,9 +19,25 @@ where
     _action: PhantomData<TAction>,
     _task: PhantomData<TTask>,
 }
+
+impl<TRecorder, TAction, TTask> Clone for SessionRecorder<TRecorder, TAction, TTask>
+where
+    TRecorder: EventSink<Event = TAction> + Clone,
+    TAction: Action,
+    TTask: TaskFactory<TAction, TTask>,
+{
+    fn clone(&self) -> Self {
+        Self {
+            recorder: self.recorder.clone(),
+            _action: PhantomData,
+            _task: PhantomData,
+        }
+    }
+}
+
 impl<TRecorder, TAction, TTask> SessionRecorder<TRecorder, TAction, TTask>
 where
-    TRecorder: ActionRecorder,
+    TRecorder: EventSink<Event = TAction>,
     TAction: Action,
     TTask: TaskFactory<TAction, TTask>,
 {
@@ -38,7 +52,7 @@ where
 
 impl<TRecorder, TAction, TTask> TokioSchedulerLogger for SessionRecorder<TRecorder, TAction, TTask>
 where
-    TRecorder: ActionRecorder<Action = TAction>,
+    TRecorder: EventSink<Event = TAction>,
     TAction: Action + Clone + 'static,
     TTask: TaskFactory<TAction, TTask>,
 {
@@ -46,9 +60,16 @@ where
     type Task = TTask;
     fn log_scheduler_command(
         &mut self,
-        _command: &TokioCommand<Self::Action, Self::Task>,
-        _enqueue_time: std::time::Instant,
+        command: &TokioCommand<Self::Action, Self::Task>,
+        _enqueue_time: AsyncMessageTimestamp,
     ) {
+        match command {
+            TokioCommand::Send { pid: _, message } => {
+                let action = message.deref();
+                self.recorder.emit(action)
+            }
+            _ => {}
+        }
     }
     fn log_worker_message(
         &mut self,
@@ -56,8 +77,15 @@ where
         _actor: &<Self::Task as TaskFactory<Self::Action, Self::Task>>::Actor,
         _pid: ProcessId,
     ) {
-        let action = message.deref();
-        self.recorder.record(action)
+        if let None = message.redispatched_from() {
+            let action = message.deref();
+            self.recorder.emit(action)
+        }
     }
-    fn log_task_message(&mut self, _message: &AsyncMessage<Self::Action>, _pid: ProcessId) {}
+    fn log_task_message(&mut self, message: &AsyncMessage<Self::Action>, _pid: ProcessId) {
+        if let None = message.redispatched_from() {
+            let action = message.deref();
+            self.recorder.emit(action)
+        }
+    }
 }

@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 // SPDX-FileContributor: Chris Campbell <c.campbell@mwam.com> https://github.com/c-campbell-mwam
-use std::{marker::PhantomData, ops::Deref, time::Instant};
+use std::{marker::PhantomData, ops::Deref};
 
 use reflex_dispatcher::{Action, ProcessId, TaskFactory};
-use reflex_scheduler::tokio::{AsyncMessage, TokioCommand, TokioSchedulerLogger};
+use reflex_scheduler::tokio::{
+    AsyncMessage, AsyncMessageTimestamp, TokioCommand, TokioSchedulerLogger,
+};
 
 use crate::logger::{
     formatter::{LogFormatter, LogWriter},
@@ -123,13 +125,15 @@ where
     fn log_scheduler_command(
         &mut self,
         command: &TokioCommand<Self::Action, Self::Task>,
-        _enqueue_time: Instant,
+        _enqueue_time: AsyncMessageTimestamp,
     ) {
         match command {
             TokioCommand::Send { pid: _, message } => {
-                let action = message.deref();
-                if let Some(writer) = self.formatter.format(action) {
-                    let _ = self.write(writer);
+                if message.redispatched_from().is_none() {
+                    let action = message.deref();
+                    if let Some(writer) = self.formatter.format(action) {
+                        let _ = self.write(writer);
+                    }
                 }
             }
             _ => {}
