@@ -22,7 +22,7 @@ use reflex_dispatcher::{
     Action, ActorEvents, HandlerContext, MessageData, NoopDisposeCallback, ProcessId,
     SchedulerCommand, SchedulerMode, SchedulerTransition, TaskFactory, TaskInbox,
 };
-use reflex_macros::{dispatcher, Named};
+use reflex_macros::{blanket_trait, dispatcher, Named};
 use reflex_runtime::{
     action::effect::{
         EffectEmitAction, EffectSubscribeAction, EffectUnsubscribeAction, EffectUpdateBatch,
@@ -34,8 +34,13 @@ use reflex_runtime::{
     AsyncExpression, AsyncExpressionFactory, AsyncHeapAllocator, QueryEvaluationMode,
     QueryInvalidationStrategy,
 };
+use reflex_stdlib::ResolveDeep;
 
 pub const EFFECT_TYPE_LOADER: &'static str = "reflex::loader";
+
+blanket_trait!(
+    pub trait LoaderHandlerBuiltin: From<ResolveDeep> {}
+);
 
 pub fn is_loader_effect_type<T: Expression>(
     effect_type: &T,
@@ -109,6 +114,7 @@ where
     T: AsyncExpression,
     TFactory: AsyncExpressionFactory<T>,
     TAllocator: AsyncHeapAllocator<T>,
+    T::Builtin: LoaderHandlerBuiltin,
 {
     factory: TFactory,
     allocator: TAllocator,
@@ -121,6 +127,7 @@ where
     T: AsyncExpression,
     TFactory: AsyncExpressionFactory<T>,
     TAllocator: AsyncHeapAllocator<T>,
+    T::Builtin: LoaderHandlerBuiltin,
 {
     pub fn new(
         factory: TFactory,
@@ -170,7 +177,10 @@ struct LoaderEntitySubscription<T: Expression> {
     effect: T::Signal,
 }
 
-impl<T: Expression> Default for LoaderHandlerState<T> {
+impl<T: Expression> Default for LoaderHandlerState<T>
+where
+    T::Builtin: LoaderHandlerBuiltin,
+{
     fn default() -> Self {
         Self {
             loaders: Default::default(),
@@ -178,7 +188,10 @@ impl<T: Expression> Default for LoaderHandlerState<T> {
         }
     }
 }
-impl<T: Expression> LoaderState<T> {
+impl<T: Expression> LoaderState<T>
+where
+    T::Builtin: LoaderHandlerBuiltin,
+{
     fn new(name: String) -> Self {
         Self {
             name,
@@ -190,7 +203,10 @@ impl<T: Expression> LoaderState<T> {
     }
 }
 
-impl<T: Expression> LoaderHandlerState<T> {
+impl<T: Expression> LoaderHandlerState<T>
+where
+    T::Builtin: LoaderHandlerBuiltin,
+{
     fn subscribe(
         &mut self,
         name: String,
@@ -326,12 +342,18 @@ fn create_load_batch_effect<T: Expression>(
     keys: T::ExpressionList,
     factory: &impl ExpressionFactory<T>,
     allocator: &impl HeapAllocator<T>,
-) -> T::Signal {
+) -> T::Signal
+where
+    T::Builtin: From<ResolveDeep>,
+{
     create_evaluate_effect(
         label,
         factory.create_application_term(
-            loader,
-            allocator.create_unit_list(factory.create_list_term(keys)),
+            factory.create_builtin_term(ResolveDeep),
+            allocator.create_unit_list(factory.create_application_term(
+                loader,
+                allocator.create_unit_list(factory.create_list_term(keys)),
+            )),
         ),
         QueryEvaluationMode::Standalone,
         QueryInvalidationStrategy::Exact,
@@ -357,6 +379,7 @@ dispatcher!({
         T: AsyncExpression + Applicable<T>,
         TFactory: AsyncExpressionFactory<T>,
         TAllocator: AsyncHeapAllocator<T>,
+        T::Builtin: LoaderHandlerBuiltin,
         TAction: Action,
         TTask: TaskFactory<TAction, TTask>,
     {
@@ -456,6 +479,7 @@ where
     T: AsyncExpression + Applicable<T>,
     TFactory: AsyncExpressionFactory<T>,
     TAllocator: AsyncHeapAllocator<T>,
+    T::Builtin: LoaderHandlerBuiltin,
 {
     fn handle_effect_subscribe<TAction, TTask>(
         &self,
