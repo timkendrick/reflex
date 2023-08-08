@@ -1441,3 +1441,19 @@ impl<'a, T: Expression> From<&'a ServerCliAction<T>> for Option<&'a InitHttpServ
         Option::<&'a InitActions>::from(value).and_then(|value| value.into())
     }
 }
+
+impl<T: Expression> From<InitSessionRecordingAction> for ServerCliAction<T> {
+    fn from(value: InitSessionRecordingAction) -> Self {
+        InitActions::from(value).into()
+    }
+}
+impl<T: Expression> From<ServerCliAction<T>> for Option<InitSessionRecordingAction> {
+    fn from(value: ServerCliAction<T>) -> Self {
+        Option::<InitActions>::from(value).and_then(|value| value.into())
+    }
+}
+impl<'a, T: Expression> From<&'a ServerCliAction<T>> for Option<&'a InitSessionRecordingAction> {
+    fn from(value: &'a ServerCliAction<T>) -> Self {
+        Option::<&'a InitActions>::from(value).and_then(|value| value.into())
+    }
+}

@@ -8,8 +8,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+reflex = { path = "../reflex" }
 reflex-dispatcher = { path = "../reflex-dispatcher" }
 reflex-macros = { path = "../reflex-macros" }
+reflex-runtime = { path = "../reflex-runtime" }
 reflex-scheduler = { path = "../reflex-scheduler" }
 reflex-utils = { path = "../reflex-utils" }
 serde = { version = "1.0", features = ["derive"] }

@@ -1,12 +1,9 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use reflex_dispatcher::Action;
-use reflex_utils::{load_messages, FileWriter, FileWriterFormat};
+use reflex_utils::{event::EventSink, load_messages, FileWriter, FileWriterFormat};
 use serde::{Deserialize, Serialize};
 use std::{fs::File, path::Path};
-
-use crate::session_recorder::ActionRecorder;
 
 #[derive(Debug)]
 pub enum FileRecorderLoadError {
@@ -23,16 +20,16 @@ impl std::fmt::Display for FileRecorderLoadError {
     }
 }
 
-pub struct FileRecorder<TAction>(FileWriter<TAction>)
+pub struct FileRecorder<TEvent>(FileWriter<TEvent>)
 where
-    TAction: Send + 'static;
-impl<TAction> FileRecorder<TAction>
+    TEvent: Send + 'static;
+impl<TEvent> FileRecorder<TEvent>
 where
-    TAction: Send + 'static,
+    TEvent: Send + 'static,
 {
     pub fn create(format: FileWriterFormat, path: &Path) -> Result<Self, String>
     where
-        TAction: Clone + Serialize,
+        TEvent: Clone + Serialize,
     {
         File::create(path)
             .map_err(|err| {
@@ -44,33 +41,30 @@ where
             })
             .map(|output_file| Self::from(FileWriter::new(format, output_file)))
     }
-    pub fn load(
-        format: FileWriterFormat,
-        path: &Path,
-    ) -> Result<Vec<TAction>, FileRecorderLoadError>
+    pub fn load(format: FileWriterFormat, path: &Path) -> Result<Vec<TEvent>, FileRecorderLoadError>
     where
-        TAction: for<'de> Deserialize<'de>,
+        TEvent: for<'de> Deserialize<'de>,
     {
         let input_file = File::open(path).map_err(FileRecorderLoadError::Load)?;
         load_messages(format, &input_file).map_err(FileRecorderLoadError::Deserialize)
     }
 }
-impl<TAction> ActionRecorder for FileRecorder<TAction>
+impl<TEvent> EventSink for FileRecorder<TEvent>
 where
-    TAction: Action + Clone + Serialize + Send + 'static,
+    TEvent: Clone + Serialize + Send + 'static,
 {
-    type Action = TAction;
-    fn record(&mut self, action: &Self::Action) {
+    type Event = TEvent;
+    fn emit(&mut self, event: &Self::Event) {
         let Self(writer) = self;
         // TODO: handle errors when recording operations
-        let _ = writer.write(action.clone());
+        let _ = writer.write(event.clone());
     }
 }
-impl<TAction> From<FileWriter<TAction>> for FileRecorder<TAction>
+impl<TEvent> From<FileWriter<TEvent>> for FileRecorder<TEvent>
 where
-    TAction: Clone + Serialize + Send + 'static,
+    TEvent: Clone + Serialize + Send + 'static,
 {
-    fn from(writer: FileWriter<TAction>) -> Self {
+    fn from(writer: FileWriter<TEvent>) -> Self {
         Self(writer)
     }
 }

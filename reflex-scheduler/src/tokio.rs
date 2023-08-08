@@ -188,6 +188,39 @@ where
     },
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct AsyncMessageMetadata {
+    pub offset: MessageOffset,
+    pub redispatched_from: Option<MessageOffset>,
+    pub caller: Option<(MessageOffset, ProcessId)>,
+    pub enqueue_time: AsyncMessageTimestamp,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct AsyncMessageTimestamp(Instant);
+
+impl AsyncMessageTimestamp {
+    fn now() -> AsyncMessageTimestamp {
+        Self(Instant::now())
+    }
+    pub fn time(&self) -> Instant {
+        let Self(value) = self;
+        *value
+    }
+}
+
+impl From<Instant> for AsyncMessageTimestamp {
+    fn from(value: Instant) -> Self {
+        Self(value)
+    }
+}
+
+impl AsyncMessageMetadata {
+    pub fn parent_offset(&self) -> Option<MessageOffset> {
+        self.caller.map(|(parent_offset, _)| parent_offset)
+    }
+}
+
 pub enum AsyncMessage<TAction> {
     // Message returned by a handler that has not yet been enqueued by the scheduler
     Pending {
@@ -196,64 +229,44 @@ pub enum AsyncMessage<TAction> {
     // Non-shared message that has been enqueued by the scheduler
     Owned {
         message: TAction,
-        offset: MessageOffset,
-        redispatched_from: Option<MessageOffset>,
-        caller: Option<(MessageOffset, ProcessId)>,
-        enqueue_time: Instant,
+        metadata: AsyncMessageMetadata,
     },
     // Shared message that has been enqueued by the scheduler
     Shared {
         message: Arc<TAction>,
-        offset: MessageOffset,
-        redispatched_from: Option<MessageOffset>,
-        caller: Option<(MessageOffset, ProcessId)>,
-        enqueue_time: Instant,
+        metadata: AsyncMessageMetadata,
     },
 }
 impl<TAction> AsyncMessage<TAction>
 where
     TAction: Action,
 {
-    pub fn offset(&self) -> Option<MessageOffset> {
+    pub fn metadata(&self) -> Option<&AsyncMessageMetadata> {
         match self {
             AsyncMessage::Pending { .. } => None,
-            AsyncMessage::Owned { offset, .. } => Some(*offset),
-            AsyncMessage::Shared { offset, .. } => Some(*offset),
+            AsyncMessage::Owned { metadata, .. } => Some(metadata),
+            AsyncMessage::Shared { metadata, .. } => Some(metadata),
         }
+    }
+    pub fn offset(&self) -> Option<MessageOffset> {
+        self.metadata().map(|metadata| metadata.offset)
     }
     pub fn parent_offset(&self) -> Option<MessageOffset> {
-        match self {
-            AsyncMessage::Pending { .. } => None,
-            AsyncMessage::Owned { caller, .. } => caller.map(|(parent_offset, _)| parent_offset),
-            AsyncMessage::Shared { caller, .. } => caller.map(|(parent_offset, _)| parent_offset),
-        }
+        self.metadata()
+            .and_then(|metadata| metadata.parent_offset())
     }
     pub fn redispatched_from(&self) -> Option<MessageOffset> {
-        match self {
-            AsyncMessage::Pending { .. } => None,
-            AsyncMessage::Owned {
-                redispatched_from, ..
-            } => *redispatched_from,
-            AsyncMessage::Shared {
-                redispatched_from, ..
-            } => *redispatched_from,
-        }
+        self.metadata()
+            .and_then(|metadata| metadata.redispatched_from)
     }
     pub fn caller(&self) -> Option<Option<(MessageOffset, ProcessId)>> {
-        match self {
-            AsyncMessage::Pending { .. } => None,
-            AsyncMessage::Owned { caller, .. } => Some(*caller),
-            AsyncMessage::Shared { caller, .. } => Some(*caller),
-        }
+        self.metadata().map(|metadata| metadata.caller)
     }
-    pub fn enqueue_time(&self) -> Option<Instant> {
-        match self {
-            AsyncMessage::Pending { .. } => None,
-            AsyncMessage::Owned { enqueue_time, .. } => Some(*enqueue_time),
-            AsyncMessage::Shared { enqueue_time, .. } => Some(*enqueue_time),
-        }
+    pub fn enqueue_time(&self) -> Option<AsyncMessageTimestamp> {
+        self.metadata().map(|metadata| metadata.enqueue_time)
     }
 }
+
 impl<TAction> TaskMessage<TAction> for AsyncMessage<TAction> where TAction: Action {}
 impl<TAction> From<TAction> for AsyncMessage<TAction> {
     fn from(value: TAction) -> Self {
@@ -278,13 +291,13 @@ impl<T> TokioSinkError<T> {
         inner
     }
 }
-impl<TAction, TTask> From<PollSendError<(TokioCommand<TAction, TTask>, Instant)>>
-    for TokioSinkError<(AsyncMessage<TAction>, Instant)>
+impl<TAction, TTask> From<PollSendError<(TokioCommand<TAction, TTask>, AsyncMessageTimestamp)>>
+    for TokioSinkError<(AsyncMessage<TAction>, AsyncMessageTimestamp)>
 where
     TAction: Action,
     TTask: TaskFactory<TAction, TTask>,
 {
-    fn from(err: PollSendError<(TokioCommand<TAction, TTask>, Instant)>) -> Self {
+    fn from(err: PollSendError<(TokioCommand<TAction, TTask>, AsyncMessageTimestamp)>) -> Self {
         match err.into_inner() {
             Some(command) => TokioSinkError(match command {
                 (TokioCommand::Send { pid: _, message }, enqueue_time) => {
@@ -303,7 +316,7 @@ where
     TTask: TaskFactory<TAction, TTask> + Send + 'static,
 {
     next_offset: Arc<AtomicUsize>,
-    commands: mpsc::Sender<(TokioCommand<TAction, TTask>, Instant)>,
+    commands: mpsc::Sender<(TokioCommand<TAction, TTask>, AsyncMessageTimestamp)>,
     init_task: JoinHandle<()>,
     commands_task: JoinHandle<()>,
     async_task_pool: JoinHandle<()>,
@@ -618,7 +631,7 @@ where
         let next_pid = Arc::new(AtomicUsize::new(next_pid.into()));
         let next_offset = Arc::new(AtomicUsize::new(Default::default()));
         let (commands_tx, mut commands_rx) =
-            mpsc::channel::<(TokioCommand<TAction, TTask>, Instant)>(32);
+            mpsc::channel::<(TokioCommand<TAction, TTask>, AsyncMessageTimestamp)>(32);
         let threadpool_queue_capacity = 1024;
         let (async_task_pool, async_tasks_tx) = {
             let (requests_tx, requests_rx) =
@@ -664,24 +677,26 @@ where
                 (offset, pid, message)
             })
             .map({
-                let enqueue_time = Instant::now();
+                let enqueue_time = AsyncMessageTimestamp::now();
                 move |(offset, pid, message)| {
                     (
                         TokioCommand::Send {
                             pid,
                             message: AsyncMessage::Owned {
                                 message,
-                                offset,
-                                redispatched_from: None,
-                                caller: None,
-                                enqueue_time,
+                                metadata: AsyncMessageMetadata {
+                                    offset,
+                                    redispatched_from: None,
+                                    caller: None,
+                                    enqueue_time,
+                                },
                             },
                         },
                         enqueue_time,
                     )
                 }
             })
-            .collect::<VecDeque<(TokioCommand<TAction, TTask>, Instant)>>();
+            .collect::<VecDeque<(TokioCommand<TAction, TTask>, AsyncMessageTimestamp)>>();
         let commands_task = {
             let processes = Arc::clone(&processes);
             let next_pid = Arc::clone(&next_pid);
@@ -758,13 +773,13 @@ where
 {
     type Action = TAction;
     type Sink = With<
-        PollSender<(TokioCommand<TAction, TTask>, Instant)>,
-        (TokioCommand<TAction, TTask>, Instant),
+        PollSender<(TokioCommand<TAction, TTask>, AsyncMessageTimestamp)>,
+        (TokioCommand<TAction, TTask>, AsyncMessageTimestamp),
         TAction,
         Ready<
             Result<
-                (TokioCommand<TAction, TTask>, Instant),
-                TokioSinkError<(AsyncMessage<TAction>, Instant)>,
+                (TokioCommand<TAction, TTask>, AsyncMessageTimestamp),
+                TokioSinkError<(AsyncMessage<TAction>, AsyncMessageTimestamp)>,
             >,
         >,
         Box<
@@ -772,8 +787,8 @@ where
                     TAction,
                 ) -> Ready<
                     Result<
-                        (TokioCommand<TAction, TTask>, Instant),
-                        TokioSinkError<(AsyncMessage<TAction>, Instant)>,
+                        (TokioCommand<TAction, TTask>, AsyncMessageTimestamp),
+                        TokioSinkError<(AsyncMessage<TAction>, AsyncMessageTimestamp)>,
                     >,
                 > + Send,
         >,
@@ -792,17 +807,19 @@ where
             let next_offset = self.next_offset.clone();
             move |message| {
                 future::ready(Ok({
-                    let enqueue_time = Instant::now();
+                    let enqueue_time = AsyncMessageTimestamp::now();
                     let offset = MessageOffset::from(increment_atomic_counter(&next_offset));
                     (
                         TokioCommand::Send {
                             pid,
                             message: AsyncMessage::Owned {
                                 message,
-                                offset,
-                                redispatched_from: None,
-                                caller: None,
-                                enqueue_time,
+                                metadata: AsyncMessageMetadata {
+                                    offset,
+                                    redispatched_from: None,
+                                    caller: None,
+                                    enqueue_time,
+                                },
                             },
                         },
                         enqueue_time,
@@ -835,7 +852,7 @@ where
                         pid,
                         subscriber,
                     },
-                    Instant::now(),
+                    AsyncMessageTimestamp::now(),
                 ));
                 let _ = send_task.await;
             }
@@ -849,7 +866,7 @@ where
                             subscription_id,
                             pid,
                         },
-                        Instant::now(),
+                        AsyncMessageTimestamp::now(),
                     ))
                     .await;
             }
@@ -1064,47 +1081,59 @@ where
             let offset = MessageOffset::from(increment_atomic_counter(&next_offset));
             let (message, enqueue_time) = match message {
                 AsyncMessage::Pending { message } => {
-                    let enqueue_time = Instant::now();
+                    let enqueue_time = AsyncMessageTimestamp::now();
                     (
                         AsyncMessage::Owned {
                             message,
-                            offset,
-                            redispatched_from: None,
-                            caller: None,
-                            enqueue_time,
+                            metadata: AsyncMessageMetadata {
+                                offset,
+                                redispatched_from: None,
+                                caller: None,
+                                enqueue_time,
+                            },
                         },
                         enqueue_time,
                     )
                 }
                 AsyncMessage::Owned {
                     message,
-                    offset: inbox_offset,
-                    redispatched_from: _,
-                    caller,
-                    enqueue_time,
+                    metadata:
+                        AsyncMessageMetadata {
+                            offset: inbox_offset,
+                            redispatched_from: _,
+                            caller,
+                            enqueue_time,
+                        },
                 } => (
                     AsyncMessage::Owned {
                         message,
-                        offset,
-                        redispatched_from: Some(inbox_offset),
-                        caller,
-                        enqueue_time,
+                        metadata: AsyncMessageMetadata {
+                            offset,
+                            redispatched_from: Some(inbox_offset),
+                            caller,
+                            enqueue_time,
+                        },
                     },
                     enqueue_time,
                 ),
                 AsyncMessage::Shared {
                     message,
-                    offset: inbox_offset,
-                    redispatched_from: _,
-                    caller,
-                    enqueue_time,
+                    metadata:
+                        AsyncMessageMetadata {
+                            offset: inbox_offset,
+                            redispatched_from: _,
+                            caller,
+                            enqueue_time,
+                        },
                 } => (
                     AsyncMessage::Shared {
                         message,
-                        offset,
-                        redispatched_from: Some(inbox_offset),
-                        caller,
-                        enqueue_time,
+                        metadata: AsyncMessageMetadata {
+                            offset,
+                            redispatched_from: Some(inbox_offset),
+                            caller,
+                            enqueue_time,
+                        },
                     },
                     enqueue_time,
                 ),
@@ -1246,7 +1275,7 @@ where
                     actor_pid,
                     &actor,
                     &message,
-                    enqueue_time.elapsed(),
+                    enqueue_time.time().elapsed(),
                 );
             }
             if let Some(offset) = message.offset() {
@@ -1256,7 +1285,7 @@ where
                     let (message, state, actions) = match scheduler_mode {
                         None => (message, state, None),
                         Some(scheduler_mode) => {
-                            let handler_start_time = Instant::now();
+                            let handler_start_time = AsyncMessageTimestamp::now();
                             let (message, state, actions) = match scheduler_mode {
                                 SchedulerMode::Sync => {
                                     let metadata = get_message_metadata(offset, parent_offset);
@@ -1343,14 +1372,14 @@ where
                                 &actor,
                                 &message,
                                 scheduler_mode,
-                                handler_start_time.elapsed(),
+                                handler_start_time.time().elapsed(),
                             );
                             (message, state, actions)
                         }
                     };
                     actor_state.replace(state);
                     if let Some(commands) = actions {
-                        let enqueue_time = Instant::now();
+                        let enqueue_time = AsyncMessageTimestamp::now();
                         let mut queue = VecDeque::with_capacity(commands.len());
                         collect_handler_results(
                             &mut queue,
@@ -1385,12 +1414,12 @@ where
 }
 
 fn collect_handler_results<TAction, TTask>(
-    queue: &mut VecDeque<(TokioCommand<TAction, TTask>, Instant)>,
+    queue: &mut VecDeque<(TokioCommand<TAction, TTask>, AsyncMessageTimestamp)>,
     commands: SchedulerTransition<TAction, TTask>,
     message: AsyncMessage<TAction>,
     offset: MessageOffset,
     pid: ProcessId,
-    enqueue_time: Instant,
+    enqueue_time: AsyncMessageTimestamp,
     next_offset: &Arc<AtomicUsize>,
 ) where
     TAction: Action,
@@ -1435,10 +1464,12 @@ fn collect_handler_results<TAction, TTask>(
                             pid: target_pid,
                             message: AsyncMessage::Owned {
                                 message,
-                                offset,
-                                redispatched_from: None,
-                                caller,
-                                enqueue_time,
+                                metadata: AsyncMessageMetadata {
+                                    offset,
+                                    redispatched_from: None,
+                                    caller,
+                                    enqueue_time,
+                                },
                             },
                         },
                         enqueue_time,
@@ -1498,10 +1529,12 @@ fn collect_handler_results<TAction, TTask>(
                                     pid: existing_target_pid,
                                     message: AsyncMessage::Shared {
                                         message: Arc::clone(&shared_message),
-                                        offset,
-                                        redispatched_from,
-                                        caller,
-                                        enqueue_time,
+                                        metadata: AsyncMessageMetadata {
+                                            offset,
+                                            redispatched_from,
+                                            caller,
+                                            enqueue_time,
+                                        },
                                     },
                                 },
                                 enqueue_time,
@@ -1514,10 +1547,12 @@ fn collect_handler_results<TAction, TTask>(
                                     pid: target_pid,
                                     message: AsyncMessage::Shared {
                                         message: Arc::clone(&shared_message),
-                                        offset,
-                                        redispatched_from,
-                                        caller,
-                                        enqueue_time,
+                                        metadata: AsyncMessageMetadata {
+                                            offset,
+                                            redispatched_from,
+                                            caller,
+                                            enqueue_time,
+                                        },
                                     },
                                 },
                                 enqueue_time,
@@ -1545,10 +1580,12 @@ fn collect_handler_results<TAction, TTask>(
                                     pid: target_pid,
                                     message: AsyncMessage::Shared {
                                         message: Arc::clone(&shared_message),
-                                        offset,
-                                        redispatched_from,
-                                        caller,
-                                        enqueue_time,
+                                        metadata: AsyncMessageMetadata {
+                                            offset,
+                                            redispatched_from,
+                                            caller,
+                                            enqueue_time,
+                                        },
                                     },
                                 },
                                 enqueue_time,
@@ -1586,10 +1623,12 @@ fn collect_handler_results<TAction, TTask>(
                         pid: target_pid,
                         message: AsyncMessage::Owned {
                             message,
-                            offset,
-                            redispatched_from,
-                            caller,
-                            enqueue_time,
+                            metadata: AsyncMessageMetadata {
+                                offset,
+                                redispatched_from,
+                                caller,
+                                enqueue_time,
+                            },
                         },
                     },
                     enqueue_time,
@@ -1608,7 +1647,7 @@ fn collect_handler_results<TAction, TTask>(
 }
 
 fn process_handler_results<TAction, TTask, TLogger, TInstrumentation>(
-    mut commands: VecDeque<(TokioCommand<TAction, TTask>, Instant)>,
+    mut commands: VecDeque<(TokioCommand<TAction, TTask>, AsyncMessageTimestamp)>,
     next_pid: &Arc<AtomicUsize>,
     next_offset: &Arc<AtomicUsize>,
     processes: &Arc<RwLock<HashMap<ProcessId, TokioProcess<TAction, TTask>>>>,
@@ -1851,7 +1890,7 @@ fn get_message_metadata(
     MessageData {
         offset,
         parent: parent_offset,
-        timestamp: std::time::Instant::now(),
+        timestamp: Instant::now(),
     }
 }
 
@@ -1883,7 +1922,7 @@ pub trait TokioSchedulerLogger {
     fn log_scheduler_command(
         &mut self,
         command: &TokioCommand<Self::Action, Self::Task>,
-        enqueue_time: Instant,
+        enqueue_time: AsyncMessageTimestamp,
     );
     // Invoked when a worker event loop takes the next message from its inbox
     fn log_worker_message(
@@ -1904,7 +1943,7 @@ where
     fn log_scheduler_command(
         &mut self,
         command: &TokioCommand<T::Action, T::Task>,
-        enqueue_time: Instant,
+        enqueue_time: AsyncMessageTimestamp,
     ) {
         match self {
             Some(inner) => inner.log_scheduler_command(command, enqueue_time),

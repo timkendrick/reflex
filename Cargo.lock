@@ -2693,8 +2693,10 @@ dependencies = [
 name = "reflex-recorder"
 version = "0.1.0"
 dependencies = [
+ "reflex",
  "reflex-dispatcher",
  "reflex-macros",
+ "reflex-runtime",
  "reflex-scheduler",
  "reflex-utils",
  "serde",

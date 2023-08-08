@@ -1,11 +1,13 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use std::{marker::PhantomData, ops::Deref, time::Instant};
+use std::{marker::PhantomData, ops::Deref};
 
 use metrics::{describe_counter, increment_counter, Unit};
 use reflex_dispatcher::{Action, Named, ProcessId, TaskFactory};
-use reflex_scheduler::tokio::{AsyncMessage, TokioCommand, TokioSchedulerLogger};
+use reflex_scheduler::tokio::{
+    AsyncMessage, AsyncMessageTimestamp, TokioCommand, TokioSchedulerLogger,
+};
 
 use crate::logger::ActionLogger;
 
@@ -71,7 +73,7 @@ where
     fn log_scheduler_command(
         &mut self,
         command: &TokioCommand<Self::Action, Self::Task>,
-        _enqueue_time: Instant,
+        _enqueue_time: AsyncMessageTimestamp,
     ) {
         match command {
             TokioCommand::Send { pid: _, message } => {

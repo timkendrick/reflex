@@ -495,8 +495,15 @@ where
                 ];
                 let source_effect = create_evaluate_effect(
                     source_label,
-                    self.factory
-                        .create_application_term(target, self.allocator.create_empty_list()),
+                    self.factory.create_application_term(
+                        self.factory.create_builtin_term(ResolveDeep),
+                        self.allocator.create_unit_list(
+                            self.factory.create_application_term(
+                                target,
+                                self.allocator.create_empty_list(),
+                            ),
+                        ),
+                    ),
                     QueryEvaluationMode::Standalone,
                     QueryInvalidationStrategy::Exact,
                     &self.factory,
