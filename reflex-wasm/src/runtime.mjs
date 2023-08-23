@@ -71,13 +71,6 @@ function createConditionTypes(runtime) {
   };
 }
 
-function createDependencyTypes(runtime) {
-  return {
-    Cache: runtime.DependencyType_CacheDependency.value,
-    State: runtime.DependencyType_StateDependency.value,
-  };
-}
-
 function createStdlib(runtime) {
   return {
     Abs: runtime.__Stdlib_Abs.value,
@@ -185,7 +178,6 @@ export function createRuntime(runtime) {
   const constants = {
     TermType: createTermTypes(runtime),
     ConditionType: createConditionTypes(runtime),
-    DependencyType: createDependencyTypes(runtime),
     Stdlib: createStdlib(runtime),
   };
   return {
@@ -194,7 +186,6 @@ export function createRuntime(runtime) {
     NULL,
     TermType: constants.TermType,
     ConditionType: constants.ConditionType,
-    DependencyType: constants.DependencyType,
     Stdlib: constants.Stdlib,
     exports: runtime,
     getTermType(value) {
@@ -261,9 +252,7 @@ export function createRuntime(runtime) {
       return runtime.getStringLength(value);
     },
     getStringValue(value) {
-      const offset = runtime.getStringOffset(value);
-      const length = runtime.getStringLength(value);
-      return new TextDecoder('utf-8').decode(new Uint8Array(runtime.memory.buffer, offset, length));
+      return getStringValue(value);
     },
     createTimestamp(millis) {
       return runtime.createTimestamp(BigInt(millis));
@@ -512,18 +501,6 @@ export function createRuntime(runtime) {
     getConstructorKeys(value) {
       return runtime.getConstructorKeys(value);
     },
-    isDependency(value) {
-      return runtime.isDependency(value);
-    },
-    getDependencyType(value) {
-      return runtime.getDependencyType(value);
-    },
-    getCacheDependencyKey(value) {
-      return runtime.getCacheDependencyKey(value);
-    },
-    getStateDependencyCondition(value) {
-      return runtime.getStateDependencyCondition(value);
-    },
     createHashmap(entries) {
       const instance = runtime.allocateHashmap(runtime.defaultHashmapCapacity(entries.length));
       entries.forEach(([key, value]) => {
@@ -674,15 +651,17 @@ export function createRuntime(runtime) {
       if (value === NULL) return [];
       if (!runtime.isTree(value)) throw new Error('Invalid dependencies');
       return getTreeValues(value)
-        .map((value) => {
-          if (!runtime.isDependency(value)) throw new Error('Invalid dependencies');
-          switch (runtime.getDependencyType(value)) {
-            case constants.DependencyType.State:
-              return runtime.getStateDependencyCondition(value);
-            case constants.DependencyType.Cache:
-            default:
-              return null;
+        .map((condition) => {
+          if (
+            !runtime.isCondition(condition) ||
+            runtime.getConditionType(condition) !== constants.ConditionType.Custom
+          )
+            throw new Error('Invalid dependencies');
+          const effectType = runtime.getCustomConditionEffectType(condition);
+          if (runtime.isString(effectType) && getStringValue(effectType) === 'reflex::cache') {
+            return null;
           }
+          return condition;
         })
         .filter(Boolean);
     },
@@ -698,6 +677,12 @@ export function createRuntime(runtime) {
       return new Uint32Array(runtime.memory.buffer, offset, length);
     },
   };
+
+  function getStringValue(value) {
+    const offset = runtime.getStringOffset(value);
+    const length = runtime.getStringLength(value);
+    return new TextDecoder('utf-8').decode(new Uint8Array(runtime.memory.buffer, offset, length));
+  }
 
   function getTreeValues(value) {
     if (value === NULL) return;

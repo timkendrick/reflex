@@ -5,6 +5,7 @@
   ;; Global evaluation cache
 
   (@const $EvaluationCache::NOT_FOUND i64 (call $Utils::i64::from_chunks (global.get $NULL) (global.get $NULL)))
+  (@const-string $EvaluationCache::EFFECT_TYPE_CACHE "reflex::cache")
 
   ;; Pre-allocate an empty cache instance within a cell term wrapper
   (@const $EvaluationCache::EMPTY i32 (call $EvaluationCache::allocate_with_cell_wrapper (i32.const 0)))
@@ -83,6 +84,7 @@
   ;; Retrieve an entry from the global cache
   (func $Runtime::EvaluationCache::lookup (export "getRuntimeEvaluationCacheEntry") (param $key i64) (result i32 i32)
     (local $cache_entry i64)
+    (local $dependencies i32)
     ;; Look up the key in the global cache hashmap
     (call $EvaluationCache::retrieve
       (call $Runtime::EvaluationCache::get_instance)
@@ -95,8 +97,11 @@
       (else
         ;; Split the resulting 64-bit bucket value into a (value, dependency) tuple of two 32-bit pointers
         (call $Utils::i64::to_chunks (local.get $cache_entry))
+        (local.set $dependencies)
         ;; Append the cache dependency to the retrieved cached dependencies
-        (call $Term::Tree::new (call $Term::Dependency::cache (local.get $key))))))
+        (call $Term::Tree::new
+          (call $Runtime::EvaluationCache::create_cache_key (local.get $key))
+          (local.get $dependencies)))))
 
   ;; Add an entry to the global cache
   (func $Runtime::EvaluationCache::insert (export "setRuntimeEvaluationCacheEntry") (param $key i64) (param $value i32) (param $dependencies i32) (result i32 i32)
@@ -115,7 +120,15 @@
       ;; Return the inserted value
       (local.get $value)
       ;; Append the cache dependency to the stored cached dependencies
-      (call $Term::Tree::new (local.get $dependencies) (call $Term::Dependency::cache (local.get $key))))
+      (call $Term::Tree::new
+        (call $Runtime::EvaluationCache::create_cache_key (local.get $key))
+        (local.get $dependencies)))
+
+  (func $Runtime::EvaluationCache::create_cache_key (param $key i64) (result i32)
+    (call $Term::Condition::custom
+      (global.get $EvaluationCache::EFFECT_TYPE_CACHE)
+      (call $Term::Int::new (local.get $key))
+      (call $Term::Nil::new)))
 
   (func $Runtime::EvaluationCache::get_instance (result i32)
     (call $Term::Cell::get_field_pointer

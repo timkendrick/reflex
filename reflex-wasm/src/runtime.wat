@@ -24,19 +24,17 @@
   (func (export "_initialize")
     (@const-init))
 
-  (func $Runtime::get_state_value (export "getStateValue") (param $state_token i32) (param $state i32) (result i32 i32)
-    ;; Retrieve the value corresponding to the provided state token from the provided state object,
+  (func $Runtime::get_state_value (export "getStateValue") (param $condition i32) (param $state i32) (result i32 i32)
+    ;; Retrieve the value corresponding to the provided condition from the provided state object,
     ;; or the null pointer if there is no corresponding value present in the state object
     (if (result i32)
       (i32.eq (global.get $NULL) (local.get $state))
       (then
         (global.get $NULL))
       (else
-        (call $Term::Hashmap::traits::get (local.get $state) (local.get $state_token))))
+        (call $Term::Hashmap::traits::get (local.get $state) (local.get $condition))))
     ;; Return a new dependency tree containing a single state dependency comprising the state token
-    (call $Term::Tree::new
-      (global.get $NULL)
-      (call $Term::Dependency::state (local.get $state_token))))
+    (call $Term::Tree::of (local.get $condition)))
 
   (func $Dependencies::new (export "createDependencyTree") (result i32)
     (global.get $NULL))
@@ -55,6 +53,7 @@
     (local $iterator_state i32)
     (local $dependencies i32)
     (local $dependency i32)
+    (local $value i32)
     (if (result i64)
       (i32.or
         (i32.eq (global.get $NULL) (local.get $self))
@@ -67,24 +66,22 @@
           ;; Skip over any non-stateful dependencies
           (br_if $LOOP
             (i32.ne
-              (call $Term::Dependency::get::type (local.get $dependency))
-              (global.get $Dependency::StateDependency)))
+              (call $Term::Condition::CustomCondition::get::effect_type (local.get $dependency))
+              (global.get $EvaluationCache::EFFECT_TYPE_CACHE)))
           ;; Get the state value corresponding to the current dependency state token
           ;; (this will be the null pointer if no state value exists for this state token)
-          (local.set $dependency
-            (call $Term::Hashmap::traits::get
-              (local.get $state)
-              (call $Term::Dependency::StateDependency::get::condition (local.get $dependency))))
+          (local.set $value
+            (call $Term::Hashmap::traits::get (local.get $state) (local.get $dependency)))
           ;; Write the state value hash (or zero if no value exists) to the combined state value hash
           (local.set $state_hash
             (call $Hash::write_i64
               (local.get $state_hash)
               (if (result i64)
-                (i32.eq (local.get $dependency) (global.get $NULL))
+                (i32.eq (local.get $value) (global.get $NULL))
                 (then
                   (i64.const 0))
                 (else
-                  (call $Term::get_hash (local.get $dependency)))))))
+                  (call $Term::get_hash (local.get $value)))))))
         ;; If the state hash is unchanged (i.e. the dependency list was empty), return -1,
         ;; otherwise return the combined state value hash
         (select

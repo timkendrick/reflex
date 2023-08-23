@@ -19,6 +19,7 @@ use reflex::{
     core::{
         Arity, ConditionListType, ConditionType, DependencyList, EvaluationResult, Expression,
         ExpressionFactory, HeapAllocator, NodeId, RefType, SignalTermType, SignalType, StateToken,
+        StringValue,
     },
     hash::{HashId, IntMap, IntSet},
 };
@@ -46,8 +47,8 @@ use reflex_wasm::{
     interpreter::{InterpreterError, UnboundEvaluationResult, WasmInterpreter, WasmProgram},
     serialize::SerializerState,
     term_type::{
-        symbol::SymbolTerm, ApplicationTerm, CellTerm, ConditionTerm, DependencyTerm, HashmapTerm,
-        ListTerm, PointerTerm, TermType, TreeTerm, TypedTerm, WasmExpression,
+        symbol::SymbolTerm, ApplicationTerm, CellTerm, ConditionTerm, HashmapTerm, ListTerm,
+        PointerTerm, TermType, TreeTerm, TypedTerm, WasmExpression,
     },
     wasmtime::Val,
     ArenaPointer, ArenaPointerIterator, ArenaRef, FunctionIndex, PointerIter, Term,
@@ -55,6 +56,8 @@ use reflex_wasm::{
 use serde::{Deserialize, Serialize};
 
 use crate::task::bytecode_worker::BytecodeWorkerAction;
+
+const EFFECT_TYPE_CACHE: &str = "reflex::cache";
 
 /// Criteria governing whether to dump the state of the heap at the point of evaluation
 #[derive(PartialEq, Eq, Clone, Copy, Debug, Serialize, Deserialize)]
@@ -577,15 +580,10 @@ fn get_live_dependency_terms<'a, A: Arena + Clone>(
     state_values: &'a IntMap<StateToken, (ArenaPointer, ArenaPointer)>,
 ) -> impl Iterator<Item = ArenaPointer> + 'a {
     dependencies
-        .iter()
-        .map(|pointer| {
-            ArenaRef::<TypedTerm<DependencyTerm>, _>::new(arena.clone(), pointer).as_inner()
-        })
+        .typed_nodes::<ConditionTerm>()
         .flat_map(|dependency| {
-            let (term, state_value) = if let Some(dependency) = dependency.as_cache_dependency() {
-                let cache_key = dependency.as_inner().key();
-                let dependency_cache_key = EvaluationCacheKey::from(cache_key);
-                let bucket_pointer = evaluation_cache_bucket_lookup.get(&dependency_cache_key);
+            let (term, state_value) = if let Some(cache_key) = parse_cache_dependency(&dependency) {
+                let bucket_pointer = evaluation_cache_bucket_lookup.get(&cache_key);
                 match bucket_pointer {
                     Some(bucket_pointer) => {
                         let bucket = bucket_pointer.as_arena_ref(arena.clone());
@@ -598,14 +596,12 @@ fn get_live_dependency_terms<'a, A: Arena + Clone>(
                     }
                     _ => (None, None),
                 }
-            } else if let Some(dependency) = dependency.as_state_dependency() {
-                let state_token = ConditionType::id(&dependency.as_inner().condition());
+            } else {
+                let state_token = ConditionType::id(&dependency);
                 match state_values.get(&state_token).copied() {
                     Some((key_pointer, value_pointer)) => (Some(key_pointer), Some(value_pointer)),
                     None => (None, None),
                 }
-            } else {
-                (None, None)
             };
             term.into_iter().chain(state_value)
         })
@@ -910,6 +906,31 @@ fn compute_evaluation_cache_metadata(
     }
 }
 
+fn parse_cache_dependency<'a, A: Arena + Clone>(
+    condition: &'a ArenaRef<TypedTerm<ConditionTerm>, A>,
+) -> Option<EvaluationCacheKey> {
+    condition
+        .as_inner()
+        .as_custom_condition()
+        .and_then(|condition| {
+            let is_cache_dependency = condition
+                .as_inner()
+                .effect_type()
+                .as_string_term()
+                .map(|effect_type| effect_type.as_inner().as_str().deref() == EFFECT_TYPE_CACHE)
+                .unwrap_or(false);
+            if is_cache_dependency {
+                condition
+                    .as_inner()
+                    .payload()
+                    .as_int_term()
+                    .map(|term| EvaluationCacheKey::from(term.as_inner().value() as u64))
+            } else {
+                None
+            }
+        })
+}
+
 fn parse_dependency_graph(
     dependencies: &ArenaRef<TypedTerm<TreeTerm>, impl Arena + Clone>,
     existing_graph: Option<IntDag<DependencyGraphKey, ()>>,
@@ -1016,16 +1037,12 @@ fn parse_dependency_graph(
                 Some(child) => {
                     if let Some(child) = child.as_tree_term() {
                         Some(ParsedDependencyGraphBranch::Tree(child.clone()))
-                    } else if let Some(dependency) = child.as_dependency_term() {
-                        let dependency = dependency.as_inner();
-                        if let Some(dependency) = dependency.as_cache_dependency() {
-                            let cache_key = EvaluationCacheKey::from(dependency.as_inner().key());
+                    } else if let Some(condition) = child.as_condition_term() {
+                        if let Some(cache_key) = parse_cache_dependency(condition) {
                             Some(ParsedDependencyGraphBranch::Cache(cache_key))
-                        } else if let Some(dependency) = dependency.as_state_dependency() {
-                            let state_token = ConditionType::id(&dependency.as_inner().condition());
-                            Some(ParsedDependencyGraphBranch::State(state_token))
                         } else {
-                            None
+                            let state_token = ConditionType::id(condition);
+                            Some(ParsedDependencyGraphBranch::State(state_token))
                         }
                     } else {
                         None
@@ -2034,11 +2051,12 @@ fn parse_wasm_interpreter_result_dependencies<'heap, T: Expression, S: Condition
         existing_dependency_mappings.unwrap_or(&empty_dependency_mappings);
     dependencies
         .as_inner()
-        .typed_nodes::<DependencyTerm>()
+        .typed_nodes::<ConditionTerm>()
         .filter_map(|dependency| {
-            let dependency = dependency.as_inner();
-            let state_dependency = dependency.as_state_dependency()?;
-            let condition = state_dependency.as_inner().condition();
+            let condition = match parse_cache_dependency(&dependency) {
+                Some(_) => None,
+                None => Some(dependency),
+            }?;
             let dependency_key = DependencyGraphKey::State(ConditionType::id(&condition));
             let parsed_condition = existing_dependency_mappings
                 .get(&dependency_key)
@@ -2152,6 +2170,7 @@ fn parse_wasm_expression<'heap, T: Expression>(
         signal_term
             .signals()
             .iter()
+            .filter(|condition| parse_cache_dependency(condition).is_none())
             .fold(
                 Ok((
                     Vec::<T::Signal>::new(),

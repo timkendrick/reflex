@@ -63,11 +63,9 @@ pub struct RuntimeBuiltinMappings {
     pub create_invalid_function_target_condition: FunctionId,
     pub create_invalid_function_args_condition: FunctionId,
     pub create_invalid_pointer_condition: FunctionId,
-    pub create_cache_dependency: FunctionId,
     pub create_constructor: FunctionId,
     pub create_dependency_tree: FunctionId,
     pub create_empty_list: FunctionId,
-    pub create_state_dependency: FunctionId,
     pub create_effect: FunctionId,
     pub create_float: FunctionId,
     pub create_hashset: FunctionId,
@@ -138,11 +136,9 @@ impl RuntimeBuiltinMappings {
                 self.create_invalid_function_args_condition
             }
             RuntimeBuiltin::CreateInvalidPointerCondition => self.create_invalid_pointer_condition,
-            RuntimeBuiltin::CreateCacheDependency => self.create_cache_dependency,
             RuntimeBuiltin::CreateConstructor => self.create_constructor,
             RuntimeBuiltin::CreateDependencyTree => self.create_dependency_tree,
             RuntimeBuiltin::CreateEmptyList => self.create_empty_list,
-            RuntimeBuiltin::CreateStateDependency => self.create_state_dependency,
             RuntimeBuiltin::CreateEffect => self.create_effect,
             RuntimeBuiltin::CreateFloat => self.create_float,
             RuntimeBuiltin::CreateHashset => self.create_hashset,

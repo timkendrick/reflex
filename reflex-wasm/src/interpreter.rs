@@ -753,9 +753,8 @@ mod tests {
         interpreter::WasmInterpreter,
         stdlib::{Add, Stdlib},
         term_type::{
-            ApplicationTerm, BuiltinTerm, ConditionTerm, CustomCondition, DependencyTerm,
-            EffectTerm, HashmapTerm, IntTerm, ListTerm, NilTerm, SignalTerm, SymbolTerm, TermType,
-            TreeTerm, TypedTerm,
+            ApplicationTerm, BuiltinTerm, ConditionTerm, CustomCondition, EffectTerm, HashmapTerm,
+            IntTerm, ListTerm, NilTerm, SignalTerm, SymbolTerm, TermType, TreeTerm, TypedTerm,
         },
         ArenaPointer, ArenaRef, Term,
     };
@@ -801,13 +800,8 @@ mod tests {
             .map(|dependencies| {
                 dependencies
                     .as_inner()
-                    .typed_nodes::<DependencyTerm>()
-                    .filter_map(|dependency| {
-                        dependency
-                            .as_inner()
-                            .as_state_dependency()
-                            .map(|dependency| ConditionType::id(&dependency.as_inner().condition()))
-                    })
+                    .typed_nodes::<ConditionTerm>()
+                    .map(|dependency| ConditionType::id(&dependency))
                     .collect::<DependencyList>()
             })
             .unwrap_or_default();
@@ -869,13 +863,8 @@ mod tests {
             .map(|dependencies| {
                 dependencies
                     .as_inner()
-                    .typed_nodes::<DependencyTerm>()
-                    .filter_map(|dependency| {
-                        dependency
-                            .as_inner()
-                            .as_state_dependency()
-                            .map(|dependency| ConditionType::id(&dependency.as_inner().condition()))
-                    })
+                    .typed_nodes::<ConditionTerm>()
+                    .map(|dependency| ConditionType::id(&dependency))
                     .collect::<DependencyList>()
             })
             .unwrap_or_default();
@@ -990,13 +979,8 @@ mod tests {
             .map(|dependencies| {
                 dependencies
                     .as_inner()
-                    .typed_nodes::<DependencyTerm>()
-                    .filter_map(|dependency| {
-                        dependency
-                            .as_inner()
-                            .as_state_dependency()
-                            .map(|dependency| ConditionType::id(&dependency.as_inner().condition()))
-                    })
+                    .typed_nodes::<ConditionTerm>()
+                    .map(|dependency| ConditionType::id(&dependency))
                     .collect::<DependencyList>()
             })
             .unwrap_or_default();
@@ -1038,13 +1022,8 @@ mod tests {
             .map(|dependencies| {
                 dependencies
                     .as_inner()
-                    .typed_nodes::<DependencyTerm>()
-                    .filter_map(|dependency| {
-                        dependency
-                            .as_inner()
-                            .as_state_dependency()
-                            .map(|dependency| ConditionType::id(&dependency.as_inner().condition()))
-                    })
+                    .typed_nodes::<ConditionTerm>()
+                    .map(|dependency| ConditionType::id(&dependency))
                     .collect::<DependencyList>()
             })
             .unwrap_or_default();

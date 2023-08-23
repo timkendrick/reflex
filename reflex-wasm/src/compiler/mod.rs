@@ -1785,10 +1785,6 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<Term, A> {
                 .as_typed_term::<ConstructorTerm>()
                 .as_inner()
                 .compile(stack, state, options),
-            TermTypeDiscriminants::Dependency => self
-                .as_typed_term::<DependencyTerm>()
-                .as_inner()
-                .compile(stack, state, options),
             TermTypeDiscriminants::Effect => self
                 .as_typed_term::<EffectTerm>()
                 .as_inner()

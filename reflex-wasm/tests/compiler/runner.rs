@@ -30,7 +30,7 @@ use reflex_wasm::{
     stdlib::Stdlib,
     term_type::{
         condition::ConditionTerm, hashmap::HashmapTerm, lambda::LambdaTerm, signal::SignalTerm,
-        tree::TreeTerm, DependencyTerm, TermType, TypedTerm, WasmExpression,
+        tree::TreeTerm, TermType, TypedTerm, WasmExpression,
     },
     ArenaPointer, ArenaRef, Term,
 };
@@ -191,19 +191,6 @@ impl<A: Arena + Clone> IntoIterator for WasmTestScenarioResultDependencyList<A> 
         std::collections::btree_map::IntoValues<HashId, ArenaRef<TypedTerm<ConditionTerm>, A>>;
     fn into_iter(self) -> Self::IntoIter {
         self.dependencies.into_values()
-    }
-}
-
-impl<A: Arena + Clone> FromIterator<ArenaRef<TypedTerm<DependencyTerm>, A>>
-    for WasmTestScenarioResultDependencyList<A>
-{
-    fn from_iter<T: IntoIterator<Item = ArenaRef<TypedTerm<DependencyTerm>, A>>>(iter: T) -> Self {
-        Self::from_iter(iter.into_iter().filter_map(|dependency| {
-            dependency
-                .as_inner()
-                .as_state_dependency()
-                .map(|dependency| dependency.as_inner().condition())
-        }))
     }
 }
 
@@ -396,7 +383,7 @@ where
         .map(|dependency_tree| {
             dependency_tree
                 .as_inner()
-                .typed_nodes::<DependencyTerm>()
+                .typed_nodes::<ConditionTerm>()
                 .collect::<WasmTestScenarioResultDependencyList<_>>()
         })
         .unwrap_or_default();
