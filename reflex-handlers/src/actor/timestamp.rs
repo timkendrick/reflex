@@ -234,35 +234,34 @@ where
         if !is_timestamp_effect_type(effect_type, &self.factory) {
             return None;
         }
-        let (initial_values, tasks): (Vec<_>, Vec<_>) =
-            effects
-                .iter()
-                .filter_map(
-                    |effect| match parse_timestamp_effect_args(effect, &self.factory) {
-                        Ok(interval) => {
-                            match state.subscribe_timestamp_task(effect, interval, context) {
-                                None => None,
-                                Some((task_pid, task)) => {
-                                    let initial_value = self.factory.create_float_term(
-                                        get_timestamp_millis(SystemTime::now()) as f64,
-                                    );
-                                    Some((
-                                        (effect.clone(), initial_value),
-                                        Some(SchedulerCommand::Task(task_pid, task.into())),
-                                    ))
-                                }
+        let (initial_values, tasks): (Vec<_>, Vec<_>) = effects
+            .iter()
+            .filter_map(
+                |effect| match parse_timestamp_effect_args(effect, &self.factory) {
+                    Ok(interval) => {
+                        match state.subscribe_timestamp_task(effect, interval, context) {
+                            None => None,
+                            Some((task_pid, task)) => {
+                                let initial_value = self.factory.create_timestamp_term(
+                                    get_timestamp_millis(SystemTime::now()) as i64,
+                                );
+                                Some((
+                                    (effect.clone(), initial_value),
+                                    Some(SchedulerCommand::Task(task_pid, task.into())),
+                                ))
                             }
                         }
-                        Err(err) => Some((
-                            (
-                                effect.clone(),
-                                create_error_expression(err, &self.factory, &self.allocator),
-                            ),
-                            None,
-                        )),
-                    },
-                )
-                .unzip();
+                    }
+                    Err(err) => Some((
+                        (
+                            effect.clone(),
+                            create_error_expression(err, &self.factory, &self.allocator),
+                        ),
+                        None,
+                    )),
+                },
+            )
+            .unzip();
         let initial_values_action = if initial_values.is_empty() {
             None
         } else {
@@ -326,7 +325,7 @@ where
         let effect = state.operation_effect_mappings.get(operation_id)?;
         let result = self
             .factory
-            .create_float_term(get_timestamp_millis(*timestamp) as f64);
+            .create_timestamp_term(get_timestamp_millis(*timestamp) as i64);
         Some(SchedulerTransition::new(once(SchedulerCommand::Send(
             self.main_pid,
             EffectEmitAction {
