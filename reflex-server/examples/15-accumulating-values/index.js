@@ -14,9 +14,9 @@ export default new Resolver({
         // Seed value
         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         // Reducer function
-        (state, value) => {
+        (state, timestamp) => {
           const buckets = state;
-          const bucket = value % 10;
+          const bucket = timestamp.getTime() % 10;
           return [
             ...buckets.slice(0, bucket),
             buckets[bucket] + 1,

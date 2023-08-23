@@ -6,9 +6,10 @@ export default new Resolver({
   mutation: null,
   subscription: {
     now: () => {
-      // Current timestamp in milliseconds (sampled every 1000 milliseconds)
+      // Current timestamp (sampled every 1000 milliseconds)
       const timestamp = now({ interval: 1000 });
-      return `Current UNIX time: ${Math.floor(timestamp / 1000)}`;
+      const millis = timestamp.getTime();
+      return `Current UNIX time: ${Math.floor(millis / 1000)}`;
     },
   },
 });
