@@ -31,7 +31,9 @@ import { now } from 'reflex::time';
 
 const timestamp = now({ interval: 1000 }); // Re-emits every 1000ms
 
-export default `Current UNIX time: ${Math.floor(timestamp / 1000)}`;
+const millis = timestamp.getTime();
+
+export default `Current UNIX time: ${Math.floor(millis / 1000)}`;
 ```
 
 When evaluated in Reflex, this module will evaluate to a sequence of strings such as the following:
