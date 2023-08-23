@@ -3,7 +3,7 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 // SPDX-FileContributor: Jordan Hall <j.hall@mwam.com> https://github.com/j-hall-mwam
 use std::{
-    collections::{BTreeSet, HashSet},
+    collections::HashSet,
     hash::{Hash, Hasher},
 };
 
@@ -13,7 +13,7 @@ use reflex::{
         GraphNode, IntoRefTypeIterator, RefType, SignalType, StackOffset, StateToken,
         StructPrototypeType,
     },
-    hash::{hash_iter, hash_object, FnvHasher, HashId},
+    hash::{hash_iter, hash_object, FnvHasher, HashId, IntSet},
 };
 use serde::{Deserialize, Serialize};
 
@@ -177,7 +177,7 @@ impl<T: Expression> Into<ExpressionList<T>> for SerializedExpressionList<T> {
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub struct SignalList<T: Expression> {
     id: HashId,
-    signals: BTreeSet<T::Signal>,
+    signals: Vec<T::Signal>,
 }
 
 impl<T: Expression> Hash for SignalList<T> {
@@ -190,7 +190,17 @@ where
     T::Signal: Ord,
 {
     pub fn new(signals: impl IntoIterator<Item = T::Signal>) -> Self {
-        let signals = signals.into_iter().collect::<BTreeSet<_>>();
+        let (signals, _) = signals.into_iter().fold(
+            (Vec::default(), IntSet::default()),
+            |(mut signals, mut lookup), signal| {
+                let condition_id = signal.id();
+                if lookup.insert(condition_id) {
+                    signals.push(signal);
+                }
+                (signals, lookup)
+            },
+        );
+        let signals = signals.into_iter().collect::<Vec<_>>();
         Self {
             id: hash_iter(signals.iter().map(|signal| signal.id())),
             signals,
@@ -198,7 +208,7 @@ where
     }
 }
 impl<T: Expression> ConditionListType<T> for SignalList<T> {
-    type Iterator<'a> = IntoRefTypeIterator<T::Signal, T::SignalRef<'a>, std::collections::btree_set::Iter<'a, T::Signal>>
+    type Iterator<'a> = IntoRefTypeIterator<T::Signal, T::SignalRef<'a>, std::slice::Iter<'a, T::Signal>>
         where
             T::Signal: 'a,
             T: 'a,
