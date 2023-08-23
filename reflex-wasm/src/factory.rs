@@ -623,44 +623,30 @@ where
         &self,
         signals: impl IntoIterator<Item = <ArenaRef<Term, Self> as Expression>::Signal>,
     ) -> <ArenaRef<Term, Self> as Expression>::SignalList {
-        let mut children = signals.into_iter().map(|condition| {
-            debug_assert!(std::ptr::eq(
-                condition.arena.arena.deref().borrow().deref(),
-                self.arena.deref().borrow().deref()
-            ));
-            condition.pointer
-        });
-        let first = children.next();
-        let remaining = children;
-        let root_size = first.as_ref().into_iter().count();
-        let root_term = Term::new(
-            TermType::Tree(TreeTerm {
-                left: first.unwrap_or(ArenaPointer::null()),
-                right: ArenaPointer::null(),
-                length: root_size as u32,
-            }),
-            self.arena.deref().borrow().deref(),
-        );
-        let root_pointer = self
-            .arena
-            .deref()
-            .borrow_mut()
-            .deref_mut()
-            .allocate(root_term);
-
-        let pointer = remaining
+        let pointer = signals
+            .into_iter()
+            .map(|condition| {
+                debug_assert!(std::ptr::eq(
+                    condition.arena.arena.deref().borrow().deref(),
+                    self.arena.deref().borrow().deref()
+                ));
+                condition.pointer
+            })
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
             .enumerate()
-            .fold(root_pointer, move |acc, (index, condition)| {
-                let length = root_size + index + 1;
+            .fold(ArenaPointer::null(), |tail, (index, condition)| {
                 let term = Term::new(
                     TermType::Tree(TreeTerm {
                         left: condition,
-                        right: acc,
-                        length: length as u32,
+                        right: tail,
+                        length: index as u32 + 1,
                     }),
                     self.arena.deref().borrow().deref(),
                 );
-                self.arena.deref().borrow_mut().deref_mut().allocate(term)
+                let pointer = self.arena.deref().borrow_mut().deref_mut().allocate(term);
+                pointer
             });
         ArenaRef::<TypedTerm<TreeTerm>, Self>::new(self.clone(), pointer)
     }

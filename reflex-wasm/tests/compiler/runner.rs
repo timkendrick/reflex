@@ -3,6 +3,7 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 use std::{
     cell::RefCell,
+    collections::BTreeMap,
     ops::{Deref, DerefMut},
     rc::Rc,
 };
@@ -11,7 +12,7 @@ use debug_ignore::DebugIgnore;
 use derivative::Derivative;
 use reflex::{
     core::{ConditionType, Expression, ExpressionFactory, HeapAllocator, SignalType},
-    hash::{HashId, IntMap},
+    hash::HashId,
 };
 use reflex_lang::{allocator::DefaultAllocator, CachedSharedTerm, SharedTermFactory};
 use reflex_wasm::{
@@ -28,8 +29,8 @@ use reflex_wasm::{
     interpreter::{InterpreterError, WasmInterpreter, WasmProgram},
     stdlib::Stdlib,
     term_type::{
-        condition::ConditionTerm, hashmap::HashmapTerm, lambda::LambdaTerm, signal::SignalTerm,
-        tree::TreeTerm, TermType, TypedTerm, WasmExpression,
+        hashmap::HashmapTerm, lambda::LambdaTerm, tree::TreeTerm, ConditionTerm, SignalTerm,
+        TermType, TypedTerm, WasmExpression,
     },
     ArenaPointer, ArenaRef, Term,
 };
@@ -45,8 +46,8 @@ pub(crate) fn run_scenario(
     >,
 ) -> Result<
     (
-        WasmEvaluationResult<Rc<RefCell<VecAllocator>>>,
-        WasmEvaluationResult<Rc<RefCell<VecAllocator>>>,
+        WasmTestScenarioResult<Rc<RefCell<VecAllocator>>>,
+        WasmTestScenarioResult<Rc<RefCell<VecAllocator>>>,
     ),
     CompilerTestError<CachedSharedTerm<reflex_wasm::stdlib::Stdlib>>,
 > {
@@ -75,16 +76,14 @@ pub(crate) fn run_scenario(
     let actual = evaluate_compiled(expression, state, &factory, &compiler_options)?;
     let actual = {
         let (result, dependencies) = actual.into_parts();
-        if let Some(signal) = result.as_signal_term() {
-            WasmEvaluationResult {
-                result: normalize_signal_term(signal),
-                dependencies,
-            }
+        let result = if let Some(signal) = result.as_signal_term() {
+            normalize_signal_term(signal)
         } else {
-            WasmEvaluationResult {
-                result,
-                dependencies,
-            }
+            result
+        };
+        WasmTestScenarioResult {
+            result,
+            dependencies,
         }
     };
     let expected = {
@@ -137,9 +136,9 @@ pub(crate) fn run_scenario(
                             condition.as_pointer(),
                         ))
                     })
-                    .collect::<Result<WasmDependencyList<_>, _>>()
+                    .collect::<Result<WasmTestScenarioResultDependencyList<_>, _>>()
                     .map_err(CompilerTestError::Allocator)?;
-                Ok(WasmEvaluationResult {
+                Ok(WasmTestScenarioResult {
                     result,
                     dependencies,
                 })
@@ -157,44 +156,41 @@ where
 {
     let arena = signal.arena();
     let wasm_factory = WasmTermFactory::from(Rc::clone(arena));
-    let conditions = signal
-        .as_inner()
-        .conditions()
-        .as_inner()
-        .iter()
-        .map(|pointer| {
-            let condition =
-                ArenaRef::<TypedTerm<ConditionTerm>, _>::new(wasm_factory.clone(), pointer);
-            (condition.id(), condition)
-        })
-        .collect::<IntMap<_, _>>();
-    // Sort the conditions by their hash ID
-    let signal_list = wasm_factory.create_signal_list(conditions.into_values());
+    // Normalize the potentially-branching condition list tree into a non-branching linked-list tree
+    let signal_list =
+        wasm_factory.create_signal_list(signal.as_inner().conditions().as_inner().iter().map(
+            |pointer| ArenaRef::<TypedTerm<ConditionTerm>, _>::new(wasm_factory.clone(), pointer),
+        ));
     let signal = wasm_factory.create_signal_term(signal_list);
     WasmExpression::new(Rc::clone(arena), signal.as_pointer())
 }
 
 #[derive(Derivative)]
-#[derivative(Default(bound = ""), Debug(bound = ""), Clone(bound = ""))]
-pub struct WasmDependencyList<A: Arena + Clone> {
-    dependencies: IntMap<HashId, WasmExpression<A>>,
+#[derivative(
+    Default(bound = ""),
+    Debug(bound = ""),
+    Clone(bound = ""),
+    PartialEq(bound = "")
+)]
+pub struct WasmTestScenarioResultDependencyList<A: Arena + Clone> {
+    dependencies: BTreeMap<HashId, WasmExpression<A>>,
 }
 
-impl<A: Arena + Clone> WasmDependencyList<A> {
-    fn iter(&self) -> std::collections::hash_map::Values<'_, HashId, WasmExpression<A>> {
+impl<A: Arena + Clone> WasmTestScenarioResultDependencyList<A> {
+    fn iter(&self) -> std::collections::btree_map::Values<'_, HashId, WasmExpression<A>> {
         self.dependencies.values()
     }
 }
 
-impl<A: Arena + Clone> IntoIterator for WasmDependencyList<A> {
+impl<A: Arena + Clone> IntoIterator for WasmTestScenarioResultDependencyList<A> {
     type Item = WasmExpression<A>;
-    type IntoIter = std::collections::hash_map::IntoValues<HashId, WasmExpression<A>>;
+    type IntoIter = std::collections::btree_map::IntoValues<HashId, WasmExpression<A>>;
     fn into_iter(self) -> Self::IntoIter {
         self.dependencies.into_values()
     }
 }
 
-impl<A: Arena + Clone> FromIterator<WasmExpression<A>> for WasmDependencyList<A> {
+impl<A: Arena + Clone> FromIterator<WasmExpression<A>> for WasmTestScenarioResultDependencyList<A> {
     fn from_iter<T: IntoIterator<Item = WasmExpression<A>>>(iter: T) -> Self {
         Self {
             dependencies: iter
@@ -210,35 +206,15 @@ impl<A: Arena + Clone> FromIterator<WasmExpression<A>> for WasmDependencyList<A>
     }
 }
 
-impl<A: Arena + Clone> PartialEq for WasmDependencyList<A> {
-    fn eq(&self, other: &Self) -> bool {
-        self.dependencies.len() == other.dependencies.len()
-            && self.dependencies.iter().all(|(key, value)| {
-                other
-                    .dependencies
-                    .get(key)
-                    .map(|other_value| value == other_value)
-                    .unwrap_or(false)
-            })
-    }
-}
-
-impl<A: Arena + Clone> Eq for WasmDependencyList<A> {}
-
 #[derive(Derivative)]
-#[derivative(
-    Debug(bound = ""),
-    Clone(bound = ""),
-    PartialEq(bound = ""),
-    Eq(bound = "")
-)]
-pub struct WasmEvaluationResult<A: Arena + Clone> {
+#[derivative(Debug(bound = ""), Clone(bound = ""), PartialEq(bound = ""))]
+pub struct WasmTestScenarioResult<A: Arena + Clone> {
     pub result: WasmExpression<A>,
-    pub dependencies: WasmDependencyList<A>,
+    pub dependencies: WasmTestScenarioResultDependencyList<A>,
 }
 
-impl<A: Arena + Clone> WasmEvaluationResult<A> {
-    pub fn into_parts(self) -> (WasmExpression<A>, WasmDependencyList<A>) {
+impl<A: Arena + Clone> WasmTestScenarioResult<A> {
+    pub fn into_parts(self) -> (WasmExpression<A>, WasmTestScenarioResultDependencyList<A>) {
         let Self {
             result,
             dependencies,
@@ -247,7 +223,7 @@ impl<A: Arena + Clone> WasmEvaluationResult<A> {
     }
 }
 
-impl<A: Arena + Clone> std::fmt::Display for WasmEvaluationResult<A> {
+impl<A: Arena + Clone> std::fmt::Display for WasmTestScenarioResult<A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -335,7 +311,7 @@ fn evaluate_compiled<T: Expression>(
     state: impl IntoIterator<Item = (T::Signal, T)>,
     factory: &impl ExpressionFactory<T>,
     compiler_options: &WasmCompilerOptions,
-) -> Result<WasmEvaluationResult<Rc<RefCell<VecAllocator>>>, CompilerTestError<T>>
+) -> Result<WasmTestScenarioResult<Rc<RefCell<VecAllocator>>>, CompilerTestError<T>>
 where
     T::Builtin: Into<Stdlib>,
 {
@@ -404,11 +380,11 @@ where
             dependency_tree
                 .as_inner()
                 .nodes()
-                .collect::<WasmDependencyList<_>>()
+                .collect::<WasmTestScenarioResultDependencyList<_>>()
         })
         .unwrap_or_default();
     let result = ArenaRef::<Term, _>::new(arena, ArenaPointer::from(result));
-    Ok(WasmEvaluationResult {
+    Ok(WasmTestScenarioResult {
         result,
         dependencies,
     })
