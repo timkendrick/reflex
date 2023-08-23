@@ -6,7 +6,6 @@ import url from 'url';
 
 import { NodeType } from '../parser.mjs';
 import { formatSourceRange, ParseError } from '../utils.mjs';
-import { createBlockDirective } from './block.mjs';
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 
@@ -63,7 +62,7 @@ export default function constDirective(node, context) {
       `Invalid ${CONST_DIRECTIVE} directive: ${formatSourceRange(source, node.location)}`,
     );
   }
-  const initializer = parseInitializer(identifier, instructions, node.location, context);
+  const initializer = parseInitializer(identifier, type, instructions, node.location, context);
   if (!initializer) {
     const source = context.sources.get(context.path);
     throw new ParseError(
@@ -133,10 +132,7 @@ function getDefaultValue(type, location, context) {
       throw new ParseError(
         location,
         source,
-        `Invalid ${CONST_DIRECTIVE} directive type: ${formatSourceRange(
-          source,
-          location,
-        )}`,
+        `Invalid ${CONST_DIRECTIVE} directive type: ${formatSourceRange(source, location)}`,
       );
     }
   }
@@ -190,7 +186,7 @@ function parseDependencyNode(node, context) {
   return identifier.source;
 }
 
-function parseInitializer(identifier, instructions, location, context) {
+function parseInitializer(identifier, type, instructions, location, context) {
   const initializerBody = (parseFunctionInitializer(instructions, context) || instructions).flatMap(
     (node) => (context.transform ? context.transform(node, context) : [node]),
   );
@@ -206,7 +202,7 @@ function parseInitializer(identifier, instructions, location, context) {
         elements: [
           NodeType.Term({ source: 'result', location }),
           NodeType.Whitespace({ source: ' ', location }),
-          NodeType.Term({ source: 'i32', location }),
+          NodeType.Term({ source: type.source, location }),
         ],
         location,
       }),

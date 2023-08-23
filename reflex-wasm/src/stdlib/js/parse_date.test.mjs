@@ -10,6 +10,7 @@ export default (describe) => {
       createUnitList,
       evaluate,
       format,
+      getStateDependencies,
       isTimestamp,
       NULL,
       Stdlib,
@@ -22,7 +23,7 @@ export default (describe) => {
       const [result, dependencies] = evaluate(expression, NULL);
       assert.ok(isTimestamp(result));
       assert.strictEqual(format(result), `Timestamp(${new Date(timestamp).toISOString()})`);
-      assert.strictEqual(format(dependencies), 'NULL');
+      assert.deepEqual(getStateDependencies(dependencies), []);
     });
 
     test('(Int)', (assert, {
@@ -32,6 +33,7 @@ export default (describe) => {
       createUnitList,
       evaluate,
       format,
+      getStateDependencies,
       isTimestamp,
       NULL,
       Stdlib,
@@ -45,7 +47,7 @@ export default (describe) => {
       const [result, dependencies] = evaluate(expression, NULL);
       assert.ok(isTimestamp(result));
       assert.strictEqual(format(result), `Timestamp(${new Date(timestamp).toISOString()})`);
-      assert.strictEqual(format(dependencies), 'NULL');
+      assert.deepEqual(getStateDependencies(dependencies), []);
     });
 
     test('(Float)', (assert, {
@@ -55,6 +57,7 @@ export default (describe) => {
       createUnitList,
       evaluate,
       format,
+      getStateDependencies,
       isTimestamp,
       NULL,
       Stdlib,
@@ -67,7 +70,7 @@ export default (describe) => {
       const [result, dependencies] = evaluate(expression, NULL);
       assert.ok(isTimestamp(result));
       assert.strictEqual(format(result), `Timestamp(${new Date(timestamp).toISOString()})`);
-      assert.strictEqual(format(dependencies), 'NULL');
+      assert.deepEqual(getStateDependencies(dependencies), []);
     });
 
     test('(String)', (assert, {
@@ -77,6 +80,7 @@ export default (describe) => {
       createUnitList,
       evaluate,
       format,
+      getStateDependencies,
       isTimestamp,
       NULL,
       Stdlib,
@@ -89,7 +93,7 @@ export default (describe) => {
       const [result, dependencies] = evaluate(expression, NULL);
       assert.ok(isTimestamp(result));
       assert.strictEqual(format(result), `Timestamp(${new Date(timestamp).toISOString()})`);
-      assert.strictEqual(format(dependencies), 'NULL');
+      assert.deepEqual(getStateDependencies(dependencies), []);
     });
   });
 };

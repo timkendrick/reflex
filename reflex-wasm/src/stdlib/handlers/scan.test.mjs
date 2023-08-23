@@ -12,6 +12,7 @@ export default (describe) => {
       createTriple,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -31,9 +32,9 @@ export default (describe) => {
         format(result),
         '{<CustomCondition:"reflex::scan":[(0) => Add(3, 4), 5, Add]:null>}',
       );
-      assert.strictEqual(
-        format(dependencies),
-        '(<CustomCondition:"reflex::scan":[(0) => Add(3, 4), 5, Add]:null> . NULL)',
+      assert.deepEqual(
+        getStateDependencies(dependencies).map((dependency) => format(dependency)),
+        ['<CustomCondition:"reflex::scan":[(0) => Add(3, 4), 5, Add]:null>'],
       );
     });
   });

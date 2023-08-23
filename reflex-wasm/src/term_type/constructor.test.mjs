@@ -185,6 +185,7 @@ export default (describe) => {
       createTriple,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
     }) => {
       (function () {
@@ -194,7 +195,7 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '{}');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (function () {
         const expression = createApplication(
@@ -205,7 +206,7 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '{ "foo": 3, "bar": 4, "baz": 5 }');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
 
@@ -218,6 +219,7 @@ export default (describe) => {
       createTriple,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
     }) => {
       (function () {
@@ -230,7 +232,7 @@ export default (describe) => {
           format(result),
           '{<InvalidFunctionArgsCondition:Constructor({})(3, 4, 5)>}',
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (function () {
         const expression = createApplication(
@@ -244,7 +246,7 @@ export default (describe) => {
           format(result),
           '{<InvalidFunctionArgsCondition:Constructor({"foo", "bar", "baz"})()>}',
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
   });

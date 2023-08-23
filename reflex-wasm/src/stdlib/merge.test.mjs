@@ -15,6 +15,7 @@ export default (describe) => {
       createZipIterator,
       evaluate,
       format,
+      getStateDependencies,
       isRecord,
       getListItems,
       getListLength,
@@ -44,7 +45,7 @@ export default (describe) => {
         const expression = createApplication(createBuiltin(Stdlib.Merge), createEmptyList());
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '{}');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -73,7 +74,7 @@ export default (describe) => {
           formatSortedRecord(result),
           '{ "a": 3, "b": 4, "c": 5, "d": 6, "e": 7, "f": 8, "g": 9, "h": 10, "i": 11 }',
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -98,7 +99,7 @@ export default (describe) => {
           formatSortedRecord(result),
           '{ "a": 3, "b": 4, "c": 5, "d": 6, "e": 7, "f": 8, "g": 9, "h": 10, "i": 11 }',
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
   });

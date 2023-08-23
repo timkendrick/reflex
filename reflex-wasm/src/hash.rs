@@ -105,9 +105,18 @@ impl TermHash for f64 {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Copy, Debug, Hash)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
 #[repr(transparent)]
 pub struct TermHashState(u64);
+
+impl std::hash::Hash for TermHashState {
+    fn hash<H: std::hash::Hasher>(&self, hasher: &mut H) {
+        hasher.write_u64(self.0)
+    }
+}
+
+impl reflex::hash::IsEnabled for TermHashState {}
+
 impl From<TermHashState> for u64 {
     fn from(value: TermHashState) -> Self {
         let TermHashState(value) = value;

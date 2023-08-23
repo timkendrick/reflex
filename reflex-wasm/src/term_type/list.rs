@@ -24,7 +24,7 @@ use crate::{
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{TermType, TypedTerm, WasmExpression},
-    ArenaArrayIter, ArenaPointer, ArenaRef, Array, IntoArenaRefIter, PointerIter, Term,
+    ArenaPointer, ArenaRef, Array, ArrayValueIter, IntoArenaRefIter, PointerIter, Term,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -108,7 +108,7 @@ impl<A: Arena + Clone> ArenaRef<ListTerm, A> {
     pub fn items(&self) -> ArenaRef<Array<ArenaPointer>, A> {
         ArenaRef::<Array<ArenaPointer>, _>::new(self.arena.clone(), self.items_pointer())
     }
-    pub fn iter(&self) -> IntoArenaRefIter<'_, Term, A, ArenaArrayIter<'_, ArenaPointer, A>> {
+    pub fn iter(&self) -> IntoArenaRefIter<'_, Term, A, ArrayValueIter<'_, ArenaPointer, A>> {
         IntoArenaRefIter::new(
             &self.arena,
             Array::<ArenaPointer>::iter(self.items_pointer(), &self.arena),
@@ -190,7 +190,7 @@ impl<A: Arena + Clone> StructPrototypeType<WasmExpression<A>> for ArenaRef<Typed
 
 impl<A: Arena + Clone> ExpressionListType<WasmExpression<A>> for ArenaRef<TypedTerm<ListTerm>, A> {
     type Iterator<'a> = MapIntoIterator<
-        IntoArenaRefIter<'a, Term, A, ArenaArrayIter<'a, ArenaPointer, A>>,
+        IntoArenaRefIter<'a, Term, A, ArrayValueIter<'a, ArenaPointer, A>>,
         ArenaRef<Term, A>,
         <WasmExpression<A> as Expression>::ExpressionRef<'a>,
     >

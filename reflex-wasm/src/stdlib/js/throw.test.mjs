@@ -10,6 +10,7 @@ export default (describe) => {
       createUnitList,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -19,7 +20,7 @@ export default (describe) => {
       );
       const [result, dependencies] = evaluate(expression, NULL);
       assert.strictEqual(format(result), '{<ErrorCondition:"foo">}');
-      assert.strictEqual(format(dependencies), 'NULL');
+      assert.deepEqual(getStateDependencies(dependencies), []);
     });
 
     test('(Record)', (assert, {
@@ -33,6 +34,7 @@ export default (describe) => {
       createUnitList,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -51,7 +53,7 @@ export default (describe) => {
           format(result),
           '{<ErrorCondition:{ "name": "Error", "message": "foo" }>}',
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -68,7 +70,7 @@ export default (describe) => {
           format(result),
           '{<ErrorCondition:{ "name": "AggregateError", "errors": [] }>}',
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -93,7 +95,7 @@ export default (describe) => {
           format(result),
           '{<ErrorCondition:{ "name": "Error", "message": "foo" }>}',
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -122,7 +124,7 @@ export default (describe) => {
           format(result),
           '{<ErrorCondition:{ "name": "Error", "message": "foo" }>,<ErrorCondition:{ "name": "Error", "message": "bar" }>}',
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -155,7 +157,7 @@ export default (describe) => {
           format(result),
           '{<ErrorCondition:{ "name": "Error", "message": "foo" }>,<ErrorCondition:{ "name": "Error", "message": "bar" }>,<ErrorCondition:{ "name": "Error", "message": "baz" }>}',
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
   });

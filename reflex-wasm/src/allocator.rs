@@ -29,6 +29,16 @@ pub trait Arena {
         Self: 'a;
 }
 
+pub trait ArenaMut: Arena {
+    fn write<T: Sized>(&mut self, offset: ArenaPointer, value: T);
+}
+
+pub trait ArenaAllocator: ArenaMut {
+    fn allocate<T: TermSize>(&mut self, value: T) -> ArenaPointer;
+    fn extend(&mut self, offset: ArenaPointer, size: usize);
+    fn shrink(&mut self, offset: ArenaPointer, size: usize);
+}
+
 impl<'slice> Arena for &'slice [u8] {
     type Slice<'a> = &'a [u8]
         where
@@ -55,6 +65,36 @@ impl<'slice> Arena for &'slice [u8] {
     }
 }
 
+impl<'slice> Arena for &'slice mut [u8] {
+    type Slice<'a> = <&'slice [u8] as Arena>::Slice<'a>
+        where
+            Self: 'a;
+    fn read_value<T, V>(&self, offset: ArenaPointer, selector: impl FnOnce(&T) -> V) -> V {
+        (&**self).read_value(offset, selector)
+    }
+    fn inner_pointer<T, V>(
+        &self,
+        offset: ArenaPointer,
+        selector: impl FnOnce(&T) -> &V,
+    ) -> ArenaPointer {
+        (&**self).inner_pointer(offset, selector)
+    }
+    fn as_slice<'a>(&'a self, offset: ArenaPointer, length: usize) -> Self::Slice<'a>
+    where
+        Self::Slice<'a>: 'a,
+        Self: 'a,
+    {
+        let offset = u32::from(offset) as usize;
+        &self[offset..(offset + length)]
+    }
+}
+
+impl<'slice> ArenaMut for &'slice mut [u8] {
+    fn write<T: Sized>(&mut self, offset: ArenaPointer, value: T) {
+        *(get_mut_slice_ref::<T>(self, offset)) = value;
+    }
+}
+
 fn get_slice_ref<T: Sized>(slice: &[u8], offset: ArenaPointer) -> &T {
     let index = u32::from(offset) as usize;
     let is_zero_sized_value = std::mem::size_of::<T>() == 0;
@@ -66,17 +106,27 @@ fn get_slice_ref<T: Sized>(slice: &[u8], offset: ArenaPointer) -> &T {
         panic!(
             "Invalid allocator offset: {} (length: {})",
             index,
-            slice.len()
+            slice.len(),
         );
     }
     unsafe { std::mem::transmute::<&u8, &T>(slice.get_unchecked(index)) }
 }
 
-pub trait ArenaAllocator: Arena {
-    fn allocate<T: TermSize>(&mut self, value: T) -> ArenaPointer;
-    fn extend(&mut self, offset: ArenaPointer, size: usize);
-    fn shrink(&mut self, offset: ArenaPointer, size: usize);
-    fn write<T: Sized>(&mut self, offset: ArenaPointer, value: T);
+fn get_mut_slice_ref<T>(slice: &mut [u8], offset: ArenaPointer) -> &mut T {
+    let index = u32::from(offset) as usize;
+    let is_zero_sized_value = std::mem::size_of::<T>() == 0;
+    let is_invalid_offset = match is_zero_sized_value {
+        true => index > slice.len(),
+        false => index >= slice.len(),
+    };
+    if is_invalid_offset {
+        panic!(
+            "Invalid allocator offset: {} (length: {})",
+            index,
+            slice.len(),
+        );
+    }
+    unsafe { std::mem::transmute::<&mut u8, &mut T>(slice.get_unchecked_mut(index)) }
 }
 
 pub struct VecAllocator(Vec<u32>);
@@ -140,12 +190,13 @@ impl VecAllocator {
             .flat_map(|word| word.to_le_bytes())
             .collect()
     }
-    pub(crate) fn start_offset(&self) -> ArenaPointer {
-        // Skip over the initial 4-byte length marker
+    pub fn start_offset(&self) -> ArenaPointer {
+        // Skip over the initial 4-byte allocator offset marker
         ArenaPointer::from(std::mem::size_of::<u32>() as u32)
     }
-    pub(crate) fn end_offset(&self) -> ArenaPointer {
+    pub fn end_offset(&self) -> ArenaPointer {
         let Self(data) = self;
+        // Read the initial 4-byte allocator offset marker
         ArenaPointer::from(data[0])
     }
     pub fn as_words(&self) -> &[u32] {
@@ -200,6 +251,12 @@ impl Arena for VecAllocator {
     }
 }
 
+impl ArenaMut for VecAllocator {
+    fn write<T: Sized>(&mut self, offset: ArenaPointer, value: T) {
+        *self.get_mut::<T>(offset) = value
+    }
+}
+
 impl ArenaAllocator for VecAllocator {
     fn allocate<T: TermSize>(&mut self, value: T) -> ArenaPointer {
         let pointer = self.end_offset();
@@ -248,9 +305,6 @@ impl ArenaAllocator for VecAllocator {
             // Update the length marker
             data[0] -= padded_size;
         }
-    }
-    fn write<T: Sized>(&mut self, offset: ArenaPointer, value: T) {
-        *self.get_mut::<T>(offset) = value
     }
 }
 
@@ -302,6 +356,12 @@ impl<'heap> Arena for &'heap mut VecAllocator {
     }
 }
 
+impl<'heap> ArenaMut for &'heap mut VecAllocator {
+    fn write<T: Sized>(&mut self, offset: ArenaPointer, value: T) {
+        self.deref_mut().write(offset, value)
+    }
+}
+
 impl<'heap> ArenaAllocator for &'heap mut VecAllocator {
     fn allocate<T: TermSize>(&mut self, value: T) -> ArenaPointer {
         self.deref_mut().allocate(value)
@@ -311,9 +371,6 @@ impl<'heap> ArenaAllocator for &'heap mut VecAllocator {
     }
     fn shrink(&mut self, offset: ArenaPointer, size: usize) {
         self.deref_mut().shrink(offset, size)
-    }
-    fn write<T: Sized>(&mut self, offset: ArenaPointer, value: T) {
-        self.deref_mut().write(offset, value)
     }
 }
 
@@ -394,6 +451,12 @@ impl<'heap> Arena for Rc<RefCell<&'heap mut VecAllocator>> {
     }
 }
 
+impl<'heap> ArenaMut for Rc<RefCell<&'heap mut VecAllocator>> {
+    fn write<T: Sized>(&mut self, offset: ArenaPointer, value: T) {
+        self.deref().borrow_mut().write(offset, value)
+    }
+}
+
 impl<'heap> ArenaAllocator for Rc<RefCell<&'heap mut VecAllocator>> {
     fn allocate<T: TermSize>(&mut self, value: T) -> ArenaPointer {
         self.deref().borrow_mut().allocate(value)
@@ -403,9 +466,6 @@ impl<'heap> ArenaAllocator for Rc<RefCell<&'heap mut VecAllocator>> {
     }
     fn shrink(&mut self, offset: ArenaPointer, size: usize) {
         self.deref().borrow_mut().shrink(offset, size)
-    }
-    fn write<T: Sized>(&mut self, offset: ArenaPointer, value: T) {
-        self.deref().borrow_mut().write(offset, value)
     }
 }
 

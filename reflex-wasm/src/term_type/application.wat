@@ -2,7 +2,6 @@
 ;; SPDX-License-Identifier: Apache-2.0
 ;; SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 (module
-
   (@let $Application
     (@struct $Application
       (@field $target (@ref $Term))
@@ -19,8 +18,7 @@
   (export "getApplicationArgs" (func $Term::Application::get::args))
 
   (func $Term::Application::new (export "createApplication") (param $target i32) (param $args i32) (result i32)
-    (local $instance i32)
-    (local.tee $instance (call $Term::TermType::Application::new (local.get $target) (local.get $args))))
+    (call $Term::TermType::Application::new (local.get $target) (local.get $args)))
 
   (func $Term::Application::traits::is_atomic (param $self i32) (result i32)
     (global.get $FALSE))

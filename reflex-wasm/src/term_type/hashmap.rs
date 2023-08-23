@@ -23,7 +23,7 @@ use crate::{
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{TermType, TypedTerm, WasmExpression},
-    ArenaArrayIter, ArenaPointer, ArenaRef, Array, IntoArenaRefIter, PointerIter, Term,
+    ArenaPointer, ArenaRef, Array, ArrayValueIter, IntoArenaRefIter, PointerIter, Term,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -113,8 +113,8 @@ impl HashmapTerm {
         });
         Array::<HashmapBucket>::extend(list, empty_buckets, arena);
         for (key, value) in entries {
-            let key_hash = arena.read_value::<Term, HashId>(key, |term| u64::from(term.id()));
-            let mut bucket_index = (u64::from(key_hash) % capacity as u64) as usize;
+            let key_hash = arena.read_value::<Term, HashId>(key, |term| term.id());
+            let mut bucket_index = (key_hash % (capacity as u64)) as usize;
             while !ArenaPointer::is_uninitialized(arena.read_value::<HashmapBucket, ArenaPointer>(
                 Array::<HashmapBucket>::get_item_offset(list, bucket_index),
                 |bucket| bucket.key,
@@ -171,7 +171,7 @@ impl<A: Arena + Clone> ArenaRef<HashmapTerm, A> {
     pub fn buckets(&self) -> ArenaRef<Array<HashmapBucket>, A> {
         ArenaRef::<Array<HashmapBucket>, _>::new(self.arena.clone(), self.buckets_pointer())
     }
-    pub fn entries(&self) -> HashmapBucketsIterator<ArenaArrayIter<'_, HashmapBucket, A>> {
+    pub fn entries(&self) -> HashmapBucketsIterator<ArrayValueIter<'_, HashmapBucket, A>> {
         HashmapBucketsIterator::new(
             self.num_entries(),
             Array::<HashmapBucket>::iter(self.buckets_pointer(), &self.arena),
@@ -183,7 +183,7 @@ impl<A: Arena + Clone> ArenaRef<HashmapTerm, A> {
         '_,
         Term,
         A,
-        HashmapBucketKeysIterator<ArenaArrayIter<'_, HashmapBucket, A>>,
+        HashmapBucketKeysIterator<ArrayValueIter<'_, HashmapBucket, A>>,
     > {
         IntoArenaRefIter::new(&self.arena, HashmapBucketKeysIterator::new(self.entries()))
     }
@@ -193,7 +193,7 @@ impl<A: Arena + Clone> ArenaRef<HashmapTerm, A> {
         '_,
         Term,
         A,
-        HashmapBucketValuesIterator<ArenaArrayIter<'_, HashmapBucket, A>>,
+        HashmapBucketValuesIterator<ArrayValueIter<'_, HashmapBucket, A>>,
     > {
         IntoArenaRefIter::new(
             &self.arena,
@@ -210,7 +210,7 @@ impl<A: Arena + Clone> ArenaRef<TypedTerm<HashmapTerm>, A> {
 
 impl<A: Arena + Clone> HashmapTermType<WasmExpression<A>> for ArenaRef<HashmapTerm, A> {
     type KeysIterator<'a> = MapIntoIterator<
-        IntoArenaRefIter<'a, Term, A, HashmapBucketKeysIterator<ArenaArrayIter<'a, HashmapBucket, A>>>,
+        IntoArenaRefIter<'a, Term, A, HashmapBucketKeysIterator<ArrayValueIter<'a, HashmapBucket, A>>>,
         ArenaRef<Term, A>,
         <WasmExpression<A> as Expression>::ExpressionRef<'a>
     >
@@ -218,7 +218,7 @@ impl<A: Arena + Clone> HashmapTermType<WasmExpression<A>> for ArenaRef<HashmapTe
         WasmExpression<A>: 'a,
         Self: 'a;
     type ValuesIterator<'a> = MapIntoIterator<
-        IntoArenaRefIter<'a, Term, A, HashmapBucketValuesIterator<ArenaArrayIter<'a, HashmapBucket, A>>>,
+        IntoArenaRefIter<'a, Term, A, HashmapBucketValuesIterator<ArrayValueIter<'a, HashmapBucket, A>>>,
         ArenaRef<Term, A>,
         <WasmExpression<A> as Expression>::ExpressionRef<'a>
     >
@@ -471,6 +471,7 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<HashmapTerm, A> {
     }
 }
 
+#[derive(Clone)]
 pub struct HashmapBucketKeysIterator<TInner: Iterator<Item = HashmapBucket>> {
     buckets: HashmapBucketsIterator<TInner>,
 }
@@ -497,6 +498,7 @@ where
     }
 }
 
+#[derive(Clone)]
 pub struct HashmapBucketValuesIterator<TInner: Iterator<Item = HashmapBucket>> {
     buckets: HashmapBucketsIterator<TInner>,
 }
@@ -524,6 +526,7 @@ where
     }
 }
 
+#[derive(Clone)]
 pub struct HashmapBucketsIterator<TInner: Iterator<Item = HashmapBucket>> {
     /// Iterator containing both empty and non-empty source buckets
     buckets: TInner,

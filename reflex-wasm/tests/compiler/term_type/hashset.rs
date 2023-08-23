@@ -1,20 +1,41 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use reflex::core::{Expression, ExpressionFactory, HeapAllocator};
-use reflex_wasm::stdlib;
+use reflex::core::{Expression, ExpressionFactory, HeapAllocator, NodeId};
+use reflex_wasm::{allocator::Arena, stdlib};
 
-use crate::{compiler::runner::run_scenario, WasmTestScenario};
+use crate::{
+    compiler::runner::{run_scenario, WasmTestScenarioResult},
+    WasmTestScenario,
+};
 
 #[test]
 fn hashset_term() {
     let scenario = HashsetTermStaticValuesScenario;
     let (actual, expected) = run_scenario(&scenario).unwrap();
-    assert_eq!(actual, expected);
+    assert_hashset_result(actual, expected);
 
     let scenario = HashsetTermDynamicValuesScenario;
     let (actual, expected) = run_scenario(&scenario).unwrap();
-    assert_eq!(actual, expected);
+    assert_hashset_result(actual, expected);
+}
+
+fn assert_hashset_result<A: Arena + Clone>(
+    actual: WasmTestScenarioResult<A>,
+    expected: WasmTestScenarioResult<A>,
+) {
+    let hashset_result = actual.result.as_hashset_term().unwrap().as_inner();
+    let expected_result = expected.result.as_hashset_term().unwrap().as_inner();
+    assert_eq!(hashset_result.num_values(), expected_result.num_values());
+    let hashset_values = hashset_result.values();
+    let expected_values = expected_result.values();
+    for value in hashset_values {
+        let expected_value = expected_values
+            .clone()
+            .find(|expected_value| expected_value.id() == value.id())
+            .unwrap();
+        assert_eq!(value, expected_value);
+    }
 }
 
 struct HashsetTermStaticValuesScenario;

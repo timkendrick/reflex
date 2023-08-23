@@ -15,7 +15,6 @@ pub fn add_wasm_runtime_imports(
     builder: WasmContextBuilder,
     memory_name: &'static str,
 ) -> Result<WasmContextBuilder, InterpreterError> {
-    // FIXME: Provide correct implementations for WASM runtime imports
     builder
         .add_import("Debugger", "debug", |value_pointer: u32| {
             let value = ArenaPointer::from(value_pointer).as_non_null();

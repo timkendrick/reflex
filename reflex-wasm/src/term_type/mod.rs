@@ -28,6 +28,7 @@ pub mod builtin;
 pub mod cell;
 pub mod condition;
 pub mod constructor;
+pub mod dependency;
 pub mod effect;
 pub mod float;
 pub mod hashmap;
@@ -55,6 +56,7 @@ pub use builtin::*;
 pub use cell::*;
 pub use condition::*;
 pub use constructor::*;
+pub use dependency::*;
 pub use effect::*;
 pub use float::*;
 pub use hashmap::*;
@@ -87,6 +89,7 @@ pub enum TermType {
     Cell(CellTerm),
     Condition(ConditionTerm),
     Constructor(ConstructorTerm),
+    Dependency(DependencyTerm),
     Effect(EffectTerm),
     Float(FloatTerm),
     Hashmap(HashmapTerm),
@@ -134,6 +137,7 @@ impl TryFrom<u32> for TermTypeDiscriminants {
             value if value == Self::Cell as u32 => Ok(Self::Cell),
             value if value == Self::Condition as u32 => Ok(Self::Condition),
             value if value == Self::Constructor as u32 => Ok(Self::Constructor),
+            value if value == Self::Dependency as u32 => Ok(Self::Dependency),
             value if value == Self::Effect as u32 => Ok(Self::Effect),
             value if value == Self::Float as u32 => Ok(Self::Float),
             value if value == Self::Hashmap as u32 => Ok(Self::Hashmap),
@@ -186,6 +190,7 @@ impl TermSize for TermType {
             Self::Cell(term) => term.size_of(),
             Self::Condition(term) => term.size_of(),
             Self::Constructor(term) => term.size_of(),
+            Self::Dependency(term) => term.size_of(),
             Self::Effect(term) => term.size_of(),
             Self::Float(term) => term.size_of(),
             Self::Hashmap(term) => term.size_of(),
@@ -246,6 +251,9 @@ impl TermHash for TermType {
                 .hash(term, arena),
             Self::Constructor(term) => hasher
                 .write_u8(TermTypeDiscriminants::Constructor as u8)
+                .hash(term, arena),
+            Self::Dependency(term) => hasher
+                .write_u8(TermTypeDiscriminants::Dependency as u8)
                 .hash(term, arena),
             Self::Effect(term) => hasher
                 .write_u8(TermTypeDiscriminants::Effect as u8)
@@ -364,6 +372,7 @@ pub enum TermPointerIterator {
     Cell(CellTermPointerIter),
     Condition(ConditionTermPointerIter),
     Constructor(ConstructorTermPointerIter),
+    Dependency(DependencyTermPointerIter),
     Effect(EffectTermPointerIter),
     Float(FloatTermPointerIter),
     Hashmap(HashmapTermPointerIter),
@@ -405,47 +414,48 @@ impl Iterator for TermPointerIterator {
     type Item = ArenaPointer;
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            TermPointerIterator::Application(inner) => inner.next(),
-            TermPointerIterator::Boolean(inner) => inner.next(),
-            TermPointerIterator::Builtin(inner) => inner.next(),
-            TermPointerIterator::Cell(inner) => inner.next(),
-            TermPointerIterator::Condition(inner) => inner.next(),
-            TermPointerIterator::Constructor(inner) => inner.next(),
-            TermPointerIterator::Effect(inner) => inner.next(),
-            TermPointerIterator::Float(inner) => inner.next(),
-            TermPointerIterator::Hashmap(inner) => inner.next(),
-            TermPointerIterator::Hashset(inner) => inner.next(),
-            TermPointerIterator::Int(inner) => inner.next(),
-            TermPointerIterator::Lambda(inner) => inner.next(),
-            TermPointerIterator::LazyResult(inner) => inner.next(),
-            TermPointerIterator::Let(inner) => inner.next(),
-            TermPointerIterator::List(inner) => inner.next(),
-            TermPointerIterator::Nil(inner) => inner.next(),
-            TermPointerIterator::Partial(inner) => inner.next(),
-            TermPointerIterator::Pointer(inner) => inner.next(),
-            TermPointerIterator::Record(inner) => inner.next(),
-            TermPointerIterator::Signal(inner) => inner.next(),
-            TermPointerIterator::String(inner) => inner.next(),
-            TermPointerIterator::Symbol(inner) => inner.next(),
-            TermPointerIterator::Timestamp(inner) => inner.next(),
-            TermPointerIterator::Tree(inner) => inner.next(),
-            TermPointerIterator::Variable(inner) => inner.next(),
-            TermPointerIterator::EmptyIterator(inner) => inner.next(),
-            TermPointerIterator::EvaluateIterator(inner) => inner.next(),
-            TermPointerIterator::FilterIterator(inner) => inner.next(),
-            TermPointerIterator::FlattenIterator(inner) => inner.next(),
-            TermPointerIterator::HashmapKeysIterator(inner) => inner.next(),
-            TermPointerIterator::HashmapValuesIterator(inner) => inner.next(),
-            TermPointerIterator::IndexedAccessorIterator(inner) => inner.next(),
-            TermPointerIterator::IntegersIterator(inner) => inner.next(),
-            TermPointerIterator::IntersperseIterator(inner) => inner.next(),
-            TermPointerIterator::MapIterator(inner) => inner.next(),
-            TermPointerIterator::OnceIterator(inner) => inner.next(),
-            TermPointerIterator::RangeIterator(inner) => inner.next(),
-            TermPointerIterator::RepeatIterator(inner) => inner.next(),
-            TermPointerIterator::SkipIterator(inner) => inner.next(),
-            TermPointerIterator::TakeIterator(inner) => inner.next(),
-            TermPointerIterator::ZipIterator(inner) => inner.next(),
+            Self::Application(inner) => inner.next(),
+            Self::Boolean(inner) => inner.next(),
+            Self::Builtin(inner) => inner.next(),
+            Self::Cell(inner) => inner.next(),
+            Self::Condition(inner) => inner.next(),
+            Self::Constructor(inner) => inner.next(),
+            Self::Dependency(inner) => inner.next(),
+            Self::Effect(inner) => inner.next(),
+            Self::Float(inner) => inner.next(),
+            Self::Hashmap(inner) => inner.next(),
+            Self::Hashset(inner) => inner.next(),
+            Self::Int(inner) => inner.next(),
+            Self::Lambda(inner) => inner.next(),
+            Self::LazyResult(inner) => inner.next(),
+            Self::Let(inner) => inner.next(),
+            Self::List(inner) => inner.next(),
+            Self::Nil(inner) => inner.next(),
+            Self::Partial(inner) => inner.next(),
+            Self::Pointer(inner) => inner.next(),
+            Self::Record(inner) => inner.next(),
+            Self::Signal(inner) => inner.next(),
+            Self::String(inner) => inner.next(),
+            Self::Symbol(inner) => inner.next(),
+            Self::Timestamp(inner) => inner.next(),
+            Self::Tree(inner) => inner.next(),
+            Self::Variable(inner) => inner.next(),
+            Self::EmptyIterator(inner) => inner.next(),
+            Self::EvaluateIterator(inner) => inner.next(),
+            Self::FilterIterator(inner) => inner.next(),
+            Self::FlattenIterator(inner) => inner.next(),
+            Self::HashmapKeysIterator(inner) => inner.next(),
+            Self::HashmapValuesIterator(inner) => inner.next(),
+            Self::IndexedAccessorIterator(inner) => inner.next(),
+            Self::IntegersIterator(inner) => inner.next(),
+            Self::IntersperseIterator(inner) => inner.next(),
+            Self::MapIterator(inner) => inner.next(),
+            Self::OnceIterator(inner) => inner.next(),
+            Self::RangeIterator(inner) => inner.next(),
+            Self::RepeatIterator(inner) => inner.next(),
+            Self::SkipIterator(inner) => inner.next(),
+            Self::TakeIterator(inner) => inner.next(),
+            Self::ZipIterator(inner) => inner.next(),
         }
     }
 }
@@ -477,6 +487,9 @@ impl<A: Arena + Clone> PointerIter for ArenaRef<Term, A> {
             ),
             TermTypeDiscriminants::Constructor => TermPointerIterator::Constructor(
                 self.as_typed_term::<ConstructorTerm>().as_inner().iter(),
+            ),
+            TermTypeDiscriminants::Dependency => TermPointerIterator::Dependency(
+                self.as_typed_term::<DependencyTerm>().as_inner().iter(),
             ),
             TermTypeDiscriminants::Effect => {
                 TermPointerIterator::Effect(self.as_typed_term::<EffectTerm>().as_inner().iter())
@@ -630,6 +643,10 @@ impl<A: Arena + Clone> Internable for ArenaRef<Term, A> {
                 .should_intern(eager),
             TermTypeDiscriminants::Constructor => self
                 .as_typed_term::<ConstructorTerm>()
+                .as_inner()
+                .should_intern(eager),
+            TermTypeDiscriminants::Dependency => self
+                .as_typed_term::<DependencyTerm>()
                 .as_inner()
                 .should_intern(eager),
             TermTypeDiscriminants::Effect => self
@@ -935,6 +952,14 @@ impl<'a> Into<Option<&'a ConstructorTerm>> for &'a TermType {
     fn into(self) -> Option<&'a ConstructorTerm> {
         match self {
             TermType::Constructor(term) => Some(term),
+            _ => None,
+        }
+    }
+}
+impl<'a> Into<Option<&'a DependencyTerm>> for &'a TermType {
+    fn into(self) -> Option<&'a DependencyTerm> {
+        match self {
+            TermType::Dependency(term) => Some(term),
             _ => None,
         }
     }
@@ -1273,6 +1298,10 @@ impl<A: Arena + Clone> PartialEq for ArenaRef<Term, A> {
                 self.as_typed_term::<ConstructorTerm>().as_inner()
                     == other.as_typed_term::<ConstructorTerm>().as_inner()
             }
+            (TermTypeDiscriminants::Dependency, TermTypeDiscriminants::Dependency) => {
+                self.as_typed_term::<DependencyTerm>().as_inner()
+                    == other.as_typed_term::<DependencyTerm>().as_inner()
+            }
             (TermTypeDiscriminants::Effect, TermTypeDiscriminants::Effect) => {
                 self.as_typed_term::<EffectTerm>().as_inner()
                     == other.as_typed_term::<EffectTerm>().as_inner()
@@ -1501,6 +1530,9 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             TermTypeDiscriminants::Constructor => {
                 GraphNode::size(&self.as_typed_term::<ConstructorTerm>().as_inner())
             }
+            TermTypeDiscriminants::Dependency => {
+                GraphNode::size(&self.as_typed_term::<DependencyTerm>().as_inner())
+            }
             TermTypeDiscriminants::Effect => {
                 GraphNode::size(&self.as_typed_term::<EffectTerm>().as_inner())
             }
@@ -1630,6 +1662,9 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             TermTypeDiscriminants::Constructor => {
                 GraphNode::capture_depth(&self.as_typed_term::<ConstructorTerm>().as_inner())
             }
+            TermTypeDiscriminants::Dependency => {
+                GraphNode::capture_depth(&self.as_typed_term::<DependencyTerm>().as_inner())
+            }
             TermTypeDiscriminants::Effect => {
                 GraphNode::capture_depth(&self.as_typed_term::<EffectTerm>().as_inner())
             }
@@ -1758,6 +1793,9 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             }
             TermTypeDiscriminants::Constructor => {
                 GraphNode::free_variables(&self.as_typed_term::<ConstructorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Dependency => {
+                GraphNode::free_variables(&self.as_typed_term::<DependencyTerm>().as_inner())
             }
             TermTypeDiscriminants::Effect => {
                 GraphNode::free_variables(&self.as_typed_term::<EffectTerm>().as_inner())
@@ -1892,6 +1930,10 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             ),
             TermTypeDiscriminants::Constructor => GraphNode::count_variable_usages(
                 &self.as_typed_term::<ConstructorTerm>().as_inner(),
+                offset,
+            ),
+            TermTypeDiscriminants::Dependency => GraphNode::count_variable_usages(
+                &self.as_typed_term::<DependencyTerm>().as_inner(),
                 offset,
             ),
             TermTypeDiscriminants::Effect => GraphNode::count_variable_usages(
@@ -2063,6 +2105,10 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
                 &self.as_typed_term::<ConstructorTerm>().as_inner(),
                 deep,
             ),
+            TermTypeDiscriminants::Dependency => GraphNode::dynamic_dependencies(
+                &self.as_typed_term::<DependencyTerm>().as_inner(),
+                deep,
+            ),
             TermTypeDiscriminants::Effect => GraphNode::dynamic_dependencies(
                 &self.as_typed_term::<EffectTerm>().as_inner(),
                 deep,
@@ -2225,6 +2271,10 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             ),
             TermTypeDiscriminants::Constructor => GraphNode::has_dynamic_dependencies(
                 &self.as_typed_term::<ConstructorTerm>().as_inner(),
+                deep,
+            ),
+            TermTypeDiscriminants::Dependency => GraphNode::has_dynamic_dependencies(
+                &self.as_typed_term::<DependencyTerm>().as_inner(),
                 deep,
             ),
             TermTypeDiscriminants::Effect => GraphNode::has_dynamic_dependencies(
@@ -2391,6 +2441,9 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             TermTypeDiscriminants::Constructor => {
                 GraphNode::is_static(&self.as_typed_term::<ConstructorTerm>().as_inner())
             }
+            TermTypeDiscriminants::Dependency => {
+                GraphNode::is_static(&self.as_typed_term::<DependencyTerm>().as_inner())
+            }
             TermTypeDiscriminants::Effect => {
                 GraphNode::is_static(&self.as_typed_term::<EffectTerm>().as_inner())
             }
@@ -2520,6 +2573,9 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             TermTypeDiscriminants::Constructor => {
                 GraphNode::is_atomic(&self.as_typed_term::<ConstructorTerm>().as_inner())
             }
+            TermTypeDiscriminants::Dependency => {
+                GraphNode::is_atomic(&self.as_typed_term::<DependencyTerm>().as_inner())
+            }
             TermTypeDiscriminants::Effect => {
                 GraphNode::is_atomic(&self.as_typed_term::<EffectTerm>().as_inner())
             }
@@ -2648,6 +2704,9 @@ impl<A: Arena + Clone> GraphNode for ArenaRef<Term, A> {
             }
             TermTypeDiscriminants::Constructor => {
                 GraphNode::is_complex(&self.as_typed_term::<ConstructorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Dependency => {
+                GraphNode::is_complex(&self.as_typed_term::<DependencyTerm>().as_inner())
             }
             TermTypeDiscriminants::Effect => {
                 GraphNode::is_complex(&self.as_typed_term::<EffectTerm>().as_inner())
@@ -2780,6 +2839,9 @@ impl<A: Arena + Clone> SerializeJson for ArenaRef<Term, A> {
             }
             TermTypeDiscriminants::Constructor => {
                 SerializeJson::to_json(&self.as_typed_term::<ConstructorTerm>().as_inner())
+            }
+            TermTypeDiscriminants::Dependency => {
+                SerializeJson::to_json(&self.as_typed_term::<DependencyTerm>().as_inner())
             }
             TermTypeDiscriminants::Effect => {
                 SerializeJson::to_json(&self.as_typed_term::<EffectTerm>().as_inner())
@@ -2930,6 +2992,12 @@ impl<A: Arena + Clone> SerializeJson for ArenaRef<Term, A> {
                 SerializeJson::patch(
                     &self.as_typed_term::<ConstructorTerm>().as_inner(),
                     &target.as_typed_term::<ConstructorTerm>().as_inner(),
+                )
+            }
+            (TermTypeDiscriminants::Dependency, TermTypeDiscriminants::Dependency) => {
+                SerializeJson::patch(
+                    &self.as_typed_term::<DependencyTerm>().as_inner(),
+                    &target.as_typed_term::<DependencyTerm>().as_inner(),
                 )
             }
             (TermTypeDiscriminants::Effect, TermTypeDiscriminants::Effect) => SerializeJson::patch(
@@ -3151,6 +3219,9 @@ impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<Term, A> {
             TermTypeDiscriminants::Constructor => {
                 std::fmt::Debug::fmt(&self.as_typed_term::<ConstructorTerm>().as_inner(), f)
             }
+            TermTypeDiscriminants::Dependency => {
+                std::fmt::Debug::fmt(&self.as_typed_term::<DependencyTerm>().as_inner(), f)
+            }
             TermTypeDiscriminants::Effect => {
                 std::fmt::Debug::fmt(&self.as_typed_term::<EffectTerm>().as_inner(), f)
             }
@@ -3287,6 +3358,9 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<Term, A> {
             TermTypeDiscriminants::Constructor => {
                 std::fmt::Display::fmt(&self.as_typed_term::<ConstructorTerm>().as_inner(), f)
             }
+            TermTypeDiscriminants::Dependency => {
+                std::fmt::Display::fmt(&self.as_typed_term::<DependencyTerm>().as_inner(), f)
+            }
             TermTypeDiscriminants::Effect => {
                 std::fmt::Display::fmt(&self.as_typed_term::<EffectTerm>().as_inner(), f)
             }
@@ -3422,6 +3496,9 @@ impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<TermType, A> {
             TermTypeDiscriminants::Constructor => {
                 std::fmt::Debug::fmt(&self.read_value(|value| *value), f)
             }
+            TermTypeDiscriminants::Dependency => {
+                std::fmt::Debug::fmt(&self.read_value(|value| *value), f)
+            }
             TermTypeDiscriminants::Effect => {
                 std::fmt::Debug::fmt(&self.read_value(|value| *value), f)
             }
@@ -3551,6 +3628,7 @@ impl<V> TypedTerm<V> {
                 TermType::Cell(inner) => std::mem::transmute::<&CellTerm, &V>(inner),
                 TermType::Condition(inner) => std::mem::transmute::<&ConditionTerm, &V>(inner),
                 TermType::Constructor(inner) => std::mem::transmute::<&ConstructorTerm, &V>(inner),
+                TermType::Dependency(inner) => std::mem::transmute::<&DependencyTerm, &V>(inner),
                 TermType::Effect(inner) => std::mem::transmute::<&EffectTerm, &V>(inner),
                 TermType::Float(inner) => std::mem::transmute::<&FloatTerm, &V>(inner),
                 TermType::Hashmap(inner) => std::mem::transmute::<&HashmapTerm, &V>(inner),
@@ -3718,6 +3796,18 @@ impl<A: Arena + Clone> ArenaRef<Term, A> {
     pub fn into_constructor_term(self) -> Option<ArenaRef<TypedTerm<ConstructorTerm>, A>> {
         match self.read_value(|term| term.type_id()) {
             TermTypeDiscriminants::Constructor => Some(self.into_typed_term::<ConstructorTerm>()),
+            _ => None,
+        }
+    }
+    pub fn as_dependency_term(&self) -> Option<&ArenaRef<TypedTerm<DependencyTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Dependency => Some(self.as_typed_term::<DependencyTerm>()),
+            _ => None,
+        }
+    }
+    pub fn into_dependency_term(self) -> Option<ArenaRef<TypedTerm<DependencyTerm>, A>> {
+        match self.read_value(|term| term.type_id()) {
+            TermTypeDiscriminants::Dependency => Some(self.into_typed_term::<DependencyTerm>()),
             _ => None,
         }
     }
@@ -4290,40 +4380,41 @@ mod tests {
         assert_eq!(TermTypeDiscriminants::Cell as u32, 3);
         assert_eq!(TermTypeDiscriminants::Condition as u32, 4);
         assert_eq!(TermTypeDiscriminants::Constructor as u32, 5);
-        assert_eq!(TermTypeDiscriminants::Effect as u32, 6);
-        assert_eq!(TermTypeDiscriminants::Float as u32, 7);
-        assert_eq!(TermTypeDiscriminants::Hashmap as u32, 8);
-        assert_eq!(TermTypeDiscriminants::Hashset as u32, 9);
-        assert_eq!(TermTypeDiscriminants::Int as u32, 10);
-        assert_eq!(TermTypeDiscriminants::Lambda as u32, 11);
-        assert_eq!(TermTypeDiscriminants::LazyResult as u32, 12);
-        assert_eq!(TermTypeDiscriminants::Let as u32, 13);
-        assert_eq!(TermTypeDiscriminants::List as u32, 14);
-        assert_eq!(TermTypeDiscriminants::Nil as u32, 15);
-        assert_eq!(TermTypeDiscriminants::Partial as u32, 16);
-        assert_eq!(TermTypeDiscriminants::Pointer as u32, 17);
-        assert_eq!(TermTypeDiscriminants::Record as u32, 18);
-        assert_eq!(TermTypeDiscriminants::Signal as u32, 19);
-        assert_eq!(TermTypeDiscriminants::String as u32, 20);
-        assert_eq!(TermTypeDiscriminants::Symbol as u32, 21);
-        assert_eq!(TermTypeDiscriminants::Timestamp as u32, 22);
-        assert_eq!(TermTypeDiscriminants::Tree as u32, 23);
-        assert_eq!(TermTypeDiscriminants::Variable as u32, 24);
-        assert_eq!(TermTypeDiscriminants::EmptyIterator as u32, 25);
-        assert_eq!(TermTypeDiscriminants::EvaluateIterator as u32, 26);
-        assert_eq!(TermTypeDiscriminants::FilterIterator as u32, 27);
-        assert_eq!(TermTypeDiscriminants::FlattenIterator as u32, 28);
-        assert_eq!(TermTypeDiscriminants::HashmapKeysIterator as u32, 29);
-        assert_eq!(TermTypeDiscriminants::HashmapValuesIterator as u32, 30);
-        assert_eq!(TermTypeDiscriminants::IndexedAccessorIterator as u32, 31);
-        assert_eq!(TermTypeDiscriminants::IntegersIterator as u32, 32);
-        assert_eq!(TermTypeDiscriminants::IntersperseIterator as u32, 33);
-        assert_eq!(TermTypeDiscriminants::MapIterator as u32, 34);
-        assert_eq!(TermTypeDiscriminants::OnceIterator as u32, 35);
-        assert_eq!(TermTypeDiscriminants::RangeIterator as u32, 36);
-        assert_eq!(TermTypeDiscriminants::RepeatIterator as u32, 37);
-        assert_eq!(TermTypeDiscriminants::SkipIterator as u32, 38);
-        assert_eq!(TermTypeDiscriminants::TakeIterator as u32, 39);
-        assert_eq!(TermTypeDiscriminants::ZipIterator as u32, 40);
+        assert_eq!(TermTypeDiscriminants::Dependency as u32, 6);
+        assert_eq!(TermTypeDiscriminants::Effect as u32, 7);
+        assert_eq!(TermTypeDiscriminants::Float as u32, 8);
+        assert_eq!(TermTypeDiscriminants::Hashmap as u32, 9);
+        assert_eq!(TermTypeDiscriminants::Hashset as u32, 10);
+        assert_eq!(TermTypeDiscriminants::Int as u32, 11);
+        assert_eq!(TermTypeDiscriminants::Lambda as u32, 12);
+        assert_eq!(TermTypeDiscriminants::LazyResult as u32, 13);
+        assert_eq!(TermTypeDiscriminants::Let as u32, 14);
+        assert_eq!(TermTypeDiscriminants::List as u32, 15);
+        assert_eq!(TermTypeDiscriminants::Nil as u32, 16);
+        assert_eq!(TermTypeDiscriminants::Partial as u32, 17);
+        assert_eq!(TermTypeDiscriminants::Pointer as u32, 18);
+        assert_eq!(TermTypeDiscriminants::Record as u32, 19);
+        assert_eq!(TermTypeDiscriminants::Signal as u32, 20);
+        assert_eq!(TermTypeDiscriminants::String as u32, 21);
+        assert_eq!(TermTypeDiscriminants::Symbol as u32, 22);
+        assert_eq!(TermTypeDiscriminants::Timestamp as u32, 23);
+        assert_eq!(TermTypeDiscriminants::Tree as u32, 24);
+        assert_eq!(TermTypeDiscriminants::Variable as u32, 25);
+        assert_eq!(TermTypeDiscriminants::EmptyIterator as u32, 26);
+        assert_eq!(TermTypeDiscriminants::EvaluateIterator as u32, 27);
+        assert_eq!(TermTypeDiscriminants::FilterIterator as u32, 28);
+        assert_eq!(TermTypeDiscriminants::FlattenIterator as u32, 29);
+        assert_eq!(TermTypeDiscriminants::HashmapKeysIterator as u32, 30);
+        assert_eq!(TermTypeDiscriminants::HashmapValuesIterator as u32, 31);
+        assert_eq!(TermTypeDiscriminants::IndexedAccessorIterator as u32, 32);
+        assert_eq!(TermTypeDiscriminants::IntegersIterator as u32, 33);
+        assert_eq!(TermTypeDiscriminants::IntersperseIterator as u32, 34);
+        assert_eq!(TermTypeDiscriminants::MapIterator as u32, 35);
+        assert_eq!(TermTypeDiscriminants::OnceIterator as u32, 36);
+        assert_eq!(TermTypeDiscriminants::RangeIterator as u32, 37);
+        assert_eq!(TermTypeDiscriminants::RepeatIterator as u32, 38);
+        assert_eq!(TermTypeDiscriminants::SkipIterator as u32, 39);
+        assert_eq!(TermTypeDiscriminants::TakeIterator as u32, 40);
+        assert_eq!(TermTypeDiscriminants::ZipIterator as u32, 41);
     }
 }

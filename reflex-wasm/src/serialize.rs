@@ -17,7 +17,7 @@ pub struct SerializerState {
     pub(crate) next_offset: ArenaPointer,
 }
 impl SerializerState {
-    pub(crate) fn new(
+    pub fn new(
         allocated_terms: impl IntoIterator<Item = (HashId, ArenaPointer)>,
         next_offset: ArenaPointer,
     ) -> Self {
@@ -25,6 +25,9 @@ impl SerializerState {
             allocated_terms: allocated_terms.into_iter().collect(),
             next_offset,
         }
+    }
+    pub fn end_offset(&self) -> ArenaPointer {
+        self.next_offset
     }
 }
 
@@ -111,7 +114,7 @@ mod tests {
     use crate::{
         allocator::{ArenaAllocator, ArenaIterator, VecAllocator},
         term_type::{IntTerm, TermType, TreeTerm},
-        ArenaRef, IntoArenaRefIterator, Term,
+        ArenaPointerIterator, ArenaRef, Term,
     };
 
     use super::*;
@@ -130,6 +133,7 @@ mod tests {
                 left: leaf,
                 right: leaf,
                 length: 2,
+                depth: 1,
             }),
             &source_arena,
         ));
@@ -152,7 +156,7 @@ mod tests {
             let start_offset = arena.start_offset();
             let end_offset = arena.end_offset();
             let heap_values = ArenaIterator::<Term, _>::new(arena, start_offset, end_offset)
-                .as_arena_refs::<Term>(&arena)
+                .into_arena_refs::<Term, _>(&arena)
                 .map(|term| {
                     let term_id = term.id();
                     (term_id, term.pointer)

@@ -51,7 +51,7 @@ use crate::{
     hash::TermHasher,
     stdlib,
     term_type::{BuiltinTerm, LambdaTerm, TermType, TypedTerm},
-    ArenaPointer, ArenaRef, FunctionIndex, IntoArenaRefIterator, PointerIter, Term, WASM_PAGE_SIZE,
+    ArenaPointer, ArenaPointerIterator, ArenaRef, FunctionIndex, PointerIter, Term, WASM_PAGE_SIZE,
 };
 
 const CACHED_FUNCTION_TEMPLATE: &'static [u8] =
@@ -942,7 +942,7 @@ fn recompute_invalidated_term_hashes(
         let end_offset = ArenaPointer::from(arena.len() as u32);
         let mut queue = VecDeque::from_iter(
             ArenaIterator::<Term, _>::new(&arena, start_offset, end_offset)
-                .as_arena_refs::<Term>(&arena),
+                .into_arena_refs::<Term, _>(&arena),
         );
         while let Some(term) = queue.pop_front() {
             let term_pointer = term.as_pointer();
@@ -951,7 +951,7 @@ fn recompute_invalidated_term_hashes(
             }
             let children = PointerIter::iter(&term)
                 .map(|pointer| arena.read_value::<ArenaPointer, _>(pointer, |target| *target))
-                .as_arena_refs::<Term>(&arena);
+                .into_arena_refs::<Term, _>(&arena);
             let unprocessed_children = children
                 .clone()
                 .filter(|child| !updated_hashes.contains_key(&child.as_pointer()));
@@ -1460,13 +1460,25 @@ fn parse_runtime_exports(module: &Module) -> Result<RuntimeExportMappings, WasmC
                 &exported_functions,
                 RuntimeBuiltin::CreateInvalidPointerCondition,
             )?,
+            create_cache_dependency: get_builtin_function(
+                &exported_functions,
+                RuntimeBuiltin::CreateCacheDependency,
+            )?,
             create_constructor: get_builtin_function(
                 &exported_functions,
                 RuntimeBuiltin::CreateConstructor,
             )?,
+            create_dependency_tree: get_builtin_function(
+                &exported_functions,
+                RuntimeBuiltin::CreateDependencyTree,
+            )?,
             create_empty_list: get_builtin_function(
                 &exported_functions,
                 RuntimeBuiltin::CreateEmptyList,
+            )?,
+            create_state_dependency: get_builtin_function(
+                &exported_functions,
+                RuntimeBuiltin::CreateStateDependency,
             )?,
             create_effect: get_builtin_function(&exported_functions, RuntimeBuiltin::CreateEffect)?,
             create_float: get_builtin_function(&exported_functions, RuntimeBuiltin::CreateFloat)?,
@@ -1873,13 +1885,18 @@ mod tests {
         rc::Rc,
     };
 
+    use reflex::core::{ConditionType, DependencyList};
+
     use crate::{
         allocator::{ArenaAllocator, VecAllocator},
         interpreter::{
             mocks::add_import_stubs, InterpreterError, WasmContextBuilder, WasmInterpreter,
         },
         stdlib::{Add, Stdlib},
-        term_type::{ApplicationTerm, BuiltinTerm, IntTerm, ListTerm, TermType, WasmExpression},
+        term_type::{
+            ApplicationTerm, BuiltinTerm, DependencyTerm, IntTerm, ListTerm, TermType,
+            WasmExpression,
+        },
         ArenaPointer, ArenaRef, Term,
     };
 
@@ -1935,6 +1952,22 @@ mod tests {
             .unwrap()
             .bind(Rc::clone(&interpreter));
 
+        let dependencies = result
+            .dependencies()
+            .map(|dependencies| {
+                dependencies
+                    .as_inner()
+                    .typed_nodes::<DependencyTerm>()
+                    .filter_map(|dependency| {
+                        dependency
+                            .as_inner()
+                            .as_state_dependency()
+                            .map(|dependency| ConditionType::id(&dependency.as_inner().condition()))
+                    })
+                    .collect::<DependencyList>()
+            })
+            .unwrap_or_default();
+
         let expected_result = ArenaRef::<Term, _>::new(
             Rc::clone(&interpreter),
             interpreter
@@ -1945,7 +1978,7 @@ mod tests {
         );
 
         assert_eq!(result.result(), expected_result);
-        assert!(result.dependencies().is_none());
+        assert_eq!(dependencies, DependencyList::empty());
     }
 
     #[test]
@@ -2011,6 +2044,22 @@ mod tests {
             .unwrap()
             .bind(Rc::clone(&interpreter));
 
+        let dependencies = result
+            .dependencies()
+            .map(|dependencies| {
+                dependencies
+                    .as_inner()
+                    .typed_nodes::<DependencyTerm>()
+                    .filter_map(|dependency| {
+                        dependency
+                            .as_inner()
+                            .as_state_dependency()
+                            .map(|dependency| ConditionType::id(&dependency.as_inner().condition()))
+                    })
+                    .collect::<DependencyList>()
+            })
+            .unwrap_or_default();
+
         let expected_result = ArenaRef::<Term, _>::new(
             Rc::clone(&interpreter),
             interpreter
@@ -2021,7 +2070,7 @@ mod tests {
         );
 
         assert_eq!(result.result(), expected_result);
-        assert!(result.dependencies().is_none());
+        assert_eq!(dependencies, DependencyList::empty());
     }
 }
 

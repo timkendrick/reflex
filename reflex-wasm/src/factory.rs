@@ -26,7 +26,7 @@ use reflex_utils::WithExactSizeIterator;
 
 use crate::{
     self as reflex_wasm,
-    allocator::{Arena, ArenaAllocator},
+    allocator::{Arena, ArenaAllocator, ArenaMut},
     hash::TermSize,
     term_type::{
         ApplicationTerm, BooleanTerm, BuiltinTerm, ConditionTerm, ConstructorTerm, CustomCondition,
@@ -526,6 +526,16 @@ where
     }
 }
 
+impl<A: Arena> ArenaMut for WasmTermFactory<A>
+where
+    A: ArenaMut,
+    Rc<RefCell<A>>: Arena,
+{
+    fn write<T: Sized>(&mut self, offset: ArenaPointer, value: T) {
+        self.arena.borrow_mut().deref_mut().write(offset, value)
+    }
+}
+
 impl<A: Arena> ArenaAllocator for WasmTermFactory<A>
 where
     A: ArenaAllocator,
@@ -539,9 +549,6 @@ where
     }
     fn shrink(&mut self, offset: ArenaPointer, size: usize) {
         self.arena.borrow_mut().deref_mut().shrink(offset, size)
-    }
-    fn write<T: Sized>(&mut self, offset: ArenaPointer, value: T) {
-        self.arena.borrow_mut().deref_mut().write(offset, value)
     }
 }
 
@@ -642,6 +649,7 @@ where
                         left: condition,
                         right: tail,
                         length: index as u32 + 1,
+                        depth: index as u32 + 1,
                     }),
                     self.arena.deref().borrow().deref(),
                 );
@@ -973,6 +981,7 @@ where
                 left: condition_pointer,
                 right: ArenaPointer::null(),
                 length: 1,
+                depth: 1,
             }),
             &*self.arena.borrow(),
         );

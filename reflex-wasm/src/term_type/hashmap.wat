@@ -22,6 +22,7 @@
     $HashmapBucket
     i32
     i32
+    (global.get $NULL)
     (call $Term::get_hash)
     (call $Term::traits::equals)
     (global.get $Term::Hashmap::MIN_UNSIZED_HASHMAP_CAPACITY)

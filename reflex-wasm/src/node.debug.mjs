@@ -3,9 +3,10 @@
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
 import createWasmTestRunner from './node.runner.mjs';
 
-const module_path = getRequiredEnvVar('WASM_MODULE');
+const WASM_MODULE = getRequiredEnvVar('WASM_MODULE');
 const ENTRY_POINT = getRequiredEnvVar('ENTRY_POINT');
-const runner = createWasmTestRunner(module_path);
+const STATE = getOptionalPointerEnvVar('STATE');
+const runner = createWasmTestRunner(WASM_MODULE);
 
 runner((describe) => {
   describe('<debug>', (test) => {
@@ -14,7 +15,8 @@ runner((describe) => {
       debugger;
       console.time(DEBUG_LABEL);
       console.profile(DEBUG_LABEL);
-      const [result, dependencies] = runtime.exports[ENTRY_POINT]();
+      const run = runtime.exports[ENTRY_POINT];
+      const [result, dependencies] = STATE !== null ? run(STATE) : run();
       console.profileEnd(DEBUG_LABEL);
       console.timeEnd(DEBUG_LABEL);
       console.log(runtime.format(result));

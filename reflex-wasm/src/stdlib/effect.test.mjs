@@ -11,6 +11,7 @@ export default (describe) => {
       createSymbol,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -21,9 +22,9 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '{<CustomCondition:Symbol(123):3:Symbol(456)>}');
-        assert.strictEqual(
-          format(dependencies),
-          '(<CustomCondition:Symbol(123):3:Symbol(456)> . NULL)',
+        assert.deepEqual(
+          getStateDependencies(dependencies).map((dependency) => format(dependency)),
+          ['<CustomCondition:Symbol(123):3:Symbol(456)>'],
         );
       })();
     });

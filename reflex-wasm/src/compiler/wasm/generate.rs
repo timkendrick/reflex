@@ -63,8 +63,11 @@ pub struct RuntimeBuiltinMappings {
     pub create_invalid_function_target_condition: FunctionId,
     pub create_invalid_function_args_condition: FunctionId,
     pub create_invalid_pointer_condition: FunctionId,
+    pub create_cache_dependency: FunctionId,
     pub create_constructor: FunctionId,
+    pub create_dependency_tree: FunctionId,
     pub create_empty_list: FunctionId,
+    pub create_state_dependency: FunctionId,
     pub create_effect: FunctionId,
     pub create_float: FunctionId,
     pub create_hashset: FunctionId,
@@ -135,8 +138,11 @@ impl RuntimeBuiltinMappings {
                 self.create_invalid_function_args_condition
             }
             RuntimeBuiltin::CreateInvalidPointerCondition => self.create_invalid_pointer_condition,
+            RuntimeBuiltin::CreateCacheDependency => self.create_cache_dependency,
             RuntimeBuiltin::CreateConstructor => self.create_constructor,
+            RuntimeBuiltin::CreateDependencyTree => self.create_dependency_tree,
             RuntimeBuiltin::CreateEmptyList => self.create_empty_list,
+            RuntimeBuiltin::CreateStateDependency => self.create_state_dependency,
             RuntimeBuiltin::CreateEffect => self.create_effect,
             RuntimeBuiltin::CreateFloat => self.create_float,
             RuntimeBuiltin::CreateHashset => self.create_hashset,
@@ -504,8 +510,8 @@ pub(crate) fn generate_stateful_function(
         let mut function_body = builder.func_body();
         // Embed the function pre-instructions
         function_body
-            // Initialize the dependencies local to the null pointer
-            .global_get(export_mappings.globals.null_pointer)
+            // Initialize the dependencies local
+            .call(export_mappings.builtins.create_dependency_tree)
             .local_set(dependencies_id);
         // Embed the compiled function body
         {
@@ -631,6 +637,7 @@ fn get_exported_hash_functions(module: &Module) -> Result<HashFunctionIds, anyho
         })
         .collect::<HashMap<_, _>>();
     Ok(HashFunctionIds {
+        write_term: get_exported_function("writeTermHash", &exported_functions)?,
         write_i32: get_exported_function("writeI32Hash", &exported_functions)?,
         write_i64: get_exported_function("writeI64Hash", &exported_functions)?,
         write_f32: get_exported_function("writeF32Hash", &exported_functions)?,
@@ -726,19 +733,21 @@ fn generate_noop_function(module: &mut Module) -> FunctionId {
 }
 
 struct HashFunctionIds {
+    write_term: FunctionId,
     write_i32: FunctionId,
     write_i64: FunctionId,
     write_f32: FunctionId,
     write_f64: FunctionId,
 }
 impl HashFunctionIds {
-    fn get(&self, value_type: ValType) -> Option<FunctionId> {
+    fn get(&self, value_type: ValueType) -> Option<FunctionId> {
         match value_type {
-            ValType::I32 => Some(self.write_i32),
-            ValType::I64 => Some(self.write_i64),
-            ValType::F32 => Some(self.write_f32),
-            ValType::F64 => Some(self.write_f64),
-            ValType::V128 | ValType::Funcref | ValType::Externref => None,
+            ValueType::I32 | ValueType::U32 => Some(self.write_i32),
+            ValueType::I64 | ValueType::U64 => Some(self.write_i64),
+            ValueType::F32 => Some(self.write_f32),
+            ValueType::F64 => Some(self.write_f64),
+            ValueType::HeapPointer => Some(self.write_term),
+            ValueType::FunctionPointer => Some(self.write_i32),
         }
     }
 }
@@ -759,12 +768,11 @@ fn generate_function_arg_hasher(
     // and the corresponding WASM function used to hash that type
     let (arg_types, arg_hashers): (Vec<_>, Vec<_>) = params
         .iter()
-        .map(parse_value_type)
         .map(|arg_type| {
             hash_function_ids
                 .get(arg_type)
                 .ok_or_else(|| anyhow::anyhow!("Unsupported function argument type: {arg_type:?}"))
-                .map(|hasher_id| (arg_type, hasher_id))
+                .map(|hasher_id| (parse_value_type(arg_type), hasher_id))
         })
         .collect::<Result<Vec<_>, _>>()?
         .into_iter()

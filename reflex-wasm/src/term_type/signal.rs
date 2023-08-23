@@ -18,7 +18,7 @@ use crate::{
         ValueType,
     },
     hash::{TermHash, TermHasher, TermSize},
-    term_type::{TreeTerm, TypedTerm, WasmExpression},
+    term_type::{ConditionTerm, TreeTerm, TypedTerm, WasmExpression},
     ArenaPointer, ArenaRef, Term,
 };
 
@@ -130,7 +130,7 @@ impl<A: Arena + Clone> std::fmt::Display for ArenaRef<SignalTerm, A> {
             "{{{}}}",
             self.conditions()
                 .as_inner()
-                .nodes()
+                .typed_nodes::<ConditionTerm>()
                 .map(|effect| format!("{}", effect))
                 .collect::<Vec<_>>()
                 .join(",")

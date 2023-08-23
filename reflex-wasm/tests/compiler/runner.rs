@@ -29,8 +29,8 @@ use reflex_wasm::{
     interpreter::{InterpreterError, WasmInterpreter, WasmProgram},
     stdlib::Stdlib,
     term_type::{
-        hashmap::HashmapTerm, lambda::LambdaTerm, tree::TreeTerm, ConditionTerm, SignalTerm,
-        TermType, TypedTerm, WasmExpression,
+        condition::ConditionTerm, hashmap::HashmapTerm, lambda::LambdaTerm, signal::SignalTerm,
+        tree::TreeTerm, DependencyTerm, TermType, TypedTerm, WasmExpression,
     },
     ArenaPointer, ArenaRef, Term,
 };
@@ -131,7 +131,7 @@ pub(crate) fn run_scenario(
                             };
                             wasm_factory.create_signal(signal_type)
                         };
-                        Ok(WasmExpression::new(
+                        Ok(ArenaRef::<TypedTerm<ConditionTerm>, _>::new(
                             Rc::clone(arena),
                             condition.as_pointer(),
                         ))
@@ -173,33 +173,50 @@ where
     PartialEq(bound = "")
 )]
 pub struct WasmTestScenarioResultDependencyList<A: Arena + Clone> {
-    dependencies: BTreeMap<HashId, WasmExpression<A>>,
+    dependencies: BTreeMap<HashId, ArenaRef<TypedTerm<ConditionTerm>, A>>,
 }
 
 impl<A: Arena + Clone> WasmTestScenarioResultDependencyList<A> {
-    fn iter(&self) -> std::collections::btree_map::Values<'_, HashId, WasmExpression<A>> {
+    fn iter(
+        &self,
+    ) -> std::collections::btree_map::Values<'_, HashId, ArenaRef<TypedTerm<ConditionTerm>, A>>
+    {
         self.dependencies.values()
     }
 }
 
 impl<A: Arena + Clone> IntoIterator for WasmTestScenarioResultDependencyList<A> {
-    type Item = WasmExpression<A>;
-    type IntoIter = std::collections::btree_map::IntoValues<HashId, WasmExpression<A>>;
+    type Item = ArenaRef<TypedTerm<ConditionTerm>, A>;
+    type IntoIter =
+        std::collections::btree_map::IntoValues<HashId, ArenaRef<TypedTerm<ConditionTerm>, A>>;
     fn into_iter(self) -> Self::IntoIter {
         self.dependencies.into_values()
     }
 }
 
-impl<A: Arena + Clone> FromIterator<WasmExpression<A>> for WasmTestScenarioResultDependencyList<A> {
-    fn from_iter<T: IntoIterator<Item = WasmExpression<A>>>(iter: T) -> Self {
+impl<A: Arena + Clone> FromIterator<ArenaRef<TypedTerm<DependencyTerm>, A>>
+    for WasmTestScenarioResultDependencyList<A>
+{
+    fn from_iter<T: IntoIterator<Item = ArenaRef<TypedTerm<DependencyTerm>, A>>>(iter: T) -> Self {
+        Self::from_iter(iter.into_iter().filter_map(|dependency| {
+            dependency
+                .as_inner()
+                .as_state_dependency()
+                .map(|dependency| dependency.as_inner().condition())
+        }))
+    }
+}
+
+impl<A: Arena + Clone> FromIterator<ArenaRef<TypedTerm<ConditionTerm>, A>>
+    for WasmTestScenarioResultDependencyList<A>
+{
+    fn from_iter<T: IntoIterator<Item = ArenaRef<TypedTerm<ConditionTerm>, A>>>(iter: T) -> Self {
         Self {
             dependencies: iter
                 .into_iter()
-                .filter_map(|expression| {
-                    expression
-                        .as_condition_term()
-                        .map(|condition| (condition.id()))
-                        .map(|state_token| (state_token, expression))
+                .map(|condition| {
+                    let state_token = ConditionType::id(&condition);
+                    (state_token, condition)
                 })
                 .collect(),
         }
@@ -379,7 +396,7 @@ where
         .map(|dependency_tree| {
             dependency_tree
                 .as_inner()
-                .nodes()
+                .typed_nodes::<DependencyTerm>()
                 .collect::<WasmTestScenarioResultDependencyList<_>>()
         })
         .unwrap_or_default();

@@ -9,13 +9,14 @@ export default (describe) => {
       createBuiltin,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
       const expression = createApplication(createBuiltin(Stdlib.CollectRecord), createEmptyList());
       const [result, dependencies] = evaluate(expression, NULL);
       assert.strictEqual(format(result), '{}');
-      assert.strictEqual(format(dependencies), 'NULL');
+      assert.deepEqual(getStateDependencies(dependencies), []);
     });
 
     test('(String, Int, String, Int, String, Int)', (assert, {
@@ -28,6 +29,7 @@ export default (describe) => {
       createString,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -45,7 +47,7 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '{ "foo": 3, "bar": 4, "baz": 5 }');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -61,7 +63,7 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '{ "foo": 3, "bar": 4, "baz": 5 }');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
 
@@ -73,6 +75,7 @@ export default (describe) => {
       createString,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -90,7 +93,7 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '{ "foo": 5, "bar": 4 }');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
 
@@ -102,6 +105,7 @@ export default (describe) => {
       createString,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -118,7 +122,7 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '{ "foo": 3, "bar": 4 }');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
   });

@@ -10,6 +10,7 @@ export default (describe) => {
       createUnitList,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -22,7 +23,7 @@ export default (describe) => {
         format(result),
         '{ "url": "http://example.com/", "method": "GET", "headers": {}, "body": null, "token": null }',
       );
-      assert.strictEqual(format(dependencies), 'NULL');
+      assert.deepEqual(getStateDependencies(dependencies), []);
     });
 
     test('(Record)', (assert, {
@@ -35,6 +36,7 @@ export default (describe) => {
       createUnitList,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -68,7 +70,7 @@ export default (describe) => {
           format(result),
           '{ "url": "http://example.com/", "method": "POST", "headers": { "foo": "bar" }, "body": "baz", "token": Symbol(123) }',
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -100,7 +102,7 @@ export default (describe) => {
           format(result),
           '{ "url": "http://example.com/", "method": "POST", "headers": { "foo": "bar" }, "body": "baz", "token": Symbol(123) }',
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
   });

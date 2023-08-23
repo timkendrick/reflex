@@ -22,7 +22,7 @@ export default (describe) => {
             ),
           ),
         ),
-        '<lazy:3>',
+        '<lazy:3:(<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)>',
       );
     });
 

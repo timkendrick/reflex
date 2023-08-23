@@ -9,7 +9,7 @@ export default (describe) => {
       createString,
       createUnitList,
       evaluate,
-      format,
+      getStateDependencies,
       getStringValue,
       isString,
       NULL,
@@ -23,7 +23,7 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.ok(isString(result));
         assert.strictEqual(getStringValue(result), 'foo');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -33,7 +33,7 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.ok(isString(result));
         assert.strictEqual(getStringValue(result), '"foo"');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
 
@@ -47,7 +47,7 @@ export default (describe) => {
       createTriple,
       createUnitList,
       evaluate,
-      format,
+      getStateDependencies,
       getStringValue,
       isString,
       NULL,
@@ -63,7 +63,7 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.ok(isString(result));
         assert.strictEqual(getStringValue(result), 'foo');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -78,7 +78,7 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.ok(isString(result));
         assert.strictEqual(getStringValue(result), 'Error: foo');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -93,7 +93,7 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.ok(isString(result));
         assert.strictEqual(getStringValue(result), 'Error: 3');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -108,7 +108,7 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.ok(isString(result));
         assert.strictEqual(getStringValue(result), '{ "foo": 3, "bar": 4, "baz": 5 }');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
 
@@ -122,7 +122,7 @@ export default (describe) => {
       createString,
       createUnitList,
       evaluate,
-      format,
+      getStateDependencies,
       getStringValue,
       isString,
       NULL,
@@ -136,7 +136,7 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.ok(isString(result));
         assert.strictEqual(getStringValue(result), '');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -153,7 +153,7 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.ok(isString(result));
         assert.strictEqual(getStringValue(result), 'Error: foo');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -174,7 +174,7 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.ok(isString(result));
         assert.strictEqual(getStringValue(result), 'Error: foo\nError: bar');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -196,7 +196,7 @@ export default (describe) => {
           getStringValue(result),
           'Error: Item 1\nError: Item 2\nError: Item 3\nError: Item 4\nError: Item 5\nError: Item 6\nError: Item 7\nError: Item 8\nError: Item 9',
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -218,7 +218,7 @@ export default (describe) => {
           getStringValue(result),
           'Error: Item 1\nError: Item 2\nError: Item 3\nError: Item 4\nError: Item 5\nError: Item 6\nError: Item 7\nError: Item 8\nError: Item 9\nError: Item 10',
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -240,7 +240,7 @@ export default (describe) => {
           getStringValue(result),
           'Error: Item 1\nError: Item 2\nError: Item 3\nError: Item 4\nError: Item 5\nError: Item 6\nError: Item 7\nError: Item 8\nError: Item 9\n...2 more errors',
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -262,7 +262,7 @@ export default (describe) => {
           getStringValue(result),
           'Error: Item 1\nError: Item 2\nError: Item 3\nError: Item 4\nError: Item 5\nError: Item 6\nError: Item 7\nError: Item 8\nError: Item 9\n...3 more errors',
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
 
@@ -279,7 +279,7 @@ export default (describe) => {
       createString,
       createUnitList,
       evaluate,
-      format,
+      getStateDependencies,
       getStringValue,
       isString,
       NULL,
@@ -308,7 +308,7 @@ export default (describe) => {
           getStringValue(result),
           'Error: Item 1\nError: Item 2\nError: Item 3\nError: Item 4\nError: Item 5\nError: Item 6\nError: Item 7\nError: Item 8\nError: Item 9\n...3 more errors',
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -333,7 +333,7 @@ export default (describe) => {
           getStringValue(result),
           'Error: Item 1\nError: Item 2\nError: Item 3\nError: Item 4\nError: Item 5\nError: Item 6\nError: Item 7\nError: Item 8\nError: Item 9\n...3 more errors',
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
   });

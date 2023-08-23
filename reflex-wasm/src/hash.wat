@@ -63,4 +63,7 @@
         (call $Hash::write_i32 (local.get $self) (i32.reinterpret_f32 (local.get $value))))
 
       (func $Hash::write_f64 (export "writeF64Hash") (param $self i64) (param $value f64) (result i64)
-        (call $Hash::write_i64 (local.get $self) (i64.reinterpret_f64 (local.get $value)))))))
+        (call $Hash::write_i64 (local.get $self) (i64.reinterpret_f64 (local.get $value))))
+
+      (func $Hash::write_term (export "writeTermHash") (param $self i64) (param $term i32) (result i64)
+        (call $Hash::write_i64 (local.get $self) (call $Term::get_hash (local.get $term)))))))

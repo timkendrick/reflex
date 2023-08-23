@@ -17,7 +17,7 @@ use wasmtime::{
 use wasmtime_wasi::{sync::WasiCtxBuilder, WasiCtx};
 
 use crate::{
-    allocator::{Arena, ArenaAllocator, ArenaIterator},
+    allocator::{Arena, ArenaAllocator, ArenaIterator, ArenaMut},
     compiler::runtime::builtin::RuntimeBuiltin,
     exports::add_wasm_runtime_imports,
     hash::TermSize,
@@ -108,9 +108,8 @@ impl<A: Arena + Clone> InterpreterEvaluationResult<A> {
     }
 
     pub fn dependencies(&self) -> Option<ArenaRef<TypedTerm<TreeTerm>, A>> {
-        self.dependencies_pointer.map(|dependencies_pointer| {
-            ArenaRef::<TypedTerm<TreeTerm>, _>::new(self.arena.clone(), dependencies_pointer)
-        })
+        self.dependencies_pointer
+            .map(|pointer| ArenaRef::<TypedTerm<TreeTerm>, _>::new(self.arena.clone(), pointer))
     }
 }
 
@@ -356,6 +355,10 @@ impl WasmInterpreter {
         self.0.data()
     }
 
+    pub fn data_mut(&mut self) -> &mut [u8] {
+        self.0.data_mut()
+    }
+
     pub fn start_offset(&self) -> ArenaPointer {
         self.0.start_offset()
     }
@@ -501,6 +504,12 @@ impl Arena for WasmContext {
     }
 }
 
+impl ArenaMut for WasmContext {
+    fn write<T: Sized>(&mut self, offset: ArenaPointer, value: T) {
+        *self.get_mut(offset) = value
+    }
+}
+
 impl ArenaAllocator for WasmContext {
     fn allocate<T: TermSize>(&mut self, value: T) -> ArenaPointer {
         let offset = self.end_offset();
@@ -542,10 +551,6 @@ impl ArenaAllocator for WasmContext {
             *self.get_mut::<u32>(0.into()) -= pad_to_4_byte_offset(size) as u32;
         }
     }
-
-    fn write<T: Sized>(&mut self, offset: ArenaPointer, value: T) {
-        *self.get_mut(offset) = value
-    }
 }
 
 impl Arena for WasmInterpreter {
@@ -571,6 +576,12 @@ impl Arena for WasmInterpreter {
     }
 }
 
+impl ArenaMut for WasmInterpreter {
+    fn write<T: Sized>(&mut self, offset: ArenaPointer, value: T) {
+        <WasmContext as ArenaMut>::write(&mut self.0, offset, value)
+    }
+}
+
 impl ArenaAllocator for WasmInterpreter {
     fn allocate<T: TermSize>(&mut self, value: T) -> ArenaPointer {
         <WasmContext as ArenaAllocator>::allocate(&mut self.0, value)
@@ -580,9 +591,6 @@ impl ArenaAllocator for WasmInterpreter {
     }
     fn shrink(&mut self, offset: ArenaPointer, size: usize) {
         <WasmContext as ArenaAllocator>::shrink(&mut self.0, offset, size)
-    }
-    fn write<T: Sized>(&mut self, offset: ArenaPointer, value: T) {
-        <WasmContext as ArenaAllocator>::write(&mut self.0, offset, value)
     }
 }
 
@@ -634,6 +642,12 @@ impl<'heap> Arena for &'heap mut WasmInterpreter {
     }
 }
 
+impl<'heap> ArenaMut for &'heap mut WasmInterpreter {
+    fn write<T: Sized>(&mut self, offset: ArenaPointer, value: T) {
+        self.deref_mut().write(offset, value)
+    }
+}
+
 impl<'heap> ArenaAllocator for &'heap mut WasmInterpreter {
     fn allocate<T: TermSize>(&mut self, value: T) -> ArenaPointer {
         self.deref_mut().allocate(value)
@@ -643,9 +657,6 @@ impl<'heap> ArenaAllocator for &'heap mut WasmInterpreter {
     }
     fn shrink(&mut self, offset: ArenaPointer, size: usize) {
         self.deref_mut().shrink(offset, size)
-    }
-    fn write<T: Sized>(&mut self, offset: ArenaPointer, value: T) {
-        self.deref_mut().write(offset, value)
     }
 }
 
@@ -676,6 +687,12 @@ impl<'heap> Arena for Rc<RefCell<&'heap mut WasmInterpreter>> {
     }
 }
 
+impl<'heap> ArenaMut for Rc<RefCell<&'heap mut WasmInterpreter>> {
+    fn write<T: Sized>(&mut self, offset: ArenaPointer, value: T) {
+        self.deref().borrow_mut().write(offset, value)
+    }
+}
+
 impl<'heap> ArenaAllocator for Rc<RefCell<&'heap mut WasmInterpreter>> {
     fn allocate<T: TermSize>(&mut self, value: T) -> ArenaPointer {
         self.deref().borrow_mut().allocate(value)
@@ -685,9 +702,6 @@ impl<'heap> ArenaAllocator for Rc<RefCell<&'heap mut WasmInterpreter>> {
     }
     fn shrink(&mut self, offset: ArenaPointer, size: usize) {
         self.deref().borrow_mut().shrink(offset, size)
-    }
-    fn write<T: Sized>(&mut self, offset: ArenaPointer, value: T) {
-        self.deref().borrow_mut().write(offset, value)
     }
 }
 
@@ -732,13 +746,16 @@ pub mod mocks {
 
 #[cfg(test)]
 mod tests {
+    use reflex::core::{ConditionType, DependencyList};
+
     use crate::{
         allocator::ArenaAllocator,
         interpreter::WasmInterpreter,
         stdlib::{Add, Stdlib},
         term_type::{
-            ApplicationTerm, BuiltinTerm, ConditionTerm, CustomCondition, EffectTerm, HashmapTerm,
-            IntTerm, ListTerm, NilTerm, SignalTerm, SymbolTerm, TermType, TreeTerm, TypedTerm,
+            ApplicationTerm, BuiltinTerm, ConditionTerm, CustomCondition, DependencyTerm,
+            EffectTerm, HashmapTerm, IntTerm, ListTerm, NilTerm, SignalTerm, SymbolTerm, TermType,
+            TreeTerm, TypedTerm,
         },
         ArenaPointer, ArenaRef, Term,
     };
@@ -779,6 +796,22 @@ mod tests {
             .unwrap()
             .bind(Rc::clone(&interpreter));
 
+        let interpreter_dependencies = interpreter_result
+            .dependencies()
+            .map(|dependencies| {
+                dependencies
+                    .as_inner()
+                    .typed_nodes::<DependencyTerm>()
+                    .filter_map(|dependency| {
+                        dependency
+                            .as_inner()
+                            .as_state_dependency()
+                            .map(|dependency| ConditionType::id(&dependency.as_inner().condition()))
+                    })
+                    .collect::<DependencyList>()
+            })
+            .unwrap_or_default();
+
         let expected_result = ArenaRef::<Term, _>::new(
             Rc::clone(&interpreter),
             interpreter
@@ -789,7 +822,7 @@ mod tests {
         );
 
         assert_eq!(interpreter_result.result(), expected_result);
-        assert!(interpreter_result.dependencies().is_none());
+        assert_eq!(interpreter_dependencies, DependencyList::empty());
     }
 
     #[test]
@@ -831,6 +864,22 @@ mod tests {
             .unwrap()
             .bind(Rc::clone(&interpreter));
 
+        let interpreter_dependencies = interpreter_result
+            .dependencies()
+            .map(|dependencies| {
+                dependencies
+                    .as_inner()
+                    .typed_nodes::<DependencyTerm>()
+                    .filter_map(|dependency| {
+                        dependency
+                            .as_inner()
+                            .as_state_dependency()
+                            .map(|dependency| ConditionType::id(&dependency.as_inner().condition()))
+                    })
+                    .collect::<DependencyList>()
+            })
+            .unwrap_or_default();
+
         let expected_result = ArenaRef::<Term, _>::new(
             Rc::clone(&interpreter),
             interpreter
@@ -841,14 +890,14 @@ mod tests {
         );
 
         assert_eq!(interpreter_result.result(), expected_result);
-        assert!(interpreter_result.dependencies().is_none());
+        assert_eq!(interpreter_dependencies, DependencyList::empty());
     }
 
     #[test]
     fn stateful_expressions() {
         let mut interpreter: WasmInterpreter = create_mock_wasm_interpreter().unwrap().into();
 
-        let condition = {
+        let (condition_pointer, condition_id) = {
             let effect_type = interpreter.allocate(Term::new(
                 TermType::Symbol(SymbolTerm { id: 123 }),
                 &interpreter,
@@ -859,7 +908,7 @@ mod tests {
 
             let token = interpreter.allocate(Term::new(TermType::Nil(NilTerm), &interpreter));
 
-            let condition = interpreter.allocate(Term::new(
+            let condition_pointer = interpreter.allocate(Term::new(
                 TermType::Condition(ConditionTerm::Custom(CustomCondition {
                     effect_type,
                     payload,
@@ -868,7 +917,12 @@ mod tests {
                 &interpreter,
             ));
 
-            condition
+            let condition_id = ConditionType::id(&ArenaRef::<TypedTerm<ConditionTerm>, _>::new(
+                &interpreter,
+                condition_pointer,
+            ));
+
+            (condition_pointer, condition_id)
         };
 
         let input = {
@@ -878,7 +932,9 @@ mod tests {
             ));
 
             let stateful_arg = interpreter.allocate(Term::new(
-                TermType::Effect(EffectTerm { condition }),
+                TermType::Effect(EffectTerm {
+                    condition: condition_pointer,
+                }),
                 &interpreter,
             ));
 
@@ -901,18 +957,19 @@ mod tests {
 
         let state = HashmapTerm::allocate(std::iter::empty(), &mut interpreter);
 
-        let expected_dependencies = interpreter.allocate(Term::new(
+        let condition_list = interpreter.allocate(Term::new(
             TermType::Tree(TreeTerm {
-                left: condition,
+                left: condition_pointer,
                 right: ArenaPointer::null(),
                 length: 1,
+                depth: 1,
             }),
             &interpreter,
         ));
 
         let expected_result = Term::new(
             TermType::Signal(SignalTerm {
-                conditions: expected_dependencies,
+                conditions: condition_list,
             }),
             &interpreter,
         );
@@ -928,19 +985,27 @@ mod tests {
             .unwrap()
             .bind(Rc::clone(&interpreter));
 
+        let interpreter_dependencies = interpreter_result
+            .dependencies()
+            .map(|dependencies| {
+                dependencies
+                    .as_inner()
+                    .typed_nodes::<DependencyTerm>()
+                    .filter_map(|dependency| {
+                        dependency
+                            .as_inner()
+                            .as_state_dependency()
+                            .map(|dependency| ConditionType::id(&dependency.as_inner().condition()))
+                    })
+                    .collect::<DependencyList>()
+            })
+            .unwrap_or_default();
+
         assert_eq!(
             interpreter_result.result(),
             ArenaRef::<Term, _>::new(Rc::clone(&interpreter), expected_result),
         );
-
-        let result_dependencies = interpreter_result.dependencies();
-        assert_eq!(
-            result_dependencies,
-            Some(ArenaRef::<TypedTerm<TreeTerm>, _>::new(
-                Rc::clone(&interpreter),
-                expected_dependencies
-            )),
-        );
+        assert_eq!(interpreter_dependencies, DependencyList::of(condition_id));
 
         let stateful_value = interpreter
             .deref()
@@ -949,7 +1014,7 @@ mod tests {
             .allocate(Term::new(TermType::Int(IntTerm::from(3)), &interpreter));
 
         let updated_state = HashmapTerm::allocate(
-            [(condition, stateful_value)],
+            [(condition_pointer, stateful_value)],
             interpreter.deref().borrow_mut().deref_mut(),
         );
 
@@ -968,20 +1033,26 @@ mod tests {
             .unwrap()
             .bind(Rc::clone(&interpreter));
 
+        let interpreter_dependencies = interpreter_result
+            .dependencies()
+            .map(|dependencies| {
+                dependencies
+                    .as_inner()
+                    .typed_nodes::<DependencyTerm>()
+                    .filter_map(|dependency| {
+                        dependency
+                            .as_inner()
+                            .as_state_dependency()
+                            .map(|dependency| ConditionType::id(&dependency.as_inner().condition()))
+                    })
+                    .collect::<DependencyList>()
+            })
+            .unwrap_or_default();
+
         assert_eq!(
             interpreter_result.result(),
             ArenaRef::<Term, _>::new(Rc::clone(&interpreter), expected_result)
         );
-
-        assert!(interpreter_result.dependencies().is_some());
-
-        let result_dependencies = interpreter_result.dependencies();
-        assert_eq!(
-            result_dependencies,
-            Some(ArenaRef::<TypedTerm<TreeTerm>, _>::new(
-                Rc::clone(&interpreter),
-                expected_dependencies
-            )),
-        );
+        assert_eq!(interpreter_dependencies, DependencyList::of(condition_id));
     }
 }

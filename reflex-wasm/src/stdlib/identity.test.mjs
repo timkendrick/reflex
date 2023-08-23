@@ -10,14 +10,18 @@ export default (describe) => {
       createUnitList,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
       (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Identity), createUnitList(createNil()));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Identity),
+          createUnitList(createNil()),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), 'null');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
 
@@ -28,20 +32,27 @@ export default (describe) => {
       createUnitList,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
       (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Identity), createUnitList(createBoolean(false)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Identity),
+          createUnitList(createBoolean(false)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), 'false');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Identity), createUnitList(createBoolean(true)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Identity),
+          createUnitList(createBoolean(true)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), 'true');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
 
@@ -52,20 +63,27 @@ export default (describe) => {
       createUnitList,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
       (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Identity), createUnitList(createInt(0)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Identity),
+          createUnitList(createInt(0)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '0');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Identity), createUnitList(createInt(3)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Identity),
+          createUnitList(createInt(3)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '3');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
   });

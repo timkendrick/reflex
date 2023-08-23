@@ -4,7 +4,7 @@
 (module
   (@export $HashmapMethods
     (@template
-      $name $bucket_type $key_type $value_type $key_hasher $key_equals $min_dynamic_capacity $allocate_with_capacity $init
+      $name $bucket_type $key_type $value_type $empty_value $key_hasher $key_equals $min_dynamic_capacity $allocate_with_capacity $init
       (@block
         (func (@concat "$" (@get $name) "::insert") (param $self i32) (param $key (@get $key_type)) (param $value (@get $value_type))
           ;; Note that this does not increase the allocated hashmap capacity, it merely inserts an entry into an
@@ -79,10 +79,10 @@
 
         (func (@concat "$" (@get $name) "::retrieve") (param $self i32) (param $key (@get $key_type)) (result (@get $value_type))
           (local $bucket_index i32)
-          (if (result i32)
+          (if (result (@get $value_type))
             (i32.eq (global.get $NULL) (local.tee $bucket_index (call (@concat "$" (@get $name) "::find_bucket_index") (local.get $self) (local.get $key))))
             (then
-              (global.get $NULL))
+              (@get $empty_value))
             (else
               (call (@concat "$" (@get $name) "::get_bucket_value") (local.get $self) (local.get $bucket_index)))))
 

@@ -24,6 +24,7 @@ export default (describe) => {
           createUnitList,
           evaluate,
           format,
+          getStateDependencies,
           getListItem,
           getListLength,
           isList,
@@ -46,7 +47,7 @@ export default (describe) => {
             assert.ok(isList(result)), assert.strictEqual(format(getListItem(result, 0)), '0');
             assert.strictEqual(getListLength(result), numItems);
             assert.strictEqual(format(getListItem(result, numItems - 1)), `${numItems - 1}`);
-            assert.strictEqual(format(dependencies), 'NULL');
+            assert.deepEqual(getStateDependencies(dependencies), []);
           },
         );
       },

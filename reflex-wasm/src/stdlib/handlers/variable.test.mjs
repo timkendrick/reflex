@@ -15,6 +15,7 @@ export default (describe) => {
       createSymbol,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -28,9 +29,9 @@ export default (describe) => {
           format(result),
           '{<CustomCondition:"reflex::variable::get":[Symbol(123), 3]:null>}',
         );
-        assert.strictEqual(
-          format(dependencies),
-          '(<CustomCondition:"reflex::variable::get":[Symbol(123), 3]:null> . NULL)',
+        assert.deepEqual(
+          getStateDependencies(dependencies).map((dependency) => format(dependency)),
+          ['<CustomCondition:"reflex::variable::get":[Symbol(123), 3]:null>'],
         );
       })();
       (() => {
@@ -60,9 +61,9 @@ export default (describe) => {
           ]),
         );
         assert.strictEqual(format(result), '4');
-        assert.strictEqual(
-          format(dependencies),
-          '(<CustomCondition:"reflex::variable::get":[Symbol(123), 3]:null> . NULL)',
+        assert.deepEqual(
+          getStateDependencies(dependencies).map((dependency) => format(dependency)),
+          ['<CustomCondition:"reflex::variable::get":[Symbol(123), 3]:null>'],
         );
       })();
     });
@@ -74,6 +75,7 @@ export default (describe) => {
       createPair,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -83,7 +85,7 @@ export default (describe) => {
       );
       const [result, dependencies] = evaluate(expression, NULL);
       assert.strictEqual(format(result), '{<InvalidFunctionArgsCondition:GetVariable(123, 3)>}');
-      assert.strictEqual(format(dependencies), 'NULL');
+      assert.deepEqual(getStateDependencies(dependencies), []);
     });
   });
 
@@ -96,6 +98,7 @@ export default (describe) => {
       createTriple,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -108,9 +111,9 @@ export default (describe) => {
         format(result),
         '{<CustomCondition:"reflex::variable::set":[Symbol(123), 3]:Symbol(456)>}',
       );
-      assert.strictEqual(
-        format(dependencies),
-        '(<CustomCondition:"reflex::variable::set":[Symbol(123), 3]:Symbol(456)> . NULL)',
+      assert.deepEqual(
+        getStateDependencies(dependencies).map((dependency) => format(dependency)),
+        ['<CustomCondition:"reflex::variable::set":[Symbol(123), 3]:Symbol(456)>'],
       );
     });
 
@@ -122,6 +125,7 @@ export default (describe) => {
       createTriple,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -134,7 +138,7 @@ export default (describe) => {
         format(result),
         '{<InvalidFunctionArgsCondition:SetVariable(123, 3, Symbol(456))>}',
       );
-      assert.strictEqual(format(dependencies), 'NULL');
+      assert.deepEqual(getStateDependencies(dependencies), []);
     });
   });
 
@@ -146,6 +150,7 @@ export default (describe) => {
       createTriple,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -158,9 +163,9 @@ export default (describe) => {
         format(result),
         '{<CustomCondition:"reflex::variable::increment":[Symbol(123)]:Symbol(456)>}',
       );
-      assert.strictEqual(
-        format(dependencies),
-        '(<CustomCondition:"reflex::variable::increment":[Symbol(123)]:Symbol(456)> . NULL)',
+      assert.deepEqual(
+        getStateDependencies(dependencies).map((dependency) => format(dependency)),
+        ['<CustomCondition:"reflex::variable::increment":[Symbol(123)]:Symbol(456)>'],
       );
     });
 
@@ -172,6 +177,7 @@ export default (describe) => {
       createTriple,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -184,7 +190,7 @@ export default (describe) => {
         format(result),
         '{<InvalidFunctionArgsCondition:IncrementVariable(123, Symbol(456))>}',
       );
-      assert.strictEqual(format(dependencies), 'NULL');
+      assert.deepEqual(getStateDependencies(dependencies), []);
     });
   });
 
@@ -196,6 +202,7 @@ export default (describe) => {
       createTriple,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -208,9 +215,9 @@ export default (describe) => {
         format(result),
         '{<CustomCondition:"reflex::variable::decrement":[Symbol(123)]:Symbol(456)>}',
       );
-      assert.strictEqual(
-        format(dependencies),
-        '(<CustomCondition:"reflex::variable::decrement":[Symbol(123)]:Symbol(456)> . NULL)',
+      assert.deepEqual(
+        getStateDependencies(dependencies).map((dependency) => format(dependency)),
+        ['<CustomCondition:"reflex::variable::decrement":[Symbol(123)]:Symbol(456)>'],
       );
     });
 
@@ -222,6 +229,7 @@ export default (describe) => {
       createTriple,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -234,7 +242,7 @@ export default (describe) => {
         format(result),
         '{<InvalidFunctionArgsCondition:DecrementVariable(123, Symbol(456))>}',
       );
-      assert.strictEqual(format(dependencies), 'NULL');
+      assert.deepEqual(getStateDependencies(dependencies), []);
     });
   });
 };

@@ -11,6 +11,7 @@ export default (describe) => {
       createUnitList,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -21,7 +22,7 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), 'null');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -36,7 +37,7 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), 'null');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
 
@@ -54,6 +55,7 @@ export default (describe) => {
       createVariable,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -94,7 +96,7 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '{ "first": 3, "second": 5 }');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -114,7 +116,7 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '{ "first": 3, "second": 5 }');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
 
@@ -133,6 +135,7 @@ export default (describe) => {
       createVariable,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -167,7 +170,7 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '[]');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -179,7 +182,7 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '[]');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -207,7 +210,7 @@ export default (describe) => {
           format(result),
           '[{ "first": 1, "second": 3 }, { "first": 4, "second": 6 }, { "first": 7, "second": 9 }]',
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -255,7 +258,7 @@ export default (describe) => {
           format(result),
           '[{ "first": 1, "second": 3 }, { "first": 4, "second": 6 }, { "first": 7, "second": 9 }]',
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -313,7 +316,7 @@ export default (describe) => {
           format(result),
           '[[{ "first": 1, "second": 3 }, { "first": 4, "second": 6 }, { "first": 7, "second": 9 }], [{ "first": 10, "second": 12 }, { "first": 13, "second": 15 }, { "first": 16, "second": 18 }], [{ "first": 19, "second": 21 }, { "first": 22, "second": 24 }, { "first": 25, "second": 27 }]]',
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -472,7 +475,7 @@ export default (describe) => {
           format(result),
           '[[{ "first": 1, "second": 3 }, { "first": 4, "second": 6 }, { "first": 7, "second": 9 }], [{ "first": 10, "second": 12 }, { "first": 13, "second": 15 }, { "first": 16, "second": 18 }], [{ "first": 19, "second": 21 }, { "first": 22, "second": 24 }, { "first": 25, "second": 27 }]]',
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
 
@@ -492,6 +495,7 @@ export default (describe) => {
       createVariable,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -526,7 +530,7 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '[]');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -541,7 +545,7 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '[]');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -606,7 +610,7 @@ export default (describe) => {
           format(result),
           '[{ "first": 1, "second": 3 }, { "first": 4, "second": 6 }, { "first": 7, "second": 9 }]',
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -708,7 +712,7 @@ export default (describe) => {
           format(result),
           '[[{ "first": 1, "second": 3 }, { "first": 4, "second": 6 }, { "first": 7, "second": 9 }], [{ "first": 10, "second": 12 }, { "first": 13, "second": 15 }, { "first": 16, "second": 18 }], [{ "first": 19, "second": 21 }, { "first": 22, "second": 24 }, { "first": 25, "second": 27 }]]',
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
 
@@ -726,6 +730,7 @@ export default (describe) => {
       createVariable,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -769,7 +774,7 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '{ "first": 3, "second": 5 }');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -792,7 +797,7 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '{ "first": 3, "second": 5 }');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
 
@@ -809,6 +814,7 @@ export default (describe) => {
       createVariable,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -852,7 +858,7 @@ export default (describe) => {
         format(result),
         `{<InvalidFunctionArgsCondition:ResolveQueryBranch(Map(3), ${format(shape)})>}`,
       );
-      assert.strictEqual(format(dependencies), 'NULL');
+      assert.deepEqual(getStateDependencies(dependencies), []);
     });
 
     test('(Hashset)', (assert, {
@@ -868,6 +874,7 @@ export default (describe) => {
       createVariable,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -904,7 +911,7 @@ export default (describe) => {
         format(result),
         `{<InvalidFunctionArgsCondition:ResolveQueryBranch(Set(3), ${format(shape)})>}`,
       );
-      assert.strictEqual(format(dependencies), 'NULL');
+      assert.deepEqual(getStateDependencies(dependencies), []);
     });
 
     test('(Tree)', (assert, {
@@ -920,6 +927,7 @@ export default (describe) => {
       createVariable,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -956,7 +964,7 @@ export default (describe) => {
         format(result),
         `{<InvalidFunctionArgsCondition:ResolveQueryBranch((3 . 4), ${format(shape)})>}`,
       );
-      assert.strictEqual(format(dependencies), 'NULL');
+      assert.deepEqual(getStateDependencies(dependencies), []);
     });
   });
 };

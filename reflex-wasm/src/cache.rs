@@ -1,91 +1,66 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
+use reflex_macros::PointerIter;
+
 use crate::{
     allocator::Arena,
-    hash::{TermHashState, TermSize},
     term_type::{TreeTerm, TypedTerm},
     utils::{chunks_to_u64, u64_to_chunks},
-    ArenaPointer, ArenaRef, PointerIter, Term,
+    ArenaPointer, ArenaRef, Array, Term,
 };
 
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
-pub struct ApplicationCache {
+pub struct EvaluationCache {
+    pub num_entries: u32,
+    pub buckets: Array<EvaluationCacheBucket>,
+}
+
+impl<A: Arena + Clone> ArenaRef<EvaluationCache, A> {
+    pub fn num_entries(&self) -> usize {
+        self.read_value(|cache| cache.num_entries) as usize
+    }
+    pub fn num_buckets(&self) -> usize {
+        self.read_value(|cache| cache.buckets.len())
+    }
+}
+
+#[derive(Clone, Copy, Debug, PointerIter)]
+#[repr(C)]
+pub struct EvaluationCacheBucket {
+    pub key: [u32; 2],
     pub value: ArenaPointer,
     pub dependencies: ArenaPointer,
-    pub overall_state_hash: [u32; 2],
-    pub minimal_state_hash: [u32; 2],
 }
 
-pub type ApplicationCachePointerIter =
-    std::iter::Chain<std::option::IntoIter<ArenaPointer>, std::option::IntoIter<ArenaPointer>>;
-
-impl<A: Arena + Clone> PointerIter for ArenaRef<ApplicationCache, A> {
-    type Iter<'a> = ApplicationCachePointerIter
-    where
-        Self: 'a;
-    fn iter<'a>(&self) -> Self::Iter<'a>
-    where
-        Self: 'a,
-    {
-        let value = self.read_value(|term| {
-            term.value
-                .as_non_null()
-                .map(|_| self.inner_pointer(|term| &term.value))
-        });
-        let dependencies = self.read_value(|term| {
-            term.dependencies
-                .as_non_null()
-                .map(|_| self.inner_pointer(|term| &term.dependencies))
-        });
-        value.into_iter().chain(dependencies)
-    }
-}
-
-impl TermSize for ApplicationCache {
-    fn size_of(&self) -> usize {
-        std::mem::size_of::<Self>()
-    }
-}
-
-impl Default for ApplicationCache {
-    fn default() -> Self {
+impl EvaluationCacheBucket {
+    pub fn new(key: u64, value: ArenaPointer, dependencies: ArenaPointer) -> Self {
         Self {
-            value: ArenaPointer::null(),
-            dependencies: ArenaPointer::null(),
-            overall_state_hash: u64_to_chunks(0xFFFFFFFFFFFFFFFF),
-            minimal_state_hash: u64_to_chunks(0xFFFFFFFFFFFFFFFF),
+            key: u64_to_chunks(key),
+            value,
+            dependencies,
+        }
+    }
+    pub fn uninitialized() -> Self {
+        Self {
+            key: u64_to_chunks(0x0000000000000000),
+            value: ArenaPointer::uninitialized(),
+            dependencies: ArenaPointer::uninitialized(),
         }
     }
 }
 
-impl<A: Arena + Clone> ArenaRef<ApplicationCache, A> {
-    pub fn value(&self) -> Option<ArenaRef<Term, A>> {
-        let pointer = self.read_value(|value| value.value).as_non_null()?;
-        Some(ArenaRef::<Term, _>::new(self.arena.clone(), pointer))
+impl<A: Arena + Clone> ArenaRef<EvaluationCacheBucket, A> {
+    pub fn key(&self) -> u64 {
+        self.read_value(|bucket| chunks_to_u64(bucket.key))
+    }
+    pub fn value(&self) -> ArenaRef<Term, A> {
+        ArenaRef::<Term, _>::new(self.arena.clone(), self.read_value(|bucket| bucket.value))
     }
     pub fn dependencies(&self) -> Option<ArenaRef<TypedTerm<TreeTerm>, A>> {
-        let pointer = self.read_value(|value| value.dependencies).as_non_null()?;
-        Some(ArenaRef::<TypedTerm<TreeTerm>, _>::new(
-            self.arena.clone(),
-            pointer,
-        ))
-    }
-    pub fn overall_state_hash(&self) -> Option<TermHashState> {
-        let value = self.read_value(|value| chunks_to_u64(value.overall_state_hash));
-        if value == 0xFFFFFFFFFFFFFFFF {
-            None
-        } else {
-            Some(TermHashState::from(value))
-        }
-    }
-    pub fn minimal_state_hash(&self) -> Option<TermHashState> {
-        let value = self.read_value(|value| chunks_to_u64(value.minimal_state_hash));
-        if value == 0xFFFFFFFFFFFFFFFF {
-            None
-        } else {
-            Some(TermHashState::from(value))
-        }
+        let dependencies_pointer = self.read_value(|bucket| bucket.dependencies.as_non_null());
+        dependencies_pointer
+            .map(|pointer| ArenaRef::<TypedTerm<TreeTerm>, _>::new(self.arena.clone(), pointer))
     }
 }

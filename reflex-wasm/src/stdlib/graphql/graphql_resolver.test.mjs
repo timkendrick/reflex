@@ -15,6 +15,7 @@ export default (describe) => {
       createUnitList,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -40,7 +41,7 @@ export default (describe) => {
           format(result),
           '{ "query": null, "mutation": null, "subscription": null }',
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -64,7 +65,7 @@ export default (describe) => {
           format(result),
           '{ "query": "foo", "mutation": "bar", "subscription": "baz" }',
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -88,7 +89,7 @@ export default (describe) => {
           format(result),
           '{ "subscription": "foo", "query": "bar", "mutation": "baz" }',
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -105,7 +106,7 @@ export default (describe) => {
           format(result),
           '{<InvalidFunctionArgsCondition:GraphQlResolver({ "query": "foo", "mutation": "bar" })>}',
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
 
@@ -121,6 +122,7 @@ export default (describe) => {
       createVariable,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -149,7 +151,7 @@ export default (describe) => {
           format(result),
           '{ "query": "foo", "mutation": "bar", "subscription": "baz" }',
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -176,7 +178,7 @@ export default (describe) => {
           format(result),
           '{ "query": "foo", "mutation": "bar", "subscription": Symbol(123) }',
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
   });

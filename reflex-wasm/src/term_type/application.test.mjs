@@ -25,6 +25,7 @@ export default (describe) => {
       createPair,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -34,7 +35,7 @@ export default (describe) => {
       );
       const [result, dependencies] = evaluate(expression, NULL);
       assert.strictEqual(format(result), `${3 + 4}`);
-      assert.strictEqual(format(dependencies), 'NULL');
+      assert.deepEqual(getStateDependencies(dependencies), []);
     });
 
     test('nested function applications', (assert, {
@@ -44,6 +45,7 @@ export default (describe) => {
       createPair,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -56,7 +58,7 @@ export default (describe) => {
       );
       const [result, dependencies] = evaluate(expression, NULL);
       assert.strictEqual(format(result), `${3 + 4 - 1}`);
-      assert.strictEqual(format(dependencies), 'NULL');
+      assert.deepEqual(getStateDependencies(dependencies), []);
     });
 
     test('invalid target', (assert, {
@@ -65,12 +67,13 @@ export default (describe) => {
       createInt,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
     }) => {
       const expression = createApplication(createInt(3), createEmptyList());
       const [result, dependencies] = evaluate(expression, NULL);
       assert.strictEqual(format(result), '{<InvalidFunctionTargetCondition:3>}');
-      assert.strictEqual(format(dependencies), 'NULL');
+      assert.deepEqual(getStateDependencies(dependencies), []);
     });
 
     test('insufficient args', (assert, {
@@ -80,13 +83,14 @@ export default (describe) => {
       createUnitList,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
       const expression = createApplication(createBuiltin(Stdlib.Add), createUnitList(createInt(3)));
       const [result, dependencies] = evaluate(expression, NULL);
       assert.strictEqual(format(result), '{<InvalidFunctionArgsCondition:Add(3)>}');
-      assert.strictEqual(format(dependencies), 'NULL');
+      assert.deepEqual(getStateDependencies(dependencies), []);
     });
 
     test('short-circuit function target', (assert, {
@@ -98,6 +102,7 @@ export default (describe) => {
       createSymbol,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
     }) => {
       const expression = createApplication(
@@ -108,7 +113,7 @@ export default (describe) => {
       );
       const [result, dependencies] = evaluate(expression, NULL);
       assert.strictEqual(format(result), '{<CustomCondition:Symbol(123):"foo":Symbol(0)>}');
-      assert.strictEqual(format(dependencies), 'NULL');
+      assert.deepEqual(getStateDependencies(dependencies), []);
     });
 
     test('short-circuit single function arg', (assert, {
@@ -122,6 +127,7 @@ export default (describe) => {
       createSymbol,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -136,7 +142,7 @@ export default (describe) => {
       );
       const [result, dependencies] = evaluate(expression, NULL);
       assert.strictEqual(format(result), '{<CustomCondition:Symbol(123):"foo":Symbol(0)>}');
-      assert.strictEqual(format(dependencies), 'NULL');
+      assert.deepEqual(getStateDependencies(dependencies), []);
     });
 
     test('short-circuit multiple function args', (assert, {
@@ -149,6 +155,7 @@ export default (describe) => {
       createSymbol,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -168,7 +175,7 @@ export default (describe) => {
         format(result),
         '{<CustomCondition:Symbol(123):"foo":Symbol(0)>,<CustomCondition:Symbol(456):"bar":Symbol(0)>}',
       );
-      assert.strictEqual(format(dependencies), 'NULL');
+      assert.deepEqual(getStateDependencies(dependencies), []);
     });
 
     test('state dependencies', (assert, {
@@ -182,6 +189,7 @@ export default (describe) => {
       createSymbol,
       evaluate,
       format,
+      getStateDependencies,
       Stdlib,
     }) => {
       (() => {
@@ -200,9 +208,9 @@ export default (describe) => {
           ]),
         );
         assert.strictEqual(format(result), `${3 + 4}`);
-        assert.strictEqual(
-          format(dependencies),
-          '(<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)',
+        assert.deepEqual(
+          getStateDependencies(dependencies).map((dependency) => format(dependency)),
+          ['<CustomCondition:Symbol(123):3:Symbol(0)>'],
         );
       })();
       (() => {
@@ -219,9 +227,9 @@ export default (describe) => {
           ]),
         );
         assert.strictEqual(format(result), `${3 + 4}`);
-        assert.strictEqual(
-          format(dependencies),
-          '(<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)',
+        assert.deepEqual(
+          getStateDependencies(dependencies).map((dependency) => format(dependency)),
+          ['<CustomCondition:Symbol(123):3:Symbol(0)>'],
         );
       })();
       (() => {
@@ -239,9 +247,12 @@ export default (describe) => {
           ]),
         );
         assert.strictEqual(format(result), `${3 + 4}`);
-        assert.strictEqual(
-          format(dependencies),
-          '((<CustomCondition:Symbol(234):4:Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):3:Symbol(0)> . NULL))',
+        assert.deepEqual(
+          getStateDependencies(dependencies).map((dependency) => format(dependency)),
+          [
+            '<CustomCondition:Symbol(234):4:Symbol(0)>',
+            '<CustomCondition:Symbol(123):3:Symbol(0)>',
+          ],
         );
       })();
       (() => {
@@ -265,9 +276,13 @@ export default (describe) => {
           ]),
         );
         assert.strictEqual(format(result), `${3 + 4}`);
-        assert.strictEqual(
-          format(dependencies),
-          '(((<CustomCondition:Symbol(345):5:Symbol(0)> . NULL) . (<CustomCondition:Symbol(234):4:Symbol(0)> . NULL)) . (<CustomCondition:Symbol(123):3:Symbol(0)> . NULL))',
+        assert.deepEqual(
+          getStateDependencies(dependencies).map((dependency) => format(dependency)),
+          [
+            '<CustomCondition:Symbol(345):5:Symbol(0)>',
+            '<CustomCondition:Symbol(234):4:Symbol(0)>',
+            '<CustomCondition:Symbol(123):3:Symbol(0)>',
+          ],
         );
       })();
       (() => {
@@ -320,9 +335,17 @@ export default (describe) => {
           ]),
         );
         assert.strictEqual(format(result), `${3 + 4 + 5 + 6}`);
-        assert.strictEqual(
-          format(dependencies),
-          '(((((<CustomCondition:Symbol(789):9:Symbol(0)> . NULL) . (<CustomCondition:Symbol(678):8:Symbol(0)> . NULL)) . (<CustomCondition:Symbol(567):7:Symbol(0)> . NULL)) . (((<CustomCondition:Symbol(456):6:Symbol(0)> . NULL) . (<CustomCondition:Symbol(345):5:Symbol(0)> . NULL)) . (<CustomCondition:Symbol(234):4:Symbol(0)> . NULL))) . (<CustomCondition:Symbol(123):3:Symbol(0)> . NULL))',
+        assert.deepEqual(
+          getStateDependencies(dependencies).map((dependency) => format(dependency)),
+          [
+            '<CustomCondition:Symbol(789):9:Symbol(0)>',
+            '<CustomCondition:Symbol(678):8:Symbol(0)>',
+            '<CustomCondition:Symbol(567):7:Symbol(0)>',
+            '<CustomCondition:Symbol(456):6:Symbol(0)>',
+            '<CustomCondition:Symbol(345):5:Symbol(0)>',
+            '<CustomCondition:Symbol(234):4:Symbol(0)>',
+            '<CustomCondition:Symbol(123):3:Symbol(0)>',
+          ],
         );
       })();
     });
@@ -339,6 +362,7 @@ export default (describe) => {
       createSymbol,
       evaluate,
       format,
+      getStateDependencies,
       Stdlib,
       NULL,
     }) => {
@@ -360,9 +384,12 @@ export default (describe) => {
             format(result),
             '{<CustomCondition:Symbol(123):"foo":Symbol(0)>,<CustomCondition:Symbol(456):"bar":Symbol(0)>}',
           );
-          assert.strictEqual(
-            format(dependencies),
-            '((<CustomCondition:Symbol(456):"bar":Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):"foo":Symbol(0)> . NULL))',
+          assert.deepEqual(
+            getStateDependencies(dependencies).map((dependency) => format(dependency)),
+            [
+              '<CustomCondition:Symbol(456):"bar":Symbol(0)>',
+              '<CustomCondition:Symbol(123):"foo":Symbol(0)>',
+            ],
           );
         }
         {
@@ -372,9 +399,12 @@ export default (describe) => {
             format(result),
             '{<CustomCondition:Symbol(123):"foo":Symbol(0)>,<CustomCondition:Symbol(456):"bar":Symbol(0)>}',
           );
-          assert.strictEqual(
-            format(dependencies),
-            '((<CustomCondition:Symbol(456):"bar":Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):"foo":Symbol(0)> . NULL))',
+          assert.deepEqual(
+            getStateDependencies(dependencies).map((dependency) => format(dependency)),
+            [
+              '<CustomCondition:Symbol(456):"bar":Symbol(0)>',
+              '<CustomCondition:Symbol(123):"foo":Symbol(0)>',
+            ],
           );
         }
         {
@@ -386,9 +416,12 @@ export default (describe) => {
           ]);
           const [result, dependencies] = evaluate(expression, state);
           assert.strictEqual(format(result), '{<CustomCondition:Symbol(456):"bar":Symbol(0)>}');
-          assert.strictEqual(
-            format(dependencies),
-            '((<CustomCondition:Symbol(456):"bar":Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):"foo":Symbol(0)> . NULL))',
+          assert.deepEqual(
+            getStateDependencies(dependencies).map((dependency) => format(dependency)),
+            [
+              '<CustomCondition:Symbol(456):"bar":Symbol(0)>',
+              '<CustomCondition:Symbol(123):"foo":Symbol(0)>',
+            ],
           );
         }
         {
@@ -400,9 +433,12 @@ export default (describe) => {
           ]);
           const [result, dependencies] = evaluate(expression, state);
           assert.strictEqual(format(result), '{<CustomCondition:Symbol(456):"bar":Symbol(0)>}');
-          assert.strictEqual(
-            format(dependencies),
-            '((<CustomCondition:Symbol(456):"bar":Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):"foo":Symbol(0)> . NULL))',
+          assert.deepEqual(
+            getStateDependencies(dependencies).map((dependency) => format(dependency)),
+            [
+              '<CustomCondition:Symbol(456):"bar":Symbol(0)>',
+              '<CustomCondition:Symbol(123):"foo":Symbol(0)>',
+            ],
           );
         }
         {
@@ -418,9 +454,12 @@ export default (describe) => {
           ]);
           const [result, dependencies] = evaluate(expression, state);
           assert.strictEqual(format(result), '{<CustomCondition:Symbol(456):"bar":Symbol(0)>}');
-          assert.strictEqual(
-            format(dependencies),
-            '((<CustomCondition:Symbol(456):"bar":Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):"foo":Symbol(0)> . NULL))',
+          assert.deepEqual(
+            getStateDependencies(dependencies).map((dependency) => format(dependency)),
+            [
+              '<CustomCondition:Symbol(456):"bar":Symbol(0)>',
+              '<CustomCondition:Symbol(123):"foo":Symbol(0)>',
+            ],
           );
         }
         {
@@ -430,9 +469,12 @@ export default (describe) => {
             format(result),
             '{<CustomCondition:Symbol(123):"foo":Symbol(0)>,<CustomCondition:Symbol(456):"bar":Symbol(0)>}',
           );
-          assert.strictEqual(
-            format(dependencies),
-            '((<CustomCondition:Symbol(456):"bar":Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):"foo":Symbol(0)> . NULL))',
+          assert.deepEqual(
+            getStateDependencies(dependencies).map((dependency) => format(dependency)),
+            [
+              '<CustomCondition:Symbol(456):"bar":Symbol(0)>',
+              '<CustomCondition:Symbol(123):"foo":Symbol(0)>',
+            ],
           );
         }
         {
@@ -448,9 +490,12 @@ export default (describe) => {
           ]);
           const [result, dependencies] = evaluate(expression, state);
           assert.strictEqual(format(result), `${3 + 4}`);
-          assert.strictEqual(
-            format(dependencies),
-            '((<CustomCondition:Symbol(456):"bar":Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):"foo":Symbol(0)> . NULL))',
+          assert.deepEqual(
+            getStateDependencies(dependencies).map((dependency) => format(dependency)),
+            [
+              '<CustomCondition:Symbol(456):"bar":Symbol(0)>',
+              '<CustomCondition:Symbol(123):"foo":Symbol(0)>',
+            ],
           );
         }
         {
@@ -466,9 +511,12 @@ export default (describe) => {
           ]);
           const [result, dependencies] = evaluate(expression, state);
           assert.strictEqual(format(result), `${3 + 4}`);
-          assert.strictEqual(
-            format(dependencies),
-            '((<CustomCondition:Symbol(456):"bar":Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):"foo":Symbol(0)> . NULL))',
+          assert.deepEqual(
+            getStateDependencies(dependencies).map((dependency) => format(dependency)),
+            [
+              '<CustomCondition:Symbol(456):"bar":Symbol(0)>',
+              '<CustomCondition:Symbol(123):"foo":Symbol(0)>',
+            ],
           );
         }
         {
@@ -488,9 +536,12 @@ export default (describe) => {
           ]);
           const [result, dependencies] = evaluate(expression, state);
           assert.strictEqual(format(result), `${3 + 4}`);
-          assert.strictEqual(
-            format(dependencies),
-            '((<CustomCondition:Symbol(456):"bar":Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):"foo":Symbol(0)> . NULL))',
+          assert.deepEqual(
+            getStateDependencies(dependencies).map((dependency) => format(dependency)),
+            [
+              '<CustomCondition:Symbol(456):"bar":Symbol(0)>',
+              '<CustomCondition:Symbol(123):"foo":Symbol(0)>',
+            ],
           );
         }
       })();

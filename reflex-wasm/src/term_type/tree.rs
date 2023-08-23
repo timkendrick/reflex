@@ -31,6 +31,7 @@ pub struct TreeTerm {
     pub left: ArenaPointer,
     pub right: ArenaPointer,
     pub length: u32,
+    pub depth: u32,
 }
 impl TermSize for TreeTerm {
     fn size_of(&self) -> usize {
@@ -51,7 +52,7 @@ impl TermHash for TreeTerm {
             let right_hash = arena.read_value::<Term, _>(self.right, |term| term.id());
             hasher.hash(&right_hash, arena)
         };
-        hasher.hash(&self.length, arena)
+        hasher.hash(&self.length, arena).hash(&self.depth, arena)
     }
 }
 
@@ -78,8 +79,14 @@ impl<A: Arena + Clone> ArenaRef<TreeTerm, A> {
     pub fn nodes(&self) -> IntoArenaRefIter<'_, Term, A, TreeIterator<'_, A>> {
         IntoArenaRefIter::new(&self.arena, self.iter())
     }
+    pub fn typed_nodes<V>(&self) -> IntoArenaRefIter<'_, TypedTerm<V>, A, TreeIterator<'_, A>> {
+        IntoArenaRefIter::new(&self.arena, self.iter())
+    }
     pub fn len(&self) -> u32 {
         self.read_value(|term| term.length)
+    }
+    pub fn depth(&self) -> u32 {
+        self.read_value(|term| term.depth)
     }
 }
 
@@ -542,14 +549,16 @@ mod tests {
             TermType::Tree(TreeTerm {
                 left: ArenaPointer(0x54321),
                 right: ArenaPointer(0x98765),
-                length: 0x12345
+                length: 0x12345,
+                depth: 0x67890,
             })
             .as_bytes(),
             [
                 TermTypeDiscriminants::Tree as u32,
                 0x54321,
                 0x98765,
-                0x12345
+                0x12345,
+                0x67890,
             ],
         );
     }

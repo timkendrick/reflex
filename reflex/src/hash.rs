@@ -9,7 +9,10 @@ use std::{
 };
 
 pub use fnv::{FnvHashMap, FnvHashSet, FnvHasher};
-pub use nohash_hasher::{IntMap, IntSet};
+pub use nohash_hasher::{BuildNoHashHasher, IntMap, IntSet, IsEnabled, NoHashHasher};
+
+pub type ImmutableIntSet<T> = im_rc::HashSet<T, BuildNoHashHasher<T>>;
+pub type ImmutableIntMap<K, V> = im_rc::HashMap<K, V, BuildNoHashHasher<K>>;
 
 pub type HashId = u64;
 

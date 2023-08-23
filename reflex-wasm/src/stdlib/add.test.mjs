@@ -10,38 +10,54 @@ export default (describe) => {
       createPair,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
       (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Add), createPair(createInt(3), createInt(4)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Add),
+          createPair(createInt(3), createInt(4)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), `${3 + 4}`);
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Add), createPair(createInt(3), createInt(-1)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Add),
+          createPair(createInt(3), createInt(-1)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), `${3 + -1}`);
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Add), createPair(createInt(3), createInt(-4)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Add),
+          createPair(createInt(3), createInt(-4)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), `${3 + -4}`);
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Add), createPair(createInt(-3), createInt(4)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Add),
+          createPair(createInt(-3), createInt(4)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), `${-3 + 4}`);
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Add), createPair(createInt(-3), createInt(-4)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Add),
+          createPair(createInt(-3), createInt(-4)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), `${-3 + -4}`);
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
 
@@ -52,68 +68,99 @@ export default (describe) => {
       createPair,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
       (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Add), createPair(createFloat(3), createFloat(4)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Add),
+          createPair(createFloat(3), createFloat(4)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), `${3 + 4}.0`);
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Add), createPair(createFloat(3), createFloat(-1)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Add),
+          createPair(createFloat(3), createFloat(-1)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), `${3 + -1}.0`);
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Add), createPair(createFloat(3), createFloat(-4)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Add),
+          createPair(createFloat(3), createFloat(-4)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), `${3 + -4}.0`);
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Add), createPair(createFloat(-3), createFloat(4)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Add),
+          createPair(createFloat(-3), createFloat(4)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), `${-3 + 4}.0`);
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Add), createPair(createFloat(-3), createFloat(-4)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Add),
+          createPair(createFloat(-3), createFloat(-4)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), `${-3 + -4}.0`);
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Add), createPair(createFloat(3.142), createFloat(2.718)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Add),
+          createPair(createFloat(3.142), createFloat(2.718)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), `${3.142 + 2.718}`);
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Add), createPair(createFloat(3.142), createFloat(-2.718)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Add),
+          createPair(createFloat(3.142), createFloat(-2.718)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), `${3.142 + -2.718}`);
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Add), createPair(createFloat(2.718), createFloat(-3.142)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Add),
+          createPair(createFloat(2.718), createFloat(-3.142)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), `${2.718 + -3.142}`);
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Add), createPair(createFloat(-2.718), createFloat(3.142)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Add),
+          createPair(createFloat(-2.718), createFloat(3.142)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), `${-2.718 + 3.142}`);
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Add), createPair(createFloat(-2.718), createFloat(-3.142)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Add),
+          createPair(createFloat(-2.718), createFloat(-3.142)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), `${-2.718 + -3.142}`);
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
 
@@ -125,6 +172,7 @@ export default (describe) => {
       createPair,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -135,7 +183,7 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), `${0 + 0}.0`);
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -144,7 +192,7 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), `${0 + 0}.0`);
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -153,7 +201,7 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), `${3 + 3}.0`);
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -162,7 +210,7 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), `${3 + 3}.0`);
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -171,7 +219,7 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), `${3 + 3.142}`);
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -180,7 +228,7 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), `${3.142 + 3}`);
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
   });

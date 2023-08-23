@@ -358,7 +358,6 @@ impl<T: Expression> ConditionType<T> for Signal<T> {
         self.id
     }
     fn signal_type(&self) -> SignalType<T> {
-        // FIXME: Prevent unnecessary cloning of signal type
         self.signal_type.clone()
     }
 }

@@ -9,13 +9,14 @@ export default (describe) => {
       createBuiltin,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
       const expression = createApplication(createBuiltin(Stdlib.CollectHashset), createEmptyList());
       const [result, dependencies] = evaluate(expression, NULL);
       assert.strictEqual(format(result), 'Set(0)');
-      assert.strictEqual(format(dependencies), 'NULL');
+      assert.deepEqual(getStateDependencies(dependencies), []);
     });
 
     test('(String, String, String)', (assert, {
@@ -27,6 +28,7 @@ export default (describe) => {
       createTriple,
       evaluate,
       format,
+      getStateDependencies,
       hasHashsetValue,
       NULL,
       Stdlib,
@@ -42,7 +44,7 @@ export default (describe) => {
         assert.strictEqual(hasHashsetValue(result, createString('bar')), true);
         assert.strictEqual(hasHashsetValue(result, createString('baz')), true);
         assert.strictEqual(hasHashsetValue(result, createString('qux')), false);
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -59,7 +61,7 @@ export default (describe) => {
         assert.strictEqual(hasHashsetValue(result, createString('bar')), true);
         assert.strictEqual(hasHashsetValue(result, createString('baz')), true);
         assert.strictEqual(hasHashsetValue(result, createString('qux')), false);
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
   });

@@ -10,6 +10,7 @@ export default (describe) => {
       createPair,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -20,28 +21,28 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '3');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
 
-    test('(Effect, Builtin)', (assert, runtime) => {
-      const {
-        createApplication,
-        createBuiltin,
-        createCustomCondition,
-        createEffect,
-        createErrorCondition,
-        createHashmap,
-        createInt,
-        createPair,
-        createSignal,
-        createString,
-        createSymbol,
-        evaluate,
-        format,
-        NULL,
-        Stdlib,
-      } = runtime;
+    test('(Effect, Builtin)', (assert, {
+      createApplication,
+      createBuiltin,
+      createCustomCondition,
+      createEffect,
+      createErrorCondition,
+      createHashmap,
+      createInt,
+      createPair,
+      createSignal,
+      createString,
+      createSymbol,
+      evaluate,
+      format,
+      getStateDependencies,
+      NULL,
+      Stdlib,
+    }) => {
       (() => {
         const expression = createApplication(
           createBuiltin(Stdlib.IfError),
@@ -52,9 +53,9 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '{<CustomCondition:Symbol(123):3:Symbol(0)>}');
-        assert.strictEqual(
-          format(dependencies),
-          '(<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)',
+        assert.deepEqual(
+          getStateDependencies(dependencies).map((dependency) => format(dependency)),
+          ['<CustomCondition:Symbol(123):3:Symbol(0)>'],
         );
       })();
       (() => {
@@ -75,9 +76,9 @@ export default (describe) => {
           ]),
         );
         assert.strictEqual(format(result), '["foo"]');
-        assert.strictEqual(
-          format(dependencies),
-          '(<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)',
+        assert.deepEqual(
+          getStateDependencies(dependencies).map((dependency) => format(dependency)),
+          ['<CustomCondition:Symbol(123):3:Symbol(0)>'],
         );
       })();
       (() => {
@@ -98,9 +99,9 @@ export default (describe) => {
           ]),
         );
         assert.strictEqual(format(result), '1');
-        assert.strictEqual(
-          format(dependencies),
-          '(<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)',
+        assert.deepEqual(
+          getStateDependencies(dependencies).map((dependency) => format(dependency)),
+          ['<CustomCondition:Symbol(123):3:Symbol(0)>'],
         );
       })();
       (() => {
@@ -142,9 +143,14 @@ export default (describe) => {
           format(result),
           '{<CustomCondition:Symbol(123):3:Symbol(0)>,<CustomCondition:Symbol(234):4:Symbol(0)>,<CustomCondition:Symbol(345):5:Symbol(0)>,<CustomCondition:Symbol(456):6:Symbol(0)>}',
         );
-        assert.strictEqual(
-          format(dependencies),
-          '(((<CustomCondition:Symbol(456):6:Symbol(0)> . NULL) . (<CustomCondition:Symbol(345):5:Symbol(0)> . NULL)) . ((<CustomCondition:Symbol(234):4:Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)))',
+        assert.deepEqual(
+          getStateDependencies(dependencies).map((dependency) => format(dependency)),
+          [
+            '<CustomCondition:Symbol(456):6:Symbol(0)>',
+            '<CustomCondition:Symbol(345):5:Symbol(0)>',
+            '<CustomCondition:Symbol(234):4:Symbol(0)>',
+            '<CustomCondition:Symbol(123):3:Symbol(0)>',
+          ],
         );
       })();
       (() => {
@@ -191,9 +197,14 @@ export default (describe) => {
           ]),
         );
         assert.strictEqual(format(result), `${3 + 4 + 5 + 6}`);
-        assert.strictEqual(
-          format(dependencies),
-          '(((<CustomCondition:Symbol(456):6:Symbol(0)> . NULL) . (<CustomCondition:Symbol(345):5:Symbol(0)> . NULL)) . ((<CustomCondition:Symbol(234):4:Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)))',
+        assert.deepEqual(
+          getStateDependencies(dependencies).map((dependency) => format(dependency)),
+          [
+            '<CustomCondition:Symbol(456):6:Symbol(0)>',
+            '<CustomCondition:Symbol(345):5:Symbol(0)>',
+            '<CustomCondition:Symbol(234):4:Symbol(0)>',
+            '<CustomCondition:Symbol(123):3:Symbol(0)>',
+          ],
         );
       })();
       (() => {
@@ -247,9 +258,14 @@ export default (describe) => {
           format(result),
           '{<CustomCondition:Symbol(123):3:Symbol(0)>,<CustomCondition:Symbol(345):5:Symbol(0)>}',
         );
-        assert.strictEqual(
-          format(dependencies),
-          '(((<CustomCondition:Symbol(456):6:Symbol(0)> . NULL) . (<CustomCondition:Symbol(345):5:Symbol(0)> . NULL)) . ((<CustomCondition:Symbol(234):4:Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)))',
+        assert.deepEqual(
+          getStateDependencies(dependencies).map((dependency) => format(dependency)),
+          [
+            '<CustomCondition:Symbol(456):6:Symbol(0)>',
+            '<CustomCondition:Symbol(345):5:Symbol(0)>',
+            '<CustomCondition:Symbol(234):4:Symbol(0)>',
+            '<CustomCondition:Symbol(123):3:Symbol(0)>',
+          ],
         );
       })();
       (() => {
@@ -308,9 +324,14 @@ export default (describe) => {
           ]),
         );
         assert.strictEqual(format(result), '["foo", "bar", "baz", "qux"]');
-        assert.strictEqual(
-          format(dependencies),
-          '(((<CustomCondition:Symbol(456):6:Symbol(0)> . NULL) . (<CustomCondition:Symbol(345):5:Symbol(0)> . NULL)) . ((<CustomCondition:Symbol(234):4:Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)))',
+        assert.deepEqual(
+          getStateDependencies(dependencies).map((dependency) => format(dependency)),
+          [
+            '<CustomCondition:Symbol(456):6:Symbol(0)>',
+            '<CustomCondition:Symbol(345):5:Symbol(0)>',
+            '<CustomCondition:Symbol(234):4:Symbol(0)>',
+            '<CustomCondition:Symbol(123):3:Symbol(0)>',
+          ],
         );
       })();
     });

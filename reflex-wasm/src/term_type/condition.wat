@@ -4,7 +4,6 @@
 (module
   (@let $Condition
     (@union $Condition
-
       (@struct $CustomCondition
         (@field $effect_type (@ref $Term))
         (@field $payload (@ref $Term))
@@ -28,47 +27,47 @@
 
       (@struct $InvalidPointerCondition))
 
-      (@derive $size (@get $Condition))
-      (@derive $equals (@get $Condition))
-      (@derive $hash (@get $Condition))
-      (@map $typename
-        (@union_variants (@get $Condition))
-        (@block
-          (@derive $size (@union_variant (@get $Condition) (@get $_)))
-          (@derive $equals (@union_variant (@get $Condition) (@get $_)))
-          (@derive $hash (@union_variant (@get $Condition) (@get $_)))))
+    (@derive $size (@get $Condition))
+    (@derive $equals (@get $Condition))
+    (@derive $hash (@get $Condition))
+    (@map $typename
+      (@union_variants (@get $Condition))
+      (@block
+        (@derive $size (@union_variant (@get $Condition) (@get $_)))
+        (@derive $equals (@union_variant (@get $Condition) (@get $_)))
+        (@derive $hash (@union_variant (@get $Condition) (@get $_)))))
 
-      (@export $Condition (@get $Condition))
+    (@export $Condition (@get $Condition))
 
-      ;; Declare global term type constants
-      (@map $typename
-        (@union_variants (@get $Condition))
-        (@block
-          (global (@concat "$Condition::" (@get $typename)) (export (@concat "\"" "ConditionType_" (@get $typename) "\"")) i32 (i32.const (@get $_)))
+    ;; Declare global term type constants
+    (@map $typename
+      (@union_variants (@get $Condition))
+      (@block
+        (global (@concat "$Condition::" (@get $typename)) (export (@concat "\"" "ConditionType_" (@get $typename) "\"")) i32 (i32.const (@get $_)))
 
-          (func (@concat "$Condition::" (@get $typename) "::sizeof") (result i32)
-            (i32.add
-              ;; Add 4 bytes for the discriminant
-              (i32.const 4)
-              ;; Add the size of the underlying condition type
-              (call (@concat "$" (@get $typename) "::sizeof"))))))
+        (func (@concat "$Condition::" (@get $typename) "::sizeof") (result i32)
+          (i32.add
+            ;; Add 4 bytes for the discriminant
+            (i32.const 4)
+            ;; Add the size of the underlying type variant
+            (call (@concat "$" (@get $typename) "::sizeof"))))))
 
-      ;; Generate display formatters for condition types
-      (func $ConditionType::display (param $variant i32) (param $offset i32) (result i32)
-        (@branch
-          (local.get $variant)
-          (@list
-            (@map $typename
-              (@union_variants (@get $Condition))
-              (return (call (@concat "$ConditionType::" (@get $typename) "::display") (local.get $offset)))))
-          (local.get $offset)))
+    ;; Generate display formatters for all type variants
+    (func $ConditionType::display (param $variant i32) (param $offset i32) (result i32)
+      (@branch
+        (local.get $variant)
+        (@list
+          (@map $typename
+            (@union_variants (@get $Condition))
+            (return (call (@concat "$ConditionType::" (@get $typename) "::display") (local.get $offset)))))
+        (local.get $offset)))
 
-      (@map $typename
-        (@union_variants (@get $Condition))
-        (@block
-          (func (@concat "$ConditionType::" (@get $typename) "::display") (param $offset i32) (result i32)
-            (@store-bytes $offset (@to-string (@get $typename)))
-            (i32.add (local.get $offset))))))
+    (@map $typename
+      (@union_variants (@get $Condition))
+      (@block
+        (func (@concat "$ConditionType::" (@get $typename) "::display") (param $offset i32) (result i32)
+          (@store-bytes $offset (@to-string (@get $typename)))
+          (i32.add (local.get $offset))))))
 
   (export "isCondition" (func $Term::Condition::is))
   (export "getConditionType" (func $Term::Condition::get::type))
@@ -94,6 +93,12 @@
 
   (func $Term::Condition::invalid_function_args (export "createInvalidFunctionArgsCondition") (param $target i32) (param $args i32) (result i32)
     (call $Term::TermType::Condition::InvalidFunctionArgsCondition::new (local.get $target) (local.get $args)))
+
+  (func $Term::Condition::invalid_builtin_function_target (export "createInvalidBuiltinFunctionTarget") (param $target i32) (result i32)
+    (call $Term::Condition::invalid_function_target (call $Term::Builtin::new (local.get $target))))
+
+  (func $Term::Condition::invalid_builtin_function_args (export "createInvalidBuiltinFunctionArgs") (param $target i32) (param $args i32) (result i32)
+    (call $Term::Condition::invalid_function_args (call $Term::Builtin::new (local.get $target)) (local.get $args)))
 
   (func $Term::Condition::invalid_pointer (export "createInvalidPointerCondition") (result i32)
     (global.get $Term::Condition::INVALID_POINTER))
@@ -133,9 +138,6 @@
   (func $Term::Condition::InvalidFunctionArgsCondition::get::args (export "getInvalidFunctionArgsConditionArgs") (param $self i32) (result i32)
     (call $Term::Condition::get::value (local.get $self))
     (call $InvalidFunctionArgsCondition::get::args))
-
-  (func $Term::Condition::invalid_builtin_function_args (param $target i32) (param $args i32) (result i32)
-    (call $Term::Condition::invalid_function_args (call $Term::Builtin::new (local.get $target)) (local.get $args)))
 
   (func $Term::Condition::traits::is_atomic (param $self i32) (result i32)
     (global.get $TRUE))

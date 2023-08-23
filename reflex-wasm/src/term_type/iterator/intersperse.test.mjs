@@ -6,7 +6,6 @@ export default (describe) => {
     test('iteration', (assert, {
       createApplication,
       createEmptyIterator,
-      createEvaluateIterator,
       createBuiltin,
       createInt,
       createIntersperseIterator,
@@ -16,66 +15,54 @@ export default (describe) => {
       createUnitList,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
       (() => {
         const expression = createApplication(
           createBuiltin(Stdlib.ResolveList),
-          createUnitList(
-            createEvaluateIterator(
-              createIntersperseIterator(createEmptyIterator(), createString('foo')),
-            ),
-          ),
+          createUnitList(createIntersperseIterator(createEmptyIterator(), createString('foo'))),
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '[]');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
           createBuiltin(Stdlib.ResolveList),
           createUnitList(
-            createEvaluateIterator(
-              createIntersperseIterator(createUnitList(createInt(3)), createString('foo')),
-            ),
+            createIntersperseIterator(createUnitList(createInt(3)), createString('foo')),
           ),
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '[3]');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
           createBuiltin(Stdlib.ResolveList),
           createUnitList(
-            createEvaluateIterator(
-              createIntersperseIterator(
-                createPair(createInt(3), createInt(4)),
-                createString('foo'),
-              ),
-            ),
+            createIntersperseIterator(createPair(createInt(3), createInt(4)), createString('foo')),
           ),
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '[3, "foo", 4]');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
           createBuiltin(Stdlib.ResolveList),
           createUnitList(
-            createEvaluateIterator(
-              createIntersperseIterator(
-                createTriple(createInt(3), createInt(4), createInt(5)),
-                createString('foo'),
-              ),
+            createIntersperseIterator(
+              createTriple(createInt(3), createInt(4), createInt(5)),
+              createString('foo'),
             ),
           ),
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '[3, "foo", 4, "foo", 5]');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
   });

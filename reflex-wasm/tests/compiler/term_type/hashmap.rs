@@ -1,20 +1,42 @@
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
-use reflex::core::{Expression, ExpressionFactory, HeapAllocator};
-use reflex_wasm::stdlib;
+use reflex::core::{Expression, ExpressionFactory, HeapAllocator, NodeId};
+use reflex_wasm::{allocator::Arena, stdlib};
 
-use crate::{compiler::runner::run_scenario, WasmTestScenario};
+use crate::{
+    compiler::runner::{run_scenario, WasmTestScenarioResult},
+    WasmTestScenario,
+};
 
 #[test]
 fn hashmap_term() {
     let scenario = HashmapTermStaticEntriesScenario;
     let (actual, expected) = run_scenario(&scenario).unwrap();
-    assert_eq!(actual, expected);
+    assert_hashmap_result(actual, expected);
 
     let scenario = HashmapTermDynamicEntriesScenario;
     let (actual, expected) = run_scenario(&scenario).unwrap();
-    assert_eq!(actual, expected);
+    assert_hashmap_result(actual, expected);
+}
+
+fn assert_hashmap_result<A: Arena + Clone>(
+    actual: WasmTestScenarioResult<A>,
+    expected: WasmTestScenarioResult<A>,
+) {
+    let hashmap_result = actual.result.as_hashmap_term().unwrap().as_inner();
+    let expected_result = expected.result.as_hashmap_term().unwrap().as_inner();
+    assert_eq!(hashmap_result.num_entries(), expected_result.num_entries());
+    let hashmap_entries = hashmap_result.keys().zip(hashmap_result.values());
+    let expected_entries = expected_result.keys().zip(expected_result.values());
+    for (key, value) in hashmap_entries {
+        let expected_value = expected_entries
+            .clone()
+            .find(|(expected_key, _)| expected_key.id() == key.id())
+            .map(|(_, value)| value)
+            .unwrap();
+        assert_eq!(value, expected_value);
+    }
 }
 
 struct HashmapTermStaticEntriesScenario;

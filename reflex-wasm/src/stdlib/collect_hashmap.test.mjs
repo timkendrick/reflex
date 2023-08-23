@@ -9,13 +9,14 @@ export default (describe) => {
       createBuiltin,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
       const expression = createApplication(createBuiltin(Stdlib.CollectHashmap), createEmptyList());
       const [result, dependencies] = evaluate(expression, NULL);
       assert.strictEqual(format(result), 'Map(0)');
-      assert.strictEqual(format(dependencies), 'NULL');
+      assert.deepEqual(getStateDependencies(dependencies), []);
     });
 
     test('(String, Int, String, Int, String, Int)', (assert, {
@@ -28,6 +29,7 @@ export default (describe) => {
       createString,
       evaluate,
       format,
+      getStateDependencies,
       getHashmapValue,
       NULL,
       Stdlib,
@@ -49,7 +51,7 @@ export default (describe) => {
         assert.strictEqual(format(getHashmapValue(result, createString('foo'))), '3');
         assert.strictEqual(format(getHashmapValue(result, createString('bar'))), '4');
         assert.strictEqual(format(getHashmapValue(result, createString('baz'))), '5');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -68,7 +70,7 @@ export default (describe) => {
         assert.strictEqual(format(getHashmapValue(result, createString('foo'))), '3');
         assert.strictEqual(format(getHashmapValue(result, createString('bar'))), '4');
         assert.strictEqual(format(getHashmapValue(result, createString('baz'))), '5');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
 
@@ -80,6 +82,7 @@ export default (describe) => {
       createString,
       evaluate,
       format,
+      getStateDependencies,
       getHashmapValue,
       NULL,
       Stdlib,
@@ -100,7 +103,7 @@ export default (describe) => {
         assert.strictEqual(format(result), 'Map(2)');
         assert.strictEqual(format(getHashmapValue(result, createString('foo'))), '5');
         assert.strictEqual(format(getHashmapValue(result, createString('bar'))), '4');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
 
@@ -113,6 +116,7 @@ export default (describe) => {
       evaluate,
       format,
       getHashmapValue,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -131,7 +135,7 @@ export default (describe) => {
         assert.strictEqual(format(result), 'Map(2)');
         assert.strictEqual(format(getHashmapValue(result, createString('foo'))), '3');
         assert.strictEqual(format(getHashmapValue(result, createString('bar'))), '4');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
   });

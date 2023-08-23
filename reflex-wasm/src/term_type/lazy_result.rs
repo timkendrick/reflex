@@ -149,7 +149,7 @@ impl<A: Arena + Clone> std::fmt::Debug for ArenaRef<LazyResultTerm, A> {
 
 impl<A: Arena + Clone> std::fmt::Display for ArenaRef<LazyResultTerm, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<lazy:{}>", self.value())
+        write!(f, "<lazy:{}:{}>", self.value(), self.dependencies())
     }
 }
 

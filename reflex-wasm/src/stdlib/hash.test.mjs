@@ -9,6 +9,7 @@ export default (describe) => {
       createEmptyList,
       evaluate,
       format,
+      getStateDependencies,
       hash,
       NULL,
       Stdlib,
@@ -20,7 +21,7 @@ export default (describe) => {
           format(result),
           `Symbol(${Number(hash(createEmptyList()) & BigInt(0x00000000ffffffff))})`,
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
 
@@ -31,6 +32,7 @@ export default (describe) => {
       createUnitList,
       evaluate,
       format,
+      getStateDependencies,
       hash,
       NULL,
       Stdlib,
@@ -45,7 +47,7 @@ export default (describe) => {
           format(result),
           `Symbol(${Number(hash(createUnitList(createInt(0))) & BigInt(0x00000000ffffffff))})`,
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -57,7 +59,7 @@ export default (describe) => {
           format(result),
           `Symbol(${Number(hash(createUnitList(createInt(3))) & BigInt(0x00000000ffffffff))})`,
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -69,7 +71,7 @@ export default (describe) => {
           format(result),
           `Symbol(${Number(hash(createUnitList(createInt(-3))) & BigInt(0x00000000ffffffff))})`,
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
 
@@ -80,6 +82,7 @@ export default (describe) => {
       createUnitList,
       evaluate,
       format,
+      getStateDependencies,
       hash,
       NULL,
       Stdlib,
@@ -94,7 +97,7 @@ export default (describe) => {
           format(result),
           `Symbol(${Number(hash(createUnitList(createString(''))) & BigInt(0x00000000ffffffff))})`,
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -108,7 +111,7 @@ export default (describe) => {
             hash(createUnitList(createString('foo'))) & BigInt(0x00000000ffffffff),
           )})`,
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
 
@@ -119,6 +122,7 @@ export default (describe) => {
       createTriple,
       evaluate,
       format,
+      getStateDependencies,
       hash,
       NULL,
       Stdlib,
@@ -136,7 +140,7 @@ export default (describe) => {
               BigInt(0x00000000ffffffff),
           )})`,
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
   });

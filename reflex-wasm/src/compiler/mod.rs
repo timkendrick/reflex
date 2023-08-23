@@ -31,7 +31,7 @@ use crate::{
         list::{collect_compiled_list_values, Strictness},
         TermType, TermTypeDiscriminants, WasmExpression,
     },
-    ArenaPointer, ArenaRef, Array, IntoArenaRefIterator, PointerIter, Term,
+    ArenaPointer, ArenaPointerIterator, ArenaRef, Array, PointerIter, Term,
 };
 
 pub mod error;
@@ -550,7 +550,7 @@ impl CompilerState {
                 let end_offset = arena.end_offset();
                 let next_offset = end_offset;
                 let allocated_terms = ArenaIterator::<T, _>::new(arena, start_offset, end_offset)
-                    .as_arena_refs::<T>(&arena)
+                    .into_arena_refs::<T, _>(&arena)
                     .map(|term| (term.id(), term.pointer));
                 SerializerState::new(allocated_terms, next_offset)
             },
@@ -1783,6 +1783,10 @@ impl<A: Arena + Clone> CompileWasm<A> for ArenaRef<Term, A> {
                 .compile(stack, state, options),
             TermTypeDiscriminants::Constructor => self
                 .as_typed_term::<ConstructorTerm>()
+                .as_inner()
+                .compile(stack, state, options),
+            TermTypeDiscriminants::Dependency => self
+                .as_typed_term::<DependencyTerm>()
                 .as_inner()
                 .compile(stack, state, options),
             TermTypeDiscriminants::Effect => self

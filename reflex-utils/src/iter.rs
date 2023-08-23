@@ -60,10 +60,24 @@ pub struct MapIntoIterator<T: Iterator<Item = T1>, T1, T2: From<T1>> {
     _from: PhantomData<T1>,
     _to: PhantomData<T2>,
 }
+
 impl<T: Iterator<Item = T1>, T1, T2: From<T1>> MapIntoIterator<T, T1, T2> {
     pub fn new(inner: T) -> Self {
         Self {
             inner,
+            _from: PhantomData,
+            _to: PhantomData,
+        }
+    }
+}
+
+impl<T: Iterator<Item = T1>, T1, T2: From<T1>> Clone for MapIntoIterator<T, T1, T2>
+where
+    T: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
             _from: PhantomData,
             _to: PhantomData,
         }

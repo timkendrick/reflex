@@ -71,6 +71,13 @@ function createConditionTypes(runtime) {
   };
 }
 
+function createDependencyTypes(runtime) {
+  return {
+    Cache: runtime.DependencyType_CacheDependency.value,
+    State: runtime.DependencyType_StateDependency.value,
+  };
+}
+
 function createStdlib(runtime) {
   return {
     Abs: runtime.__Stdlib_Abs.value,
@@ -178,6 +185,7 @@ export function createRuntime(runtime) {
   const constants = {
     TermType: createTermTypes(runtime),
     ConditionType: createConditionTypes(runtime),
+    DependencyType: createDependencyTypes(runtime),
     Stdlib: createStdlib(runtime),
   };
   return {
@@ -186,6 +194,7 @@ export function createRuntime(runtime) {
     NULL,
     TermType: constants.TermType,
     ConditionType: constants.ConditionType,
+    DependencyType: constants.DependencyType,
     Stdlib: constants.Stdlib,
     exports: runtime,
     getTermType(value) {
@@ -448,12 +457,6 @@ export function createRuntime(runtime) {
     getApplicationCacheDependencies(value) {
       return runtime.getApplicationCacheDependencies(value);
     },
-    getApplicationCacheOverallStateId(value) {
-      return runtime.getApplicationCacheOverallStateId(value);
-    },
-    getApplicationCacheMinimalStateId(value) {
-      return runtime.getApplicationCacheMinimalStateId(value);
-    },
     createList(items) {
       const instance = runtime.allocateList(items.length);
       const offset = runtime.getListItems(instance);
@@ -508,6 +511,18 @@ export function createRuntime(runtime) {
     },
     getConstructorKeys(value) {
       return runtime.getConstructorKeys(value);
+    },
+    isDependency(value) {
+      return runtime.isDependency(value);
+    },
+    getDependencyType(value) {
+      return runtime.getDependencyType(value);
+    },
+    getCacheDependencyKey(value) {
+      return runtime.getCacheDependencyKey(value);
+    },
+    getStateDependencyCondition(value) {
+      return runtime.getStateDependencyCondition(value);
     },
     createHashmap(entries) {
       const instance = runtime.allocateHashmap(runtime.defaultHashmapCapacity(entries.length));
@@ -570,6 +585,12 @@ export function createRuntime(runtime) {
     },
     getTreeLength(value) {
       return runtime.getTreeLength(value);
+    },
+    getTreeDepth(value) {
+      return runtime.getTreeDepth(value);
+    },
+    getTreeValues(value) {
+      return getTreeValues(value);
     },
     createEmptyIterator() {
       return runtime.createEmptyIterator();
@@ -649,6 +670,22 @@ export function createRuntime(runtime) {
       runtime.deallocate(offset + length, length);
       return stringValue;
     },
+    getStateDependencies(value) {
+      if (value === NULL) return [];
+      if (!runtime.isTree(value)) throw new Error('Invalid dependencies');
+      return getTreeValues(value)
+        .map((value) => {
+          if (!runtime.isDependency(value)) throw new Error('Invalid dependencies');
+          switch (runtime.getDependencyType(value)) {
+            case constants.DependencyType.State:
+              return runtime.getStateDependencyCondition(value);
+            case constants.DependencyType.Cache:
+            default:
+              return null;
+          }
+        })
+        .filter(Boolean);
+    },
     display(value) {
       const offset = runtime.getAllocatorOffset();
       const length = runtime.display(value, offset) - offset;
@@ -661,4 +698,14 @@ export function createRuntime(runtime) {
       return new Uint32Array(runtime.memory.buffer, offset, length);
     },
   };
+
+  function getTreeValues(value) {
+    if (value === NULL) return;
+    const left = runtime.getTreeLeft(value);
+    const right = runtime.getTreeRight(value);
+    return [
+      ...(left === NULL ? [] : runtime.isTree(left) ? getTreeValues(left) : [left]),
+      ...(right === NULL ? [] : runtime.isTree(right) ? getTreeValues(right) : [right]),
+    ];
+  }
 }

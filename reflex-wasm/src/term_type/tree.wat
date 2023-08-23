@@ -6,7 +6,8 @@
     (@struct $Tree
       (@field $left (@ref $Term @optional))
       (@field $right (@ref $Term @optional))
-      (@field $length i32))
+      (@field $length i32)
+      (@field $depth i32))
 
     (@derive $size (@get $Tree))
     (@derive $hash (@get $Tree))
@@ -16,13 +17,17 @@
   (export "isTree" (func $Term::Tree::is))
 
   (@const $Term::Tree::EMPTY i32
-    (call $Term::TermType::Tree::new (global.get $NULL) (global.get $NULL) (i32.const 0)))
+    (call $Term::TermType::Tree::new (global.get $NULL) (global.get $NULL) (i32.const 0) (i32.const 0)))
 
   (func $Tree::traits::equals (param $self i32) (param $other i32) (result i32)
-    ;; This assumes that trees with the same length and hash are almost certainly identical
-    (i32.eq
-      (call $Tree::get::length (local.get $self))
-      (call $Tree::get::length (local.get $other))))
+    ;; This assumes that trees with the same length, depth and hash are almost certainly identical
+    (i32.and
+      (i32.eq
+        (call $Tree::get::length (local.get $self))
+        (call $Tree::get::length (local.get $other)))
+      (i32.eq
+        (call $Tree::get::depth (local.get $self))
+        (call $Tree::get::depth (local.get $other)))))
 
   (func $Term::Tree::new (export "createTree") (param $left i32) (param $right i32) (result i32)
     (call $Term::TermType::Tree::new
@@ -30,7 +35,10 @@
       (local.get $right)
       (i32.add
         (call $Term::Tree::get_branch_length (local.get $left))
-        (call $Term::Tree::get_branch_length (local.get $right)))))
+        (call $Term::Tree::get_branch_length (local.get $right)))
+      (call $Utils::i32::max_u
+        (call $Term::Tree::get_branch_depth (local.get $left))
+        (call $Term::Tree::get_branch_depth (local.get $right)))))
 
   (func $Term::Tree::empty (export "createEmptyTree") (result i32)
     (global.get $Term::Tree::EMPTY))
@@ -120,13 +128,19 @@
   (func $Term::Tree::traits::union (param $self i32) (param $other i32) (result i32)
     (if (result i32)
       (i32.or
-        (i32.eq (global.get $NULL) (local.get $self))
-        (i32.eq (global.get $NULL) (local.get $other)))
+        (i32.or
+          (i32.eq (global.get $NULL) (local.get $self))
+          (i32.eq (call $Term::Tree::empty) (local.get $self)))
+        (i32.or
+          (i32.eq (global.get $NULL) (local.get $other))
+          (i32.eq (call $Term::Tree::empty) (local.get $other))))
       (then
         (select
           (local.get $other)
           (local.get $self)
-          (i32.eq (global.get $NULL) (local.get $self))))
+          (i32.or
+            (i32.eq (global.get $NULL) (local.get $self))
+            (i32.eq (call $Term::Tree::empty) (local.get $self)))))
       (else
         (call $Term::Tree::new (local.get $self) (local.get $other)))))
 
@@ -415,10 +429,8 @@
   (func $Term::Tree::get_length (export "getTreeLength") (param $self i32) (result i32)
     (call $Term::Tree::get::length (local.get $self)))
 
-  (func $Term::Tree::get_depth (param $self i32) (result i32)
-    (call $Utils::i32::max_u
-      (call $Term::Tree::get_branch_depth (call $Term::Tree::get::left (local.get $self)))
-      (call $Term::Tree::get_branch_depth (call $Term::Tree::get::right (local.get $self)))))
+  (func $Term::Tree::get_depth (export "getTreeDepth") (param $self i32) (result i32)
+    (call $Term::Tree::get::depth (local.get $self)))
 
   (func $Term::Tree::get_branch_length (param $branch i32) (result i32)
     (if (result i32)

@@ -29,7 +29,7 @@ output_module_path="${module_path%.wasm}.${cache_key}_${state_index}_${entry_poi
 # Inline the heap snapshot into the runtime module
 echo "Inlining heap snapshot..."
 (cd "$workspace_path" && \
-  cargo run --bin snapshot -- \
+  cargo run --release --bin snapshot -- \
     --input "$module_path" \
     --memory-name "memory" \
     --snapshot "$heap_snapshot_path" \
@@ -38,7 +38,7 @@ echo "Inlining heap snapshot..."
 # Inline the heap snapshot into the runtime module
 echo "Creating entry point function..."
 (cd "$workspace_path" && \
-  cargo run --bin entry-point -- \
+  cargo run --release --bin entry-point -- \
     --input "$output_module_path" \
     --entry-point "$entry_point" \
     --state "$state" \

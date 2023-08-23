@@ -162,48 +162,38 @@ impl<T, A: Arena> RefType<Self> for ArenaRef<T, A> {
     }
 }
 
-pub struct IntoArenaRefIter<'a, T: 'a, A: Arena, TInner: Iterator<Item = ArenaPointer>> {
-    arena: &'a A,
-    inner: TInner,
-    _item: PhantomData<T>,
-}
-impl<'a, T: 'a, A: Arena, TInner: Iterator<Item = ArenaPointer>>
-    IntoArenaRefIter<'a, T, A, TInner>
-{
-    fn new(arena: &'a A, inner: TInner) -> Self {
-        Self {
-            arena,
-            inner,
-            _item: PhantomData,
-        }
-    }
-}
-impl<'a, T: 'a, A: Arena, TInner: Iterator<Item = ArenaPointer>> Clone
-    for IntoArenaRefIter<'a, T, A, TInner>
-where
-    TInner: Clone,
-{
-    fn clone(&self) -> Self {
-        Self {
-            arena: self.arena,
-            inner: self.inner.clone(),
-            _item: PhantomData,
-        }
-    }
-}
-
-pub trait IntoArenaRefIterator<'a, A: Arena>
+pub trait ArenaPointerIterator
 where
     Self: Iterator<Item = ArenaPointer> + Sized,
 {
-    fn as_arena_refs<T: 'a>(self, arena: &'a A) -> IntoArenaRefIter<'a, T, A, Self>;
+    fn skip_null_pointers(self) -> SkipNullPointersIter<Self>;
+    fn skip_uninitialized_pointers<'a, A: Arena>(
+        self,
+        arena: &'a A,
+    ) -> SkipUninitializedPointersIter<'a, Self, A>;
+    fn into_arena_refs<'a, T: 'a, A: Arena + Clone>(
+        self,
+        arena: &'a A,
+    ) -> IntoArenaRefIter<'a, T, A, Self>;
 }
 
-impl<'a, _Self, A: Arena> IntoArenaRefIterator<'a, A> for _Self
+impl<_Self> ArenaPointerIterator for _Self
 where
     Self: Iterator<Item = ArenaPointer> + Sized,
 {
-    fn as_arena_refs<T: 'a>(self, arena: &'a A) -> IntoArenaRefIter<'a, T, A, Self> {
+    fn skip_null_pointers(self) -> SkipNullPointersIter<Self> {
+        SkipNullPointersIter::new(self)
+    }
+    fn skip_uninitialized_pointers<'a, A: Arena>(
+        self,
+        arena: &'a A,
+    ) -> SkipUninitializedPointersIter<'a, Self, A> {
+        SkipUninitializedPointersIter::new(self, arena)
+    }
+    fn into_arena_refs<'a, T: 'a, A: Arena + Clone>(
+        self,
+        arena: &'a A,
+    ) -> IntoArenaRefIter<'a, T, A, Self> {
         IntoArenaRefIter::new(arena, self)
     }
 }
@@ -221,6 +211,7 @@ impl<'a, T: 'a, A: Arena + Clone, TInner: Iterator<Item = ArenaPointer>> Iterato
         self.inner.size_hint()
     }
 }
+
 impl<'a, T: 'a, A: Arena + Clone, TInner: Iterator<Item = ArenaPointer>> ExactSizeIterator
     for IntoArenaRefIter<'a, T, A, TInner>
 where
@@ -228,6 +219,110 @@ where
 {
     fn len(&self) -> usize {
         self.inner.len()
+    }
+}
+
+pub struct IntoArenaRefIter<'a, T: 'a, A: Arena, TInner: Iterator<Item = ArenaPointer>> {
+    arena: &'a A,
+    inner: TInner,
+    _item: PhantomData<T>,
+}
+
+impl<'a, T: 'a, A: Arena, TInner: Iterator<Item = ArenaPointer>>
+    IntoArenaRefIter<'a, T, A, TInner>
+{
+    fn new(arena: &'a A, inner: TInner) -> Self {
+        Self {
+            arena,
+            inner,
+            _item: PhantomData,
+        }
+    }
+}
+
+impl<'a, T: 'a, A: Arena, TInner: Iterator<Item = ArenaPointer>> Clone
+    for IntoArenaRefIter<'a, T, A, TInner>
+where
+    TInner: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            arena: self.arena,
+            inner: self.inner.clone(),
+            _item: PhantomData,
+        }
+    }
+}
+
+pub struct SkipUninitializedPointersIter<'a, T: Iterator<Item = ArenaPointer>, A: Arena> {
+    inner: T,
+    arena: &'a A,
+}
+
+impl<'a, T: Iterator<Item = ArenaPointer>, A: Arena> SkipUninitializedPointersIter<'a, T, A> {
+    pub fn new(inner: T, arena: &'a A) -> Self {
+        Self { inner, arena }
+    }
+}
+
+impl<'a, T: Iterator<Item = ArenaPointer>, A: Arena> Clone
+    for SkipUninitializedPointersIter<'a, T, A>
+where
+    T: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            arena: self.arena,
+        }
+    }
+}
+
+impl<'a, T: Iterator<Item = ArenaPointer>, A: Arena> Iterator
+    for SkipUninitializedPointersIter<'a, T, A>
+{
+    type Item = ArenaPointer;
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut item = self.inner.next()?;
+        while self
+            .arena
+            .read_value::<u32, bool>(item, |value| ArenaPointer::from(*value).is_uninitialized())
+        {
+            item = self.inner.next()?
+        }
+        Some(item)
+    }
+}
+
+pub struct SkipNullPointersIter<T: Iterator<Item = ArenaPointer>> {
+    inner: T,
+}
+
+impl<T: Iterator<Item = ArenaPointer>> SkipNullPointersIter<T> {
+    pub fn new(inner: T) -> Self {
+        Self { inner }
+    }
+}
+
+impl<T: Iterator<Item = ArenaPointer>> Clone for SkipNullPointersIter<T>
+where
+    T: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+        }
+    }
+}
+
+impl<T: Iterator<Item = ArenaPointer>> Iterator for SkipNullPointersIter<T> {
+    type Item = ArenaPointer;
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut item = self.inner.next()?;
+        while item.is_null() {
+            item = self.inner.next()?
+        }
+        Some(item)
     }
 }
 
@@ -298,6 +393,9 @@ pub struct TermHeader {
 #[derive(PartialOrd, Ord, PartialEq, Eq, Clone, Copy, Hash, Debug)]
 #[repr(transparent)]
 pub struct ArenaPointer(u32);
+
+impl reflex::hash::IsEnabled for ArenaPointer {}
+
 impl ArenaPointer {
     pub fn null() -> Self {
         Self(0xFFFFFFFF)
@@ -412,22 +510,22 @@ impl<T: Sized> Array<T> {
         let pointer = (offset + (index * std::mem::size_of::<T>())) as *const T;
         std::mem::transmute::<*const T, &T>(pointer)
     }
-    pub fn items(&self) -> ArrayIter<'_, T> {
-        ArrayIter::new(self)
+    pub fn items(&self) -> ArrayRefIter<'_, T> {
+        ArrayRefIter::new(self)
     }
-    pub fn get_item_offset(list: ArenaPointer, index: usize) -> ArenaPointer {
-        list.offset((std::mem::size_of::<Array<T>>() + (index * std::mem::size_of::<T>())) as u32)
-    }
-    pub fn iter<'a, A: Arena>(list: ArenaPointer, arena: &'a A) -> ArenaArrayIter<'a, T, A>
+    pub(crate) fn iter<'a, A: Arena>(list: ArenaPointer, arena: &'a A) -> ArrayValueIter<'a, T, A>
     where
         T: Copy,
     {
-        ArenaArrayIter {
+        ArrayValueIter {
             length: arena.read_value::<Array<T>, _>(list, |value| value.length as usize),
             offset: Self::get_item_offset(list, 0),
             arena,
             _item: PhantomData,
         }
+    }
+    pub(crate) fn get_item_offset(list: ArenaPointer, index: usize) -> ArenaPointer {
+        list.offset((std::mem::size_of::<Array<T>>() + (index * std::mem::size_of::<T>())) as u32)
     }
 }
 
@@ -452,24 +550,100 @@ impl<T, A: Arena> ArenaRef<Array<T>, A> {
     {
         self.read_value(|items| items.get(index).copied())
     }
-    pub fn iter<'a>(&'a self) -> ArenaArrayIter<'a, T, A>
+    pub fn iter<'a>(&'a self) -> ArrayValueIter<'a, T, A>
     where
         T: Copy,
     {
         Array::<T>::iter(self.pointer, &self.arena)
     }
+    pub fn item_offset(&self, index: usize) -> ArenaPointer {
+        if index < self.len() {
+            Array::<T>::get_item_offset(self.as_pointer(), index)
+        } else {
+            ArenaPointer::null()
+        }
+    }
+    pub fn item_offsets(&self) -> ArrayPointerIter<T> {
+        ArrayPointerIter::new(self)
+    }
 }
 
-pub struct ArrayIter<'a, T: Sized> {
+#[derive(Debug)]
+pub struct ArrayPointerIter<T: Sized> {
+    offset: ArenaPointer,
+    length: usize,
+    _item: PhantomData<T>,
+}
+
+impl<T: Sized> ArrayPointerIter<T> {
+    fn new<A: Arena>(list: &ArenaRef<Array<T>, A>) -> ArrayPointerIter<T> {
+        Self {
+            offset: Array::<T>::get_item_offset(list.as_pointer(), 0),
+            length: list.len(),
+            _item: PhantomData,
+        }
+    }
+}
+
+impl<'a, T: Sized> Clone for ArrayPointerIter<T> {
+    fn clone(&self) -> Self {
+        Self {
+            offset: self.offset,
+            length: self.length,
+            _item: PhantomData,
+        }
+    }
+}
+
+impl<'a, T: Sized> Copy for ArrayPointerIter<T> {}
+
+impl<'a, T: Sized> Iterator for ArrayPointerIter<T> {
+    type Item = ArenaPointer;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.length == 0 {
+            None
+        } else {
+            let current_pointer = self.offset;
+            self.offset = current_pointer.offset(std::mem::size_of::<T>() as u32);
+            self.length -= 1;
+            Some(current_pointer)
+        }
+    }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.length, Some(self.length))
+    }
+    fn count(self) -> usize
+    where
+        Self: Sized,
+    {
+        self.length
+    }
+}
+
+#[derive(Debug)]
+pub struct ArrayRefIter<'a, T: Sized> {
     array: &'a Array<T>,
     offset: usize,
 }
-impl<'a, T: Sized> ArrayIter<'a, T> {
+
+impl<'a, T: Sized> ArrayRefIter<'a, T> {
     fn new(array: &'a Array<T>) -> Self {
         Self { array, offset: 0 }
     }
 }
-impl<'a, T: Sized> Iterator for ArrayIter<'a, T> {
+
+impl<'a, T: Sized> Clone for ArrayRefIter<'a, T> {
+    fn clone(&self) -> Self {
+        Self {
+            array: self.array,
+            offset: self.offset,
+        }
+    }
+}
+
+impl<'a, T: Sized> Copy for ArrayRefIter<'a, T> {}
+
+impl<'a, T: Sized> Iterator for ArrayRefIter<'a, T> {
     type Item = &'a T;
     fn next(&mut self) -> Option<Self::Item> {
         match self.array.get(self.offset) {
@@ -486,14 +660,16 @@ impl<'a, T: Sized> Iterator for ArrayIter<'a, T> {
     }
 }
 
-pub struct ArenaArrayIter<'a, T: Sized + Copy, A: Arena> {
+impl<'a, T: Sized> ExactSizeIterator for ArrayRefIter<'a, T> {}
+
+pub struct ArrayValueIter<'a, T: Sized + Copy, A: Arena> {
     length: usize,
     offset: ArenaPointer,
     arena: &'a A,
     _item: PhantomData<T>,
 }
 
-impl<'a, T: Sized + Copy, A: Arena> Clone for ArenaArrayIter<'a, T, A> {
+impl<'a, T: Sized + Copy, A: Arena> Clone for ArrayValueIter<'a, T, A> {
     fn clone(&self) -> Self {
         Self {
             length: self.length.clone(),
@@ -504,9 +680,9 @@ impl<'a, T: Sized + Copy, A: Arena> Clone for ArenaArrayIter<'a, T, A> {
     }
 }
 
-impl<'a, T: Sized + Copy, A: Arena> Copy for ArenaArrayIter<'a, T, A> {}
+impl<'a, T: Sized + Copy, A: Arena> Copy for ArrayValueIter<'a, T, A> {}
 
-impl<'a, T: Sized + Copy, A: Arena> Iterator for ArenaArrayIter<'a, T, A> {
+impl<'a, T: Sized + Copy, A: Arena> Iterator for ArrayValueIter<'a, T, A> {
     type Item = T;
     fn next(&mut self) -> Option<Self::Item> {
         if self.length == 0 {
@@ -528,7 +704,8 @@ impl<'a, T: Sized + Copy, A: Arena> Iterator for ArenaArrayIter<'a, T, A> {
         self.length
     }
 }
-impl<'a, T: Sized + Copy, A: Arena> ExactSizeIterator for ArenaArrayIter<'a, T, A> {}
+
+impl<'a, T: Sized + Copy, A: Arena> ExactSizeIterator for ArrayValueIter<'a, T, A> {}
 
 pub fn pad_to_4_byte_offset(value: usize) -> usize {
     if value == 0 {

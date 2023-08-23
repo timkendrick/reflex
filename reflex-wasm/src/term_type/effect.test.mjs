@@ -88,6 +88,7 @@ export default (describe) => {
       createSymbol,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
     }) => {
       (() => {
@@ -96,9 +97,9 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '{<CustomCondition:Symbol(123):3:Symbol(0)>}');
-        assert.strictEqual(
-          format(dependencies),
-          '(<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)',
+        assert.deepEqual(
+          getStateDependencies(dependencies).map((dependency) => format(dependency)),
+          ['<CustomCondition:Symbol(123):3:Symbol(0)>'],
         );
       })();
       (() => {
@@ -107,9 +108,9 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, createHashmap([]));
         assert.strictEqual(format(result), '{<CustomCondition:Symbol(123):3:Symbol(0)>}');
-        assert.strictEqual(
-          format(dependencies),
-          '(<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)',
+        assert.deepEqual(
+          getStateDependencies(dependencies).map((dependency) => format(dependency)),
+          ['<CustomCondition:Symbol(123):3:Symbol(0)>'],
         );
       })();
       (() => {
@@ -124,9 +125,9 @@ export default (describe) => {
           ]),
         );
         assert.strictEqual(format(result), '{<CustomCondition:Symbol(123):3:Symbol(0)>}');
-        assert.strictEqual(
-          format(dependencies),
-          '(<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)',
+        assert.deepEqual(
+          getStateDependencies(dependencies).map((dependency) => format(dependency)),
+          ['<CustomCondition:Symbol(123):3:Symbol(0)>'],
         );
       })();
       (() => {
@@ -142,9 +143,9 @@ export default (describe) => {
           ]),
         );
         assert.strictEqual(format(result), '3');
-        assert.strictEqual(
-          format(dependencies),
-          '(<CustomCondition:Symbol(123):3:Symbol(0)> . NULL)',
+        assert.deepEqual(
+          getStateDependencies(dependencies).map((dependency) => format(dependency)),
+          ['<CustomCondition:Symbol(123):3:Symbol(0)>'],
         );
       })();
       (() => {
@@ -162,9 +163,12 @@ export default (describe) => {
           ]),
         );
         assert.strictEqual(format(result), '5');
-        assert.strictEqual(
-          format(dependencies),
-          '((<CustomCondition:Symbol(456):4:Symbol(0)> . NULL) . (<CustomCondition:Symbol(123):3:Symbol(0)> . NULL))',
+        assert.deepEqual(
+          getStateDependencies(dependencies).map((dependency) => format(dependency)),
+          [
+            '<CustomCondition:Symbol(456):4:Symbol(0)>',
+            '<CustomCondition:Symbol(123):3:Symbol(0)>',
+          ],
         );
       })();
     });

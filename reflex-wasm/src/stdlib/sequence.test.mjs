@@ -10,6 +10,7 @@ export default (describe) => {
       createPair,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -20,7 +21,7 @@ export default (describe) => {
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '3');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
 
@@ -31,6 +32,7 @@ export default (describe) => {
       createPair,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
@@ -38,13 +40,16 @@ export default (describe) => {
         const expression = createApplication(
           createBuiltin(Stdlib.Sequence),
           createPair(
-            createApplication(createBuiltin(Stdlib.Subtract), createPair(createInt(0), createInt(3))),
+            createApplication(
+              createBuiltin(Stdlib.Subtract),
+              createPair(createInt(0), createInt(3)),
+            ),
             createBuiltin(Stdlib.Abs),
           ),
         );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '3');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
   });

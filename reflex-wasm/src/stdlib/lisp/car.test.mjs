@@ -11,38 +11,54 @@ export default (describe) => {
       createUnitList,
       evaluate,
       format,
+      getStateDependencies,
       NULL,
       Stdlib,
     }) => {
       (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Car), createUnitList(createTree(NULL, NULL)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Car),
+          createUnitList(createTree(NULL, NULL)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), 'null');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Car), createUnitList(createTree(createInt(3), NULL)));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Car),
+          createUnitList(createTree(createInt(3), NULL)),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '3');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Car), createUnitList(createTree(NULL, createInt(3))));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Car),
+          createUnitList(createTree(NULL, createInt(3))),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), 'null');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Car), createUnitList(createTree(createInt(3), createInt(4))));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Car),
+          createUnitList(createTree(createInt(3), createInt(4))),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '3');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
-        const expression = createApplication(createBuiltin(Stdlib.Car), createUnitList(createTree(createInt(3), createTree(createInt(4), NULL))));
+        const expression = createApplication(
+          createBuiltin(Stdlib.Car),
+          createUnitList(createTree(createInt(3), createTree(createInt(4), NULL))),
+        );
         const [result, dependencies] = evaluate(expression, NULL);
         assert.strictEqual(format(result), '3');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
   });

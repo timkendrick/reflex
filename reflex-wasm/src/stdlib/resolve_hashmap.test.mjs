@@ -15,6 +15,7 @@ export default (describe) => {
       createUnitList,
       evaluate,
       format,
+      getStateDependencies,
       getHashmapNumEntries,
       getHashmapValue,
       isHashmap,
@@ -29,7 +30,7 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.ok(isHashmap(result));
         assert.strictEqual(getHashmapNumEntries(result), 0);
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -49,7 +50,7 @@ export default (describe) => {
         assert.strictEqual(format(getHashmapValue(result, createString('bar'))), '4');
         assert.strictEqual(format(getHashmapValue(result, createString('baz'))), '5');
         assert.strictEqual(format(getHashmapValue(result, createString('qux'))), 'NULL');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -78,7 +79,7 @@ export default (describe) => {
         assert.strictEqual(format(getHashmapValue(result, createString('bar'))), '4');
         assert.strictEqual(format(getHashmapValue(result, createString('baz'))), '5');
         assert.strictEqual(format(getHashmapValue(result, createString('qux'))), 'NULL');
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -145,7 +146,7 @@ export default (describe) => {
           format(getHashmapValue(result, createString('baz'))),
           '[(0) => 7(), (0) => 8(), (0) => 9()]',
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
   });

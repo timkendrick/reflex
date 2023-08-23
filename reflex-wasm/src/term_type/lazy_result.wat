@@ -30,6 +30,12 @@
       (call $Term::traits::debug
         (call $Term::LazyResult::get::value (local.get $self))
         (local.get $offset)))
+    (@store-bytes $offset ":")
+    (local.set $offset (i32.add (local.get $offset)))
+    (local.set $offset
+      (call $Term::traits::debug
+        (call $Term::LazyResult::get::dependencies (local.get $self))
+        (local.get $offset)))
     (@store-bytes $offset ">")
     (i32.add (local.get $offset)))
 

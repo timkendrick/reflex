@@ -115,6 +115,17 @@
   (func $Utils::i64::get_byte (param $self i64) (param $index i32) (result i32)
     (i32.wrap_i64 (i64.and (i64.const 0xFF) (i64.shr_u (local.get $self) (i64.extend_i32_u (i32.mul (local.get $index) (i32.const 8)))))))
 
+  (func $Utils::i64::from_chunks (param $left i32) (param $right i32) (result i64)
+    ;; Little-endian integer encoding means low-order chunk precedes high-order chunk
+    (i64.or
+      (i64.extend_i32_u (local.get $left))
+      (i64.shl (i64.extend_i32_u (local.get $right)) (i64.const 32))))
+
+  (func $Utils::i64::to_chunks (param $self i64) (result i32 i32)
+    ;; Little-endian integer encoding means low-order chunk precedes high-order chunk
+    (i32.wrap_i64 (local.get $self))
+    (i32.wrap_i64 (i64.shr_u (local.get $self) (i64.const 32))))
+
   (func $Utils::i32::round_to_next (param $self i32) (param $step i32) (result i32)
     ;; (step * ((self + (step - 1)) / step))
     (i32.mul (i32.div_u (i32.add (local.get $self) (i32.sub (local.get $step) (i32.const 1))) (local.get $step)) (local.get $step)))

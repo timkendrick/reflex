@@ -14,7 +14,7 @@ export default (describe) => {
       createTriple,
       createUnitList,
       evaluate,
-      format,
+      getStateDependencies,
       getHashsetNumEntries,
       hasHashsetValue,
       isHashset,
@@ -29,7 +29,7 @@ export default (describe) => {
         const [result, dependencies] = evaluate(expression, NULL);
         assert.ok(isHashset(result));
         assert.strictEqual(getHashsetNumEntries(result), 0);
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -45,7 +45,7 @@ export default (describe) => {
         assert.strictEqual(hasHashsetValue(result, createString('bar')), true);
         assert.strictEqual(hasHashsetValue(result, createString('baz')), true);
         assert.strictEqual(hasHashsetValue(result, createString('qux')), false);
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -64,7 +64,7 @@ export default (describe) => {
         assert.strictEqual(hasHashsetValue(result, createString('foo')), true);
         assert.strictEqual(hasHashsetValue(result, createString('bar')), true);
         assert.strictEqual(hasHashsetValue(result, createString('baz')), true);
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
       (() => {
         const expression = createApplication(
@@ -147,7 +147,7 @@ export default (describe) => {
           hasHashsetValue(result, createTriple(createInt(1), createInt(2), createInt(3))),
           false,
         );
-        assert.strictEqual(format(dependencies), 'NULL');
+        assert.deepEqual(getStateDependencies(dependencies), []);
       })();
     });
   });
