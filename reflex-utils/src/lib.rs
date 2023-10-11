@@ -12,8 +12,12 @@ pub mod json;
 pub mod reconnect;
 pub mod serialize;
 pub mod stack;
+pub mod stack_vec;
+pub mod visitor;
 
 pub use self::file_writer::*;
 pub use self::iter::*;
 pub use self::partition_results::*;
 pub use self::stack::*;
+pub use self::stack_vec::*;
+pub use self::visitor::*;
