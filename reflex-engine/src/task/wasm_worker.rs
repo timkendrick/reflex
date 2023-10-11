@@ -36,9 +36,12 @@ use reflex_runtime::{
     action::bytecode_interpreter::{BytecodeInterpreterGcCompleteAction, BytecodeWorkerStatistics},
     AsyncExpression, AsyncExpressionFactory, AsyncHeapAllocator, QueryEvaluationMode,
 };
-use reflex_utils::dag::{
-    reporter::{CounterDagReporter, NoopDagReporter},
-    DagEdgeDirection, DagReporter, DagVisitor, IntDag,
+use reflex_utils::{
+    dag::{
+        reporter::{CounterDagReporter, NoopDagReporter},
+        DagEdgeDirection, DagReporter, DagVisitor, IntDag,
+    },
+    Visitable,
 };
 use reflex_wasm::{
     allocator::{Arena, ArenaAllocator, ArenaMut, VecAllocator},
@@ -51,7 +54,7 @@ use reflex_wasm::{
         PointerTerm, TermType, TreeTerm, TypedTerm, WasmExpression,
     },
     wasmtime::Val,
-    ArenaPointer, ArenaPointerIterator, ArenaRef, FunctionIndex, PointerIter, Term,
+    ArenaPointer, ArenaPointerIterator, ArenaRef, FunctionIndex, Term,
 };
 use serde::{Deserialize, Serialize};
 
@@ -815,7 +818,7 @@ fn copy_term<ASource: Arena + Clone, ADest: ArenaAllocator>(
     serializer_state: &mut SerializerState,
 ) -> ArenaPointer
 where
-    ArenaRef<Term, ASource>: PointerIter + NodeId,
+    ArenaRef<Term, ASource>: Visitable<ArenaPointer> + NodeId,
 {
     use reflex_wasm::serialize::Serialize;
     let term = ArenaRef::<Term, _>::new(source_arena.clone(), source_pointer);

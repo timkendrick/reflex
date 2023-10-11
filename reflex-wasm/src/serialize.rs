@@ -5,11 +5,12 @@ use reflex::{
     core::NodeId,
     hash::{HashId, IntMap},
 };
+use reflex_utils::Visitable;
 
 use crate::{
     allocator::{Arena, ArenaAllocator},
     hash::TermSize,
-    ArenaPointer, ArenaRef, PointerIter,
+    ArenaPointer, ArenaRef,
 };
 
 pub struct SerializerState {
@@ -41,7 +42,7 @@ pub trait Serialize {
 
 impl<ASource: Arena + Clone, T: Clone + TermSize> Serialize for ArenaRef<T, ASource>
 where
-    ArenaRef<T, ASource>: PointerIter + NodeId,
+    ArenaRef<T, ASource>: Visitable<ArenaPointer> + NodeId,
 {
     fn serialize<ADest: ArenaAllocator>(
         &self,
@@ -55,7 +56,7 @@ where
         }
 
         // Iterate over the source term children and serialize them into the target arena
-        let children = PointerIter::iter(self)
+        let children = Visitable::<ArenaPointer>::children(self)
             .filter_map(|inner_pointer| {
                 let value_pointer = self
                     .arena

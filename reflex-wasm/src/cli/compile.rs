@@ -23,6 +23,7 @@ use reflex::{
     },
 };
 use reflex_parser::{create_parser, ParserBuiltin, Syntax, SyntaxParser};
+use reflex_utils::Visitable;
 use strum::IntoEnumIterator;
 use walrus::{
     self,
@@ -51,7 +52,7 @@ use crate::{
     hash::TermHasher,
     stdlib,
     term_type::{BuiltinTerm, LambdaTerm, TermType, TypedTerm},
-    ArenaPointer, ArenaPointerIterator, ArenaRef, FunctionIndex, PointerIter, Term, WASM_PAGE_SIZE,
+    ArenaPointer, ArenaPointerIterator, ArenaRef, FunctionIndex, Term, WASM_PAGE_SIZE,
 };
 
 const CACHED_FUNCTION_TEMPLATE: &'static [u8] =
@@ -949,7 +950,7 @@ fn recompute_invalidated_term_hashes(
             if updated_hashes.contains_key(&term_pointer) {
                 continue;
             }
-            let children = PointerIter::iter(&term)
+            let children = Visitable::<ArenaPointer>::children(&term)
                 .map(|pointer| arena.read_value::<ArenaPointer, _>(pointer, |target| *target))
                 .into_arena_refs::<Term, _>(&arena);
             let unprocessed_children = children

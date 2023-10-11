@@ -10,6 +10,7 @@ use reflex::{
     },
     hash::HashId,
 };
+use reflex_utils::Visitable;
 use serde_json::Value as JsonValue;
 use strum_macros::EnumDiscriminants;
 
@@ -19,7 +20,7 @@ use crate::{
     factory::WasmTermFactory,
     hash::{TermHash, TermHasher, TermSize},
     stdlib::Stdlib,
-    ArenaPointer, ArenaRef, PointerIter, Term,
+    ArenaPointer, ArenaRef, Term,
 };
 
 pub mod application;
@@ -450,157 +451,192 @@ impl Iterator for TermPointerIterator {
     }
 }
 
-impl<A: Arena + Clone> PointerIter for ArenaRef<Term, A> {
-    type Iter<'a> = TermPointerIterator
-    where
-        Self: 'a;
+impl<A: Arena + Clone> Visitable<ArenaPointer> for ArenaRef<Term, A> {
+    type Children = TermPointerIterator;
 
-    fn iter<'a>(&'a self) -> Self::Iter<'a>
-    where
-        Self: 'a,
-    {
+    fn children(&self) -> Self::Children {
         match self.read_value(|term| term.type_id()) {
             TermTypeDiscriminants::Application => TermPointerIterator::Application(
-                self.as_typed_term::<ApplicationTerm>().as_inner().iter(),
+                self.as_typed_term::<ApplicationTerm>()
+                    .as_inner()
+                    .children(),
             ),
             TermTypeDiscriminants::Boolean => {
-                TermPointerIterator::Boolean(self.as_typed_term::<BooleanTerm>().as_inner().iter())
+                TermPointerIterator::Boolean(Visitable::<ArenaPointer>::children(
+                    &self.as_typed_term::<BooleanTerm>().as_inner(),
+                ))
             }
             TermTypeDiscriminants::Builtin => {
-                TermPointerIterator::Builtin(self.as_typed_term::<BuiltinTerm>().as_inner().iter())
+                TermPointerIterator::Builtin(Visitable::<ArenaPointer>::children(
+                    &self.as_typed_term::<BuiltinTerm>().as_inner(),
+                ))
             }
-            TermTypeDiscriminants::Cell => {
-                TermPointerIterator::Cell(self.as_typed_term::<CellTerm>().as_inner().iter())
-            }
-            TermTypeDiscriminants::Condition => TermPointerIterator::Condition(
-                self.as_typed_term::<ConditionTerm>().as_inner().iter(),
+            TermTypeDiscriminants::Cell => TermPointerIterator::Cell(
+                Visitable::<ArenaPointer>::children(&self.as_typed_term::<CellTerm>().as_inner()),
             ),
-            TermTypeDiscriminants::Constructor => TermPointerIterator::Constructor(
-                self.as_typed_term::<ConstructorTerm>().as_inner().iter(),
+            TermTypeDiscriminants::Condition => {
+                TermPointerIterator::Condition(Visitable::<ArenaPointer>::children(
+                    &self.as_typed_term::<ConditionTerm>().as_inner(),
+                ))
+            }
+            TermTypeDiscriminants::Constructor => {
+                TermPointerIterator::Constructor(Visitable::<ArenaPointer>::children(
+                    &self.as_typed_term::<ConstructorTerm>().as_inner(),
+                ))
+            }
+            TermTypeDiscriminants::Effect => TermPointerIterator::Effect(
+                Visitable::<ArenaPointer>::children(&self.as_typed_term::<EffectTerm>().as_inner()),
             ),
-            TermTypeDiscriminants::Effect => {
-                TermPointerIterator::Effect(self.as_typed_term::<EffectTerm>().as_inner().iter())
-            }
-            TermTypeDiscriminants::Float => {
-                TermPointerIterator::Float(self.as_typed_term::<FloatTerm>().as_inner().iter())
-            }
+            TermTypeDiscriminants::Float => TermPointerIterator::Float(
+                Visitable::<ArenaPointer>::children(&self.as_typed_term::<FloatTerm>().as_inner()),
+            ),
             TermTypeDiscriminants::Hashmap => {
-                TermPointerIterator::Hashmap(self.as_typed_term::<HashmapTerm>().as_inner().iter())
+                TermPointerIterator::Hashmap(Visitable::<ArenaPointer>::children(
+                    &self.as_typed_term::<HashmapTerm>().as_inner(),
+                ))
             }
             TermTypeDiscriminants::Hashset => {
-                TermPointerIterator::Hashset(self.as_typed_term::<HashsetTerm>().as_inner().iter())
+                TermPointerIterator::Hashset(Visitable::<ArenaPointer>::children(
+                    &self.as_typed_term::<HashsetTerm>().as_inner(),
+                ))
             }
-            TermTypeDiscriminants::Int => {
-                TermPointerIterator::Int(self.as_typed_term::<IntTerm>().as_inner().iter())
-            }
-            TermTypeDiscriminants::Lambda => {
-                TermPointerIterator::Lambda(self.as_typed_term::<LambdaTerm>().as_inner().iter())
-            }
-            TermTypeDiscriminants::LazyResult => TermPointerIterator::LazyResult(
-                self.as_typed_term::<LazyResultTerm>().as_inner().iter(),
+            TermTypeDiscriminants::Int => TermPointerIterator::Int(
+                Visitable::<ArenaPointer>::children(&self.as_typed_term::<IntTerm>().as_inner()),
             ),
-            TermTypeDiscriminants::Let => {
-                TermPointerIterator::Let(self.as_typed_term::<LetTerm>().as_inner().iter())
+            TermTypeDiscriminants::Lambda => TermPointerIterator::Lambda(
+                Visitable::<ArenaPointer>::children(&self.as_typed_term::<LambdaTerm>().as_inner()),
+            ),
+            TermTypeDiscriminants::LazyResult => {
+                TermPointerIterator::LazyResult(Visitable::<ArenaPointer>::children(
+                    &self.as_typed_term::<LazyResultTerm>().as_inner(),
+                ))
             }
-            TermTypeDiscriminants::List => TermPointerIterator::List(PointerIter::iter(
-                &self.as_typed_term::<ListTerm>().as_inner(),
-            )),
-            TermTypeDiscriminants::Nil => {
-                TermPointerIterator::Nil(self.as_typed_term::<NilTerm>().as_inner().iter())
-            }
+            TermTypeDiscriminants::Let => TermPointerIterator::Let(
+                Visitable::<ArenaPointer>::children(&self.as_typed_term::<LetTerm>().as_inner()),
+            ),
+            TermTypeDiscriminants::List => TermPointerIterator::List(
+                Visitable::<ArenaPointer>::children(&self.as_typed_term::<ListTerm>().as_inner()),
+            ),
+            TermTypeDiscriminants::Nil => TermPointerIterator::Nil(
+                Visitable::<ArenaPointer>::children(&self.as_typed_term::<NilTerm>().as_inner()),
+            ),
             TermTypeDiscriminants::Partial => {
-                TermPointerIterator::Partial(self.as_typed_term::<PartialTerm>().as_inner().iter())
+                TermPointerIterator::Partial(Visitable::<ArenaPointer>::children(
+                    &self.as_typed_term::<PartialTerm>().as_inner(),
+                ))
             }
             TermTypeDiscriminants::Pointer => {
-                TermPointerIterator::Pointer(self.as_typed_term::<PointerTerm>().as_inner().iter())
+                TermPointerIterator::Pointer(Visitable::<ArenaPointer>::children(
+                    &self.as_typed_term::<PointerTerm>().as_inner(),
+                ))
             }
-            TermTypeDiscriminants::Record => {
-                TermPointerIterator::Record(self.as_typed_term::<RecordTerm>().as_inner().iter())
+            TermTypeDiscriminants::Record => TermPointerIterator::Record(
+                Visitable::<ArenaPointer>::children(&self.as_typed_term::<RecordTerm>().as_inner()),
+            ),
+            TermTypeDiscriminants::Signal => TermPointerIterator::Signal(
+                Visitable::<ArenaPointer>::children(&self.as_typed_term::<SignalTerm>().as_inner()),
+            ),
+            TermTypeDiscriminants::String => TermPointerIterator::String(
+                Visitable::<ArenaPointer>::children(&self.as_typed_term::<StringTerm>().as_inner()),
+            ),
+            TermTypeDiscriminants::Symbol => TermPointerIterator::Symbol(
+                Visitable::<ArenaPointer>::children(&self.as_typed_term::<SymbolTerm>().as_inner()),
+            ),
+            TermTypeDiscriminants::Timestamp => {
+                TermPointerIterator::Timestamp(Visitable::<ArenaPointer>::children(
+                    &self.as_typed_term::<TimestampTerm>().as_inner(),
+                ))
             }
-            TermTypeDiscriminants::Signal => {
-                TermPointerIterator::Signal(self.as_typed_term::<SignalTerm>().as_inner().iter())
+            TermTypeDiscriminants::Tree => TermPointerIterator::Tree(
+                Visitable::<ArenaPointer>::children(&self.as_typed_term::<TreeTerm>().as_inner()),
+            ),
+            TermTypeDiscriminants::Variable => {
+                TermPointerIterator::Variable(Visitable::<ArenaPointer>::children(
+                    &self.as_typed_term::<VariableTerm>().as_inner(),
+                ))
             }
-            TermTypeDiscriminants::String => {
-                TermPointerIterator::String(self.as_typed_term::<StringTerm>().as_inner().iter())
+            TermTypeDiscriminants::EmptyIterator => {
+                TermPointerIterator::EmptyIterator(Visitable::<ArenaPointer>::children(
+                    &self.as_typed_term::<EmptyIteratorTerm>().as_inner(),
+                ))
             }
-            TermTypeDiscriminants::Symbol => {
-                TermPointerIterator::Symbol(self.as_typed_term::<SymbolTerm>().as_inner().iter())
+            TermTypeDiscriminants::EvaluateIterator => {
+                TermPointerIterator::EvaluateIterator(Visitable::<ArenaPointer>::children(
+                    &self.as_typed_term::<EvaluateIteratorTerm>().as_inner(),
+                ))
             }
-            TermTypeDiscriminants::Timestamp => TermPointerIterator::Timestamp(
-                self.as_typed_term::<TimestampTerm>().as_inner().iter(),
-            ),
-            TermTypeDiscriminants::Tree => TermPointerIterator::Tree(PointerIter::iter(
-                &self.as_typed_term::<TreeTerm>().as_inner(),
-            )),
-            TermTypeDiscriminants::Variable => TermPointerIterator::Variable(
-                self.as_typed_term::<VariableTerm>().as_inner().iter(),
-            ),
-            TermTypeDiscriminants::EmptyIterator => TermPointerIterator::EmptyIterator(
-                self.as_typed_term::<EmptyIteratorTerm>().as_inner().iter(),
-            ),
-            TermTypeDiscriminants::EvaluateIterator => TermPointerIterator::EvaluateIterator(
-                self.as_typed_term::<EvaluateIteratorTerm>()
-                    .as_inner()
-                    .iter(),
-            ),
-            TermTypeDiscriminants::FilterIterator => TermPointerIterator::FilterIterator(
-                self.as_typed_term::<FilterIteratorTerm>().as_inner().iter(),
-            ),
-            TermTypeDiscriminants::FlattenIterator => TermPointerIterator::FlattenIterator(
-                self.as_typed_term::<FlattenIteratorTerm>()
-                    .as_inner()
-                    .iter(),
-            ),
-            TermTypeDiscriminants::HashmapKeysIterator => TermPointerIterator::HashmapKeysIterator(
-                self.as_typed_term::<HashmapKeysIteratorTerm>()
-                    .as_inner()
-                    .iter(),
-            ),
+            TermTypeDiscriminants::FilterIterator => {
+                TermPointerIterator::FilterIterator(Visitable::<ArenaPointer>::children(
+                    &self.as_typed_term::<FilterIteratorTerm>().as_inner(),
+                ))
+            }
+            TermTypeDiscriminants::FlattenIterator => {
+                TermPointerIterator::FlattenIterator(Visitable::<ArenaPointer>::children(
+                    &self.as_typed_term::<FlattenIteratorTerm>().as_inner(),
+                ))
+            }
+            TermTypeDiscriminants::HashmapKeysIterator => {
+                TermPointerIterator::HashmapKeysIterator(Visitable::<ArenaPointer>::children(
+                    &self.as_typed_term::<HashmapKeysIteratorTerm>().as_inner(),
+                ))
+            }
             TermTypeDiscriminants::HashmapValuesIterator => {
-                TermPointerIterator::HashmapValuesIterator(
-                    self.as_typed_term::<HashmapValuesIteratorTerm>()
-                        .as_inner()
-                        .iter(),
-                )
+                TermPointerIterator::HashmapValuesIterator(Visitable::<ArenaPointer>::children(
+                    &self.as_typed_term::<HashmapValuesIteratorTerm>().as_inner(),
+                ))
             }
             TermTypeDiscriminants::IndexedAccessorIterator => {
-                TermPointerIterator::IndexedAccessorIterator(
-                    self.as_typed_term::<IndexedAccessorIteratorTerm>()
-                        .as_inner()
-                        .iter(),
-                )
+                TermPointerIterator::IndexedAccessorIterator(Visitable::<ArenaPointer>::children(
+                    &self
+                        .as_typed_term::<IndexedAccessorIteratorTerm>()
+                        .as_inner(),
+                ))
             }
-            TermTypeDiscriminants::IntegersIterator => TermPointerIterator::IntegersIterator(
-                self.as_typed_term::<IntegersIteratorTerm>()
-                    .as_inner()
-                    .iter(),
-            ),
-            TermTypeDiscriminants::IntersperseIterator => TermPointerIterator::IntersperseIterator(
-                self.as_typed_term::<IntersperseIteratorTerm>()
-                    .as_inner()
-                    .iter(),
-            ),
-            TermTypeDiscriminants::MapIterator => TermPointerIterator::MapIterator(
-                self.as_typed_term::<MapIteratorTerm>().as_inner().iter(),
-            ),
-            TermTypeDiscriminants::OnceIterator => TermPointerIterator::OnceIterator(
-                self.as_typed_term::<OnceIteratorTerm>().as_inner().iter(),
-            ),
-            TermTypeDiscriminants::RangeIterator => TermPointerIterator::RangeIterator(
-                self.as_typed_term::<RangeIteratorTerm>().as_inner().iter(),
-            ),
-            TermTypeDiscriminants::RepeatIterator => TermPointerIterator::RepeatIterator(
-                self.as_typed_term::<RepeatIteratorTerm>().as_inner().iter(),
-            ),
-            TermTypeDiscriminants::SkipIterator => TermPointerIterator::SkipIterator(
-                self.as_typed_term::<SkipIteratorTerm>().as_inner().iter(),
-            ),
-            TermTypeDiscriminants::TakeIterator => TermPointerIterator::TakeIterator(
-                self.as_typed_term::<TakeIteratorTerm>().as_inner().iter(),
-            ),
-            TermTypeDiscriminants::ZipIterator => TermPointerIterator::ZipIterator(
-                self.as_typed_term::<ZipIteratorTerm>().as_inner().iter(),
-            ),
+            TermTypeDiscriminants::IntegersIterator => {
+                TermPointerIterator::IntegersIterator(Visitable::<ArenaPointer>::children(
+                    &self.as_typed_term::<IntegersIteratorTerm>().as_inner(),
+                ))
+            }
+            TermTypeDiscriminants::IntersperseIterator => {
+                TermPointerIterator::IntersperseIterator(Visitable::<ArenaPointer>::children(
+                    &self.as_typed_term::<IntersperseIteratorTerm>().as_inner(),
+                ))
+            }
+            TermTypeDiscriminants::MapIterator => {
+                TermPointerIterator::MapIterator(Visitable::<ArenaPointer>::children(
+                    &self.as_typed_term::<MapIteratorTerm>().as_inner(),
+                ))
+            }
+            TermTypeDiscriminants::OnceIterator => {
+                TermPointerIterator::OnceIterator(Visitable::<ArenaPointer>::children(
+                    &self.as_typed_term::<OnceIteratorTerm>().as_inner(),
+                ))
+            }
+            TermTypeDiscriminants::RangeIterator => {
+                TermPointerIterator::RangeIterator(Visitable::<ArenaPointer>::children(
+                    &self.as_typed_term::<RangeIteratorTerm>().as_inner(),
+                ))
+            }
+            TermTypeDiscriminants::RepeatIterator => {
+                TermPointerIterator::RepeatIterator(Visitable::<ArenaPointer>::children(
+                    &self.as_typed_term::<RepeatIteratorTerm>().as_inner(),
+                ))
+            }
+            TermTypeDiscriminants::SkipIterator => {
+                TermPointerIterator::SkipIterator(Visitable::<ArenaPointer>::children(
+                    &self.as_typed_term::<SkipIteratorTerm>().as_inner(),
+                ))
+            }
+            TermTypeDiscriminants::TakeIterator => {
+                TermPointerIterator::TakeIterator(Visitable::<ArenaPointer>::children(
+                    &self.as_typed_term::<TakeIteratorTerm>().as_inner(),
+                ))
+            }
+            TermTypeDiscriminants::ZipIterator => {
+                TermPointerIterator::ZipIterator(Visitable::<ArenaPointer>::children(
+                    &self.as_typed_term::<ZipIteratorTerm>().as_inner(),
+                ))
+            }
         }
     }
 }

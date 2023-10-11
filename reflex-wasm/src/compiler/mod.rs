@@ -11,7 +11,7 @@ use reflex::{
     core::{ArgType, Arity, GraphNode, NodeId, StackOffset},
     hash::IntMap,
 };
-use reflex_utils::Stack;
+use reflex_utils::{Stack, Visitable};
 
 use crate::{
     allocator::{Arena, ArenaAllocator, ArenaIterator, VecAllocator},
@@ -31,7 +31,7 @@ use crate::{
         list::{collect_compiled_list_values, Strictness},
         TermType, TermTypeDiscriminants, WasmExpression,
     },
-    ArenaPointer, ArenaPointerIterator, ArenaRef, Array, PointerIter, Term,
+    ArenaPointer, ArenaPointerIterator, ArenaRef, Array, Term,
 };
 
 pub mod error;
@@ -559,10 +559,9 @@ impl CompilerState {
             heap,
         }
     }
-    pub fn from_arena<A: Arena + PointerIter + Clone>(arena: &A) -> Self {
+    pub fn from_arena<A: Arena + Visitable<ArenaPointer> + Clone>(arena: &A) -> Self {
         Self::from_heap_values(
-            arena
-                .iter()
+            Visitable::<ArenaPointer>::children(arena)
                 .map(|pointer| ArenaRef::<Term, _>::new(arena.clone(), pointer)),
         )
     }

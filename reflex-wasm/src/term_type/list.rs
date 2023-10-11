@@ -11,7 +11,7 @@ use reflex::{
     },
     hash::HashId,
 };
-use reflex_utils::{json::is_empty_json_object, MapIntoIterator};
+use reflex_utils::{json::is_empty_json_object, MapIntoIterator, Visitable};
 use serde_json::Value as JsonValue;
 
 use crate::{
@@ -24,7 +24,7 @@ use crate::{
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{TermType, TypedTerm, WasmExpression},
-    ArenaPointer, ArenaRef, Array, ArrayValueIter, IntoArenaRefIter, PointerIter, Term,
+    ArenaPointer, ArenaRef, Array, ArrayValueIter, IntoArenaRefIter, Term,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -35,15 +35,10 @@ pub struct ListTerm {
 
 pub type ListTermPointerIter = std::vec::IntoIter<ArenaPointer>;
 
-impl<A: Arena> PointerIter for ArenaRef<ListTerm, A> {
-    type Iter<'a> = ListTermPointerIter
-    where
-        Self: 'a;
+impl<A: Arena> Visitable<ArenaPointer> for ArenaRef<ListTerm, A> {
+    type Children = ListTermPointerIter;
 
-    fn iter<'a>(&self) -> Self::Iter<'a>
-    where
-        Self: 'a,
-    {
+    fn children(&self) -> Self::Children {
         self.read_value(|term| {
             let ptr = term as *const ListTerm as u32;
 

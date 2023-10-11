@@ -715,20 +715,11 @@ pub fn pad_to_4_byte_offset(value: usize) -> usize {
     }
 }
 
-pub trait PointerIter {
-    type Iter<'a>: Iterator<Item = ArenaPointer>
-    where
-        Self: 'a;
-
-    fn iter<'a>(&'a self) -> Self::Iter<'a>
-    where
-        Self: 'a;
-}
-
 #[cfg(test)]
 mod tests {
     use reflex::core::NodeId;
     use reflex_macros::PointerIter;
+    use reflex_utils::Visitable;
 
     use crate::{
         allocator::{Arena, ArenaAllocator, VecAllocator},
@@ -819,7 +810,7 @@ mod tests {
         );
 
         assert_eq!(
-            expression.iter().as_slice(),
+            Visitable::<ArenaPointer>::children(&expression).as_slice(),
             &[first_pointer, second_pointer]
         );
     }

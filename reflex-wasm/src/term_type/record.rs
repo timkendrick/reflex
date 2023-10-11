@@ -8,7 +8,7 @@ use reflex::core::{
     ArgType, DependencyList, Expression, GraphNode, HashmapTermType, NodeId, RecordTermType,
     SerializeJson, StackOffset,
 };
-use reflex_utils::json::is_empty_json_object;
+use reflex_utils::{json::is_empty_json_object, Visitable};
 use serde_json::{Map as JsonMap, Value as JsonValue};
 
 use crate::{
@@ -19,7 +19,7 @@ use crate::{
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{hashmap::HashmapTerm, list::compile_list, ListTerm, TypedTerm, WasmExpression},
-    ArenaPointer, ArenaRef, PointerIter, Term,
+    ArenaPointer, ArenaRef, Term,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -82,14 +82,10 @@ impl<A: Arena + Clone> ArenaRef<RecordTerm, A> {
 pub type RecordTermPointerIter =
     std::iter::Chain<std::array::IntoIter<ArenaPointer, 2>, std::option::IntoIter<ArenaPointer>>;
 
-impl<A: Arena + Clone> PointerIter for ArenaRef<RecordTerm, A> {
-    type Iter<'a> = RecordTermPointerIter
-    where
-        Self: 'a;
-    fn iter<'a>(&self) -> Self::Iter<'a>
-    where
-        Self: 'a,
-    {
+impl<A: Arena + Clone> Visitable<ArenaPointer> for ArenaRef<RecordTerm, A> {
+    type Children = RecordTermPointerIter;
+
+    fn children(&self) -> Self::Children {
         let keys = self.inner_pointer(|term| &term.keys);
         let values = self.inner_pointer(|term| &term.values);
         let lookup_table = self.read_value(|term| {

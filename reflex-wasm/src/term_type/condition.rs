@@ -8,6 +8,8 @@ use reflex::core::{
     ArgType, ConditionType, DependencyList, GraphNode, SerializeJson, SignalType, StackOffset,
     StateToken,
 };
+use reflex_macros::PointerIter;
+use reflex_utils::Visitable;
 use serde_json::Value as JsonValue;
 use strum_macros::EnumDiscriminants;
 
@@ -19,7 +21,7 @@ use crate::{
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{ListTerm, TermTypeDiscriminants, TypedTerm, WasmExpression},
-    ArenaPointer, ArenaRef, PointerIter, Term,
+    ArenaPointer, ArenaRef, Term,
 };
 
 #[derive(Clone, Copy, Debug, EnumDiscriminants)]
@@ -191,54 +193,54 @@ impl<A: Arena + Clone> ArenaRef<ConditionTerm, A> {
     }
 }
 
-impl<A: Arena + Clone> PointerIter for ArenaRef<ConditionTerm, A> {
-    type Iter<'a> = ConditionTermPointerIter
-    where
-        Self: 'a;
-    fn iter<'a>(&'a self) -> Self::Iter<'a>
-    where
-        Self: 'a,
-    {
+impl<A: Arena + Clone> Visitable<ArenaPointer> for ArenaRef<ConditionTerm, A> {
+    type Children = ConditionTermPointerIter;
+
+    fn children(&self) -> Self::Children {
         match self.condition_type() {
-            ConditionTermDiscriminants::Custom => ConditionTermPointerIter::Custom(
-                self.as_typed_condition::<CustomCondition>()
-                    .as_inner()
-                    .iter(),
-            ),
-            ConditionTermDiscriminants::Error => ConditionTermPointerIter::Error(
-                self.as_typed_condition::<ErrorCondition>()
-                    .as_inner()
-                    .iter(),
-            ),
-            ConditionTermDiscriminants::Pending => ConditionTermPointerIter::Pending(
-                self.as_typed_condition::<PendingCondition>()
-                    .as_inner()
-                    .iter(),
-            ),
-            ConditionTermDiscriminants::TypeError => ConditionTermPointerIter::TypeError(
-                self.as_typed_condition::<TypeErrorCondition>()
-                    .as_inner()
-                    .iter(),
-            ),
+            ConditionTermDiscriminants::Custom => {
+                ConditionTermPointerIter::Custom(Visitable::<ArenaPointer>::children(
+                    &self.as_typed_condition::<CustomCondition>().as_inner(),
+                ))
+            }
+            ConditionTermDiscriminants::Error => {
+                ConditionTermPointerIter::Error(Visitable::<ArenaPointer>::children(
+                    &self.as_typed_condition::<ErrorCondition>().as_inner(),
+                ))
+            }
+            ConditionTermDiscriminants::Pending => {
+                ConditionTermPointerIter::Pending(Visitable::<ArenaPointer>::children(
+                    &self.as_typed_condition::<PendingCondition>().as_inner(),
+                ))
+            }
+            ConditionTermDiscriminants::TypeError => {
+                ConditionTermPointerIter::TypeError(Visitable::<ArenaPointer>::children(
+                    &self.as_typed_condition::<TypeErrorCondition>().as_inner(),
+                ))
+            }
             ConditionTermDiscriminants::InvalidFunctionTarget => {
                 ConditionTermPointerIter::InvalidFunctionTarget(
-                    self.as_typed_condition::<InvalidFunctionTargetCondition>()
-                        .as_inner()
-                        .iter(),
+                    Visitable::<ArenaPointer>::children(
+                        &self
+                            .as_typed_condition::<InvalidFunctionTargetCondition>()
+                            .as_inner(),
+                    ),
                 )
             }
             ConditionTermDiscriminants::InvalidFunctionArgs => {
-                ConditionTermPointerIter::InvalidFunctionArgs(
-                    self.as_typed_condition::<InvalidFunctionArgsCondition>()
-                        .as_inner()
-                        .iter(),
-                )
+                ConditionTermPointerIter::InvalidFunctionArgs(Visitable::<ArenaPointer>::children(
+                    &self
+                        .as_typed_condition::<InvalidFunctionArgsCondition>()
+                        .as_inner(),
+                ))
             }
-            ConditionTermDiscriminants::InvalidPointer => ConditionTermPointerIter::InvalidPointer(
-                self.as_typed_condition::<InvalidPointerCondition>()
-                    .as_inner()
-                    .iter(),
-            ),
+            ConditionTermDiscriminants::InvalidPointer => {
+                ConditionTermPointerIter::InvalidPointer(Visitable::<ArenaPointer>::children(
+                    &self
+                        .as_typed_condition::<InvalidPointerCondition>()
+                        .as_inner(),
+                ))
+            }
         }
     }
 }

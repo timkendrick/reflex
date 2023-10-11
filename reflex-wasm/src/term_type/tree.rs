@@ -11,7 +11,7 @@ use reflex::{
     },
     hash::HashId,
 };
-use reflex_utils::{MapIntoIterator, WithExactSizeIterator};
+use reflex_utils::{MapIntoIterator, Visitable, WithExactSizeIterator};
 use serde_json::Value as JsonValue;
 
 use crate::{
@@ -22,7 +22,7 @@ use crate::{
     },
     hash::{TermHash, TermHasher, TermSize},
     term_type::{ConditionTerm, TermTypeDiscriminants, TypedTerm, WasmExpression},
-    ArenaPointer, ArenaRef, IntoArenaRefIter, PointerIter, Term,
+    ArenaPointer, ArenaRef, IntoArenaRefIter, Term,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -93,15 +93,10 @@ impl<A: Arena + Clone> ArenaRef<TreeTerm, A> {
 pub type TreeTermPointerIter =
     std::iter::Chain<std::option::IntoIter<ArenaPointer>, std::option::IntoIter<ArenaPointer>>;
 
-impl<A: Arena> PointerIter for ArenaRef<TreeTerm, A> {
-    type Iter<'a> = TreeTermPointerIter
-    where
-        Self: 'a;
+impl<A: Arena> Visitable<ArenaPointer> for ArenaRef<TreeTerm, A> {
+    type Children = TreeTermPointerIter;
 
-    fn iter<'a>(&'a self) -> Self::Iter<'a>
-    where
-        Self: 'a,
-    {
+    fn children(&self) -> Self::Children {
         let left = self.read_value(|term| {
             term.left
                 .as_non_null()

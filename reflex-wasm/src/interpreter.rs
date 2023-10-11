@@ -9,6 +9,7 @@ use std::{
     rc::Rc,
 };
 
+use reflex_utils::Visitable;
 use serde::{Deserialize, Serialize};
 use wasmtime::{
     Engine, ExternType, Instance, IntoFunc, Linker, Memory, Module, Store, Val, WasmParams,
@@ -23,7 +24,7 @@ use crate::{
     hash::TermSize,
     pad_to_4_byte_offset,
     term_type::{TreeTerm, TypedTerm},
-    ArenaPointer, ArenaRef, PointerIter, Term, WASM_PAGE_SIZE,
+    ArenaPointer, ArenaRef, Term, WASM_PAGE_SIZE,
 };
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
@@ -76,15 +77,10 @@ impl UnboundEvaluationResult {
     }
 }
 
-impl<'heap> PointerIter for Rc<RefCell<&'heap mut WasmInterpreter>> {
-    type Iter<'a> = ArenaIterator<'a, Term, Self>
-    where
-        Self: 'a;
+impl<'a, 'heap> Visitable<ArenaPointer> for &'a Rc<RefCell<&'heap mut WasmInterpreter>> {
+    type Children = ArenaIterator<'a, Term, Rc<RefCell<&'heap mut WasmInterpreter>>>;
 
-    fn iter<'a>(&'a self) -> Self::Iter<'a>
-    where
-        Self: 'a,
-    {
+    fn children(&self) -> Self::Children {
         let (start_offset, end_offset) = {
             let interpreter = self.borrow();
             let interpreter = interpreter.deref();

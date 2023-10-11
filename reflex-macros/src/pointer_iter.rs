@@ -58,15 +58,10 @@ fn impl_pointer_iter_struct(
         #visibility type #iter_name = ::std::array::IntoIter<crate::ArenaPointer, #num_fields>;
 
         #[automatically_derived]
-        impl<A: crate::Arena> crate::PointerIter for crate::ArenaRef<#name, A> {
-            type Iter<'a> = #iter_name
-            where
-                Self: 'a;
+        impl<A: crate::Arena> ::reflex_utils::Visitable<crate::ArenaPointer> for crate::ArenaRef<#name, A> {
+            type Children = #iter_name;
 
-            fn iter<'a>(&'a self) -> Self::Iter<'a>
-            where
-                Self: 'a
-            {
+            fn children(&self) -> Self::Children {
                 [#(self.inner_pointer(|term| &term.#fields)),*].into_iter()
             }
         }
