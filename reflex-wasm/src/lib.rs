@@ -9,6 +9,7 @@ use reflex::{
     hash::HashId,
 };
 use reflex_macros::PointerIter;
+use reflex_utils::Visitable;
 
 use crate::{
     allocator::{Arena, ArenaAllocator},
@@ -381,6 +382,44 @@ impl<A: Arena> ArenaRef<Term, A> {
 impl<A: Arena> NodeId for ArenaRef<Term, A> {
     fn id(&self) -> HashId {
         self.read_value(|term| term.id())
+    }
+}
+
+impl<A: Arena + Clone> Visitable<Self> for ArenaRef<Term, A> {
+    type Children = ArenaRefTermChildrenIter<A, <Self as Visitable<ArenaPointer>>::Children>;
+
+    fn children(&self) -> Self::Children {
+        ArenaRefTermChildrenIter {
+            arena: self.arena.clone(),
+            field_addresses: Visitable::<ArenaPointer>::children(self),
+        }
+    }
+}
+
+pub struct ArenaRefTermChildrenIter<A: Arena, I: Iterator<Item = ArenaPointer>> {
+    arena: A,
+    field_addresses: I,
+}
+
+impl<A: Arena + Clone, I: Iterator<Item = ArenaPointer>> Iterator
+    for ArenaRefTermChildrenIter<A, I>
+{
+    type Item = ArenaRef<Term, A>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let field_address = self.field_addresses.next()?;
+        // Read the pointer value to determine the pointer reference target
+        let pointer_target = self
+            .arena
+            .read_value(field_address, |target_pointer: &ArenaPointer| {
+                *target_pointer
+            });
+        // Skip over any null pointers
+        if pointer_target.is_null() {
+            return self.next();
+        }
+        // Construct a new term reference for the given target address
+        Some(ArenaRef::<Term, A>::new(self.arena.clone(), pointer_target))
     }
 }
 

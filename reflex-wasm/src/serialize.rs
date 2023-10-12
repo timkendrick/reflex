@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 // SPDX-FileCopyrightText: 2023 Marshall Wace <opensource@mwam.com>
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Tim Kendrick <t.kendrick@mwam.com> https://github.com/timkendrickmw
@@ -5,7 +7,9 @@ use reflex::{
     core::NodeId,
     hash::{HashId, IntMap},
 };
-use reflex_utils::Visitable;
+use reflex_utils::{
+    PostOrderQueueVisitor, StatefulPostOrderVisitor, StatefulPostOrderVisitorAlgorithm, Visitable,
+};
 
 use crate::{
     allocator::{Arena, ArenaAllocator},
@@ -42,65 +46,119 @@ pub trait Serialize {
 
 impl<ASource: Arena + Clone, T: Clone + TermSize> Serialize for ArenaRef<T, ASource>
 where
-    ArenaRef<T, ASource>: Visitable<ArenaPointer> + NodeId,
+    ArenaRef<T, ASource>: NodeId + Visitable<ArenaPointer> + Visitable<ArenaRef<T, ASource>>,
 {
     fn serialize<ADest: ArenaAllocator>(
         &self,
         destination: &mut ADest,
         state: &mut SerializerState,
     ) -> ArenaPointer {
+        let (algorithm, mut state) = SerializeArenaTerms::new_with_state(destination, state);
+        PostOrderQueueVisitor.apply_mut(self.clone(), &algorithm, &mut state)
+    }
+}
+
+struct SerializeArenaTerms<'a, ADest: ArenaAllocator> {
+    state: PhantomData<SerializeArenaTermsState<'a, ADest>>,
+}
+
+impl<'a, ADest: ArenaAllocator> SerializeArenaTerms<'a, ADest> {
+    fn new_with_state(
+        destination: &'a mut ADest,
+        serializer_state: &'a mut SerializerState,
+    ) -> (Self, SerializeArenaTermsState<'a, ADest>) {
+        (
+            Self { state: PhantomData },
+            SerializeArenaTermsState {
+                destination,
+                serializer_state,
+            },
+        )
+    }
+}
+
+struct SerializeArenaTermsState<'a, ADest: ArenaAllocator> {
+    destination: &'a mut ADest,
+    serializer_state: &'a mut SerializerState,
+}
+
+impl<'a, T, ASource, ADest> StatefulPostOrderVisitorAlgorithm<ArenaRef<T, ASource>>
+    for SerializeArenaTerms<'a, ADest>
+where
+    T: Clone + TermSize,
+    ArenaRef<T, ASource>: NodeId + Visitable<ArenaPointer> + Visitable<ArenaRef<T, ASource>>,
+    ASource: Arena + Clone,
+    ADest: ArenaAllocator,
+{
+    type Result = ArenaPointer;
+
+    type State = SerializeArenaTermsState<'a, ADest>;
+
+    fn visit_mut(
+        &self,
+        term: ArenaRef<T, ASource>,
+        child_results: impl IntoIterator<Item = Self::Result>,
+        state: &mut SerializeArenaTermsState<'a, ADest>,
+    ) -> Self::Result {
+        let SerializeArenaTermsState {
+            destination,
+            serializer_state,
+        } = state;
+
         // Check if we have already serialized this before
-        let cached_result = state.allocated_terms.get(&self.id()).copied();
+        let cached_result = serializer_state.allocated_terms.get(&term.id()).copied();
         if let Some(existing) = cached_result {
             return existing;
         }
 
-        // Iterate over the source term children and serialize them into the target arena
-        let children = Visitable::<ArenaPointer>::children(self)
-            .filter_map(|inner_pointer| {
-                let value_pointer = self
+        // Get a list of internal field offsets within the current struct for all the pointer fields
+        // that hold non-null references (this will be used to overwrite the values with the
+        // serialized child target addresses)
+        let internal_pointer_struct_offsets = Visitable::<ArenaPointer>::children(&term)
+            // Filter out null pointers
+            .filter(|struct_field_address| {
+                let target_pointer = term
                     .arena
-                    .read_value(inner_pointer, |target_pointer: &ArenaPointer| {
+                    .read_value(*struct_field_address, |target_pointer: &ArenaPointer| {
                         *target_pointer
-                    })
-                    .as_non_null()?;
-                Some((inner_pointer, value_pointer))
+                    });
+                !target_pointer.is_null()
             })
-            .map(|(inner_pointer, value_pointer)| {
-                (
-                    // The offset of the field of the term within the struct
-                    u32::from(inner_pointer) - u32::from(self.pointer),
-                    ArenaRef::<T, ASource>::new(self.arena.clone(), value_pointer)
-                        .serialize(destination, state),
-                )
-            })
+            // Get the offset of the field within the struct
+            .map(|struct_field_address| u32::from(struct_field_address) - u32::from(term.pointer));
+
+        // Pair up the field offsets with the corresponding serialized child terms
+        let children = internal_pointer_struct_offsets
+            .zip(child_results)
             .collect::<Vec<_>>();
 
         // Allocate space for the term in the target arena
-        let allocator_offset = state.next_offset;
+        let allocator_offset = serializer_state.next_offset;
         let term_pointer = allocator_offset;
-        let term_size = self.read_value(|term| term.size_of());
+        let term_size = term.read_value(|term| term.size_of());
         destination.extend(allocator_offset, term_size);
 
         // Copy the term contents from the source arena to the target arena
         for index in 0..(term_size / 4) {
             let delta = (index * 4) as u32;
-            let value = self
+            let value = term
                 .arena
-                .read_value::<u32, _>(self.pointer.offset(delta), |value| *value);
+                .read_value::<u32, _>(term.pointer.offset(delta), |value| *value);
             destination.write::<u32>(term_pointer.offset(delta), value);
         }
 
         // Update the serializer state to reflect the current allocator size
-        state.next_offset = term_pointer.offset(term_size as u32);
+        serializer_state.next_offset = term_pointer.offset(term_size as u32);
 
         // Overwrite child pointers with updated addresses
-        for (delta, child_pointer) in children {
-            destination.write(term_pointer.offset(delta), child_pointer)
+        for (field_offset, child_pointer) in children {
+            destination.write(term_pointer.offset(field_offset), child_pointer)
         }
 
         // Cache the term for future usages
-        state.allocated_terms.insert(self.id(), term_pointer);
+        serializer_state
+            .allocated_terms
+            .insert(term.id(), term_pointer);
 
         // Return the target term arena pointer
         term_pointer
